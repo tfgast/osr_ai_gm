@@ -890,7 +890,7 @@ fn backstab(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize
 
     if hit {
         // Roll damage and multiply
-        let base_damage = match dice::roll_str(weapon.damage) {
+        let base_damage = match dice::roll_str(weapon.damage_dice()) {
             Ok(r) => r.total.max(1),
             Err(_) => 1,
         };

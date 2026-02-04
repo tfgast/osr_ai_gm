@@ -223,18 +223,19 @@ pub fn resolve_character_attack(
         return Err(format!("{} is dead and cannot attack.", character.name));
     }
 
-    if weapon.qualities.missile && !weapon.qualities.melee {
+    let qualities = weapon.weapon_qualities();
+    if qualities.missile && !qualities.melee {
         // Pure missile weapon
         let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
-        character_missile_attack(combat, character, monster_idx, weapon.damage, dex_mod, weapon.range)
-    } else if weapon.qualities.missile && weapon.qualities.melee {
+        character_missile_attack(combat, character, monster_idx, weapon.damage_dice(), dex_mod, weapon.range_tuple())
+    } else if qualities.missile && qualities.melee {
         // Versatile weapon (e.g., dagger, spear) — melee if close, missile if far
         if combat.distance <= 10 {
             let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
-            Ok(character_melee_attack(combat, character, monster_idx, weapon.damage, str_mod))
+            Ok(character_melee_attack(combat, character, monster_idx, weapon.damage_dice(), str_mod))
         } else {
             let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
-            character_missile_attack(combat, character, monster_idx, weapon.damage, dex_mod, weapon.range)
+            character_missile_attack(combat, character, monster_idx, weapon.damage_dice(), dex_mod, weapon.range_tuple())
         }
     } else {
         // Pure melee weapon
@@ -242,8 +243,8 @@ pub fn resolve_character_attack(
             // Find missile weapons in character's inventory
             let missile_weapons: Vec<&str> = character.inventory.iter()
                 .filter_map(|item| equipment::find_weapon(&item.name))
-                .filter(|w| w.qualities.missile)
-                .map(|w| w.name)
+                .filter(|w| w.weapon_qualities().missile)
+                .map(|w| w.name.as_str())
                 .collect();
 
             let missile_hint = if missile_weapons.is_empty() {
@@ -258,7 +259,7 @@ pub fn resolve_character_attack(
                 weapon.name, combat.distance, character.name, missile_hint));
         }
         let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
-        Ok(character_melee_attack(combat, character, monster_idx, weapon.damage, str_mod))
+        Ok(character_melee_attack(combat, character, monster_idx, weapon.damage_dice(), str_mod))
     }
 }
 

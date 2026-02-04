@@ -1,0 +1,1263 @@
+{
+  "source": "Advanced_Fantasy_Players_Tome_v1-3.md",
+  "counts": {
+    "gear": 24,
+    "weapons": 22,
+    "ammunition": 4,
+    "armour": 4,
+    "poisons": 9,
+    "mounts": 5,
+    "dogs": 2,
+    "tack": 4,
+    "land_vehicles": 2,
+    "water_vessels": 16,
+    "ship_weapons": 5
+  },
+  "total": 97,
+  "equipment": {
+    "gear": [
+      {
+        "name": "Backpack",
+        "cost": {
+          "gp": 5
+        },
+        "category": "gear",
+        "description": "Has two straps and can be worn on the back, keeping the hands free. Holds up to 400 coins."
+      },
+      {
+        "name": "Crowbar",
+        "cost": {
+          "gp": 10
+        },
+        "category": "gear",
+        "description": "2-3' long and made of solid iron. Can be used for forcing doors and other objects open."
+      },
+      {
+        "name": "Garlic",
+        "cost": {
+          "gp": 5
+        },
+        "category": "gear"
+      },
+      {
+        "name": "Grappling hook",
+        "cost": {
+          "gp": 25
+        },
+        "category": "gear",
+        "description": "Has 3 or 4 prongs. Can be used for anchoring a rope."
+      },
+      {
+        "name": "Hammer (small)",
+        "cost": {
+          "gp": 2
+        },
+        "category": "gear",
+        "description": "Can be used for construction or as a mallet with iron or wooden spikes."
+      },
+      {
+        "name": "Holy symbol",
+        "cost": {
+          "gp": 25
+        },
+        "category": "gear",
+        "description": "A divine spell caster is required to own a holy symbol of their deity, often worn as a necklace. Each religion has its own holy symbol."
+      },
+      {
+        "name": "Holy water (vial)",
+        "cost": {
+          "gp": 25
+        },
+        "category": "gear",
+        "description": "A divine spell caster is required to own a holy symbol of their deity, often worn as a necklace. Each religion has its own holy symbol."
+      },
+      {
+        "name": "Iron spikes (12)",
+        "cost": {
+          "gp": 1
+        },
+        "category": "gear",
+        "description": "May be used for wedging doors open or shut (see Dungeon Adventuring, p222 ), as an anchor to attach a rope to, and many other purposes."
+      },
+      {
+        "name": "Lantern",
+        "cost": {
+          "gp": 10
+        },
+        "category": "gear",
+        "description": "Can be closed to hide the light. Burns one oil flask every four hours (24 turns). Casts light in a 30' radius."
+      },
+      {
+        "name": "Mirror (hand-sized, steel)",
+        "cost": {
+          "gp": 5
+        },
+        "category": "gear",
+        "description": "Useful for looking around corners or for reflecting a gaze attack."
+      },
+      {
+        "name": "Oil (1 flask)",
+        "cost": {
+          "gp": 2
+        },
+        "category": "gear",
+        "description": "A flask of oil fuels a lantern for four hours (24 turns). In addition to fuelling lanterns, oil can be used as a weapon: - Throwing: An oil flask may be lit on fire and thrown (see Weapon Combat Stats, p97 ). - Pools: Oil that is poured on the ground and lit covers a diameter of 3 feet and burns for 1 turn, inflicting damage on any character or monster moving through the pool. - Immunity: Burning oil does not harm monsters that have a natural flame attack."
+      },
+      {
+        "name": "Pole (10' long, wooden)",
+        "cost": {
+          "gp": 1
+        },
+        "category": "gear",
+        "description": "A 2' thick wooden pole useful for poking and prodding suspicious items in a dungeon."
+      },
+      {
+        "name": "Rations (iron, 7 days)",
+        "cost": {
+          "gp": 15
+        },
+        "category": "gear",
+        "description": "Dried and preserved food to be carried on long voyages when securing fresh food may be uncertain."
+      },
+      {
+        "name": "Rations (standard, 7 days)",
+        "cost": {
+          "gp": 5
+        },
+        "category": "gear",
+        "description": "Dried and preserved food to be carried on long voyages when securing fresh food may be uncertain."
+      },
+      {
+        "name": "Rope (50')",
+        "cost": {
+          "gp": 1
+        },
+        "category": "gear",
+        "description": "Can hold the weight of approximately three human-sized beings."
+      },
+      {
+        "name": "Sack (large)",
+        "cost": {
+          "gp": 2
+        },
+        "category": "gear",
+        "description": "Can hold up to 600 coins."
+      },
+      {
+        "name": "Sack (small)",
+        "cost": {
+          "gp": 1
+        },
+        "category": "gear",
+        "description": "Can hold up to 600 coins."
+      },
+      {
+        "name": "Stakes (3) and mallet",
+        "cost": {
+          "gp": 3
+        },
+        "category": "gear",
+        "description": "A wooden mallet and three 18' long stakes. Valuable when confronting vampires."
+      },
+      {
+        "name": "Thieves' tools",
+        "cost": {
+          "gp": 25
+        },
+        "category": "gear",
+        "description": "This kit contains all of the tools needed to pick locks."
+      },
+      {
+        "name": "Tinder box (flint &steel)",
+        "cost": {
+          "gp": 3
+        },
+        "category": "gear"
+      },
+      {
+        "name": "Torches (6)",
+        "cost": {
+          "gp": 1
+        },
+        "category": "gear"
+      },
+      {
+        "name": "Waterskin",
+        "cost": {
+          "gp": 1
+        },
+        "category": "gear"
+      },
+      {
+        "name": "Wine (2 pints)",
+        "cost": {
+          "gp": 1
+        },
+        "category": "gear"
+      },
+      {
+        "name": "Wolfsbane (1 bunch)",
+        "cost": {
+          "gp": 10
+        },
+        "category": "gear"
+      }
+    ],
+    "weapons": [
+      {
+        "name": "Battle axe",
+        "cost": {
+          "gp": 7
+        },
+        "weight_coins": 50,
+        "category": "weapon",
+        "damage": "1d8",
+        "qualities": [
+          "melee",
+          "slow",
+          "two_handed"
+        ]
+      },
+      {
+        "name": "Club",
+        "cost": {
+          "gp": 3
+        },
+        "weight_coins": 50,
+        "category": "weapon",
+        "damage": "1d4",
+        "qualities": [
+          "blunt",
+          "melee"
+        ]
+      },
+      {
+        "name": "Crossbow",
+        "cost": {
+          "gp": 30
+        },
+        "weight_coins": 50,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "missile",
+          "reload",
+          "slow",
+          "two_handed"
+        ],
+        "range": {
+          "short": [
+            5,
+            80
+          ],
+          "medium": [
+            81,
+            160
+          ],
+          "long": [
+            161,
+            240
+          ]
+        }
+      },
+      {
+        "name": "Dagger",
+        "cost": {
+          "gp": 3
+        },
+        "weight_coins": 10,
+        "category": "weapon",
+        "damage": "1d4",
+        "qualities": [
+          "melee",
+          "missile"
+        ],
+        "range": {
+          "short": [
+            5,
+            10
+          ],
+          "medium": [
+            11,
+            20
+          ],
+          "long": [
+            21,
+            30
+          ]
+        }
+      },
+      {
+        "name": "Hand axe",
+        "cost": {
+          "gp": 4
+        },
+        "weight_coins": 30,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "melee",
+          "missile"
+        ],
+        "range": {
+          "short": [
+            5,
+            10
+          ],
+          "medium": [
+            11,
+            20
+          ],
+          "long": [
+            21,
+            30
+          ]
+        }
+      },
+      {
+        "name": "Javelin",
+        "cost": {
+          "gp": 1
+        },
+        "weight_coins": 20,
+        "category": "weapon",
+        "damage": "1d4",
+        "qualities": [
+          "missile"
+        ],
+        "range": {
+          "short": [
+            5,
+            30
+          ],
+          "medium": [
+            31,
+            60
+          ],
+          "long": [
+            61,
+            90
+          ]
+        }
+      },
+      {
+        "name": "Lance",
+        "cost": {
+          "gp": 5
+        },
+        "weight_coins": 120,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "charge",
+          "melee"
+        ]
+      },
+      {
+        "name": "Long bow",
+        "cost": {
+          "gp": 40
+        },
+        "weight_coins": 30,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "missile",
+          "two_handed"
+        ],
+        "range": {
+          "short": [
+            5,
+            70
+          ],
+          "medium": [
+            71,
+            140
+          ],
+          "long": [
+            141,
+            210
+          ]
+        }
+      },
+      {
+        "name": "Mace",
+        "cost": {
+          "gp": 5
+        },
+        "weight_coins": 30,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "blunt",
+          "melee"
+        ]
+      },
+      {
+        "name": "Pole arm",
+        "cost": {
+          "gp": 7
+        },
+        "weight_coins": 150,
+        "category": "weapon",
+        "damage": "1d10",
+        "qualities": [
+          "brace",
+          "melee",
+          "slow",
+          "two_handed"
+        ]
+      },
+      {
+        "name": "Short bow",
+        "cost": {
+          "gp": 25
+        },
+        "weight_coins": 30,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "missile",
+          "two_handed"
+        ],
+        "range": {
+          "short": [
+            5,
+            50
+          ],
+          "medium": [
+            51,
+            100
+          ],
+          "long": [
+            101,
+            150
+          ]
+        }
+      },
+      {
+        "name": "Short sword",
+        "cost": {
+          "gp": 7
+        },
+        "weight_coins": 30,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "melee"
+        ]
+      },
+      {
+        "name": "Silver dagger",
+        "cost": {
+          "gp": 30
+        },
+        "weight_coins": 10,
+        "category": "weapon",
+        "damage": "1d4",
+        "qualities": [
+          "melee",
+          "missile"
+        ],
+        "range": {
+          "short": [
+            5,
+            10
+          ],
+          "medium": [
+            11,
+            20
+          ],
+          "long": [
+            21,
+            30
+          ]
+        }
+      },
+      {
+        "name": "Sling",
+        "cost": {
+          "gp": 2
+        },
+        "weight_coins": 20,
+        "category": "weapon",
+        "damage": "1d4",
+        "qualities": [
+          "blunt",
+          "missile"
+        ],
+        "range": {
+          "short": [
+            5,
+            40
+          ],
+          "medium": [
+            41,
+            80
+          ],
+          "long": [
+            81,
+            160
+          ]
+        }
+      },
+      {
+        "name": "Spear",
+        "cost": {
+          "gp": 3
+        },
+        "weight_coins": 30,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "brace",
+          "melee",
+          "missile"
+        ],
+        "range": {
+          "short": [
+            5,
+            20
+          ],
+          "medium": [
+            21,
+            40
+          ],
+          "long": [
+            41,
+            60
+          ]
+        }
+      },
+      {
+        "name": "Staff",
+        "cost": {
+          "gp": 2
+        },
+        "weight_coins": 40,
+        "category": "weapon",
+        "damage": "1d4",
+        "qualities": [
+          "blunt",
+          "melee",
+          "slow",
+          "two_handed"
+        ]
+      },
+      {
+        "name": "Sword",
+        "cost": {
+          "gp": 10
+        },
+        "weight_coins": 60,
+        "category": "weapon",
+        "damage": "1d8",
+        "qualities": [
+          "melee"
+        ]
+      },
+      {
+        "name": "Two-handed sword",
+        "cost": {
+          "gp": 15
+        },
+        "weight_coins": 150,
+        "category": "weapon",
+        "damage": "1d10",
+        "qualities": [
+          "melee",
+          "slow",
+          "two_handed"
+        ]
+      },
+      {
+        "name": "War hammer",
+        "cost": {
+          "gp": 5
+        },
+        "weight_coins": 30,
+        "category": "weapon",
+        "damage": "1d6",
+        "qualities": [
+          "blunt",
+          "melee"
+        ]
+      },
+      {
+        "name": "Holy water vial",
+        "damage": "1d8",
+        "qualities": [
+          "missile",
+          "splash"
+        ],
+        "category": "improvised_weapon",
+        "range": {
+          "short": [
+            5,
+            10
+          ],
+          "medium": [
+            11,
+            30
+          ],
+          "long": [
+            31,
+            50
+          ]
+        }
+      },
+      {
+        "name": "Oil flask, burning",
+        "damage": "1d8",
+        "qualities": [
+          "missile",
+          "splash"
+        ],
+        "category": "improvised_weapon",
+        "range": {
+          "short": [
+            5,
+            10
+          ],
+          "medium": [
+            11,
+            30
+          ],
+          "long": [
+            31,
+            50
+          ]
+        }
+      },
+      {
+        "name": "Torch",
+        "damage": "1d4",
+        "qualities": [
+          "melee"
+        ],
+        "category": "improvised_weapon"
+      }
+    ],
+    "ammunition": [
+      {
+        "name": "Arrows (quiver of 20)",
+        "cost": {
+          "gp": 5
+        },
+        "category": "ammunition"
+      },
+      {
+        "name": "Crossbow bolts (case of 30)",
+        "cost": {
+          "gp": 10
+        },
+        "category": "ammunition"
+      },
+      {
+        "name": "Silver tipped arrow (1)",
+        "cost": {
+          "gp": 5
+        },
+        "category": "ammunition"
+      },
+      {
+        "name": "Sling stones",
+        "cost": {
+          "gp": 0
+        },
+        "category": "ammunition"
+      }
+    ],
+    "armour": [
+      {
+        "name": "Leather",
+        "ac": {
+          "descending": 7,
+          "ascending": 12
+        },
+        "cost": {
+          "gp": 20
+        },
+        "category": "armour",
+        "weight_coins": 200
+      },
+      {
+        "name": "Chainmail",
+        "ac": {
+          "descending": 5,
+          "ascending": 14
+        },
+        "cost": {
+          "gp": 40
+        },
+        "category": "armour",
+        "weight_coins": 400
+      },
+      {
+        "name": "Plate mail",
+        "ac": {
+          "descending": 3,
+          "ascending": 16
+        },
+        "cost": {
+          "gp": 60
+        },
+        "category": "armour",
+        "weight_coins": 500
+      },
+      {
+        "name": "Shield",
+        "ac": {
+          "bonus": 1,
+          "is_shield": true
+        },
+        "cost": {
+          "gp": 10
+        },
+        "category": "armour",
+        "weight_coins": 100
+      }
+    ],
+    "poisons": [
+      {
+        "name": "Bloodstream Poison Type I",
+        "type": "bloodstream",
+        "tier": "I",
+        "cost": {
+          "gp": 10
+        },
+        "save_modifier": "+6",
+        "detection_chance": "80%",
+        "onset_time": "1d4+1 rounds",
+        "effect_on_save": "None",
+        "effect_on_fail": "15hp damage",
+        "category": "poison"
+      },
+      {
+        "name": "Bloodstream Poison Type II",
+        "type": "bloodstream",
+        "tier": "II",
+        "cost": {
+          "gp": 75
+        },
+        "save_modifier": "+5",
+        "detection_chance": "65%",
+        "onset_time": "1d3 rounds",
+        "effect_on_save": "None",
+        "effect_on_fail": "25hp damage",
+        "category": "poison"
+      },
+      {
+        "name": "Bloodstream Poison Type III",
+        "type": "bloodstream",
+        "tier": "III",
+        "cost": {
+          "gp": 600
+        },
+        "save_modifier": "+4",
+        "detection_chance": "40%",
+        "onset_time": "1 round",
+        "effect_on_save": "None",
+        "effect_on_fail": "35hp damage",
+        "category": "poison"
+      },
+      {
+        "name": "Bloodstream Poison Type IV",
+        "type": "bloodstream",
+        "tier": "IV",
+        "cost": {
+          "gp": 1500
+        },
+        "save_modifier": "+3",
+        "detection_chance": "15%",
+        "onset_time": "Instant",
+        "effect_on_save": "None",
+        "effect_on_fail": "Death",
+        "category": "poison"
+      },
+      {
+        "name": "Ingested Poison Type I",
+        "type": "ingested",
+        "tier": "I",
+        "cost": {
+          "gp": 5
+        },
+        "save_modifier": "+6",
+        "detection_chance": "80%",
+        "onset_time": "2d4 rounds",
+        "effect_on_save": "10hp damage",
+        "effect_on_fail": "20hp damage",
+        "category": "poison"
+      },
+      {
+        "name": "Ingested Poison Type II",
+        "type": "ingested",
+        "tier": "II",
+        "cost": {
+          "gp": 30
+        },
+        "save_modifier": "+5",
+        "detection_chance": "65%",
+        "onset_time": "1d4+1 rounds",
+        "effect_on_save": "15hp damage",
+        "effect_on_fail": "30hp damage",
+        "category": "poison"
+      },
+      {
+        "name": "Ingested Poison Type III",
+        "type": "ingested",
+        "tier": "III",
+        "cost": {
+          "gp": 200
+        },
+        "save_modifier": "+4",
+        "detection_chance": "40%",
+        "onset_time": "1d2 rounds",
+        "effect_on_save": "20hp damage",
+        "effect_on_fail": "40hp damage",
+        "category": "poison"
+      },
+      {
+        "name": "Ingested Poison Type IV",
+        "type": "ingested",
+        "tier": "IV",
+        "cost": {
+          "gp": 500
+        },
+        "save_modifier": "+3",
+        "detection_chance": "15%",
+        "onset_time": "Instant",
+        "effect_on_save": "25hp damage",
+        "effect_on_fail": "Death",
+        "category": "poison"
+      },
+      {
+        "name": "Ingested Poison Type V",
+        "type": "ingested",
+        "tier": "V",
+        "cost": {
+          "gp": 1000
+        },
+        "save_modifier": "+2",
+        "detection_chance": "0%",
+        "onset_time": "1d4 turns",
+        "effect_on_save": "30hp damage",
+        "effect_on_fail": "Death",
+        "category": "poison"
+      }
+    ],
+    "mounts": [
+      {
+        "name": "Camel",
+        "cost": {
+          "gp": 100
+        },
+        "unencumbered": {
+          "miles_per_day": "30",
+          "movement_rate": "150' (50')",
+          "max_load_coins": "3000"
+        },
+        "encumbered": {
+          "miles_per_day": "15",
+          "movement_rate": "75' (25')",
+          "max_load_coins": "6000"
+        },
+        "category": "mount"
+      },
+      {
+        "name": "Horse (draft)",
+        "cost": {
+          "gp": 40
+        },
+        "unencumbered": {
+          "miles_per_day": "18",
+          "movement_rate": "90' (30')",
+          "max_load_coins": "4500"
+        },
+        "encumbered": {
+          "miles_per_day": "9",
+          "movement_rate": "45' (15')",
+          "max_load_coins": "9000"
+        },
+        "category": "mount"
+      },
+      {
+        "name": "Horse (riding)",
+        "cost": {
+          "gp": 75
+        },
+        "unencumbered": {
+          "miles_per_day": "48",
+          "movement_rate": "240' (80')",
+          "max_load_coins": "3000"
+        },
+        "encumbered": {
+          "miles_per_day": "24",
+          "movement_rate": "120' (40')",
+          "max_load_coins": "6000"
+        },
+        "category": "mount"
+      },
+      {
+        "name": "Horse (war)",
+        "cost": {
+          "gp": 250
+        },
+        "unencumbered": {
+          "miles_per_day": "24",
+          "movement_rate": "120' (40')",
+          "max_load_coins": "4000"
+        },
+        "encumbered": {
+          "miles_per_day": "12",
+          "movement_rate": "60' (20')",
+          "max_load_coins": "8000"
+        },
+        "category": "mount"
+      },
+      {
+        "name": "Mule",
+        "cost": {
+          "gp": 30
+        },
+        "unencumbered": {
+          "miles_per_day": "24",
+          "movement_rate": "120' (40')",
+          "max_load_coins": "2000"
+        },
+        "encumbered": {
+          "miles_per_day": "12",
+          "movement_rate": "60' (20')",
+          "max_load_coins": "4000"
+        },
+        "category": "mount"
+      }
+    ],
+    "dogs": [
+      {
+        "name": "Hunting dog",
+        "cost": {
+          "gp": 17
+        },
+        "miles_per_day": "36",
+        "movement_rate": "180' (60')",
+        "category": "animal"
+      },
+      {
+        "name": "War dog",
+        "cost": {
+          "gp": 25
+        },
+        "miles_per_day": "24",
+        "movement_rate": "120' (40')",
+        "category": "animal"
+      }
+    ],
+    "tack": [
+      {
+        "name": "Dog armour",
+        "cost": {
+          "gp": 25
+        },
+        "category": "tack"
+      },
+      {
+        "name": "Horse barding",
+        "cost": {
+          "gp": 150
+        },
+        "category": "tack"
+      },
+      {
+        "name": "Saddle and bridle",
+        "cost": {
+          "gp": 25
+        },
+        "category": "tack"
+      },
+      {
+        "name": "Saddle bags",
+        "cost": {
+          "gp": 5
+        },
+        "category": "tack"
+      }
+    ],
+    "land_vehicles": [
+      {
+        "name": "Cart",
+        "cost": {
+          "gp": 100
+        },
+        "miles_per_day": "12",
+        "movement_rate": "60' (20')",
+        "minimum_animals": "1 draft horse or 2 mules",
+        "min_load_coins": "4000",
+        "category": "land_vehicle",
+        "extra_animals": "2 draft horses or 4 mules",
+        "max_load_coins": "8000"
+      },
+      {
+        "name": "Wagon",
+        "cost": {
+          "gp": 200
+        },
+        "miles_per_day": "12",
+        "movement_rate": "60' (20')",
+        "minimum_animals": "2 draft horses or 4 mules",
+        "min_load_coins": "15000",
+        "category": "land_vehicle",
+        "extra_animals": "4 draft horses or 8 mules",
+        "max_load_coins": "25000"
+      }
+    ],
+    "water_vessels": [
+      {
+        "name": "Lifeboat",
+        "cost": {
+          "gp": 1000
+        },
+        "cargo_capacity_coins": "15000",
+        "usage": "Any",
+        "length": "20'",
+        "beam": "4'-5'",
+        "draft": "1'-2'",
+        "seaworthy": true,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Longship",
+        "cost": {
+          "gp": 15000
+        },
+        "cargo_capacity_coins": "40000",
+        "usage": "Any",
+        "length": "60'-80'",
+        "beam": "10'-15'",
+        "draft": "2'-3'",
+        "seaworthy": true,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Sailing ship (large)",
+        "cost": {
+          "gp": 20000
+        },
+        "cargo_capacity_coins": "300000",
+        "usage": "Coastal waters, open seas",
+        "length": "100'-150'",
+        "beam": "25'-30'",
+        "draft": "10'-12'",
+        "seaworthy": true,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Sailing ship (small)",
+        "cost": {
+          "gp": 5000
+        },
+        "cargo_capacity_coins": "100000",
+        "usage": "Coastal waters, open seas",
+        "length": "60'-80'",
+        "beam": "20'-30'",
+        "draft": "5'-8'",
+        "seaworthy": true,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Troop trans- port (large)",
+        "cost": {
+          "gp": 26600
+        },
+        "cargo_capacity_coins": "300000",
+        "usage": "Coastal waters, open seas",
+        "length": "100'-150'",
+        "beam": "25'-30'",
+        "draft": "10'-12'",
+        "seaworthy": true,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Troop trans- port (small)",
+        "cost": {
+          "gp": 6600
+        },
+        "cargo_capacity_coins": "100000",
+        "usage": "Coastal waters, open seas",
+        "length": "60'-80'",
+        "beam": "20'-30'",
+        "draft": "5'-8'",
+        "seaworthy": true,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Warship (large)",
+        "cost": {
+          "gp": 26600
+        },
+        "cargo_capacity_coins": "300000",
+        "usage": "Coastal waters, open seas",
+        "length": "100'-150'",
+        "beam": "25'-30'",
+        "draft": "10'-12'",
+        "seaworthy": true,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Warship (small)",
+        "cost": {
+          "gp": 6600
+        },
+        "cargo_capacity_coins": "100000",
+        "usage": "Coastal waters, open seas",
+        "length": "60'-80'",
+        "beam": "20'-30'",
+        "draft": "5'-8'",
+        "seaworthy": true,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Boat (river)",
+        "cost": {
+          "gp": 4000
+        },
+        "cargo_capacity_coins": "30000",
+        "usage": "Rivers, lakes",
+        "length": "20'-30'",
+        "beam": "10'",
+        "draft": "2'-3'",
+        "seaworthy": false,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Boat (sailing)",
+        "cost": {
+          "gp": 2000
+        },
+        "cargo_capacity_coins": "20000",
+        "usage": "Lakes, coastal waters",
+        "length": "20'-40'",
+        "beam": "10'-15'",
+        "draft": "2'-3'",
+        "seaworthy": false,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Canoe",
+        "cost": {
+          "gp": 50
+        },
+        "cargo_capacity_coins": "6000",
+        "usage": "Rivers, swamps",
+        "length": "15'",
+        "beam": "3'",
+        "draft": "1'",
+        "seaworthy": false,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Galley (large)",
+        "cost": {
+          "gp": 30000
+        },
+        "cargo_capacity_coins": "40000",
+        "usage": "Coastal waters",
+        "length": "120'-150'",
+        "beam": "15'-20'",
+        "draft": "3'",
+        "seaworthy": false,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Galley (small)",
+        "cost": {
+          "gp": 10000
+        },
+        "cargo_capacity_coins": "20000",
+        "usage": "Coastal waters",
+        "length": "60'-100'",
+        "beam": "10'-15'",
+        "draft": "2'-3'",
+        "seaworthy": false,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Galley (war)",
+        "cost": {
+          "gp": 60000
+        },
+        "cargo_capacity_coins": "60000",
+        "usage": "Coastal waters",
+        "length": "120'-150'",
+        "beam": "20'-30'",
+        "draft": "4'-6'",
+        "seaworthy": false,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Raft (makeshift)",
+        "cost": {
+          "gp": 0
+        },
+        "cargo_capacity_coins": "50 per square foot",
+        "usage": "Rivers, lakes",
+        "length": "Varies",
+        "beam": "Varies",
+        "draft": "\u00bd'",
+        "seaworthy": false,
+        "category": "water_vessel"
+      },
+      {
+        "name": "Raft (professional)",
+        "cost": {
+          "gp": 0,
+          "note": "1gp per square foot"
+        },
+        "cargo_capacity_coins": "100 per square foot",
+        "usage": "Rivers, lakes",
+        "length": "Varies",
+        "beam": "Varies",
+        "draft": "\u00bd'",
+        "seaworthy": false,
+        "category": "water_vessel"
+      }
+    ],
+    "ship_weapons": [
+      {
+        "name": "Catapult",
+        "cost": {
+          "gp": 100
+        },
+        "category": "ship_weapon"
+      },
+      {
+        "name": "Catapult shot",
+        "cost": {
+          "gp": 5
+        },
+        "category": "ship_weapon"
+      },
+      {
+        "name": "Catapult shot, pitch",
+        "cost": {
+          "gp": 25
+        },
+        "category": "ship_weapon"
+      },
+      {
+        "name": "Ram, large galley",
+        "cost": {
+          "gp": 10000
+        },
+        "category": "ship_weapon"
+      },
+      {
+        "name": "Ram, small galley",
+        "cost": {
+          "gp": 3000
+        },
+        "category": "ship_weapon"
+      }
+    ]
+  }
+}

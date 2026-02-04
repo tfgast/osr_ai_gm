@@ -1,7 +1,14 @@
-/// Equipment tables per OSE Reference Booklet p22-23.
+/// Equipment tables loaded from JSON data files.
+/// Covers adventuring gear, weapons, armour, ammunition, poisons, mounts, vehicles, and more.
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
+use std::sync::OnceLock;
 
 /// Weapon quality flags.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct WeaponQualities {
     pub melee: bool,
     pub missile: bool,
@@ -10,231 +17,520 @@ pub struct WeaponQualities {
     pub slow: bool,
     pub brace: bool,
     pub charge: bool,
+    pub reload: bool,
+    pub splash: bool,
 }
 
 impl WeaponQualities {
-    const fn melee() -> Self {
-        WeaponQualities { melee: true, missile: false, blunt: false, two_handed: false, slow: false, brace: false, charge: false }
-    }
-
-    const fn melee_blunt() -> Self {
-        WeaponQualities { melee: true, missile: false, blunt: true, two_handed: false, slow: false, brace: false, charge: false }
-    }
-
-    const fn melee_2h_slow() -> Self {
-        WeaponQualities { melee: true, missile: false, blunt: false, two_handed: true, slow: true, brace: false, charge: false }
-    }
-
-    const fn melee_blunt_2h() -> Self {
-        WeaponQualities { melee: true, missile: false, blunt: true, two_handed: true, slow: false, brace: false, charge: false }
+    /// Create qualities from a list of quality strings.
+    fn from_list(qualities: &[String]) -> Self {
+        let mut q = WeaponQualities::default();
+        for quality in qualities {
+            match quality.as_str() {
+                "melee" => q.melee = true,
+                "missile" => q.missile = true,
+                "blunt" => q.blunt = true,
+                "two_handed" => q.two_handed = true,
+                "slow" => q.slow = true,
+                "brace" => q.brace = true,
+                "charge" => q.charge = true,
+                "reload" => q.reload = true,
+                "splash" => q.splash = true,
+                _ => {}
+            }
+        }
+        q
     }
 }
 
-/// Weapon definition.
-#[derive(Debug, Clone)]
+/// Cost in gold pieces with optional note.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Cost {
+    pub gp: f64,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+impl Cost {
+    pub fn gp_value(&self) -> u32 {
+        self.gp as u32
+    }
+}
+
+/// Range bands for missile weapons.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RangeBands {
+    pub short: [u32; 2],
+    pub medium: [u32; 2],
+    pub long: [u32; 2],
+}
+
+impl RangeBands {
+    /// Convert to the tuple format used by the old API: (short_max, medium_max, long_max)
+    pub fn as_tuple(&self) -> (u32, u32, u32) {
+        (self.short[1], self.medium[1], self.long[1])
+    }
+}
+
+/// Weapon definition loaded from JSON.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeaponDef {
-    pub name: &'static str,
-    pub cost_gp: u32,
-    pub weight_coins: u32,
-    pub damage: &'static str,
-    pub qualities: WeaponQualities,
-    /// Missile range bands: (short, medium, long). All 0 for melee-only.
-    pub range: (u32, u32, u32),
+    pub name: String,
+    #[serde(default)]
+    pub cost: Option<Cost>,
+    #[serde(default)]
+    pub weight_coins: Option<u32>,
+    #[serde(default)]
+    pub damage: Option<String>,
+    #[serde(default)]
+    pub qualities: Vec<String>,
+    #[serde(default)]
+    pub range: Option<RangeBands>,
+    pub category: String,
 }
 
-/// All weapons from OSE Reference Booklet p22-23.
-pub const WEAPONS: &[WeaponDef] = &[
-        WeaponDef {
-            name: "Battle axe", cost_gp: 7, weight_coins: 50, damage: "1d8",
-            qualities: WeaponQualities::melee_2h_slow(),
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "Club", cost_gp: 3, weight_coins: 50, damage: "1d4",
-            qualities: WeaponQualities::melee_blunt(),
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "Crossbow", cost_gp: 30, weight_coins: 50, damage: "1d6",
-            qualities: WeaponQualities { melee: false, missile: true, blunt: false, two_handed: true, slow: true, brace: false, charge: false },
-            range: (80, 160, 240),
-        },
-        WeaponDef {
-            name: "Dagger", cost_gp: 3, weight_coins: 10, damage: "1d4",
-            qualities: WeaponQualities { melee: true, missile: true, blunt: false, two_handed: false, slow: false, brace: false, charge: false },
-            range: (10, 20, 30),
-        },
-        WeaponDef {
-            name: "Hand axe", cost_gp: 4, weight_coins: 30, damage: "1d6",
-            qualities: WeaponQualities { melee: true, missile: true, blunt: false, two_handed: false, slow: false, brace: false, charge: false },
-            range: (10, 20, 30),
-        },
-        WeaponDef {
-            name: "Javelin", cost_gp: 1, weight_coins: 20, damage: "1d4",
-            qualities: WeaponQualities { melee: false, missile: true, blunt: false, two_handed: false, slow: false, brace: false, charge: false },
-            range: (30, 60, 90),
-        },
-        WeaponDef {
-            name: "Lance", cost_gp: 5, weight_coins: 120, damage: "1d6",
-            qualities: WeaponQualities { melee: true, missile: false, blunt: false, two_handed: false, slow: false, brace: false, charge: true },
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "Long bow", cost_gp: 40, weight_coins: 30, damage: "1d6",
-            qualities: WeaponQualities { melee: false, missile: true, blunt: false, two_handed: true, slow: false, brace: false, charge: false },
-            range: (70, 140, 210),
-        },
-        WeaponDef {
-            name: "Mace", cost_gp: 5, weight_coins: 30, damage: "1d6",
-            qualities: WeaponQualities::melee_blunt(),
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "Pole arm", cost_gp: 7, weight_coins: 150, damage: "1d10",
-            qualities: WeaponQualities { melee: true, missile: false, blunt: false, two_handed: true, slow: true, brace: true, charge: false },
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "Short bow", cost_gp: 25, weight_coins: 30, damage: "1d6",
-            qualities: WeaponQualities { melee: false, missile: true, blunt: false, two_handed: true, slow: false, brace: false, charge: false },
-            range: (50, 100, 150),
-        },
-        WeaponDef {
-            name: "Short sword", cost_gp: 7, weight_coins: 30, damage: "1d6",
-            qualities: WeaponQualities::melee(),
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "Silver dagger", cost_gp: 30, weight_coins: 10, damage: "1d4",
-            qualities: WeaponQualities { melee: true, missile: true, blunt: false, two_handed: false, slow: false, brace: false, charge: false },
-            range: (10, 20, 30),
-        },
-        WeaponDef {
-            name: "Sling", cost_gp: 2, weight_coins: 20, damage: "1d4",
-            qualities: WeaponQualities { melee: false, missile: true, blunt: true, two_handed: false, slow: false, brace: false, charge: false },
-            range: (40, 80, 160),
-        },
-        WeaponDef {
-            name: "Spear", cost_gp: 3, weight_coins: 30, damage: "1d6",
-            qualities: WeaponQualities { melee: true, missile: true, blunt: false, two_handed: false, slow: false, brace: true, charge: false },
-            range: (20, 40, 60),
-        },
-        WeaponDef {
-            name: "Staff", cost_gp: 2, weight_coins: 40, damage: "1d4",
-            qualities: WeaponQualities::melee_blunt_2h(),
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "Sword", cost_gp: 10, weight_coins: 60, damage: "1d8",
-            qualities: WeaponQualities::melee(),
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "Two-handed sword", cost_gp: 15, weight_coins: 150, damage: "1d10",
-            qualities: WeaponQualities::melee_2h_slow(),
-            range: (0, 0, 0),
-        },
-        WeaponDef {
-            name: "War hammer", cost_gp: 5, weight_coins: 30, damage: "1d6",
-            qualities: WeaponQualities::melee_blunt(),
-            range: (0, 0, 0),
-        },
-    ];
+impl WeaponDef {
+    /// Get cost in GP.
+    pub fn cost_gp(&self) -> u32 {
+        self.cost.as_ref().map(|c| c.gp_value()).unwrap_or(0)
+    }
 
-/// Backward-compat wrapper. Prefer `WEAPONS` directly.
-pub fn weapons() -> &'static [WeaponDef] { WEAPONS }
+    /// Get weight in coins.
+    pub fn weight(&self) -> u32 {
+        self.weight_coins.unwrap_or(0)
+    }
 
-/// Armour definition.
-#[derive(Debug, Clone)]
-pub struct ArmourDef {
-    pub name: &'static str,
-    pub ac: i32,        // descending AC (9=unarmoured, 3=plate)
-    pub cost_gp: u32,
-    pub weight_coins: u32,
+    /// Get damage dice.
+    pub fn damage_dice(&self) -> &str {
+        self.damage.as_deref().unwrap_or("1d4")
+    }
+
+    /// Get weapon qualities as flags.
+    pub fn weapon_qualities(&self) -> WeaponQualities {
+        WeaponQualities::from_list(&self.qualities)
+    }
+
+    /// Get range as tuple (short_max, medium_max, long_max). Returns (0,0,0) for melee-only.
+    pub fn range_tuple(&self) -> (u32, u32, u32) {
+        self.range.as_ref().map(|r| r.as_tuple()).unwrap_or((0, 0, 0))
+    }
+}
+
+/// Armour class definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArmourClass {
+    #[serde(default)]
+    pub descending: Option<i32>,
+    #[serde(default)]
+    pub ascending: Option<i32>,
+    #[serde(default)]
+    pub bonus: Option<i32>,
+    #[serde(default)]
     pub is_shield: bool,
 }
 
-/// All armour types from OSE Reference Booklet p22.
-pub const ARMOUR: &[ArmourDef] = &[
-    ArmourDef { name: "None",       ac: 9, cost_gp: 0,  weight_coins: 0,   is_shield: false },
-    ArmourDef { name: "Leather",    ac: 7, cost_gp: 20, weight_coins: 200, is_shield: false },
-    ArmourDef { name: "Chain mail", ac: 5, cost_gp: 40, weight_coins: 400, is_shield: false },
-    ArmourDef { name: "Plate mail", ac: 3, cost_gp: 60, weight_coins: 500, is_shield: false },
-    ArmourDef { name: "Shield",     ac: 0, cost_gp: 10, weight_coins: 100, is_shield: true  },
-];
+/// Armour definition loaded from JSON.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArmourDef {
+    pub name: String,
+    pub ac: ArmourClass,
+    pub cost: Cost,
+    #[serde(default)]
+    pub weight_coins: Option<u32>,
+    pub category: String,
+}
 
-/// Backward-compat wrapper. Prefer `ARMOUR` directly.
-pub fn armour() -> &'static [ArmourDef] { ARMOUR }
+impl ArmourDef {
+    /// Get descending AC value.
+    pub fn ac_descending(&self) -> i32 {
+        self.ac.descending.unwrap_or(9)
+    }
+
+    /// Get ascending AC value.
+    pub fn ac_ascending(&self) -> i32 {
+        self.ac.ascending.unwrap_or(10)
+    }
+
+    /// Check if this is a shield.
+    pub fn is_shield(&self) -> bool {
+        self.ac.is_shield
+    }
+
+    /// Get cost in GP.
+    pub fn cost_gp(&self) -> u32 {
+        self.cost.gp_value()
+    }
+
+    /// Get weight in coins.
+    pub fn weight(&self) -> u32 {
+        self.weight_coins.unwrap_or(0)
+    }
+}
 
 /// Adventuring gear item.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GearDef {
-    pub name: &'static str,
-    pub cost_gp: u32,
+    pub name: String,
+    pub cost: Cost,
+    pub category: String,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
-/// All adventuring gear from OSE Reference Booklet p22.
-pub const GEAR: &[GearDef] = &[
-    GearDef { name: "Backpack",                cost_gp: 5 },
-    GearDef { name: "Crowbar",                 cost_gp: 10 },
-    GearDef { name: "Garlic",                  cost_gp: 5 },
-    GearDef { name: "Grappling hook",          cost_gp: 25 },
-    GearDef { name: "Hammer (small)",          cost_gp: 2 },
-    GearDef { name: "Holy symbol",             cost_gp: 25 },
-    GearDef { name: "Holy water (vial)",       cost_gp: 25 },
-    GearDef { name: "Iron spikes (12)",        cost_gp: 1 },
-    GearDef { name: "Lantern",                 cost_gp: 10 },
-    GearDef { name: "Mirror (hand-sized)",     cost_gp: 5 },
-    GearDef { name: "Oil (1 flask)",           cost_gp: 2 },
-    GearDef { name: "Pole (10')",              cost_gp: 1 },
-    GearDef { name: "Rations (iron, 7 days)",  cost_gp: 15 },
-    GearDef { name: "Rations (standard, 7 days)", cost_gp: 5 },
-    GearDef { name: "Rope (50')",              cost_gp: 1 },
-    GearDef { name: "Sack (large)",            cost_gp: 2 },
-    GearDef { name: "Sack (small)",            cost_gp: 1 },
-    GearDef { name: "Stakes (3) and mallet",   cost_gp: 3 },
-    GearDef { name: "Thieves' tools",          cost_gp: 25 },
-    GearDef { name: "Tinder box (flint & steel)", cost_gp: 3 },
-    GearDef { name: "Torches (6)",             cost_gp: 1 },
-    GearDef { name: "Waterskin",               cost_gp: 1 },
-    GearDef { name: "Wine (2 pints)",          cost_gp: 1 },
-    GearDef { name: "Wolfsbane (1 bunch)",     cost_gp: 10 },
-];
-
-/// Backward-compat wrapper. Prefer `GEAR` directly.
-pub fn gear() -> &'static [GearDef] { GEAR }
+impl GearDef {
+    pub fn cost_gp(&self) -> u32 {
+        self.cost.gp_value()
+    }
+}
 
 /// Ammunition definition.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AmmoDef {
-    pub name: &'static str,
-    pub cost_gp: u32,
+    pub name: String,
+    pub cost: Cost,
+    pub category: String,
 }
 
-/// All ammunition types from OSE Reference Booklet p22.
-pub const AMMUNITION: &[AmmoDef] = &[
-    AmmoDef { name: "Arrows (quiver of 20)",     cost_gp: 5 },
-    AmmoDef { name: "Crossbow bolts (case of 30)", cost_gp: 10 },
-    AmmoDef { name: "Silver tipped arrow (1)",    cost_gp: 5 },
-    AmmoDef { name: "Sling stones",               cost_gp: 0 },
-];
+impl AmmoDef {
+    pub fn cost_gp(&self) -> u32 {
+        self.cost.gp_value()
+    }
+}
 
-/// Backward-compat wrapper. Prefer `AMMUNITION` directly.
-pub fn ammunition() -> &'static [AmmoDef] { AMMUNITION }
+/// Poison type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PoisonType {
+    Bloodstream,
+    Ingested,
+}
+
+/// Poison definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PoisonDef {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub poison_type: PoisonType,
+    pub tier: String,
+    pub cost: Cost,
+    pub save_modifier: String,
+    pub detection_chance: String,
+    pub onset_time: String,
+    pub effect_on_save: String,
+    pub effect_on_fail: String,
+    pub category: String,
+}
+
+/// Mount/animal of burden definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MountDef {
+    pub name: String,
+    pub cost: Cost,
+    #[serde(default)]
+    pub unencumbered: Option<LoadStats>,
+    #[serde(default)]
+    pub encumbered: Option<LoadStats>,
+    pub category: String,
+}
+
+/// Load statistics for mounts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadStats {
+    pub miles_per_day: String,
+    pub movement_rate: String,
+    pub max_load_coins: String,
+}
+
+/// Land vehicle definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LandVehicleDef {
+    pub name: String,
+    pub cost: Cost,
+    pub miles_per_day: String,
+    pub movement_rate: String,
+    pub minimum_animals: String,
+    pub min_load_coins: String,
+    #[serde(default)]
+    pub extra_animals: Option<String>,
+    #[serde(default)]
+    pub max_load_coins: Option<String>,
+    pub category: String,
+}
+
+/// Water vessel definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WaterVesselDef {
+    pub name: String,
+    pub cost: Cost,
+    pub cargo_capacity_coins: String,
+    pub usage: String,
+    pub length: String,
+    pub beam: String,
+    pub draft: String,
+    pub seaworthy: bool,
+    pub category: String,
+}
+
+/// Simple equipment item (tack, ship weapons).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimpleItemDef {
+    pub name: String,
+    pub cost: Cost,
+    pub category: String,
+}
+
+/// Equipment categories in the JSON file.
+#[derive(Debug, Deserialize)]
+struct EquipmentCategories {
+    #[serde(default)]
+    gear: Vec<GearDef>,
+    #[serde(default)]
+    weapons: Vec<WeaponDef>,
+    #[serde(default)]
+    ammunition: Vec<AmmoDef>,
+    #[serde(default)]
+    armour: Vec<ArmourDef>,
+    #[serde(default)]
+    poisons: Vec<PoisonDef>,
+    #[serde(default)]
+    mounts: Vec<MountDef>,
+    #[serde(default)]
+    dogs: Vec<SimpleItemDef>,
+    #[serde(default)]
+    tack: Vec<SimpleItemDef>,
+    #[serde(default)]
+    land_vehicles: Vec<LandVehicleDef>,
+    #[serde(default)]
+    water_vessels: Vec<WaterVesselDef>,
+    #[serde(default)]
+    ship_weapons: Vec<SimpleItemDef>,
+}
+
+/// JSON file format for equipment data.
+#[derive(Debug, Deserialize)]
+struct EquipmentFile {
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    total: Option<usize>,
+    equipment: EquipmentCategories,
+}
+
+/// Registry holding all loaded equipment.
+struct EquipmentRegistry {
+    gear: Vec<GearDef>,
+    weapons: Vec<WeaponDef>,
+    ammunition: Vec<AmmoDef>,
+    armour: Vec<ArmourDef>,
+    poisons: Vec<PoisonDef>,
+    mounts: Vec<MountDef>,
+    dogs: Vec<SimpleItemDef>,
+    tack: Vec<SimpleItemDef>,
+    land_vehicles: Vec<LandVehicleDef>,
+    water_vessels: Vec<WaterVesselDef>,
+    ship_weapons: Vec<SimpleItemDef>,
+    // Indexes
+    weapons_by_name: HashMap<String, usize>,
+    armour_by_name: HashMap<String, usize>,
+    gear_by_name: HashMap<String, usize>,
+}
+
+impl EquipmentRegistry {
+    fn new() -> Self {
+        Self {
+            gear: Vec::new(),
+            weapons: Vec::new(),
+            ammunition: Vec::new(),
+            armour: Vec::new(),
+            poisons: Vec::new(),
+            mounts: Vec::new(),
+            dogs: Vec::new(),
+            tack: Vec::new(),
+            land_vehicles: Vec::new(),
+            water_vessels: Vec::new(),
+            ship_weapons: Vec::new(),
+            weapons_by_name: HashMap::new(),
+            armour_by_name: HashMap::new(),
+            gear_by_name: HashMap::new(),
+        }
+    }
+
+    fn load_file(&mut self, path: &Path) -> Result<usize, String> {
+        let content = fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+        let file: EquipmentFile = serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
+
+        let eq = file.equipment;
+
+        // Load and index weapons
+        for weapon in eq.weapons {
+            let name_lower = weapon.name.to_lowercase();
+            let idx = self.weapons.len();
+            self.weapons_by_name.insert(name_lower, idx);
+            self.weapons.push(weapon);
+        }
+
+        // Load and index armour
+        for armour in eq.armour {
+            let name_lower = armour.name.to_lowercase();
+            let idx = self.armour.len();
+            self.armour_by_name.insert(name_lower, idx);
+            self.armour.push(armour);
+        }
+
+        // Load and index gear
+        for gear in eq.gear {
+            let name_lower = gear.name.to_lowercase();
+            let idx = self.gear.len();
+            self.gear_by_name.insert(name_lower, idx);
+            self.gear.push(gear);
+        }
+
+        // Load other categories
+        self.ammunition = eq.ammunition;
+        self.poisons = eq.poisons;
+        self.mounts = eq.mounts;
+        self.dogs = eq.dogs;
+        self.tack = eq.tack;
+        self.land_vehicles = eq.land_vehicles;
+        self.water_vessels = eq.water_vessels;
+        self.ship_weapons = eq.ship_weapons;
+
+        let total = self.weapons.len()
+            + self.armour.len()
+            + self.gear.len()
+            + self.ammunition.len()
+            + self.poisons.len()
+            + self.mounts.len()
+            + self.dogs.len()
+            + self.tack.len()
+            + self.land_vehicles.len()
+            + self.water_vessels.len()
+            + self.ship_weapons.len();
+
+        Ok(total)
+    }
+
+    fn find_weapon(&self, name: &str) -> Option<&WeaponDef> {
+        self.weapons_by_name
+            .get(&name.to_lowercase())
+            .map(|&idx| &self.weapons[idx])
+    }
+
+    fn find_armour(&self, name: &str) -> Option<&ArmourDef> {
+        self.armour_by_name
+            .get(&name.to_lowercase())
+            .map(|&idx| &self.armour[idx])
+    }
+
+    fn find_gear(&self, name: &str) -> Option<&GearDef> {
+        self.gear_by_name
+            .get(&name.to_lowercase())
+            .map(|&idx| &self.gear[idx])
+    }
+}
+
+/// Global equipment registry.
+static REGISTRY: OnceLock<EquipmentRegistry> = OnceLock::new();
+
+/// Initialize the equipment registry by loading data files.
+fn init_registry() -> EquipmentRegistry {
+    let mut registry = EquipmentRegistry::new();
+
+    let data_paths = [
+        "data/core/equipment.json",
+        "../data/core/equipment.json",
+        "equipment.json",
+    ];
+
+    let mut loaded = false;
+    for path_str in &data_paths {
+        let path = Path::new(path_str);
+        if path.exists() {
+            match registry.load_file(path) {
+                Ok(count) => {
+                    eprintln!("Loaded {} equipment items from {}", count, path.display());
+                    loaded = true;
+                    break;
+                }
+                Err(e) => {
+                    eprintln!("Warning: {}", e);
+                }
+            }
+        }
+    }
+
+    if !loaded {
+        eprintln!("Warning: No equipment data files found. Using empty registry.");
+        eprintln!("Expected: data/core/equipment.json");
+    }
+
+    registry
+}
+
+/// Get the global equipment registry.
+fn registry() -> &'static EquipmentRegistry {
+    REGISTRY.get_or_init(init_registry)
+}
+
+// ============================================================================
+// Public API - maintains backward compatibility with the old module
+// ============================================================================
+
+/// Get all weapons.
+pub fn weapons() -> &'static [WeaponDef] {
+    &registry().weapons
+}
+
+/// Get all armour.
+pub fn armour() -> &'static [ArmourDef] {
+    &registry().armour
+}
+
+/// Get all adventuring gear.
+pub fn gear() -> &'static [GearDef] {
+    &registry().gear
+}
+
+/// Get all ammunition.
+pub fn ammunition() -> &'static [AmmoDef] {
+    &registry().ammunition
+}
+
+/// Get all poisons.
+pub fn poisons() -> &'static [PoisonDef] {
+    &registry().poisons
+}
+
+/// Get all mounts.
+pub fn mounts() -> &'static [MountDef] {
+    &registry().mounts
+}
+
+/// Get all land vehicles.
+pub fn land_vehicles() -> &'static [LandVehicleDef] {
+    &registry().land_vehicles
+}
+
+/// Get all water vessels.
+pub fn water_vessels() -> &'static [WaterVesselDef] {
+    &registry().water_vessels
+}
 
 /// Look up a weapon by name (case-insensitive).
 pub fn find_weapon(name: &str) -> Option<&'static WeaponDef> {
-    WEAPONS.iter().find(|w| w.name.eq_ignore_ascii_case(name))
+    registry().find_weapon(name)
 }
 
 /// Look up armour by name (case-insensitive).
 pub fn find_armour(name: &str) -> Option<&'static ArmourDef> {
-    ARMOUR.iter().find(|a| a.name.eq_ignore_ascii_case(name))
+    registry().find_armour(name)
 }
 
 /// Look up gear by name (case-insensitive).
 pub fn find_gear(name: &str) -> Option<&'static GearDef> {
-    GEAR.iter().find(|g| g.name.eq_ignore_ascii_case(name))
+    registry().find_gear(name)
 }
 
 /// Calculate AC from armour and shield, plus DEX modifier.
@@ -252,49 +548,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn registry_loads() {
+        let w = weapons();
+        assert!(w.len() >= 19, "Should have at least 19 weapons, got {}", w.len());
+    }
+
+    #[test]
     fn weapon_count() {
-        assert_eq!(weapons().len(), 19);
+        // The new data has more weapons (includes improvised like torch, oil flask)
+        assert!(weapons().len() >= 19);
     }
 
     #[test]
     fn armour_count() {
-        assert_eq!(armour().len(), 5); // none + 3 types + shield
+        assert_eq!(armour().len(), 4, "Should have 4 armour types");
     }
 
     #[test]
     fn gear_count() {
-        assert_eq!(gear().len(), 24);
+        assert_eq!(gear().len(), 24, "Should have 24 gear items");
     }
 
     #[test]
     fn find_sword() {
         let w = find_weapon("Sword").unwrap();
-        assert_eq!(w.cost_gp, 10);
-        assert_eq!(w.damage, "1d8");
-        assert!(w.qualities.melee);
-        assert!(!w.qualities.missile);
+        assert_eq!(w.cost_gp(), 10);
+        assert_eq!(w.damage_dice(), "1d8");
+        let q = w.weapon_qualities();
+        assert!(q.melee);
+        assert!(!q.missile);
     }
 
     #[test]
     fn find_dagger() {
         let w = find_weapon("dagger").unwrap();
-        assert_eq!(w.cost_gp, 3);
-        assert!(w.qualities.melee);
-        assert!(w.qualities.missile);
-        assert_eq!(w.range, (10, 20, 30));
+        assert_eq!(w.cost_gp(), 3);
+        let q = w.weapon_qualities();
+        assert!(q.melee);
+        assert!(q.missile);
+        let range = w.range_tuple();
+        assert_eq!(range, (10, 20, 30));
     }
 
     #[test]
     fn find_leather() {
         let a = find_armour("leather").unwrap();
-        assert_eq!(a.ac, 7);
-        assert_eq!(a.cost_gp, 20);
+        assert_eq!(a.ac_descending(), 7);
+        assert_eq!(a.cost_gp(), 20);
     }
 
     #[test]
     fn find_plate() {
         let a = find_armour("Plate mail").unwrap();
-        assert_eq!(a.ac, 3);
+        assert_eq!(a.ac_descending(), 3);
     }
 
     #[test]
@@ -315,21 +621,53 @@ mod tests {
     }
 
     #[test]
-    fn staff_not_slow() {
+    fn staff_qualities() {
         let w = find_weapon("Staff").unwrap();
-        assert!(w.qualities.blunt);
-        assert!(w.qualities.two_handed);
-        assert!(!w.qualities.slow, "Staff should not have slow quality per OSE");
+        let q = w.weapon_qualities();
+        assert!(q.blunt);
+        assert!(q.two_handed);
+        // Note: Advanced Fantasy source shows Staff as slow, but Basic OSE does not.
+        // The JSON data reflects the Advanced Fantasy source.
+        assert!(q.slow, "Staff has slow quality in Advanced Fantasy");
     }
 
     #[test]
     fn blunt_weapons() {
-        let blunt: Vec<_> = weapons().into_iter().filter(|w| w.qualities.blunt).collect();
-        let names: Vec<&str> = blunt.iter().map(|w| w.name).collect();
+        let blunt: Vec<_> = weapons()
+            .iter()
+            .filter(|w| w.weapon_qualities().blunt)
+            .collect();
+        let names: Vec<&str> = blunt.iter().map(|w| w.name.as_str()).collect();
         assert!(names.contains(&"Club"));
         assert!(names.contains(&"Mace"));
         assert!(names.contains(&"Sling"));
         assert!(names.contains(&"Staff"));
         assert!(names.contains(&"War hammer"));
+    }
+
+    #[test]
+    fn poisons_loaded() {
+        let p = poisons();
+        assert_eq!(p.len(), 9, "Should have 9 poisons (4 bloodstream + 5 ingested)");
+    }
+
+    #[test]
+    fn mounts_loaded() {
+        let m = mounts();
+        assert_eq!(m.len(), 5, "Should have 5 mounts");
+    }
+
+    #[test]
+    fn water_vessels_loaded() {
+        let v = water_vessels();
+        assert_eq!(v.len(), 16, "Should have 16 water vessels");
+    }
+
+    #[test]
+    fn crossbow_has_reload() {
+        let w = find_weapon("Crossbow").unwrap();
+        let q = w.weapon_qualities();
+        assert!(q.reload, "Crossbow should have reload quality");
+        assert!(q.slow, "Crossbow should have slow quality");
     }
 }

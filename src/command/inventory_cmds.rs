@@ -1,56 +1,56 @@
 use super::{Command, CommandResult};
 use crate::model::Item;
 use crate::persist::GameState;
-use crate::rules::equipment::{self, AMMUNITION, ARMOUR, GEAR, WEAPONS};
+use crate::rules::equipment;
 
 /// Look up an item across all equipment tables.
 /// Returns (name, cost_gp, weight as f32).
-fn find_buyable(name: &str) -> Option<(&'static str, u32, f32)> {
+fn find_buyable(name: &str) -> Option<(String, u32, f32)> {
     if let Some(w) = equipment::find_weapon(name) {
-        return Some((w.name, w.cost_gp, w.weight_coins as f32));
+        return Some((w.name.clone(), w.cost_gp(), w.weight() as f32));
     }
     if let Some(a) = equipment::find_armour(name) {
-        if a.cost_gp > 0 {
-            return Some((a.name, a.cost_gp, a.weight_coins as f32));
+        if a.cost_gp() > 0 {
+            return Some((a.name.clone(), a.cost_gp(), a.weight() as f32));
         }
     }
     if let Some(g) = equipment::find_gear(name) {
-        return Some((g.name, g.cost_gp, 0.0));
+        return Some((g.name.clone(), g.cost_gp(), 0.0));
     }
-    if let Some(a) = AMMUNITION.iter().find(|a| a.name.eq_ignore_ascii_case(name)) {
-        return Some((a.name, a.cost_gp, 0.0));
+    if let Some(a) = equipment::ammunition().iter().find(|a| a.name.eq_ignore_ascii_case(name)) {
+        return Some((a.name.clone(), a.cost_gp(), 0.0));
     }
     None
 }
 
 /// Find equipment names that contain the query as a substring (case-insensitive).
 /// Returns up to 3 suggestions.
-fn suggest_equipment(query: &str) -> Vec<&'static str> {
+fn suggest_equipment(query: &str) -> Vec<String> {
     let query_lower = query.to_lowercase();
-    let mut suggestions: Vec<&'static str> = Vec::new();
+    let mut suggestions: Vec<String> = Vec::new();
 
     // Check weapons
-    for w in WEAPONS {
+    for w in equipment::weapons() {
         if w.name.to_lowercase().contains(&query_lower) {
-            suggestions.push(w.name);
+            suggestions.push(w.name.clone());
         }
     }
-    // Check armour (skip "None")
-    for a in ARMOUR {
-        if a.cost_gp > 0 && a.name.to_lowercase().contains(&query_lower) {
-            suggestions.push(a.name);
+    // Check armour (skip items with 0 cost)
+    for a in equipment::armour() {
+        if a.cost_gp() > 0 && a.name.to_lowercase().contains(&query_lower) {
+            suggestions.push(a.name.clone());
         }
     }
     // Check gear
-    for g in GEAR {
+    for g in equipment::gear() {
         if g.name.to_lowercase().contains(&query_lower) {
-            suggestions.push(g.name);
+            suggestions.push(g.name.clone());
         }
     }
     // Check ammunition
-    for a in AMMUNITION {
+    for a in equipment::ammunition() {
         if a.name.to_lowercase().contains(&query_lower) {
-            suggestions.push(a.name);
+            suggestions.push(a.name.clone());
         }
     }
 
@@ -102,7 +102,7 @@ impl Command for BuyCommand {
         }
 
         character.gold_gp -= cost;
-        character.inventory.push(Item::new(canonical_name, weight, cost));
+        character.inventory.push(Item::new(&canonical_name, weight, cost));
 
         CommandResult::ok(format!(
             "{} buys {} for {} gp. ({} gp remaining)",
@@ -227,13 +227,13 @@ impl Command for EquipCommand {
         let armour_ac = character.inventory.iter()
             .filter(|i| i.equipped)
             .filter_map(|i| equipment::find_armour(&i.name))
-            .filter(|a| !a.is_shield)
-            .map(|a| a.ac)
+            .filter(|a| !a.is_shield())
+            .map(|a| a.ac_descending())
             .min()
             .unwrap_or(9);
 
         let has_shield = character.inventory.iter()
-            .any(|i| i.equipped && equipment::find_armour(&i.name).map(|a| a.is_shield).unwrap_or(false));
+            .any(|i| i.equipped && equipment::find_armour(&i.name).map(|a| a.is_shield()).unwrap_or(false));
 
         let dex_mod = crate::rules::ability::dex_ac_mod(character.abilities.dexterity);
         character.ac = equipment::calculate_ac(armour_ac, has_shield, dex_mod);
@@ -363,12 +363,12 @@ mod tests {
         let equip = EquipCommand;
         let buy = BuyCommand;
         let mut state = state_with_fighter();
-        buy.execute(&["Aldric", "Chain", "mail"], &mut state);
+        buy.execute(&["Aldric", "Chainmail"], &mut state);
         buy.execute(&["Aldric", "Shield"], &mut state);
-        equip.execute(&["Aldric", "Chain", "mail"], &mut state);
+        equip.execute(&["Aldric", "Chainmail"], &mut state);
         let result = equip.execute(&["Aldric", "Shield"], &mut state);
         assert!(result.output.contains("equips Shield"));
-        // Chain mail (5) + shield (-1) = AC 4
+        // Chainmail (5) + shield (-1) = AC 4
         assert!(result.output.contains("AC 4"));
     }
 
@@ -419,7 +419,7 @@ mod tests {
         let result = cmd.execute(&["Aldric", "chain"], &mut state);
         assert!(result.output.contains("Error"));
         assert!(result.output.contains("Did you mean"));
-        assert!(result.output.contains("Chain mail"));
+        assert!(result.output.contains("Chainmail"));
     }
 
     #[test]
@@ -446,15 +446,15 @@ mod tests {
     #[test]
     fn suggest_equipment_finds_partial_matches() {
         let suggestions = suggest_equipment("bow");
-        assert!(suggestions.contains(&"Long bow"));
-        assert!(suggestions.contains(&"Short bow"));
-        assert!(suggestions.contains(&"Crossbow"));
+        assert!(suggestions.iter().any(|s| s == "Long bow"));
+        assert!(suggestions.iter().any(|s| s == "Short bow"));
+        assert!(suggestions.iter().any(|s| s == "Crossbow"));
     }
 
     #[test]
     fn suggest_equipment_case_insensitive() {
         let suggestions = suggest_equipment("CHAIN");
-        assert!(suggestions.contains(&"Chain mail"));
+        assert!(suggestions.iter().any(|s| s == "Chainmail"));
     }
 
     #[test]

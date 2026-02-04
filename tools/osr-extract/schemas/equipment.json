@@ -1,0 +1,259 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OSE Equipment",
+  "description": "Equipment definitions for Old-School Essentials including gear, weapons, armour, vehicles, and more",
+  "type": "object",
+  "required": ["source", "counts", "total", "equipment"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "description": "Source file name"
+    },
+    "counts": {
+      "type": "object",
+      "description": "Count of items per category",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "total": {
+      "type": "integer",
+      "description": "Total number of equipment items"
+    },
+    "equipment": {
+      "type": "object",
+      "description": "Equipment organized by category",
+      "properties": {
+        "gear": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/gear_item" }
+        },
+        "weapons": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/weapon" }
+        },
+        "ammunition": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ammunition" }
+        },
+        "armour": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/armour" }
+        },
+        "poisons": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/poison" }
+        },
+        "mounts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/mount" }
+        },
+        "dogs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/animal" }
+        },
+        "tack": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/simple_item" }
+        },
+        "land_vehicles": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/land_vehicle" }
+        },
+        "water_vessels": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/water_vessel" }
+        },
+        "ship_weapons": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/simple_item" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "cost": {
+      "type": "object",
+      "properties": {
+        "gp": {
+          "type": "number",
+          "description": "Cost in gold pieces"
+        },
+        "note": {
+          "type": "string",
+          "description": "Special cost note (e.g., 'per square foot')"
+        }
+      }
+    },
+    "simple_item": {
+      "type": "object",
+      "required": ["name", "cost", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "cost": { "$ref": "#/definitions/cost" },
+        "category": { "type": "string" }
+      }
+    },
+    "gear_item": {
+      "type": "object",
+      "required": ["name", "cost", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "cost": { "$ref": "#/definitions/cost" },
+        "category": { "type": "string", "const": "gear" },
+        "description": { "type": "string" }
+      }
+    },
+    "weapon": {
+      "type": "object",
+      "required": ["name", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "cost": { "$ref": "#/definitions/cost" },
+        "weight_coins": { "type": "integer" },
+        "damage": { "type": "string" },
+        "qualities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["melee", "missile", "blunt", "two_handed", "slow", "brace", "charge", "reload", "splash"]
+          }
+        },
+        "range": {
+          "type": "object",
+          "properties": {
+            "short": {
+              "type": "array",
+              "items": { "type": "integer" },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "medium": {
+              "type": "array",
+              "items": { "type": "integer" },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "long": {
+              "type": "array",
+              "items": { "type": "integer" },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
+        "category": { "type": "string" }
+      }
+    },
+    "ammunition": {
+      "type": "object",
+      "required": ["name", "cost", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "cost": { "$ref": "#/definitions/cost" },
+        "category": { "type": "string", "const": "ammunition" }
+      }
+    },
+    "armour": {
+      "type": "object",
+      "required": ["name", "ac", "cost", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "ac": {
+          "type": "object",
+          "properties": {
+            "descending": { "type": "integer" },
+            "ascending": { "type": "integer" },
+            "bonus": { "type": "integer" },
+            "is_shield": { "type": "boolean" }
+          }
+        },
+        "cost": { "$ref": "#/definitions/cost" },
+        "weight_coins": { "type": "integer" },
+        "category": { "type": "string", "const": "armour" }
+      }
+    },
+    "poison": {
+      "type": "object",
+      "required": ["name", "type", "tier", "cost", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["bloodstream", "ingested"] },
+        "tier": { "type": "string", "enum": ["I", "II", "III", "IV", "V"] },
+        "cost": { "$ref": "#/definitions/cost" },
+        "save_modifier": { "type": "string" },
+        "detection_chance": { "type": "string" },
+        "onset_time": { "type": "string" },
+        "effect_on_save": { "type": "string" },
+        "effect_on_fail": { "type": "string" },
+        "category": { "type": "string", "const": "poison" }
+      }
+    },
+    "mount": {
+      "type": "object",
+      "required": ["name", "cost", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "cost": { "$ref": "#/definitions/cost" },
+        "unencumbered": {
+          "type": "object",
+          "properties": {
+            "miles_per_day": { "type": "string" },
+            "movement_rate": { "type": "string" },
+            "max_load_coins": { "type": "string" }
+          }
+        },
+        "encumbered": {
+          "type": "object",
+          "properties": {
+            "miles_per_day": { "type": "string" },
+            "movement_rate": { "type": "string" },
+            "max_load_coins": { "type": "string" }
+          }
+        },
+        "category": { "type": "string", "const": "mount" }
+      }
+    },
+    "animal": {
+      "type": "object",
+      "required": ["name", "cost", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "cost": { "$ref": "#/definitions/cost" },
+        "miles_per_day": { "type": "string" },
+        "movement_rate": { "type": "string" },
+        "category": { "type": "string", "const": "animal" }
+      }
+    },
+    "land_vehicle": {
+      "type": "object",
+      "required": ["name", "cost", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "cost": { "$ref": "#/definitions/cost" },
+        "miles_per_day": { "type": "string" },
+        "movement_rate": { "type": "string" },
+        "minimum_animals": { "type": "string" },
+        "min_load_coins": { "type": "string" },
+        "extra_animals": { "type": "string" },
+        "max_load_coins": { "type": "string" },
+        "category": { "type": "string", "const": "land_vehicle" }
+      }
+    },
+    "water_vessel": {
+      "type": "object",
+      "required": ["name", "cost", "seaworthy", "category"],
+      "properties": {
+        "name": { "type": "string" },
+        "cost": { "$ref": "#/definitions/cost" },
+        "cargo_capacity_coins": { "type": "string" },
+        "usage": { "type": "string" },
+        "length": { "type": "string" },
+        "beam": { "type": "string" },
+        "draft": { "type": "string" },
+        "seaworthy": { "type": "boolean" },
+        "category": { "type": "string", "const": "water_vessel" }
+      }
+    }
+  }
+}
