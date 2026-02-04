@@ -13,6 +13,15 @@ use osr_ai_gm::state::game::GameMode;
 use osr_ai_gm::state::time::LightSourceKind;
 use osr_ai_gm::state::wilderness::Terrain;
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
+fn unique_tmp_path(prefix: &str) -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    format!("{}/osr_test_{}_{pid}_{n}.json", std::env::temp_dir().display(), prefix)
+}
+
 fn req(id: &str, command: GMCommand) -> GMRequest {
     GMRequest { id: id.to_string(), command }
 }
@@ -486,7 +495,7 @@ fn save_load_roundtrip() {
     state.notes.push("[RULING] The door is trapped.".to_string());
 
     // Save
-    let path = "/tmp/osr_test_save.json";
+    let path = unique_tmp_path("save");
     let resp = handle_request(&req("1", GMCommand::Save {
         path: path.to_string(),
     }), &mut state);
@@ -1486,7 +1495,7 @@ fn session_a_dungeon_crawl() {
     assert!(fighter.saving_throws.is_some());
 
     // === STEP 7: Save state ===
-    let save_path = "/tmp/osr_session_a_test.json";
+    let save_path = unique_tmp_path("session_a");
     let resp = handle_request(&req("a40", GMCommand::Save {
         path: save_path.to_string(),
     }), &mut state);
@@ -1803,7 +1812,7 @@ fn session_c_retainers() {
 
 #[test]
 fn save_load_complex_state() {
-    let save_path = "/tmp/osr_complex_roundtrip_test.json";
+    let save_path = unique_tmp_path("complex_roundtrip");
 
     // === Build complex state: mid-combat with lights ===
     let mut state = GameState::new();
@@ -1961,7 +1970,7 @@ fn save_load_complex_state() {
     let pre_ws_lost = ws_state.wilderness.as_ref().unwrap().lost;
     let pre_ws_day = ws_state.wilderness.as_ref().unwrap().travel_day;
 
-    let ws_save_path = "/tmp/osr_wilderness_roundtrip_test.json";
+    let ws_save_path = unique_tmp_path("wilderness_roundtrip");
     let resp = handle_request(&req("w4", GMCommand::Save {
         path: ws_save_path.to_string(),
     }), &mut ws_state);

@@ -18,6 +18,15 @@ use osr_ai_gm::state::game::GameMode;
 use osr_ai_gm::state::time::LightSourceKind;
 use osr_ai_gm::state::wilderness::Terrain;
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
+fn unique_tmp_path(prefix: &str) -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    format!("{}/osr_test_{}_{pid}_{n}.json", std::env::temp_dir().display(), prefix)
+}
+
 // ===========================================================================
 // Test helpers
 // ===========================================================================
@@ -2112,7 +2121,7 @@ fn save_happy_path() {
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
 
-    let path = "/tmp/osr_qa_save_test.json";
+    let path = unique_tmp_path("qa_save");
     let resp = handle_request(&req("sv1", GMCommand::Save {
         path: path.to_string(),
     }), &mut state);
@@ -2142,7 +2151,7 @@ fn load_happy_path() {
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
 
-    let path = "/tmp/osr_qa_load_test.json";
+    let path = unique_tmp_path("qa_load");
     let resp = handle_request(&req("1", GMCommand::Save {
         path: path.to_string(),
     }), &mut state);
@@ -2293,7 +2302,7 @@ fn double_save() {
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
 
-    let path = "/tmp/osr_qa_double_save.json";
+    let path = unique_tmp_path("qa_double_save");
     let resp1 = handle_request(&req("ds1", GMCommand::Save {
         path: path.to_string(),
     }), &mut state);
