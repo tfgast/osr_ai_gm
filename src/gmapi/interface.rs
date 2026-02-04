@@ -1,9 +1,9 @@
 use crate::dice;
-use crate::engine::{chargen, combat, encounter_engine, exploration, wilderness_engine};
+use crate::engine::{chargen, combat, encounter_engine, exploration, retainer, wilderness_engine, xp};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::model::{CombatState, Monster};
 use crate::persist::{self, GameState};
-use crate::rules::{ability, class, equipment};
+use crate::rules::{ability, class, encumbrance, equipment, monster, spell_data, thief};
 use crate::rules::class::Class;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
 use crate::state::game::GameMode;
@@ -71,6 +71,27 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 
         // -- Management --
         GMCommand::AwardXp { character, xp } => award_xp(id, state, character, *xp),
+        GMCommand::AwardTreasureXp { character, treasure_gp, monster_xp } => {
+            award_treasure_xp(id, state, character, *treasure_gp, *monster_xp)
+        }
+        GMCommand::ThiefSkillCheck { character, skill } => {
+            thief_skill_check(id, state, character, skill)
+        }
+        GMCommand::Backstab { character, monster_idx, weapon } => {
+            backstab(id, state, character, *monster_idx, weapon)
+        }
+        GMCommand::QueryEncumbrance { character } => query_encumbrance(id, state, character),
+        GMCommand::SpawnMonster { name, count, distance } => {
+            spawn_monster(id, state, name, *count, *distance)
+        }
+        GMCommand::LookupSpell { name, list } => lookup_spell(id, state, name, list),
+        GMCommand::HireRetainer { employer, retainer_name, retainer_class, retainer_level } => {
+            hire_retainer(id, state, employer, retainer_name, retainer_class, *retainer_level)
+        }
+        GMCommand::LoyaltyCheck { retainer_name, loyalty } => {
+            loyalty_check(id, state, retainer_name, *loyalty)
+        }
+        GMCommand::LevelUp { character } => level_up(id, state, character),
         GMCommand::Ruling { text } => ruling(id, state, text),
 
         // -- System --
@@ -677,22 +698,397 @@ fn roll_reaction(id: &str, state: &GameState, char_name: &str) -> GMResponse {
 // Management
 // =============================================================================
 
-fn award_xp(id: &str, state: &mut GameState, char_name: &str, xp: u64) -> GMResponse {
+fn award_xp(id: &str, state: &mut GameState, char_name: &str, xp_amount: u64) -> GMResponse {
     let character = match state.party.find_member_mut(char_name) {
         Some(c) => c,
         None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
     };
-    character.xp += xp;
+    character.xp += xp_amount;
     GMResponse::ok_with_data(
         id,
-        format!("{} awarded {} XP (total: {}).", character.name, xp, character.xp),
+        format!("{} awarded {} XP (total: {}).", character.name, xp_amount, character.xp),
         state.mode.clone(),
         serde_json::json!({
             "character": character.name,
-            "xp_awarded": xp,
+            "xp_awarded": xp_amount,
             "total_xp": character.xp,
         }),
     )
+}
+
+fn award_treasure_xp(id: &str, state: &mut GameState, char_name: &str, treasure_gp: u64, monster_xp: u64) -> GMResponse {
+    let character = match state.party.find_member_mut(char_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let result = xp::award_xp(character, treasure_gp, monster_xp);
+    let mut msg = format!(
+        "{}: base {}xp ({}gp treasure + {}xp monsters), {:+}% prime req modifier = {} adjusted XP. Total: {}.",
+        character.name, result.base_xp, treasure_gp, monster_xp,
+        result.modifier_pct, result.adjusted_xp, result.new_total,
+    );
+    if result.leveled_up {
+        msg.push_str(&format!(
+            " LEVEL UP to {}! Gained {} HP.",
+            result.new_level, result.hp_gained,
+        ));
+    }
+    GMResponse::ok_with_data(
+        id, msg, state.mode.clone(),
+        serde_json::json!({
+            "character": character.name,
+            "base_xp": result.base_xp,
+            "modifier_pct": result.modifier_pct,
+            "adjusted_xp": result.adjusted_xp,
+            "total_xp": result.new_total,
+            "leveled_up": result.leveled_up,
+            "new_level": result.new_level,
+            "hp_gained": result.hp_gained,
+        }),
+    )
+}
+
+fn thief_skill_check(id: &str, state: &GameState, char_name: &str, skill_name: &str) -> GMResponse {
+    let character = match state.party.find_member(char_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    if !thief::has_thief_skills(&character.class) {
+        return GMResponse::err(id, format!("{} ({}) does not have thief skills.", character.name, character.class), state.mode.clone());
+    }
+    let skill = match skill_name.to_lowercase().replace([' ', '_', '-'], "").as_str() {
+        "climbwalls" | "climb" => thief::ThiefSkill::ClimbWalls,
+        "findtraps" | "traps" => thief::ThiefSkill::FindTraps,
+        "hearnoise" | "hear" | "listen" => thief::ThiefSkill::HearNoise,
+        "hideshadows" | "hide" | "hideinshadows" => thief::ThiefSkill::HideShadows,
+        "movesilently" | "sneak" | "stealth" => thief::ThiefSkill::MoveSilently,
+        "openlocks" | "pick" | "lockpick" => thief::ThiefSkill::OpenLocks,
+        "pickpockets" | "pickpocket" | "steal" => thief::ThiefSkill::PickPockets,
+        "readlanguages" | "read" => thief::ThiefSkill::ReadLanguages,
+        _ => return GMResponse::err(id, format!("unknown thief skill '{}'.", skill_name), state.mode.clone()),
+    };
+    let target = thief::skill_chance(skill, character.level);
+    let roll: u32 = if skill.is_d6() {
+        rand::Rng::gen_range(&mut rand::thread_rng(), 1..=6)
+    } else {
+        rand::Rng::gen_range(&mut rand::thread_rng(), 1..=100)
+    };
+    let result = thief::check_skill(skill, character.level, roll);
+    let die_type = if skill.is_d6() { "d6" } else { "d%" };
+    GMResponse::ok_with_data(
+        id,
+        format!("{} attempts {} (level {}): target {}, rolled {} ({}) — {}.",
+            character.name, skill.name(), character.level,
+            target, roll, die_type,
+            if result.success { "SUCCESS" } else { "FAILURE" }),
+        state.mode.clone(),
+        serde_json::json!({
+            "character": character.name,
+            "skill": skill.name(),
+            "target": target,
+            "roll": roll,
+            "success": result.success,
+        }),
+    )
+}
+
+fn backstab(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize, weapon_name: &str) -> GMResponse {
+    let weapon = match equipment::find_weapon(weapon_name) {
+        Some(w) => w,
+        None => return GMResponse::err(id, format!("unknown weapon '{}'.", weapon_name), state.mode.clone()),
+    };
+    let character = match state.party.find_member(char_name) {
+        Some(c) => c.clone(),
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    if !thief::can_backstab(&character.class) {
+        return GMResponse::err(id, format!("{} ({}) cannot backstab.", character.name, character.class), state.mode.clone());
+    }
+    let combat_state = match state.combat.as_mut() {
+        Some(c) => c,
+        None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
+    };
+    if monster_idx >= combat_state.monsters.len() {
+        return GMResponse::err(id, format!("monster index {} out of range.", monster_idx), state.mode.clone());
+    }
+    if !combat_state.monsters[monster_idx].is_alive() {
+        return GMResponse::err(id, format!("{} is already dead.", combat_state.monsters[monster_idx].name), state.mode.clone());
+    }
+
+    let multiplier = thief::backstab_multiplier(character.level);
+    let str_mod = ability::str_melee_mod(character.abilities.strength);
+    let attack_bonus = thief::BACKSTAB_ATTACK_BONUS;
+
+    // Roll attack with backstab bonus
+    let target_ac = combat_state.monsters[monster_idx].ac;
+    let target_number = (character.thac0 as i32 - target_ac - attack_bonus - str_mod).max(2).min(20);
+    let attack_roll: i32 = rand::Rng::gen_range(&mut rand::thread_rng(), 1..=20);
+
+    let hit = attack_roll == 20 || (attack_roll != 1 && attack_roll >= target_number);
+
+    if hit {
+        // Roll damage and multiply
+        let base_damage = match dice::roll_str(weapon.damage) {
+            Ok(r) => r.total.max(1),
+            Err(_) => 1,
+        };
+        let total_damage = (base_damage + str_mod).max(1) * multiplier as i32;
+        combat_state.monsters[monster_idx].hp -= total_damage;
+        let monster_name = combat_state.monsters[monster_idx].name.clone();
+        let alive = combat_state.monsters[monster_idx].is_alive();
+        combat_state.log.push(format!(
+            "{} backstabs {} for {} damage (x{}){}",
+            character.name, monster_name, total_damage, multiplier,
+            if !alive { " — KILLED!" } else { "" }
+        ));
+        GMResponse::ok_with_data(
+            id,
+            format!("{} backstabs {} (+{} to hit, x{} damage)! Rolled {} vs target {}: HIT for {} damage{}.",
+                character.name, monster_name, attack_bonus, multiplier,
+                attack_roll, target_number, total_damage,
+                if !alive { " — KILLED!" } else { "" }),
+            state.mode.clone(),
+            serde_json::json!({
+                "hit": true,
+                "attack_roll": attack_roll,
+                "target_number": target_number,
+                "damage": total_damage,
+                "multiplier": multiplier,
+                "monster_alive": alive,
+            }),
+        )
+    } else {
+        combat_state.log.push(format!("{} backstab attempt on {} missed", character.name, combat_state.monsters[monster_idx].name));
+        GMResponse::ok_with_data(
+            id,
+            format!("{} backstab attempt: rolled {} vs target {} — MISS.",
+                character.name, attack_roll, target_number),
+            state.mode.clone(),
+            serde_json::json!({
+                "hit": false,
+                "attack_roll": attack_roll,
+                "target_number": target_number,
+            }),
+        )
+    }
+}
+
+fn query_encumbrance(id: &str, state: &GameState, char_name: &str) -> GMResponse {
+    let character = match state.party.find_member(char_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let item_weights: Vec<u32> = character.inventory.iter()
+        .map(|item| (item.weight * 10.0) as u32) // weight is in pounds, convert to coins (10 cn = 1 lb)
+        .collect();
+    let total = encumbrance::total_weight(&item_weights, character.gold_gp);
+    let level = encumbrance::encumbrance_level(total);
+    let movement = encumbrance::movement_rate(total);
+    GMResponse::ok_with_data(
+        id,
+        format!("{}: {} cn total, {} (movement {}').",
+            character.name, total, level.name(), movement),
+        state.mode.clone(),
+        serde_json::json!({
+            "character": character.name,
+            "total_weight_cn": total,
+            "encumbrance_level": level.name(),
+            "movement_rate": movement,
+            "max_capacity": encumbrance::MAX_CAPACITY_CN,
+        }),
+    )
+}
+
+fn spawn_monster(id: &str, state: &mut GameState, name: &str, count: u32, distance: u32) -> GMResponse {
+    if state.combat.is_some() {
+        return GMResponse::err(id, "combat already active.", state.mode.clone());
+    }
+    let def = match monster::find_monster(name) {
+        Some(d) => d,
+        None => return GMResponse::err(id, format!("unknown monster '{}'. Use SpawnEncounter for custom monsters.", name), state.mode.clone()),
+    };
+
+    let mut monsters = Vec::new();
+    for i in 0..count {
+        let monster_name = if count > 1 {
+            format!("{} {}", def.name, i + 1)
+        } else {
+            def.name.to_string()
+        };
+        let mut m = Monster::new(&monster_name, def.hit_dice);
+        // Roll HP from hit dice
+        let hd = crate::rules::attack::parse_monster_hd(def.hit_dice);
+        let hp = if hd == 0 {
+            // Half HD monsters (kobolds, etc): 1d4
+            match dice::roll_str("1d4") {
+                Ok(r) => r.total.max(1),
+                Err(_) => 2,
+            }
+        } else {
+            match dice::roll_str(&format!("{}d8", hd)) {
+                Ok(r) => r.total.max(1),
+                Err(_) => (hd as i32 * 4).max(1),
+            }
+        };
+        m.hp = hp;
+        m.max_hp = hp;
+        m.ac = def.ac;
+        m.damage = def.damage.to_string();
+        m.morale = def.morale;
+        m.xp_value = def.xp_value;
+        m.attacks = def.attacks.iter().map(|a| a.to_string()).collect();
+        monsters.push(m);
+    }
+
+    let combat_state = CombatState::new(monsters, distance);
+    let status = combat::combat_status(&combat_state, &state.party.members);
+    state.combat = Some(combat_state);
+    state.mode = GameMode::Combat;
+
+    let mut msg = format!("combat started: {} {}(s) at {}' distance.", count, def.name, distance);
+    if !def.special.is_empty() {
+        msg.push_str(&format!(" Special: {}", def.special));
+    }
+
+    GMResponse::ok_with_data(
+        id, msg, state.mode.clone(),
+        serde_json::json!({
+            "status": status,
+            "monster": def.name,
+            "hit_dice": def.hit_dice,
+            "ac": def.ac,
+            "special": def.special,
+        }),
+    )
+}
+
+fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &str) -> GMResponse {
+    let list = if list_name.is_empty() {
+        None
+    } else {
+        match list_name.to_lowercase().as_str() {
+            "cleric" => Some(spell_data::SpellList::Cleric),
+            "magicuser" | "magic-user" | "magic_user" | "mu" | "mage" => Some(spell_data::SpellList::MagicUser),
+            "druid" => Some(spell_data::SpellList::Druid),
+            "illusionist" => Some(spell_data::SpellList::Illusionist),
+            _ => return GMResponse::err(id, format!("unknown spell list '{}'.", list_name), state.mode.clone()),
+        }
+    };
+    match spell_data::find_spell(name, list) {
+        Some(spell) => GMResponse::ok_with_data(
+            id,
+            format!("{} ({}L{}) — Range: {}, Duration: {}: {}",
+                spell.name, spell.list.name(), spell.level,
+                spell.range, spell.duration, spell.description),
+            state.mode.clone(),
+            serde_json::json!({
+                "name": spell.name,
+                "list": spell.list.name(),
+                "level": spell.level,
+                "range": spell.range,
+                "duration": spell.duration,
+                "description": spell.description,
+            }),
+        ),
+        None => GMResponse::err(id, format!("spell '{}' not found.", name), state.mode.clone()),
+    }
+}
+
+fn hire_retainer(id: &str, state: &GameState, employer_name: &str, ret_name: &str, ret_class: &str, ret_level: u32) -> GMResponse {
+    let employer = match state.party.find_member(employer_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", employer_name), state.mode.clone()),
+    };
+    let cha = employer.abilities.charisma;
+    let max = retainer::max_retainers(cha);
+    let base_loyalty = retainer::base_loyalty(cha);
+    let reaction = retainer::hiring_reaction(cha);
+    let wage = retainer::standard_wage(ret_level);
+
+    let hired = matches!(reaction, retainer::HireReaction::Accepts | retainer::HireReaction::Eager);
+    let bonus_loyalty = matches!(reaction, retainer::HireReaction::Eager);
+    let loyalty = if bonus_loyalty { base_loyalty + 1 } else { base_loyalty };
+
+    GMResponse::ok_with_data(
+        id,
+        format!("{} attempts to hire {} ({} L{}, {}gp/month). CHA {} (max {} retainers, loyalty {}). Reaction: {} — {}.",
+            employer.name, ret_name, ret_class, ret_level, wage,
+            cha, max, base_loyalty, reaction.name(),
+            if hired { "HIRED" } else { "NOT HIRED" }),
+        state.mode.clone(),
+        serde_json::json!({
+            "employer": employer.name,
+            "retainer": ret_name,
+            "class": ret_class,
+            "level": ret_level,
+            "reaction": reaction.name(),
+            "hired": hired,
+            "loyalty": loyalty,
+            "wage_gp": wage,
+            "max_retainers": max,
+        }),
+    )
+}
+
+fn loyalty_check(id: &str, state: &GameState, ret_name: &str, loyalty: u32) -> GMResponse {
+    let result = retainer::loyalty_check(loyalty);
+    let result_name = match result {
+        retainer::LoyaltyResult::Loyal => "Loyal",
+        retainer::LoyaltyResult::Wavering => "Wavering",
+        retainer::LoyaltyResult::Disloyal => "Disloyal",
+    };
+    GMResponse::ok_with_data(
+        id,
+        format!("{} loyalty check (loyalty {}): {}.", ret_name, loyalty, result_name),
+        state.mode.clone(),
+        serde_json::json!({
+            "retainer": ret_name,
+            "loyalty": loyalty,
+            "result": result_name,
+        }),
+    )
+}
+
+fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
+    let character = match state.party.find_member_mut(char_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let cls = match Class::parse(&character.class) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("unknown class '{}'.", character.class), state.mode.clone()),
+    };
+    match crate::rules::xp::check_level_up(cls, character.level, character.xp) {
+        Some(_next_level) => {
+            let result = xp::award_xp(character, 0, 0);
+            if result.leveled_up {
+                GMResponse::ok_with_data(
+                    id,
+                    format!("{} leveled up to {}! Gained {} HP. HP: {}/{}.",
+                        character.name, result.new_level, result.hp_gained,
+                        character.hp, character.max_hp),
+                    state.mode.clone(),
+                    serde_json::json!({
+                        "character": character.name,
+                        "new_level": result.new_level,
+                        "hp_gained": result.hp_gained,
+                        "hp": character.hp,
+                        "max_hp": character.max_hp,
+                    }),
+                )
+            } else {
+                GMResponse::ok(id, format!("{} is already at level {} and cannot advance further.", character.name, character.level), state.mode.clone())
+            }
+        }
+        None => {
+            let needed = crate::rules::xp::xp_for_level(cls, character.level + 1);
+            if needed == u64::MAX {
+                GMResponse::err(id, format!("{} is at maximum level ({}).", character.name, character.level), state.mode.clone())
+            } else {
+                GMResponse::err(id, format!("{} needs {} XP for level {} (has {}).", character.name, needed, character.level + 1, character.xp), state.mode.clone())
+            }
+        }
+    }
 }
 
 fn ruling(id: &str, state: &mut GameState, text: &str) -> GMResponse {

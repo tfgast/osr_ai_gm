@@ -131,11 +131,58 @@ pub enum GMCommand {
     RollReaction { character: String },
 
     // -- GM-only: management --
-    /// Award XP to a character.
+    /// Award XP to a character (with prime requisite modifier and level-up check).
     AwardXp {
         character: String,
         xp: u64,
     },
+    /// Award treasure XP (1gp = 1xp) and monster XP with level-up check.
+    AwardTreasureXp {
+        character: String,
+        treasure_gp: u64,
+        monster_xp: u64,
+    },
+    /// Check thief skill.
+    ThiefSkillCheck {
+        character: String,
+        skill: String,
+    },
+    /// Perform a backstab attack.
+    Backstab {
+        character: String,
+        monster_idx: usize,
+        #[serde(default = "default_weapon")]
+        weapon: String,
+    },
+    /// Query encumbrance for a character.
+    QueryEncumbrance { character: String },
+    /// Spawn monsters from the built-in monster database.
+    SpawnMonster {
+        name: String,
+        count: u32,
+        #[serde(default = "default_distance")]
+        distance: u32,
+    },
+    /// Look up a spell definition.
+    LookupSpell {
+        name: String,
+        #[serde(default)]
+        list: String,
+    },
+    /// Hire a retainer.
+    HireRetainer {
+        employer: String,
+        retainer_name: String,
+        retainer_class: String,
+        retainer_level: u32,
+    },
+    /// Check retainer loyalty.
+    LoyaltyCheck {
+        retainer_name: String,
+        loyalty: u32,
+    },
+    /// Level up a character (if they have enough XP).
+    LevelUp { character: String },
     /// Issue a GM ruling (free-text note recorded in the session log).
     Ruling { text: String },
 
@@ -162,6 +209,7 @@ fn default_room_name() -> String { "Entrance".to_string() }
 fn default_door_state() -> String { "closed".to_string() }
 fn default_terrain() -> String { "clear".to_string() }
 fn default_save_path() -> String { "save.json".to_string() }
+fn default_distance() -> u32 { 60 }
 
 // =============================================================================
 // GM Response — what the game engine sends back
