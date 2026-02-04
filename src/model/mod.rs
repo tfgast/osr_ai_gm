@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::rules::save::SavingThrows;
 
 /// Character ability scores.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -9,6 +10,22 @@ pub struct AbilityScores {
     pub dexterity: i32,
     pub constitution: i32,
     pub charisma: i32,
+}
+
+impl AbilityScores {
+    /// Convert to array: [STR, INT, WIS, DEX, CON, CHA].
+    pub fn to_array(&self) -> [i32; 6] {
+        [self.strength, self.intelligence, self.wisdom,
+         self.dexterity, self.constitution, self.charisma]
+    }
+
+    /// Create from array: [STR, INT, WIS, DEX, CON, CHA].
+    pub fn from_array(a: &[i32; 6]) -> Self {
+        AbilityScores {
+            strength: a[0], intelligence: a[1], wisdom: a[2],
+            dexterity: a[3], constitution: a[4], charisma: a[5],
+        }
+    }
 }
 
 /// A player or non-player character.
@@ -24,6 +41,16 @@ pub struct Character {
     pub xp: u64,
     pub inventory: Vec<Item>,
     pub spells: Vec<Spell>,
+    #[serde(default)]
+    pub alignment: String,
+    #[serde(default)]
+    pub gold_gp: u32,
+    #[serde(default)]
+    pub saving_throws: Option<SavingThrows>,
+    #[serde(default)]
+    pub thac0: u32,
+    #[serde(default)]
+    pub movement_rate: u32,
 }
 
 impl Character {
@@ -39,6 +66,11 @@ impl Character {
             xp: 0,
             inventory: Vec::new(),
             spells: Vec::new(),
+            alignment: String::new(),
+            gold_gp: 0,
+            saving_throws: None,
+            thac0: 19,
+            movement_rate: 120,
         }
     }
 
