@@ -229,7 +229,7 @@ pub fn resolve_character_attack(
         character_missile_attack(combat, character, monster_idx, weapon.damage, dex_mod, weapon.range)
     } else if weapon.qualities.missile && weapon.qualities.melee {
         // Versatile weapon (e.g., dagger, spear) — melee if close, missile if far
-        if combat.distance <= 5 {
+        if combat.distance <= 10 {
             let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
             Ok(character_melee_attack(combat, character, monster_idx, weapon.damage, str_mod))
         } else {
@@ -238,7 +238,7 @@ pub fn resolve_character_attack(
         }
     } else {
         // Pure melee weapon
-        if combat.distance > 5 {
+        if combat.distance > 10 {
             return Err(format!(
                 "{} is a melee weapon but monsters are {}' away. Move closer or use a missile weapon.",
                 weapon.name, combat.distance));
@@ -1066,6 +1066,27 @@ mod tests {
         character_melee_attack_with(&mut combat, &fighter, 0, "1d8", 2, &mut test_rng());
         assert!(!combat.log.is_empty());
         assert!(combat.log.last().unwrap().contains("Grond"));
+    }
+
+    #[test]
+    fn melee_range_allows_10_feet() {
+        // Per OSR rules, melee combat is allowed at 5-10' distance
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        let fighter = test_fighter();
+        let sword = equipment::find_weapon("Sword").unwrap();
+        let result = resolve_character_attack(&mut combat, &fighter, 0, &sword, 0);
+        assert!(result.is_ok(), "melee attack should succeed at 10' distance");
+    }
+
+    #[test]
+    fn melee_range_fails_beyond_10_feet() {
+        // Melee weapons cannot reach beyond 10'
+        let mut combat = CombatState::new(vec![test_goblin()], 11);
+        let fighter = test_fighter();
+        let sword = equipment::find_weapon("Sword").unwrap();
+        let result = resolve_character_attack(&mut combat, &fighter, 0, &sword, 0);
+        assert!(result.is_err(), "melee attack should fail at 11' distance");
+        assert!(result.unwrap_err().contains("melee weapon"));
     }
 
     // --- Missile Attack ---
