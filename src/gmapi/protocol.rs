@@ -52,6 +52,9 @@ pub enum GMCommand {
         damage: String,
         morale: u32,
         distance: u32,
+        /// XP per monster. If omitted, auto-looked up from monster database.
+        #[serde(default)]
+        xp_value: Option<u64>,
     },
     /// Roll initiative for the current combat round.
     RollInitiative,

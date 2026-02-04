@@ -31,8 +31,8 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         }
 
         // -- Combat --
-        GMCommand::SpawnEncounter { name, count, hit_dice, ac, hp, damage, morale, distance } => {
-            spawn_encounter(id, state, name, *count, hit_dice, *ac, *hp, damage, *morale, *distance)
+        GMCommand::SpawnEncounter { name, count, hit_dice, ac, hp, damage, morale, distance, xp_value } => {
+            spawn_encounter(id, state, name, *count, hit_dice, *ac, *hp, damage, *morale, *distance, *xp_value)
         }
         GMCommand::RollInitiative => roll_initiative(id, state),
         GMCommand::Attack { character, monster_idx, weapon } => {
@@ -268,7 +268,7 @@ fn create_character(id: &str, state: &mut GameState, name: &str, class_name: &st
 fn spawn_encounter(
     id: &str, state: &mut GameState,
     name: &str, count: u32, hit_dice: &str, ac: i32, hp: i32,
-    damage: &str, morale: u32, distance: u32,
+    damage: &str, morale: u32, distance: u32, xp_value: Option<u64>,
 ) -> GMResponse {
     if state.combat.is_some() {
         return GMResponse::err(id, "combat already active.", state.mode.clone());
@@ -276,6 +276,12 @@ fn spawn_encounter(
     if !(2..=12).contains(&morale) {
         return GMResponse::err(id, "morale must be 2-12.", state.mode.clone());
     }
+    // XP: use explicit value if provided, otherwise look up from monster database
+    let xp = xp_value.unwrap_or_else(|| {
+        crate::rules::monster::find_monster(name)
+            .map(|m| m.xp_value)
+            .unwrap_or(0)
+    });
     let mut monsters = Vec::new();
     for i in 0..count {
         let monster_name = if count > 1 {
@@ -289,6 +295,7 @@ fn spawn_encounter(
         m.ac = ac;
         m.damage = damage.to_string();
         m.morale = morale;
+        m.xp_value = xp;
         m.attacks = vec!["attack".to_string()];
         monsters.push(m);
     }
@@ -658,18 +665,19 @@ fn travel(id: &str, state: &mut GameState, x: i32, y: i32) -> GMResponse {
         None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
     };
     let result = wilderness_engine::travel_day(ws, x, y, party_movement);
-    let has_encounter = result.encounter.is_some();
-    let mut data = serde_json::json!({
+    let has_encounter = !result.encounters.is_empty();
+    let encounters_json: Vec<serde_json::Value> = result.encounters.iter().map(|enc| {
+        serde_json::json!({
+            "name": enc.name,
+            "number": enc.number,
+        })
+    }).collect();
+    let data = serde_json::json!({
         "messages": result.messages,
         "lost": result.lost,
         "has_encounter": has_encounter,
+        "encounters": encounters_json,
     });
-    if let Some(enc) = &result.encounter {
-        data["encounter"] = serde_json::json!({
-            "name": enc.name,
-            "number": enc.number,
-        });
-    }
     GMResponse::ok_with_data(id, format!("{}", result), state.mode.clone(), data)
 }
 
@@ -1230,6 +1238,7 @@ mod tests {
             damage: "1d6".to_string(),
             morale: 7,
             distance: 60,
+            xp_value: None,
         }), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
@@ -1252,6 +1261,7 @@ mod tests {
             damage: "1d6".to_string(),
             morale: 13,
             distance: 60,
+            xp_value: None,
         }), &mut state);
         assert!(!resp.success);
     }
@@ -1269,6 +1279,7 @@ mod tests {
             damage: "1d6".to_string(),
             morale: 8,
             distance: 30,
+            xp_value: None,
         }), &mut state);
         assert!(!resp.success);
         assert!(resp.error.unwrap().contains("already active"));
@@ -1464,6 +1475,7 @@ mod tests {
             damage: "1d6".to_string(),
             morale: 7,
             distance: 5,
+            xp_value: None,
         }), &mut state);
         assert!(resp.success);
 

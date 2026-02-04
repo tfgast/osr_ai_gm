@@ -9,8 +9,8 @@ pub struct TravelResult {
     pub messages: Vec<String>,
     /// Whether the party got lost.
     pub lost: bool,
-    /// Encounter triggered during travel.
-    pub encounter: Option<encounter::EncounterEntry>,
+    /// Encounters triggered during travel (up to 3 per day: morning, afternoon, night).
+    pub encounters: Vec<encounter::EncounterEntry>,
     /// Whether foraging was attempted and succeeded.
     pub foraged: Option<bool>,
 }
@@ -20,7 +20,7 @@ impl TravelResult {
         TravelResult {
             messages: Vec::new(),
             lost: false,
-            encounter: None,
+            encounters: Vec::new(),
             foraged: None,
         }
     }
@@ -79,8 +79,34 @@ pub fn travel_day_with<R: Rng>(
             "The party is LOST! (rolled {} vs {}-in-6)",
             lost_roll, lost_chance
         ));
-        // When lost, the party moves in a random direction instead
-        result.msg("The party wanders aimlessly and makes no progress toward their destination.");
+        // Per OSE, lost party moves in a random direction
+        let adjacent: Vec<(i32, i32)> = wilderness.hexes.iter()
+            .filter(|h| {
+                let dx = (h.x - wilderness.current_x).abs();
+                let dy = (h.y - wilderness.current_y).abs();
+                dx <= 1 && dy <= 1 && (h.x, h.y) != (wilderness.current_x, wilderness.current_y)
+            })
+            .map(|h| (h.x, h.y))
+            .collect();
+        if adjacent.is_empty() {
+            result.msg("The party wanders aimlessly but there is nowhere to go.");
+        } else {
+            let idx = rng.gen_range(0..adjacent.len());
+            let (rx, ry) = adjacent[idx];
+            match wilderness.move_to(rx, ry) {
+                Err(e) => {
+                    result.msg(format!("The party tries to wander but cannot: {}", e));
+                }
+                Ok(()) => {}
+            }
+            let terrain_name = wilderness.current_hex()
+                .map(|h| h.terrain.name())
+                .unwrap_or("unknown");
+            result.msg(format!(
+                "The party wanders into ({}, {}) — {} terrain.",
+                rx, ry, terrain_name
+            ));
+        }
     } else {
         wilderness.lost = false;
         // Travel speed
@@ -115,23 +141,30 @@ pub fn travel_day_with<R: Rng>(
         }
     }
 
-    // Encounter check: 1-in-6 per day in most terrain, 2-in-6 in some
-    let encounter_chance: u32 = match terrain {
+    // Per OSE: 3 encounter checks per day (morning, afternoon, night).
+    // Use current (post-move) terrain for encounter table and chance.
+    let current_terrain = wilderness.current_hex()
+        .map(|h| h.terrain)
+        .unwrap_or(Terrain::Clear);
+    let encounter_chance: u32 = match current_terrain {
         Terrain::City => 1,
         Terrain::Clear | Terrain::Hills | Terrain::Barren => 1,
         Terrain::Forest | Terrain::Desert | Terrain::Mountains => 2,
         Terrain::Swamp | Terrain::Jungle => 2,
         Terrain::Ocean | Terrain::River => 2,
     };
-    let encounter_roll: u32 = rng.gen_range(1..=6);
-    if encounter_roll <= encounter_chance {
-        let table_roll: u32 = rng.gen_range(1..=20);
-        let entry = encounter::wilderness_encounter(terrain, table_roll);
-        result.msg(format!(
-            "Encounter! {} ({} appearing).",
-            entry.name, entry.number
-        ));
-        result.encounter = Some(entry.clone());
+    let periods = ["Morning", "Afternoon", "Night"];
+    for period in &periods {
+        let encounter_roll: u32 = rng.gen_range(1..=6);
+        if encounter_roll <= encounter_chance {
+            let table_roll: u32 = rng.gen_range(1..=20);
+            let entry = encounter::wilderness_encounter(current_terrain, table_roll);
+            result.msg(format!(
+                "{} encounter! {} ({} appearing).",
+                period, entry.name, entry.number
+            ));
+            result.encounters.push(entry.clone());
+        }
     }
 
     wilderness.travel_day += 1;
@@ -159,9 +192,10 @@ pub fn forage_with<R: Rng>(rng: &mut R, wilderness: &WildernessState) -> String 
     let roll: u32 = rng.gen_range(1..=6);
 
     if roll <= chance {
+        let quantity: u32 = rng.gen_range(1..=6);
         format!(
-            "Foraging successful! Found enough food for 1d6 person-days. (rolled {} vs {}-in-6)",
-            roll, chance
+            "Foraging successful! Found enough food for {} person-days. (rolled {} vs {}-in-6, quantity: 1d6={})",
+            quantity, roll, chance, quantity
         )
     } else {
         format!(
@@ -189,9 +223,10 @@ pub fn hunt_with<R: Rng>(rng: &mut R, wilderness: &WildernessState) -> String {
 
     let roll: u32 = rng.gen_range(1..=6);
     if roll == 1 {
+        let quantity: u32 = rng.gen_range(1..=6);
         format!(
-            "Hunt successful! Killed game sufficient for 1d6 person-days of food. (rolled {})",
-            roll
+            "Hunt successful! Killed game sufficient for {} person-days of food. (rolled {}, quantity: 1d6={})",
+            quantity, roll, quantity
         )
     } else {
         format!("Hunt unsuccessful. No game found. (rolled {})", roll)
@@ -253,32 +288,57 @@ mod tests {
     #[test]
     fn travel_can_get_lost() {
         let mut lost_count = 0;
+        let mut moved_randomly = false;
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
-            // Travel through swamp (3-in-6 lost chance)
+            // Travel through swamp (2-in-6 lost chance)
             ws.move_to(0, 1).unwrap();
+            let start_x = ws.current_x;
+            let start_y = ws.current_y;
             let result = travel_day_with(&mut rng, &mut ws, 1, 1, 120);
             if result.lost {
                 lost_count += 1;
+                // When lost, party should have moved to a random adjacent hex
+                if (ws.current_x, ws.current_y) != (start_x, start_y) {
+                    moved_randomly = true;
+                }
             }
         }
         assert!(lost_count > 0, "should get lost sometimes in swamp");
+        assert!(moved_randomly, "lost party should move to a random adjacent hex");
     }
 
     #[test]
     fn travel_encounter_check() {
-        let mut encounters = 0;
+        let mut encounter_days = 0;
         for seed in 0..200 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
             let result = travel_day_with(&mut rng, &mut ws, 1, 0, 120);
-            if result.encounter.is_some() {
-                encounters += 1;
+            if !result.encounters.is_empty() {
+                encounter_days += 1;
             }
         }
-        assert!(encounters > 0, "should get encounters sometimes");
-        assert!(encounters < 100, "should not get encounters too often");
+        assert!(encounter_days > 0, "should get encounters sometimes");
+        assert!(encounter_days < 150, "should not get encounters every day");
+    }
+
+    #[test]
+    fn travel_three_encounter_checks_per_day() {
+        // With enough trials in high-encounter terrain, we should see days with multiple encounters
+        let mut multi_encounter_days = 0;
+        for seed in 0..500 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            // Forest has 2-in-6 encounter chance per check
+            ws.move_to(1, 0).unwrap();
+            let result = travel_day_with(&mut rng, &mut ws, 0, 0, 120);
+            if result.encounters.len() > 1 {
+                multi_encounter_days += 1;
+            }
+        }
+        assert!(multi_encounter_days > 0, "with 3 checks/day at 2-in-6, should sometimes get multiple encounters");
     }
 
     #[test]

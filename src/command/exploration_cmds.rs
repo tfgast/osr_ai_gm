@@ -105,13 +105,22 @@ impl Command for SearchCommand {
 pub struct ListenCommand;
 impl Command for ListenCommand {
     fn name(&self) -> &str { "listen" }
-    fn help(&self) -> &str { "Listen at a door (1-in-6, demihumans 2-in-6)" }
-    fn execute(&self, args: &[&str], _state: &mut GameState) -> CommandResult {
+    fn help(&self) -> &str { "Listen at a door (1-in-6, demihumans 2-in-6). Takes one turn." }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         let is_demihuman = args.first()
             .map(|a| a.eq_ignore_ascii_case("demihuman") || a.eq_ignore_ascii_case("elf"))
             .unwrap_or(false);
-        let result = exploration::listen_at_door(is_demihuman);
-        CommandResult::ok(result)
+        let level = state.dungeon_level;
+        let time = match state.time.as_mut() {
+            Some(t) => t,
+            None => return CommandResult::error("not in exploration mode."),
+        };
+        let dungeon = match state.dungeon.as_ref() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        let result = exploration::listen_at_door(time, dungeon, level, is_demihuman);
+        CommandResult::ok(format!("{}", result))
     }
 }
 

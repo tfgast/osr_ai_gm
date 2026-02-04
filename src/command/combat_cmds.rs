@@ -2,20 +2,21 @@ use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::engine::combat;
 use crate::model::{CombatState, Monster};
-use crate::rules::{ability, equipment};
+use crate::rules::{ability, equipment, monster as monster_db};
 
 pub struct StartCombatCommand;
 impl Command for StartCombatCommand {
     fn name(&self) -> &str { "start_combat" }
-    fn help(&self) -> &str { "Start combat (start_combat <name> <count> <hd> <ac> <hp> <damage> <morale> <distance>)" }
+    fn help(&self) -> &str { "Start combat (start_combat <name> <count> <hd> <ac> <hp> <damage> <morale> <distance> [xp])" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if state.combat.is_some() {
             return CommandResult::error("combat already active. Use 'end_combat' first.");
         }
         if args.len() < 8 {
             return CommandResult::error(
-                "usage: start_combat <name> <count> <hd> <ac> <hp> <damage> <morale> <distance>\n  \
-                 example: start_combat goblin 3 1 6 3 1d6 7 60"
+                "usage: start_combat <name> <count> <hd> <ac> <hp> <damage> <morale> <distance> [xp]\n  \
+                 example: start_combat goblin 3 1 6 3 1d6 7 60\n  \
+                 XP is auto-looked up from monster database if available, or specify manually."
             );
         }
         let name = args[0];
@@ -42,6 +43,18 @@ impl Command for StartCombatCommand {
             _ => return CommandResult::error("distance must be a non-negative integer"),
         };
 
+        // XP: use explicit arg if provided, otherwise look up from monster database
+        let xp_value: u64 = if args.len() >= 9 {
+            match args[8].parse() {
+                Ok(n) => n,
+                _ => return CommandResult::error("xp must be a non-negative integer"),
+            }
+        } else {
+            monster_db::find_monster(name)
+                .map(|m| m.xp_value)
+                .unwrap_or(0)
+        };
+
         let mut monsters = Vec::new();
         for i in 0..count {
             let monster_name = if count > 1 {
@@ -55,6 +68,7 @@ impl Command for StartCombatCommand {
             m.ac = ac;
             m.damage = damage.to_string();
             m.morale = morale;
+            m.xp_value = xp_value;
             m.attacks = vec!["attack".to_string()];
             monsters.push(m);
         }
@@ -63,8 +77,14 @@ impl Command for StartCombatCommand {
         let status = combat::combat_status(&combat_state, &state.party.members);
         state.combat = Some(combat_state);
 
-        let mut out = format!("Combat started! {} {}(s) at {}' distance.\n\n",
+        let mut out = format!("Combat started! {} {}(s) at {}' distance.\n",
             count, name, distance);
+        if xp_value > 0 {
+            out.push_str(&format!("XP per monster: {}\n", xp_value));
+        } else {
+            out.push_str("Warning: monster XP is 0. Specify XP as 9th argument or use a known monster name.\n");
+        }
+        out.push('\n');
         out.push_str(&status);
         out.push_str("\nUse 'initiative' to roll for the first round.");
         CommandResult::ok(out)
@@ -147,8 +167,11 @@ impl Command for AttackCommand {
             return CommandResult::error(format!("{} is dead and cannot attack.", character.name));
         }
 
+        // Per OSE, -1 to attack and damage when rest is overdue
+        let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
+
         if weapon.qualities.missile && !weapon.qualities.melee {
-            let dex_mod = ability::dex_missile_mod(character.abilities.dexterity);
+            let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
             match combat::character_missile_attack(
                 combat, &character, monster_idx,
                 weapon.damage, dex_mod, weapon.range,
@@ -158,13 +181,13 @@ impl Command for AttackCommand {
             }
         } else if weapon.qualities.missile && weapon.qualities.melee {
             if combat.distance <= 5 {
-                let str_mod = ability::str_melee_mod(character.abilities.strength);
+                let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
                 let result = combat::character_melee_attack(
                     combat, &character, monster_idx, weapon.damage, str_mod,
                 );
                 CommandResult::ok(format!("{}", result))
             } else {
-                let dex_mod = ability::dex_missile_mod(character.abilities.dexterity);
+                let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
                 match combat::character_missile_attack(
                     combat, &character, monster_idx,
                     weapon.damage, dex_mod, weapon.range,
@@ -180,7 +203,7 @@ impl Command for AttackCommand {
                     weapon.name, combat.distance
                 ));
             }
-            let str_mod = ability::str_melee_mod(character.abilities.strength);
+            let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
             let result = combat::character_melee_attack(
                 combat, &character, monster_idx, weapon.damage, str_mod,
             );

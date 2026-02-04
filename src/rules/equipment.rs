@@ -25,8 +25,8 @@ impl WeaponQualities {
         WeaponQualities { melee: true, missile: false, blunt: false, two_handed: true, slow: true, brace: false, charge: false }
     }
 
-    const fn melee_blunt_2h_slow() -> Self {
-        WeaponQualities { melee: true, missile: false, blunt: true, two_handed: true, slow: true, brace: false, charge: false }
+    const fn melee_blunt_2h() -> Self {
+        WeaponQualities { melee: true, missile: false, blunt: true, two_handed: true, slow: false, brace: false, charge: false }
     }
 }
 
@@ -121,7 +121,7 @@ pub const WEAPONS: &[WeaponDef] = &[
         },
         WeaponDef {
             name: "Staff", cost_gp: 2, weight_coins: 40, damage: "1d4",
-            qualities: WeaponQualities::melee_blunt_2h_slow(),
+            qualities: WeaponQualities::melee_blunt_2h(),
             range: (0, 0, 0),
         },
         WeaponDef {
@@ -312,6 +312,14 @@ mod tests {
     fn ac_leather_no_shield_low_dex() {
         // Leather (7) + no shield + DEX -1 = 8
         assert_eq!(calculate_ac(7, false, -1), 8);
+    }
+
+    #[test]
+    fn staff_not_slow() {
+        let w = find_weapon("Staff").unwrap();
+        assert!(w.qualities.blunt);
+        assert!(w.qualities.two_handed);
+        assert!(!w.qualities.slow, "Staff should not have slow quality per OSE");
     }
 
     #[test]

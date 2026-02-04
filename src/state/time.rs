@@ -152,6 +152,11 @@ impl TimeTracker {
         self.turns_since_rest >= 5
     }
 
+    /// Per OSE, -1 penalty to attack and damage when rest is overdue.
+    pub fn rest_penalty(&self) -> i32 {
+        if self.needs_rest() { -1 } else { 0 }
+    }
+
     /// Record a rest turn. Resets activity counter.
     pub fn rest(&mut self) {
         self.log(format!("Turn {}: Party rests for one turn.", self.total_turns));
@@ -282,6 +287,19 @@ mod tests {
         assert_eq!(tracker.turns_since_rest, 0);
         // Rest itself advances a turn (for light tracking)
         assert_eq!(tracker.total_turns, turns_before + 1);
+    }
+
+    #[test]
+    fn rest_penalty_applied_when_overdue() {
+        let mut tracker = TimeTracker::new();
+        assert_eq!(tracker.rest_penalty(), 0);
+        for _ in 0..5 {
+            tracker.advance_turn();
+        }
+        assert_eq!(tracker.rest_penalty(), -1, "should have -1 penalty when rest is overdue");
+        tracker.light(LightSourceKind::Lantern, "Test");
+        tracker.rest();
+        assert_eq!(tracker.rest_penalty(), 0, "penalty should clear after rest");
     }
 
     #[test]

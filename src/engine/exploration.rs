@@ -82,14 +82,16 @@ pub fn advance_dungeon_turn_with<R: Rng>(
         result.msg(msg);
     }
 
-    // Darkness warning
+    // Darkness — block exploration movement
     if !time.has_light() {
         result.msg("The party is in DARKNESS! Movement is impossible without light.");
+        result.msg("Light a torch or lantern before exploring.");
+        return result;
     }
 
-    // Rest requirement
+    // Rest requirement — per OSE, -1 to attack and damage when rest is overdue
     if time.needs_rest() {
-        result.msg("The party must rest this turn (1 turn per 5 turns of activity).");
+        result.msg("The party must rest this turn (1 turn per 5 turns of activity). Penalty: -1 to attack and damage rolls.");
     }
 
     // Mark current room as explored
@@ -183,19 +185,50 @@ pub fn search_room_with<R: Rng>(
 }
 
 /// Listen at a door. Base chance 1-in-6 to hear noises behind it.
-pub fn listen_at_door(is_elf_or_halfling: bool) -> String {
-    listen_at_door_with(&mut rand::thread_rng(), is_elf_or_halfling)
+/// Per OSE, listening takes one dungeon turn.
+pub fn listen_at_door(
+    time: &mut TimeTracker,
+    dungeon: &DungeonState,
+    dungeon_level: u32,
+    is_elf_or_halfling: bool,
+) -> ExplorationResult {
+    listen_at_door_with(&mut rand::thread_rng(), time, dungeon, dungeon_level, is_elf_or_halfling)
 }
 
 /// Testable version.
-pub fn listen_at_door_with<R: Rng>(rng: &mut R, is_elf_or_halfling: bool) -> String {
+pub fn listen_at_door_with<R: Rng>(
+    rng: &mut R,
+    time: &mut TimeTracker,
+    _dungeon: &DungeonState,
+    dungeon_level: u32,
+    is_elf_or_halfling: bool,
+) -> ExplorationResult {
+    let mut result = ExplorationResult::new();
+
+    // Listening consumes one turn
+    let light_msgs = time.advance_turn();
+    for msg in light_msgs {
+        result.msg(msg);
+    }
+
     let threshold = if is_elf_or_halfling { 2 } else { 1 };
     let roll: u32 = rng.gen_range(1..=6);
     if roll <= threshold {
-        "You hear sounds beyond the door!".to_string()
+        result.msg("You hear sounds beyond the door!");
     } else {
-        "You hear nothing.".to_string()
+        result.msg("You hear nothing.");
     }
+
+    // Wandering monster check (listening consumes a turn)
+    if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
+        result.msg(format!(
+            "Wandering monster! {} ({} appearing)",
+            entry.name, entry.number
+        ));
+        result.encounter = Some(entry);
+    }
+
+    result
 }
 
 /// Force open a door. Base chance 2-in-6, modified by STR.
@@ -285,6 +318,11 @@ pub fn move_through_door_with<R: Rng>(
     dungeon_level: u32,
     door_id: u32,
 ) -> Result<ExplorationResult, String> {
+    // Block movement in darkness
+    if !time.has_light() {
+        return Err("Cannot move — the party is in DARKNESS! Light a torch or lantern first.".to_string());
+    }
+
     let door = match dungeon.doors.iter().find(|d| d.id == door_id) {
         Some(d) => d.clone(),
         None => return Err(format!("Door {} not found.", door_id)),
@@ -425,13 +463,28 @@ mod tests {
     }
 
     #[test]
-    fn darkness_warning_without_light() {
+    fn darkness_blocks_exploration() {
         let mut rng = test_rng();
         let mut time = TimeTracker::new();
         let mut dungeon = test_dungeon();
 
         let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
         assert!(result.messages.iter().any(|m| m.contains("DARKNESS")));
+        // Should not have explored any rooms (blocked by darkness)
+        assert!(!dungeon.explored.contains(&0), "should not explore in darkness");
+    }
+
+    #[test]
+    fn darkness_blocks_door_movement() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        // Open door 0 so we can try to move
+        dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("DARKNESS"));
     }
 
     #[test]
@@ -493,8 +546,22 @@ mod tests {
     #[test]
     fn listen_at_door_basic() {
         let mut rng = test_rng();
-        let result = listen_at_door_with(&mut rng, false);
-        assert!(result.contains("hear") || result.contains("nothing"));
+        let mut time = TimeTracker::new();
+        let dungeon = test_dungeon();
+        time.light(LightSourceKind::Torch, "Arden");
+        let result = listen_at_door_with(&mut rng, &mut time, &dungeon, 1, false);
+        assert!(result.messages.iter().any(|m| m.contains("hear") || m.contains("nothing")));
+    }
+
+    #[test]
+    fn listen_at_door_consumes_turn() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let dungeon = test_dungeon();
+        time.light(LightSourceKind::Torch, "Arden");
+        let turns_before = time.total_turns;
+        listen_at_door_with(&mut rng, &mut time, &dungeon, 1, false);
+        assert_eq!(time.total_turns, turns_before + 1, "listening should consume one turn");
     }
 
     #[test]

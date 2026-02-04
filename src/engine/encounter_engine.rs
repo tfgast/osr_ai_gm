@@ -171,13 +171,14 @@ impl fmt::Display for EvasionResult {
     }
 }
 
-/// Attempt to evade an encounter.
-/// Success based on party size vs monster number and relative speed.
+/// Attempt to evade an encounter per OSE evasion rules.
 ///
-/// OSE evasion: if party is smaller, 50% chance (d% <= 50) per round of chase.
-/// If party is faster, automatic success after initial check.
-/// Simplified: roll d% — if party movement >= monster movement, succeed on 1-70.
-/// If party is slower, succeed on 1-50. If greatly outnumbered, -25%.
+/// If the party is faster than the monsters, evasion automatically succeeds.
+/// Otherwise, chance is based on the OSE party-size-vs-monster-number table:
+///   Party 1-4:   party outnumbers monsters 70%, monsters outnumber party 50%
+///   Party 5-12:  party outnumbers monsters 50%, monsters outnumber party 35%
+///   Party 13-24: party outnumbers monsters 35%, monsters outnumber party 25%
+///   Party 25+:   party outnumbers monsters 25%, monsters outnumber party 10%
 pub fn attempt_evasion(
     party_size: u32,
     party_movement: u32,
@@ -201,26 +202,19 @@ pub fn attempt_evasion_with<R: Rng>(
     monster_count: u32,
     monster_movement: u32,
 ) -> EvasionResult {
-    let mut chance: i32 = 50;
-
-    // Faster party gets +20%
+    // Per OSE: if party is faster, evasion automatically succeeds
     if party_movement > monster_movement {
-        chance += 20;
-    }
-    // Slower party gets -20%
-    if party_movement < monster_movement {
-        chance -= 20;
-    }
-    // Smaller party gets +10% (easier to hide)
-    if party_size < monster_count {
-        chance += 10;
-    }
-    // Greatly outnumbered (4:1+) gets -10%
-    if monster_count >= party_size * 4 {
-        chance -= 10;
+        return EvasionResult::Escaped;
     }
 
-    chance = chance.max(5).min(95); // Always at least 5%, at most 95%
+    // OSE evasion table: chance depends on party size and relative numbers
+    let fewer_monsters = monster_count <= party_size;
+    let chance: i32 = match party_size {
+        1..=4 => if fewer_monsters { 70 } else { 50 },
+        5..=12 => if fewer_monsters { 50 } else { 35 },
+        13..=24 => if fewer_monsters { 35 } else { 25 },
+        _ => if fewer_monsters { 25 } else { 10 },
+    };
 
     let roll: i32 = rng.gen_range(1..=100);
     if roll <= chance {
@@ -412,45 +406,57 @@ mod tests {
     }
 
     #[test]
-    fn evasion_faster_party() {
-        let mut escaped = 0;
-        for seed in 0..100 {
+    fn evasion_faster_party_auto_success() {
+        // Per OSE: faster party always escapes
+        for seed in 0..50 {
             let mut rng = StdRng::seed_from_u64(seed);
             let result = attempt_evasion_with(&mut rng, 4, 120, 6, 90);
-            if result == EvasionResult::Escaped {
-                escaped += 1;
-            }
+            assert_eq!(result, EvasionResult::Escaped, "faster party should always escape");
         }
-        // Faster party should escape more often (70% base)
-        assert!(escaped > 50, "faster party should escape frequently, got {}", escaped);
     }
 
     #[test]
-    fn evasion_slower_party() {
+    fn evasion_small_party_vs_more_monsters() {
+        // Party 1-4, more monsters than party: 50% chance
         let mut escaped = 0;
-        for seed in 0..100 {
+        for seed in 0..200 {
             let mut rng = StdRng::seed_from_u64(seed);
             let result = attempt_evasion_with(&mut rng, 4, 90, 6, 120);
             if result == EvasionResult::Escaped {
                 escaped += 1;
             }
         }
-        // Slower party should escape less often (30% base)
-        assert!(escaped < 60, "slower party should not escape too often, got {}", escaped);
+        // Should be around 50% (allow margin)
+        assert!(escaped > 70 && escaped < 130, "expected ~50% escape rate, got {}", escaped);
     }
 
     #[test]
-    fn evasion_always_has_some_chance() {
-        // Even worst case should have at least 5%
+    fn evasion_small_party_vs_fewer_monsters() {
+        // Party 1-4, fewer monsters: 70% chance
+        let mut escaped = 0;
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let result = attempt_evasion_with(&mut rng, 4, 90, 2, 120);
+            if result == EvasionResult::Escaped {
+                escaped += 1;
+            }
+        }
+        assert!(escaped > 100, "expected ~70% escape rate, got {}", escaped);
+    }
+
+    #[test]
+    fn evasion_large_party_low_chance() {
+        // Party 25+, more monsters: 10% chance
         let mut escaped = 0;
         for seed in 0..1000 {
             let mut rng = StdRng::seed_from_u64(seed);
-            let result = attempt_evasion_with(&mut rng, 1, 60, 100, 180);
+            let result = attempt_evasion_with(&mut rng, 30, 60, 50, 120);
             if result == EvasionResult::Escaped {
                 escaped += 1;
             }
         }
         assert!(escaped > 0, "should have at least some chance of escape");
+        assert!(escaped < 200, "expected ~10% escape rate, got {}", escaped);
     }
 
     #[test]
