@@ -66,6 +66,10 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(AdvanceTurnCommand));
     registry.register(Box::new(AwardXpCommand));
     registry.register(Box::new(RulingCommand));
+    // Notes
+    registry.register(Box::new(NoteCommand));
+    registry.register(Box::new(NotesCommand));
+    registry.register(Box::new(NoteDeleteCommand));
     // System
     registry.register(Box::new(RollCommand));
     registry.register(Box::new(SaveCommand));
