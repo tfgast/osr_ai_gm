@@ -578,6 +578,46 @@ pub fn resolve_turn_undead_with<R: Rng>(
 // Movement
 // =============================================================================
 
+/// Close distance toward the monsters.
+///
+/// Movement is capped by encounter movement rate (movement_rate / 3).
+/// If `feet` is `None`, the character closes as far as possible (up to encounter move).
+/// If `feet` is `Some(n)`, the character closes exactly `n` feet.
+/// Returns an error if the requested distance exceeds the encounter movement rate.
+/// Distance cannot go below 0.
+pub fn close(combat: &mut CombatState, character: &Character, feet: Option<u32>) -> Result<String, String> {
+    let encounter_move = character.movement_rate / 3;
+    if encounter_move == 0 {
+        return Err(format!("{} cannot move (movement rate 0).", character.name));
+    }
+
+    if combat.distance == 0 {
+        return Err("already in melee range.".to_string());
+    }
+
+    let actual = match feet {
+        Some(f) => {
+            if f == 0 {
+                return Err("distance to close must be positive.".to_string());
+            }
+            if f > encounter_move {
+                return Err(format!(
+                    "{} can only move {}' per round (encounter movement rate). Requested {}' is too far.",
+                    character.name, encounter_move, f));
+            }
+            f.min(combat.distance)
+        }
+        None => encounter_move.min(combat.distance), // close as far as possible this round
+    };
+
+    combat.distance = combat.distance.saturating_sub(actual);
+
+    let msg = format!("{} closes {}' (distance now {}')",
+        character.name, actual, combat.distance);
+    combat.log.push(msg.clone());
+    Ok(msg)
+}
+
 /// Resolve fighting withdrawal for a character.
 /// Half encounter movement speed backward; no free attacks from enemies.
 /// Character can still defend but cannot attack this round.
@@ -1486,6 +1526,73 @@ mod tests {
         let fighter = test_fighter(); // encounter move = 40
         retreat(&mut combat, &fighter);
         assert_eq!(combat.distance, u32::MAX); // saturated, not wrapped
+    }
+
+    // --- Close ---
+
+    #[test]
+    fn close_to_melee() {
+        let mut combat = CombatState::new(vec![test_goblin()], 60);
+        let fighter = test_fighter(); // movement 120, encounter = 40
+        let msg = close(&mut combat, &fighter, None).unwrap();
+        assert!(msg.contains("closes 40'"));
+        assert_eq!(combat.distance, 20); // 60 - 40
+    }
+
+    #[test]
+    fn close_specific_feet() {
+        let mut combat = CombatState::new(vec![test_goblin()], 100);
+        let fighter = test_fighter(); // encounter move = 40
+        let msg = close(&mut combat, &fighter, Some(30)).unwrap();
+        assert!(msg.contains("30'"));
+        assert_eq!(combat.distance, 70); // 100 - 30
+    }
+
+    #[test]
+    fn close_capped_by_encounter_move() {
+        let mut combat = CombatState::new(vec![test_goblin()], 100);
+        let fighter = test_fighter(); // encounter move = 40
+        let result = close(&mut combat, &fighter, Some(50));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too far"));
+        assert_eq!(combat.distance, 100); // unchanged
+    }
+
+    #[test]
+    fn close_none_caps_at_encounter_move() {
+        // When no distance specified, close up to encounter move
+        let mut combat = CombatState::new(vec![test_goblin()], 100);
+        let fighter = test_fighter(); // encounter move = 40
+        let msg = close(&mut combat, &fighter, None).unwrap();
+        assert!(msg.contains("40'"));
+        assert_eq!(combat.distance, 60); // 100 - 40
+    }
+
+    #[test]
+    fn close_none_reaches_zero_when_closer() {
+        let mut combat = CombatState::new(vec![test_goblin()], 30);
+        let fighter = test_fighter(); // encounter move = 40, but only 30' away
+        let msg = close(&mut combat, &fighter, None).unwrap();
+        assert!(msg.contains("30'"));
+        assert_eq!(combat.distance, 0);
+    }
+
+    #[test]
+    fn close_already_at_zero() {
+        let mut combat = CombatState::new(vec![test_goblin()], 0);
+        let fighter = test_fighter();
+        let result = close(&mut combat, &fighter, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("melee range"));
+    }
+
+    #[test]
+    fn close_logs_entry() {
+        let mut combat = CombatState::new(vec![test_goblin()], 60);
+        let fighter = test_fighter();
+        close(&mut combat, &fighter, Some(20)).unwrap();
+        assert!(combat.log.last().unwrap().contains("Grond"));
+        assert!(combat.log.last().unwrap().contains("20'"));
     }
 
     // --- Monster attack with multiple routines ---

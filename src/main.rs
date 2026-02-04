@@ -31,6 +31,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(MonsterAttackCommand));
     registry.register(Box::new(MoraleCommand));
     registry.register(Box::new(TurnUndeadCommand));
+    registry.register(Box::new(CloseCommand));
     registry.register(Box::new(RetreatCommand));
     registry.register(Box::new(WithdrawalCommand));
     registry.register(Box::new(DeclareSpellCommand));

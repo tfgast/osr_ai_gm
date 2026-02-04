@@ -340,6 +340,43 @@ impl Command for WithdrawalCommand {
     }
 }
 
+pub struct CloseCommand;
+impl Command for CloseCommand {
+    fn name(&self) -> &str { "close" }
+    fn help(&self) -> &str { "Close distance to monsters (close <character> [feet])" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error(
+                "usage: close <character_name> [feet]\n  \
+                 close Grond       — close to melee range\n  \
+                 close Grond 30    — close 30 feet"
+            );
+        }
+        let character = match state.party.find_member(args[0]) {
+            Some(c) => c.clone(),
+            None => return CommandResult::error(format!(
+                "no party member named '{}'.", args[0]
+            )),
+        };
+        let feet: Option<u32> = if args.len() >= 2 {
+            match args[1].parse() {
+                Ok(n) if n > 0 => Some(n),
+                _ => return CommandResult::error("feet must be a positive integer"),
+            }
+        } else {
+            None
+        };
+        let combat = match state.combat.as_mut() {
+            Some(c) => c,
+            None => return CommandResult::error("no active combat."),
+        };
+        match combat::close(combat, &character, feet) {
+            Ok(msg) => CommandResult::ok(msg),
+            Err(e) => CommandResult::error(e),
+        }
+    }
+}
+
 pub struct DeclareSpellCommand;
 impl Command for DeclareSpellCommand {
     fn name(&self) -> &str { "declare_spell" }

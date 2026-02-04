@@ -47,6 +47,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::TurnUndead { character, monster_idx } => {
             turn_undead(id, state, character, *monster_idx)
         }
+        GMCommand::Close { character, feet } => close(id, state, character, *feet),
         GMCommand::EndCombat => end_combat(id, state),
 
         // -- Exploration --
@@ -411,6 +412,24 @@ fn turn_undead(id: &str, state: &mut GameState, char_name: &str, monster_idx: us
     }
     let result = combat::resolve_turn_undead(combat_state, &character, character.level, monster_idx);
     GMResponse::ok(id, format!("{}", result), state.mode.clone())
+}
+
+fn close(id: &str, state: &mut GameState, char_name: &str, feet: Option<u32>) -> GMResponse {
+    let character = match state.party.find_member(char_name) {
+        Some(c) => c.clone(),
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let combat_state = match state.combat.as_mut() {
+        Some(c) => c,
+        None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
+    };
+    match combat::close(combat_state, &character, feet) {
+        Ok(msg) => GMResponse::ok_with_data(
+            id, msg, state.mode.clone(),
+            serde_json::json!({ "distance": combat_state.distance }),
+        ),
+        Err(e) => GMResponse::err(id, e, state.mode.clone()),
+    }
 }
 
 fn end_combat(id: &str, state: &mut GameState) -> GMResponse {
@@ -1422,5 +1441,56 @@ mod tests {
         let resp = handle_request(&make_req("4", GMCommand::EndCombat), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Idle);
+    }
+
+    #[test]
+    fn close_command_integration() {
+        let mut state = GameState::new();
+        // Add a character
+        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        c.hp = 10;
+        c.max_hp = 10;
+        c.thac0 = 19;
+        c.movement_rate = 120; // encounter move = 40
+        state.party.add_member(c);
+
+        // Spawn encounter at 100' distance
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
+            name: "goblin".to_string(),
+            count: 1,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 100,
+            xp_value: None,
+        }), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.combat.as_ref().unwrap().distance, 100);
+
+        // Close 30 feet
+        let resp = handle_request(&make_req("2", GMCommand::Close {
+            character: "Aldric".to_string(),
+            feet: Some(30),
+        }), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.combat.as_ref().unwrap().distance, 70);
+
+        // Close without specifying feet (uses full encounter move)
+        let resp = handle_request(&make_req("3", GMCommand::Close {
+            character: "Aldric".to_string(),
+            feet: None,
+        }), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.combat.as_ref().unwrap().distance, 30);
+
+        // Try to close too far
+        let resp = handle_request(&make_req("4", GMCommand::Close {
+            character: "Aldric".to_string(),
+            feet: Some(50),
+        }), &mut state);
+        assert!(!resp.success);
+        assert!(resp.error.unwrap().contains("too far"));
     }
 }

@@ -84,6 +84,12 @@ pub enum GMCommand {
         character: String,
         monster_idx: usize,
     },
+    /// Close distance to monsters.
+    Close {
+        character: String,
+        #[serde(default)]
+        feet: Option<u32>,
+    },
     /// End the current combat.
     EndCombat,
 
@@ -443,6 +449,32 @@ mod tests {
         let json = serialize_response(&r);
         assert!(!json.contains('\n'));
         assert!(json.contains("\"success\":true"));
+    }
+
+    #[test]
+    fn parse_close() {
+        let json = r#"{"id":"c1","command":{"type":"Close","params":{"character":"Aldric"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Close { character, feet } => {
+                assert_eq!(character, "Aldric");
+                assert!(feet.is_none());
+            }
+            _ => panic!("expected Close"),
+        }
+    }
+
+    #[test]
+    fn parse_close_with_feet() {
+        let json = r#"{"id":"c2","command":{"type":"Close","params":{"character":"Aldric","feet":30}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Close { character, feet } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(*feet, Some(30));
+            }
+            _ => panic!("expected Close"),
+        }
     }
 
     #[test]
