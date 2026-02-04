@@ -2,7 +2,7 @@
 .claude/
 .beads/
 .logs/
-
+*.pdf
 
 # Added by cargo
 
