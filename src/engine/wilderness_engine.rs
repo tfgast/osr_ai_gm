@@ -117,7 +117,7 @@ pub fn travel_day_with<R: Rng>(
         // Day 1+: -1 to attack rolls and saving throws per day
         let penalty = days.min(4) as i32; // Cap at -4 per typical OSE
         result.msg(format!(
-            "Starvation day {}: -{}penalty to attack rolls and saving throws.",
+            "Starvation day {}: -{} penalty to attack rolls and saving throws.",
             days, penalty
         ));
 
