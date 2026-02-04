@@ -369,11 +369,10 @@ fn create_character_happy_path() {
         alignment: Alignment::Lawful,
     }), &mut state);
     assert_response_format(&resp, "cc1");
-    // May fail due to random ability rolls, but response should be well-formed
-    if resp.success {
-        assert!(resp.data.is_some(), "success should include character sheet");
-        assert_eq!(state.party.members.len(), 1);
-    }
+    // Fighter has no ability requirements, so creation always succeeds.
+    assert!(resp.success, "Fighter creation should always succeed (no requirements)");
+    assert!(resp.data.is_some(), "success should include character sheet");
+    assert_eq!(state.party.members.len(), 1);
 }
 
 #[test]

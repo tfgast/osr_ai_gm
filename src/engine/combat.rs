@@ -952,7 +952,7 @@ mod tests {
                 return;
             }
         }
-        // If we got here without a hit, the test is inconclusive (unlikely)
+        panic!("expected at least one hit in 50 attempts with seeded RNG");
     }
 
     #[test]
