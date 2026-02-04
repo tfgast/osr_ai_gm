@@ -29,7 +29,7 @@ impl Command for EnterWildernessCommand {
             }
         };
         let mut ws = WildernessState::new();
-        ws.add_hex(HexCell::new(0, 0, terrain));
+        ws.add_hex(HexCell::new(0, 0, terrain)).unwrap();
         state.wilderness = Some(ws);
         CommandResult::ok(format!(
             "Entered wilderness. Starting hex: (0, 0) — {}.\n\
@@ -73,8 +73,10 @@ impl Command for AddHexCommand {
             Some(w) => w,
             None => return CommandResult::error("not in wilderness mode."),
         };
-        ws.add_hex(HexCell::new(x, y, terrain));
-        CommandResult::ok(format!("Added hex ({}, {}) — {}.", x, y, terrain.name()))
+        match ws.add_hex(HexCell::new(x, y, terrain)) {
+            Ok(()) => CommandResult::ok(format!("Added hex ({}, {}) — {}.", x, y, terrain.name())),
+            Err(e) => CommandResult::error(e),
+        }
     }
 }
 

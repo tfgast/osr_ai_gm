@@ -225,11 +225,11 @@ mod tests {
 
     fn test_wilderness() -> WildernessState {
         let mut ws = WildernessState::new();
-        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
-        ws.add_hex(HexCell::new(1, 0, Terrain::Forest));
-        ws.add_hex(HexCell::new(2, 0, Terrain::Mountains));
-        ws.add_hex(HexCell::new(0, 1, Terrain::Swamp));
-        ws.add_hex(HexCell::new(1, 1, Terrain::Desert));
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear)).unwrap();
+        ws.add_hex(HexCell::new(1, 0, Terrain::Forest)).unwrap();
+        ws.add_hex(HexCell::new(2, 0, Terrain::Mountains)).unwrap();
+        ws.add_hex(HexCell::new(0, 1, Terrain::Swamp)).unwrap();
+        ws.add_hex(HexCell::new(1, 1, Terrain::Desert)).unwrap();
         ws
     }
 
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn forage_in_ocean_fails() {
         let mut ws = WildernessState::new();
-        ws.add_hex(HexCell::new(0, 0, Terrain::Ocean));
+        ws.add_hex(HexCell::new(0, 0, Terrain::Ocean)).unwrap();
         let result = forage_with(&mut test_rng(), &ws);
         assert!(result.contains("Cannot forage"));
     }
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn hunt_ocean_fails() {
         let mut ws = WildernessState::new();
-        ws.add_hex(HexCell::new(0, 0, Terrain::Ocean));
+        ws.add_hex(HexCell::new(0, 0, Terrain::Ocean)).unwrap();
         let result = hunt_with(&mut test_rng(), &ws);
         assert!(result.contains("Cannot hunt"));
     }

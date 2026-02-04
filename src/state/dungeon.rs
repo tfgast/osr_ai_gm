@@ -31,9 +31,12 @@ pub struct Door {
 }
 
 impl Door {
-    pub fn new(id: u32, room_a: u32, room_b: u32, state: DoorState) -> Self {
+    pub fn new(id: u32, room_a: u32, room_b: u32, state: DoorState) -> Result<Self, String> {
+        if room_a == room_b {
+            return Err(format!("door {} connects room {} to itself", id, room_a));
+        }
         let discovered = state != DoorState::Secret;
-        Door { id, room_a, room_b, state, discovered }
+        Ok(Door { id, room_a, room_b, state, discovered })
     }
 
     /// Whether the party can attempt to pass through this door.
@@ -84,58 +87,78 @@ pub struct DungeonState {
     pub doors: Vec<Door>,
     /// IDs of rooms the party has visited.
     pub explored: HashSet<u32>,
-    /// The room the party is currently in.
-    pub current_room: u32,
+    /// The room the party is currently in (None if no rooms exist yet).
+    pub current_room: Option<u32>,
     /// Event log.
     pub log: Vec<String>,
 }
 
 impl DungeonState {
+    /// Maximum log entries retained before oldest are dropped.
+    const MAX_LOG_ENTRIES: usize = 1000;
+
     pub fn new(level: u32) -> Self {
         DungeonState {
             level,
             rooms: Vec::new(),
             doors: Vec::new(),
             explored: HashSet::new(),
-            current_room: 0,
+            current_room: None,
             log: Vec::new(),
         }
     }
 
-    /// Add a room to the dungeon.
-    pub fn add_room(&mut self, room: Room) {
+    /// Add a room to the dungeon. Returns an error if a room with the same
+    /// ID already exists.
+    pub fn add_room(&mut self, room: Room) -> Result<(), String> {
+        if self.rooms.iter().any(|r| r.id == room.id) {
+            return Err(format!("duplicate room id {}", room.id));
+        }
+        if self.current_room.is_none() {
+            self.current_room = Some(room.id);
+        }
         self.rooms.push(room);
+        Ok(())
     }
 
-    /// Add a door between two rooms.
-    pub fn add_door(&mut self, door: Door) {
+    /// Add a door between two rooms. Returns an error if a door with the
+    /// same ID already exists.
+    pub fn add_door(&mut self, door: Door) -> Result<(), String> {
+        if self.doors.iter().any(|d| d.id == door.id) {
+            return Err(format!("duplicate door id {}", door.id));
+        }
         self.doors.push(door);
+        Ok(())
     }
 
     /// Mark the current room as explored.
     pub fn explore_current(&mut self) {
-        self.explored.insert(self.current_room);
+        if let Some(room) = self.current_room {
+            self.explored.insert(room);
+        }
     }
 
     /// Move to a room by ID. Requires a passable door connecting the
     /// current room to the destination (prevents teleportation).
     pub fn move_to(&mut self, room_id: u32) -> Result<(), String> {
+        let current = self.current_room
+            .ok_or_else(|| "no current room set".to_string())?;
         if !self.rooms.iter().any(|r| r.id == room_id) {
             return Err(format!("room {} does not exist", room_id));
         }
         // Check that a passable door connects current room to destination
         let connected = self.doors.iter().any(|d| {
             d.is_passable()
-                && ((d.room_a == self.current_room && d.room_b == room_id)
-                    || (d.room_b == self.current_room && d.room_a == room_id))
+                && ((d.room_a == current && d.room_b == room_id)
+                    || (d.room_b == current && d.room_a == room_id))
         });
         if !connected {
             return Err(format!(
                 "no open door between room {} and room {}",
-                self.current_room, room_id
+                current, room_id
             ));
         }
-        self.current_room = room_id;
+        self.current_room = Some(room_id);
         self.explored.insert(room_id);
         Ok(())
     }
@@ -157,27 +180,47 @@ impl DungeonState {
 
     /// Get all doors connected to the current room.
     pub fn doors_from_current(&self) -> Vec<&Door> {
+        let current = match self.current_room {
+            Some(id) => id,
+            None => return Vec::new(),
+        };
         self.doors
             .iter()
-            .filter(|d| d.room_a == self.current_room || d.room_b == self.current_room)
+            .filter(|d| d.room_a == current || d.room_b == current)
             .filter(|d| d.discovered)
             .collect()
     }
 
+    /// Append a message to the log, capping at MAX_LOG_ENTRIES.
+    pub fn log(&mut self, msg: String) {
+        if self.log.len() >= Self::MAX_LOG_ENTRIES {
+            let drain = self.log.len() - Self::MAX_LOG_ENTRIES / 2;
+            self.log.drain(..drain);
+        }
+        self.log.push(msg);
+    }
+
     /// Status display of the current position.
     pub fn status(&self) -> String {
-        let room_name = self.find_room(self.current_room)
-            .map(|r| r.name.as_str())
-            .unwrap_or("unknown");
+        let (room_id_str, room_name) = match self.current_room {
+            Some(id) => {
+                let name = self.find_room(id)
+                    .map(|r| r.name.as_str())
+                    .unwrap_or("unknown");
+                (id.to_string(), name)
+            }
+            None => ("none".to_string(), "no rooms"),
+        };
         let mut out = format!(
             "Dungeon Level: {}  Room: {} ({})\nExplored: {} rooms",
-            self.level, self.current_room, room_name, self.explored.len()
+            self.level, room_id_str, room_name, self.explored.len()
         );
         let doors = self.doors_from_current();
         if !doors.is_empty() {
+            let current = self.current_room.unwrap();
             out.push_str("\nExits:");
             for d in &doors {
-                let dest = if d.room_a == self.current_room { d.room_b } else { d.room_a };
+                let dest = if d.room_a == current { d.room_b } else { d.room_a };
                 let dest_name = self.find_room(dest)
                     .map(|r| r.name.as_str())
                     .unwrap_or("?");
@@ -208,22 +251,22 @@ mod tests {
 
     fn sample_dungeon() -> DungeonState {
         let mut ds = DungeonState::new(1);
-        ds.add_room(Room::new(0, "Entrance"));
-        ds.add_room(Room::new(1, "Guard Room"));
-        ds.add_room(Room::new(2, "Hidden Chamber"));
-        ds.add_door(Door::new(0, 0, 1, DoorState::Closed));
-        ds.add_door(Door::new(1, 1, 2, DoorState::Secret));
+        ds.add_room(Room::new(0, "Entrance")).unwrap();
+        ds.add_room(Room::new(1, "Guard Room")).unwrap();
+        ds.add_room(Room::new(2, "Hidden Chamber")).unwrap();
+        ds.add_door(Door::new(0, 0, 1, DoorState::Closed).unwrap()).unwrap();
+        ds.add_door(Door::new(1, 1, 2, DoorState::Secret).unwrap()).unwrap();
         ds
     }
 
     #[test]
     fn move_to_room_through_open_door() {
         let mut ds = sample_dungeon();
-        assert_eq!(ds.current_room, 0);
+        assert_eq!(ds.current_room, Some(0));
         // Open the door first
         ds.find_door_mut(0).unwrap().state = DoorState::Open;
         ds.move_to(1).unwrap();
-        assert_eq!(ds.current_room, 1);
+        assert_eq!(ds.current_room, Some(1));
         assert!(ds.explored.contains(&1));
     }
 
@@ -273,14 +316,49 @@ mod tests {
 
     #[test]
     fn door_passable_when_open() {
-        let door = Door::new(0, 0, 1, DoorState::Open);
+        let door = Door::new(0, 0, 1, DoorState::Open).unwrap();
         assert!(door.is_passable());
 
-        let door = Door::new(0, 0, 1, DoorState::Closed);
+        let door = Door::new(0, 0, 1, DoorState::Closed).unwrap();
         assert!(!door.is_passable());
 
-        let door = Door::new(0, 0, 1, DoorState::Locked);
+        let door = Door::new(0, 0, 1, DoorState::Locked).unwrap();
         assert!(!door.is_passable());
+    }
+
+    #[test]
+    fn door_self_connection_rejected() {
+        assert!(Door::new(0, 1, 1, DoorState::Closed).is_err());
+    }
+
+    #[test]
+    fn duplicate_room_id_rejected() {
+        let mut ds = DungeonState::new(1);
+        ds.add_room(Room::new(0, "First")).unwrap();
+        assert!(ds.add_room(Room::new(0, "Duplicate")).is_err());
+    }
+
+    #[test]
+    fn duplicate_door_id_rejected() {
+        let mut ds = DungeonState::new(1);
+        ds.add_room(Room::new(0, "A")).unwrap();
+        ds.add_room(Room::new(1, "B")).unwrap();
+        ds.add_room(Room::new(2, "C")).unwrap();
+        ds.add_door(Door::new(0, 0, 1, DoorState::Closed).unwrap()).unwrap();
+        assert!(ds.add_door(Door::new(0, 1, 2, DoorState::Closed).unwrap()).is_err());
+    }
+
+    #[test]
+    fn empty_dungeon_has_no_current_room() {
+        let ds = DungeonState::new(1);
+        assert!(ds.current_room.is_none());
+    }
+
+    #[test]
+    fn first_room_becomes_current() {
+        let mut ds = DungeonState::new(1);
+        ds.add_room(Room::new(5, "Start")).unwrap();
+        assert_eq!(ds.current_room, Some(5));
     }
 
     #[test]

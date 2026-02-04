@@ -208,6 +208,11 @@ pub fn character_melee_attack_with<R: Rng>(
     str_mod: i32,
     rng: &mut R,
 ) -> AttackResult {
+    assert!(
+        monster_idx < combat.monsters.len() && combat.monsters[monster_idx].is_alive(),
+        "cannot attack dead or nonexistent monster at index {}",
+        monster_idx
+    );
     let monster = &combat.monsters[monster_idx];
     let target_ac = monster.ac;
     let target_name = monster.name.clone();
@@ -278,6 +283,9 @@ pub fn character_missile_attack_with<R: Rng>(
     range: (u32, u32, u32),
     rng: &mut R,
 ) -> Result<AttackResult, String> {
+    if monster_idx >= combat.monsters.len() || !combat.monsters[monster_idx].is_alive() {
+        return Err(format!("cannot attack dead or nonexistent monster at index {}", monster_idx));
+    }
     let range_mod = attack::missile_range_modifier(combat.distance, range.0, range.1, range.2)
         .ok_or_else(|| format!("target out of range (distance: {}')", combat.distance))?;
 
@@ -343,6 +351,11 @@ pub fn monster_attack_with<R: Rng>(
     character: &mut Character,
     rng: &mut R,
 ) -> AttackResult {
+    assert!(
+        monster_idx < combat.monsters.len() && combat.monsters[monster_idx].is_alive(),
+        "cannot attack with dead or nonexistent monster at index {}",
+        monster_idx
+    );
     let monster = &combat.monsters[monster_idx];
     let attacker_name = monster.name.clone();
     let hd = attack::parse_monster_hd(&monster.hit_dice);
@@ -472,6 +485,28 @@ pub fn resolve_turn_undead_with<R: Rng>(
         }
     };
 
+    // Apply the turn/destroy effect to monsters
+    if success && hd_affected > 0 {
+        let mut remaining_hd = hd_affected;
+        for m in combat.monsters.iter_mut() {
+            if remaining_hd == 0 {
+                break;
+            }
+            if !m.is_alive() || m.turned {
+                continue;
+            }
+            let m_hd = attack::parse_monster_hd(&m.hit_dice).max(1) as u32;
+            if m_hd <= remaining_hd {
+                remaining_hd -= m_hd;
+                if destroyed {
+                    m.hp = 0;
+                } else {
+                    m.turned = true;
+                }
+            }
+        }
+    }
+
     let result = TurnUndeadResult {
         cleric_name: cleric.name.clone(),
         cleric_level,
@@ -497,8 +532,9 @@ pub fn resolve_turn_undead_with<R: Rng>(
 pub fn fighting_withdrawal(combat: &mut CombatState, character: &Character) -> String {
     let encounter_move = character.movement_rate / 3;
     let half_move = encounter_move / 2;
-    let msg = format!("{} performs a fighting withdrawal ({}' backward)",
-        character.name, half_move);
+    combat.distance = combat.distance.saturating_add(half_move);
+    let msg = format!("{} performs a fighting withdrawal ({}' backward, distance now {}')",
+        character.name, half_move, combat.distance);
     combat.log.push(msg.clone());
     msg
 }
@@ -507,9 +543,10 @@ pub fn fighting_withdrawal(combat: &mut CombatState, character: &Character) -> S
 /// Full encounter movement speed; enemies in melee get a free attack at +2.
 pub fn retreat(combat: &mut CombatState, character: &Character) -> String {
     let encounter_move = character.movement_rate / 3;
+    combat.distance = combat.distance.saturating_add(encounter_move);
     let msg = format!(
-        "{} retreats at full speed ({}')! Enemies in melee get free attack at +2.",
-        character.name, encounter_move);
+        "{} retreats at full speed ({}', distance now {}'). Enemies in melee get free attack at +2.",
+        character.name, encounter_move, combat.distance);
     combat.log.push(msg.clone());
     msg
 }
@@ -652,6 +689,7 @@ mod tests {
             attacks: vec!["weapon".to_string()],
             damage: "1d6".to_string(),
             morale: 7, xp_value: 5,
+            turned: false,
         }
     }
 
@@ -663,6 +701,7 @@ mod tests {
             attacks: vec!["weapon".to_string()],
             damage: "1d6".to_string(),
             morale: 12, xp_value: 10,
+            turned: false,
         }
     }
 
@@ -674,6 +713,7 @@ mod tests {
             attacks: vec!["club".to_string()],
             damage: "1d10".to_string(),
             morale: 10, xp_value: 125,
+            turned: false,
         }
     }
 
@@ -937,6 +977,7 @@ mod tests {
         // encounter movement = 120/3 = 40, half = 20
         assert!(msg.contains("20'"));
         assert!(msg.contains("Grond"));
+        assert_eq!(combat.distance, 30); // 10 + 20
     }
 
     #[test]
@@ -947,6 +988,7 @@ mod tests {
         // encounter movement = 120/3 = 40
         assert!(msg.contains("40'"));
         assert!(msg.contains("free attack"));
+        assert_eq!(combat.distance, 50); // 10 + 40
     }
 
     // --- Status Display ---

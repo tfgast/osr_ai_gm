@@ -474,7 +474,7 @@ fn enter_dungeon(id: &str, state: &mut GameState, level: u32, room_name: &str) -
         return GMResponse::err(id, "level must be a positive integer.", state.mode.clone());
     }
     let mut dungeon = DungeonState::new(level);
-    dungeon.add_room(Room::new(0, room_name));
+    dungeon.add_room(Room::new(0, room_name)).unwrap();
     dungeon.explore_current();
     state.dungeon = Some(dungeon);
     state.time = Some(TimeTracker::new());
@@ -518,7 +518,9 @@ fn add_room(id: &str, state: &mut GameState, room_id: u32, name: &str) -> GMResp
         Some(d) => d,
         None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
     };
-    dungeon.add_room(Room::new(room_id, name));
+    if let Err(e) = dungeon.add_room(Room::new(room_id, name)) {
+        return GMResponse::err(id, e, state.mode.clone());
+    }
     GMResponse::ok(id, format!("added room {}: {}.", room_id, name), state.mode.clone())
 }
 
@@ -535,7 +537,13 @@ fn add_door(id: &str, state: &mut GameState, door_id: u32, room_a: u32, room_b: 
         Some(d) => d,
         None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
     };
-    dungeon.add_door(Door::new(door_id, room_a, room_b, door_state));
+    let door = match Door::new(door_id, room_a, room_b, door_state) {
+        Ok(d) => d,
+        Err(e) => return GMResponse::err(id, e, state.mode.clone()),
+    };
+    if let Err(e) = dungeon.add_door(door) {
+        return GMResponse::err(id, e, state.mode.clone());
+    }
     GMResponse::ok(
         id,
         format!("added door {} between rooms {} and {} ({:?}).", door_id, room_a, room_b, door_state),
@@ -614,7 +622,7 @@ fn enter_wilderness(id: &str, state: &mut GameState, terrain_name: &str) -> GMRe
         None => return GMResponse::err(id, "invalid terrain type.", state.mode.clone()),
     };
     let mut ws = WildernessState::new();
-    ws.add_hex(HexCell::new(0, 0, terrain));
+    ws.add_hex(HexCell::new(0, 0, terrain)).unwrap();
     state.wilderness = Some(ws);
     state.mode = GameMode::Wilderness;
     GMResponse::ok(
@@ -633,7 +641,9 @@ fn add_hex(id: &str, state: &mut GameState, x: i32, y: i32, terrain_name: &str) 
         Some(w) => w,
         None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
     };
-    ws.add_hex(HexCell::new(x, y, terrain));
+    if let Err(e) = ws.add_hex(HexCell::new(x, y, terrain)) {
+        return GMResponse::err(id, e, state.mode.clone());
+    }
     GMResponse::ok(id, format!("added hex ({}, {}) — {}.", x, y, terrain.name()), state.mode.clone())
 }
 

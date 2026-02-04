@@ -92,6 +92,9 @@ pub struct Monster {
     pub damage: String,
     pub morale: u32,
     pub xp_value: u64,
+    /// Whether this monster has been turned by a cleric.
+    #[serde(default)]
+    pub turned: bool,
 }
 
 impl Monster {
@@ -106,6 +109,7 @@ impl Monster {
             damage: String::new(),
             morale: 7,
             xp_value: 0,
+            turned: false,
         }
     }
 
@@ -232,10 +236,20 @@ pub struct CombatState {
     /// Current combat phase.
     #[serde(default = "CombatState::default_phase")]
     pub phase: CombatPhase,
+    /// Whether the first-death morale check has been triggered.
+    #[serde(default)]
+    pub first_death_checked: bool,
+    /// Whether the half-killed morale check has been triggered.
+    #[serde(default)]
+    pub half_killed_checked: bool,
+    /// Initial monster count for morale trigger tracking.
+    #[serde(default)]
+    pub initial_monster_count: usize,
 }
 
 impl CombatState {
     pub fn new(monsters: Vec<Monster>, distance: u32) -> Self {
+        let initial_count = monsters.len();
         CombatState {
             round: 0,
             monsters,
@@ -246,6 +260,9 @@ impl CombatState {
             spell_declarations: Vec::new(),
             disrupted: Vec::new(),
             phase: CombatPhase::Declaration,
+            first_death_checked: false,
+            half_killed_checked: false,
+            initial_monster_count: initial_count,
         }
     }
 
@@ -275,6 +292,24 @@ impl CombatState {
 
     pub fn living_monster_count(&self) -> usize {
         self.monsters.iter().filter(|m| m.is_alive()).count()
+    }
+
+    /// Check whether a morale trigger condition has been newly met.
+    /// Returns true if morale should be checked (first death, or half killed).
+    pub fn should_check_morale(&mut self) -> bool {
+        let dead = self.initial_monster_count - self.living_monster_count();
+        if dead >= 1 && !self.first_death_checked {
+            self.first_death_checked = true;
+            return true;
+        }
+        if self.initial_monster_count > 0
+            && dead * 2 >= self.initial_monster_count
+            && !self.half_killed_checked
+        {
+            self.half_killed_checked = true;
+            return true;
+        }
+        false
     }
 }
 

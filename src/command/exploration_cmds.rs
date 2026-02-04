@@ -19,7 +19,7 @@ impl Command for EnterDungeonCommand {
         let room_name = if args.len() > 1 { args[1..].join(" ") } else { "Entrance".to_string() };
 
         let mut dungeon = DungeonState::new(level);
-        dungeon.add_room(Room::new(0, &room_name));
+        dungeon.add_room(Room::new(0, &room_name)).unwrap();
         dungeon.explore_current();
 
         let time = TimeTracker::new();
@@ -158,8 +158,10 @@ impl Command for AddRoomCommand {
             Some(d) => d,
             None => return CommandResult::error("no dungeon state."),
         };
-        dungeon.add_room(Room::new(id, &name));
-        CommandResult::ok(format!("Added room {}: {}", id, name))
+        match dungeon.add_room(Room::new(id, &name)) {
+            Ok(()) => CommandResult::ok(format!("Added room {}: {}", id, name)),
+            Err(e) => CommandResult::error(e),
+        }
     }
 }
 
@@ -202,8 +204,14 @@ impl Command for AddDoorCommand {
             Some(d) => d,
             None => return CommandResult::error("no dungeon state."),
         };
-        dungeon.add_door(Door::new(id, room_a, room_b, door_state));
-        CommandResult::ok(format!("Added door {} between rooms {} and {} ({:?})", id, room_a, room_b, door_state))
+        let door = match Door::new(id, room_a, room_b, door_state) {
+            Ok(d) => d,
+            Err(e) => return CommandResult::error(e),
+        };
+        match dungeon.add_door(door) {
+            Ok(()) => CommandResult::ok(format!("Added door {} between rooms {} and {} ({:?})", id, room_a, room_b, door_state)),
+            Err(e) => CommandResult::error(e),
+        }
     }
 }
 

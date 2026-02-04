@@ -126,6 +126,9 @@ pub struct WildernessState {
 }
 
 impl WildernessState {
+    /// Maximum log entries retained before oldest are dropped.
+    const MAX_LOG_ENTRIES: usize = 1000;
+
     pub fn new() -> Self {
         WildernessState {
             hexes: Vec::new(),
@@ -138,9 +141,23 @@ impl WildernessState {
         }
     }
 
-    /// Add a hex to the map.
-    pub fn add_hex(&mut self, hex: HexCell) {
+    /// Add a hex to the map. Returns an error if a hex at the same
+    /// coordinates already exists.
+    pub fn add_hex(&mut self, hex: HexCell) -> Result<(), String> {
+        if self.hexes.iter().any(|h| h.x == hex.x && h.y == hex.y) {
+            return Err(format!("duplicate hex at ({}, {})", hex.x, hex.y));
+        }
         self.hexes.push(hex);
+        Ok(())
+    }
+
+    /// Append a message to the log, capping at MAX_LOG_ENTRIES.
+    pub fn log(&mut self, msg: String) {
+        if self.log.len() >= Self::MAX_LOG_ENTRIES {
+            let drain = self.log.len() - Self::MAX_LOG_ENTRIES / 2;
+            self.log.drain(..drain);
+        }
+        self.log.push(msg);
     }
 
     /// Find a hex by coordinates.
@@ -253,8 +270,8 @@ mod tests {
     #[test]
     fn hex_movement() {
         let mut ws = WildernessState::new();
-        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
-        ws.add_hex(HexCell::new(1, 0, Terrain::Forest));
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear)).unwrap();
+        ws.add_hex(HexCell::new(1, 0, Terrain::Forest)).unwrap();
         ws.move_to(1, 0).unwrap();
         assert_eq!(ws.current_x, 1);
         assert!(ws.explored.contains(&(1, 0)));
@@ -263,17 +280,24 @@ mod tests {
     #[test]
     fn hex_movement_invalid() {
         let mut ws = WildernessState::new();
-        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear)).unwrap();
         assert!(ws.move_to(5, 5).is_err());
     }
 
     #[test]
     fn hex_movement_nonadjacent_fails() {
         let mut ws = WildernessState::new();
-        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
-        ws.add_hex(HexCell::new(3, 0, Terrain::Hills));
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear)).unwrap();
+        ws.add_hex(HexCell::new(3, 0, Terrain::Hills)).unwrap();
         // (3,0) exists but is not adjacent to (0,0)
         assert!(ws.move_to(3, 0).is_err());
+    }
+
+    #[test]
+    fn duplicate_hex_rejected() {
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear)).unwrap();
+        assert!(ws.add_hex(HexCell::new(0, 0, Terrain::Forest)).is_err());
     }
 
     #[test]
@@ -307,7 +331,7 @@ mod tests {
     #[test]
     fn status_display() {
         let mut ws = WildernessState::new();
-        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear)).unwrap();
         let s = ws.status();
         assert!(s.contains("Clear"));
         assert!(s.contains("(0, 0)"));

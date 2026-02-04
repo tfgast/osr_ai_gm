@@ -67,6 +67,9 @@ pub struct TimeTracker {
 }
 
 impl TimeTracker {
+    /// Maximum log entries retained before oldest are dropped.
+    const MAX_LOG_ENTRIES: usize = 1000;
+
     pub fn new() -> Self {
         TimeTracker {
             total_turns: 0,
@@ -74,6 +77,15 @@ impl TimeTracker {
             lights: Vec::new(),
             log: Vec::new(),
         }
+    }
+
+    /// Append a message to the log, capping at MAX_LOG_ENTRIES.
+    fn log(&mut self, msg: String) {
+        if self.log.len() >= Self::MAX_LOG_ENTRIES {
+            let drain = self.log.len() - Self::MAX_LOG_ENTRIES / 2;
+            self.log.drain(..drain);
+        }
+        self.log.push(msg);
     }
 
     /// Advance time by one dungeon turn (10 minutes).
@@ -110,7 +122,7 @@ impl TimeTracker {
         self.lights.retain(|l| !l.is_expired());
 
         for msg in &messages {
-            self.log.push(msg.clone());
+            self.log(msg.clone());
         }
 
         messages
@@ -119,7 +131,7 @@ impl TimeTracker {
     /// Add a new light source.
     pub fn light(&mut self, kind: LightSourceKind, carrier: &str) {
         let light = ActiveLight::new(kind, carrier);
-        self.log.push(format!(
+        self.log(format!(
             "{} lights a {} ({} turns).",
             carrier,
             kind.name(),
@@ -129,8 +141,10 @@ impl TimeTracker {
     }
 
     /// Check if the party has any active light.
+    /// Since `advance_turn` already removes expired lights, this only
+    /// needs to check whether any lights remain.
     pub fn has_light(&self) -> bool {
-        self.lights.iter().any(|l| !l.is_expired())
+        !self.lights.is_empty()
     }
 
     /// Whether rest is required (after 5 turns of activity).
@@ -140,7 +154,7 @@ impl TimeTracker {
 
     /// Record a rest turn. Resets activity counter.
     pub fn rest(&mut self) {
-        self.log.push(format!("Turn {}: Party rests for one turn.", self.total_turns));
+        self.log(format!("Turn {}: Party rests for one turn.", self.total_turns));
         // Resting still consumes a turn for light sources
         self.advance_turn();
         // Reset activity counter after the turn advance

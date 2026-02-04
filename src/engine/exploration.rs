@@ -95,11 +95,12 @@ pub fn advance_dungeon_turn_with<R: Rng>(
     // Mark current room as explored
     dungeon.explore_current();
 
+    let current_room_name = dungeon.current_room
+        .and_then(|id| dungeon.find_room(id))
+        .map(|r| r.name.as_str())
+        .unwrap_or("unknown area");
     result.msg(format!("Turn {}: Exploring {}.",
-        time.total_turns,
-        dungeon.find_room(dungeon.current_room)
-            .map(|r| r.name.as_str())
-            .unwrap_or("unknown area")
+        time.total_turns, current_room_name
     ));
 
     // Wandering monster check every 2 turns (1-in-6)
@@ -139,13 +140,15 @@ pub fn search_room_with<R: Rng>(
     let roll: u32 = rng.gen_range(1..=6);
     let success = roll <= threshold;
 
-    if let Some(room) = dungeon.find_room_mut(dungeon.current_room) {
-        room.searched = true;
+    if let Some(current) = dungeon.current_room {
+        if let Some(room) = dungeon.find_room_mut(current) {
+            room.searched = true;
+        }
     }
 
     if success {
         // Check for secret doors in this room
-        let current = dungeon.current_room;
+        let current = dungeon.current_room.unwrap_or(0);
         let mut found_something = false;
         for door in &mut dungeon.doors {
             if door.state == DoorState::Secret && !door.discovered
@@ -291,9 +294,11 @@ pub fn move_through_door_with<R: Rng>(
         return Err(format!("Door {} is not open. Force it first.", door_id));
     }
 
-    let dest = if door.room_a == dungeon.current_room {
+    let current = dungeon.current_room
+        .ok_or_else(|| "no current room set".to_string())?;
+    let dest = if door.room_a == current {
         door.room_b
-    } else if door.room_b == dungeon.current_room {
+    } else if door.room_b == current {
         door.room_a
     } else {
         return Err(format!("Door {} is not connected to the current room.", door_id));
@@ -373,13 +378,13 @@ mod tests {
 
     fn test_dungeon() -> DungeonState {
         let mut ds = DungeonState::new(1);
-        ds.add_room(Room::new(0, "Entrance Hall"));
-        ds.add_room(Room::new(1, "Guard Room"));
-        ds.add_room(Room::new(2, "Hidden Chamber"));
-        ds.add_room(Room::new(3, "Trap Room").with_trap("Pit trap"));
-        ds.add_door(Door::new(0, 0, 1, DoorState::Closed));
-        ds.add_door(Door::new(1, 1, 2, DoorState::Secret));
-        ds.add_door(Door::new(2, 1, 3, DoorState::Open));
+        ds.add_room(Room::new(0, "Entrance Hall")).unwrap();
+        ds.add_room(Room::new(1, "Guard Room")).unwrap();
+        ds.add_room(Room::new(2, "Hidden Chamber")).unwrap();
+        ds.add_room(Room::new(3, "Trap Room").with_trap("Pit trap")).unwrap();
+        ds.add_door(Door::new(0, 0, 1, DoorState::Closed).unwrap()).unwrap();
+        ds.add_door(Door::new(1, 1, 2, DoorState::Secret).unwrap()).unwrap();
+        ds.add_door(Door::new(2, 1, 3, DoorState::Open).unwrap()).unwrap();
         ds
     }
 
@@ -514,7 +519,7 @@ mod tests {
         let mut rng = test_rng();
         let mut dungeon = test_dungeon();
         // Add a locked door
-        dungeon.add_door(Door::new(3, 0, 3, DoorState::Locked));
+        dungeon.add_door(Door::new(3, 0, 3, DoorState::Locked).unwrap()).unwrap();
         let character = test_character();
 
         let result = force_door_with(&mut rng, &mut dungeon, 3, &character);
@@ -558,7 +563,7 @@ mod tests {
         let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 2);
         assert!(result.is_ok());
         // Should have moved to room 3 (Trap Room)
-        assert_eq!(dungeon.current_room, 3);
+        assert_eq!(dungeon.current_room, Some(3));
     }
 
     #[test]
