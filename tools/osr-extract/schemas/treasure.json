@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OSE Treasure Type",
+  "description": "Treasure type definition for Old-School Essentials",
+  "type": "object",
+  "required": ["letter", "average_gp", "category", "entries"],
+  "properties": {
+    "letter": {
+      "type": "string",
+      "description": "Treasure type letter (A-V)",
+      "pattern": "^[A-V]$"
+    },
+    "average_gp": {
+      "type": "number",
+      "description": "Average gold piece value of this treasure type",
+      "minimum": 0
+    },
+    "category": {
+      "type": "string",
+      "enum": ["hoard", "individual", "group"],
+      "description": "Treasure category"
+    },
+    "entries": {
+      "type": "array",
+      "description": "List of possible treasure entries",
+      "items": {
+        "type": "object",
+        "required": ["chance", "quantity", "type"],
+        "properties": {
+          "chance": {
+            "type": "integer",
+            "description": "Percentage chance of this entry appearing (1-100)",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "quantity": {
+            "type": "string",
+            "description": "Dice notation for quantity (e.g., '1d6', '2d4 × 1000')"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["cp", "sp", "ep", "gp", "pp", "gems", "jewellery", "magic_items", "magic_weapon", "potions", "scrolls"],
+            "description": "Type of treasure"
+          },
+          "restriction": {
+            "type": ["string", "null"],
+            "description": "Restrictions on magic items (e.g., 'not weapons')"
+          },
+          "note": {
+            "type": "string",
+            "description": "Additional notes about this entry"
+          }
+        }
+      }
+    }
+  }
+}

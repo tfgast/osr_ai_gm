@@ -11,5 +11,6 @@ pub mod save;
 pub mod spell;
 pub mod spell_data;
 pub mod thief;
+pub mod treasure;
 pub mod turn;
 pub mod xp;

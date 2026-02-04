@@ -1,0 +1,646 @@
+{
+  "source": "Advanced_Fantasy_Referees_Tome_v1-3.md",
+  "count": 22,
+  "by_category": {
+    "hoard": 15,
+    "individual": 5,
+    "group": 2
+  },
+  "treasure_types": [
+    {
+      "letter": "A",
+      "average_gp": 18000.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 25,
+          "quantity": "1d6 \u00d7 1000",
+          "type": "cp"
+        },
+        {
+          "chance": 30,
+          "quantity": "1d6 \u00d7 1000",
+          "type": "sp"
+        },
+        {
+          "chance": 20,
+          "quantity": "1d4 \u00d7 1000",
+          "type": "ep"
+        },
+        {
+          "chance": 35,
+          "quantity": "2d6 \u00d7 1000",
+          "type": "gp"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d2 \u00d7 1000",
+          "type": "pp"
+        },
+        {
+          "chance": 50,
+          "quantity": "6d6",
+          "type": "gems"
+        },
+        {
+          "chance": 50,
+          "quantity": "6d6",
+          "type": "jewellery"
+        },
+        {
+          "chance": 30,
+          "quantity": "3",
+          "type": "magic_items",
+          "restriction": null
+        }
+      ]
+    },
+    {
+      "letter": "B",
+      "average_gp": 2000.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 50,
+          "quantity": "1d8 \u00d7 1000",
+          "type": "cp"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d6 \u00d7 1000",
+          "type": "sp"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d4 \u00d7 1000",
+          "type": "ep"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d3 \u00d7 1000",
+          "type": "gp"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d6",
+          "type": "gems"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d6",
+          "type": "jewellery"
+        },
+        {
+          "chance": 10,
+          "quantity": "1",
+          "type": "magic_weapon",
+          "note": "1 magic sword, suit of armour, or weapon"
+        }
+      ]
+    },
+    {
+      "letter": "C",
+      "average_gp": 1000.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 20,
+          "quantity": "1d12 \u00d7 1000",
+          "type": "cp"
+        },
+        {
+          "chance": 30,
+          "quantity": "1d4 \u00d7 1000",
+          "type": "sp"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d4 \u00d7 1000",
+          "type": "ep"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d4",
+          "type": "gems"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d4",
+          "type": "jewellery"
+        },
+        {
+          "chance": 10,
+          "quantity": "2",
+          "type": "magic_items",
+          "restriction": null
+        }
+      ]
+    },
+    {
+      "letter": "D",
+      "average_gp": 3900.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 10,
+          "quantity": "1d8 \u00d7 1000",
+          "type": "cp"
+        },
+        {
+          "chance": 15,
+          "quantity": "1d12 \u00d7 1000",
+          "type": "sp"
+        },
+        {
+          "chance": 60,
+          "quantity": "1d6 \u00d7 1000",
+          "type": "gp"
+        },
+        {
+          "chance": 30,
+          "quantity": "1d8",
+          "type": "gems"
+        },
+        {
+          "chance": 30,
+          "quantity": "1d8",
+          "type": "jewellery"
+        },
+        {
+          "chance": 15,
+          "quantity": "2",
+          "type": "magic_items",
+          "restriction": null
+        },
+        {
+          "chance": 15,
+          "quantity": "1",
+          "type": "potions"
+        }
+      ]
+    },
+    {
+      "letter": "E",
+      "average_gp": 2300.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 5,
+          "quantity": "1d10 \u00d7 1000",
+          "type": "cp"
+        },
+        {
+          "chance": 30,
+          "quantity": "1d12 \u00d7 1000",
+          "type": "sp"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d4 \u00d7 1000",
+          "type": "ep"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d8 \u00d7 1000",
+          "type": "gp"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d10",
+          "type": "gems"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d10",
+          "type": "jewellery"
+        },
+        {
+          "chance": 25,
+          "quantity": "3",
+          "type": "magic_items",
+          "restriction": null
+        },
+        {
+          "chance": 25,
+          "quantity": "1",
+          "type": "scrolls"
+        }
+      ]
+    },
+    {
+      "letter": "F",
+      "average_gp": 7700.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 10,
+          "quantity": "2d10 \u00d7 1000",
+          "type": "sp"
+        },
+        {
+          "chance": 20,
+          "quantity": "1d8 \u00d7 1000",
+          "type": "ep"
+        },
+        {
+          "chance": 45,
+          "quantity": "1d12 \u00d7 1000",
+          "type": "gp"
+        },
+        {
+          "chance": 30,
+          "quantity": "1d3 \u00d7 1000",
+          "type": "pp"
+        },
+        {
+          "chance": 20,
+          "quantity": "2d12",
+          "type": "gems"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d12",
+          "type": "jewellery"
+        },
+        {
+          "chance": 30,
+          "quantity": "3",
+          "type": "magic_items",
+          "restriction": "not weapons"
+        },
+        {
+          "chance": 30,
+          "quantity": "1",
+          "type": "potions"
+        },
+        {
+          "chance": 30,
+          "quantity": "1",
+          "type": "scrolls"
+        }
+      ]
+    },
+    {
+      "letter": "G",
+      "average_gp": 23000.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 50,
+          "quantity": "1d4 \u00d7 10000",
+          "type": "gp"
+        },
+        {
+          "chance": 50,
+          "quantity": "1d6 \u00d7 1000",
+          "type": "pp"
+        },
+        {
+          "chance": 25,
+          "quantity": "3d6",
+          "type": "gems"
+        },
+        {
+          "chance": 25,
+          "quantity": "1d10",
+          "type": "jewellery"
+        },
+        {
+          "chance": 35,
+          "quantity": "4",
+          "type": "magic_items",
+          "restriction": null
+        },
+        {
+          "chance": 35,
+          "quantity": "1",
+          "type": "scrolls"
+        }
+      ]
+    },
+    {
+      "letter": "H",
+      "average_gp": 60000.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 25,
+          "quantity": "3d8 \u00d7 1000",
+          "type": "cp"
+        },
+        {
+          "chance": 50,
+          "quantity": "1d100 \u00d7 1000",
+          "type": "sp"
+        },
+        {
+          "chance": 50,
+          "quantity": "1d4 \u00d7 10000",
+          "type": "ep"
+        },
+        {
+          "chance": 50,
+          "quantity": "1d6 \u00d7 10000",
+          "type": "gp"
+        },
+        {
+          "chance": 25,
+          "quantity": "5d4 \u00d7 1000",
+          "type": "pp"
+        },
+        {
+          "chance": 50,
+          "quantity": "1d100",
+          "type": "gems"
+        },
+        {
+          "chance": 50,
+          "quantity": "1d4 \u00d7 10",
+          "type": "jewellery"
+        },
+        {
+          "chance": 15,
+          "quantity": "4",
+          "type": "magic_items",
+          "restriction": null
+        },
+        {
+          "chance": 15,
+          "quantity": "1",
+          "type": "potions"
+        },
+        {
+          "chance": 15,
+          "quantity": "1",
+          "type": "scrolls"
+        }
+      ]
+    },
+    {
+      "letter": "I",
+      "average_gp": 11000.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 30,
+          "quantity": "1d8 \u00d7 1000",
+          "type": "pp"
+        },
+        {
+          "chance": 50,
+          "quantity": "2d6",
+          "type": "gems"
+        },
+        {
+          "chance": 50,
+          "quantity": "2d6",
+          "type": "jewellery"
+        },
+        {
+          "chance": 15,
+          "quantity": "1",
+          "type": "magic_items",
+          "restriction": null
+        }
+      ]
+    },
+    {
+      "letter": "J",
+      "average_gp": 25.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 25,
+          "quantity": "1d4 \u00d7 1000",
+          "type": "cp"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d3 \u00d7 1000",
+          "type": "sp"
+        }
+      ]
+    },
+    {
+      "letter": "K",
+      "average_gp": 180.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 30,
+          "quantity": "1d6 \u00d7 1000",
+          "type": "sp"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d2 \u00d7 1000",
+          "type": "ep"
+        }
+      ]
+    },
+    {
+      "letter": "L",
+      "average_gp": 240.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 50,
+          "quantity": "1d4",
+          "type": "gems"
+        }
+      ]
+    },
+    {
+      "letter": "M",
+      "average_gp": 50000.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 40,
+          "quantity": "2d4 \u00d7 1000",
+          "type": "gp"
+        },
+        {
+          "chance": 50,
+          "quantity": "5d6 \u00d7 1000",
+          "type": "pp"
+        },
+        {
+          "chance": 55,
+          "quantity": "5d4",
+          "type": "gems"
+        },
+        {
+          "chance": 45,
+          "quantity": "2d6",
+          "type": "jewellery"
+        }
+      ]
+    },
+    {
+      "letter": "N",
+      "average_gp": 0.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 40,
+          "quantity": "2d4",
+          "type": "potions"
+        }
+      ]
+    },
+    {
+      "letter": "O",
+      "average_gp": 0.0,
+      "category": "hoard",
+      "entries": [
+        {
+          "chance": 50,
+          "quantity": "1d4",
+          "type": "scrolls"
+        }
+      ]
+    },
+    {
+      "letter": "P",
+      "average_gp": 0.1,
+      "category": "individual",
+      "entries": [
+        {
+          "chance": 100,
+          "quantity": "3d8",
+          "type": "cp"
+        }
+      ]
+    },
+    {
+      "letter": "Q",
+      "average_gp": 1.0,
+      "category": "individual",
+      "entries": [
+        {
+          "chance": 100,
+          "quantity": "3d6",
+          "type": "sp"
+        }
+      ]
+    },
+    {
+      "letter": "R",
+      "average_gp": 3.0,
+      "category": "individual",
+      "entries": [
+        {
+          "chance": 100,
+          "quantity": "2d6",
+          "type": "ep"
+        }
+      ]
+    },
+    {
+      "letter": "S",
+      "average_gp": 5.0,
+      "category": "individual",
+      "entries": [
+        {
+          "chance": 100,
+          "quantity": "2d4",
+          "type": "gp"
+        }
+      ]
+    },
+    {
+      "letter": "T",
+      "average_gp": 17.0,
+      "category": "individual",
+      "entries": [
+        {
+          "chance": 100,
+          "quantity": "1d6",
+          "type": "pp"
+        }
+      ]
+    },
+    {
+      "letter": "U",
+      "average_gp": 160.0,
+      "category": "group",
+      "entries": [
+        {
+          "chance": 10,
+          "quantity": "1d100",
+          "type": "cp"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d100",
+          "type": "sp"
+        },
+        {
+          "chance": 5,
+          "quantity": "1d100",
+          "type": "gp"
+        },
+        {
+          "chance": 5,
+          "quantity": "1d4",
+          "type": "gems"
+        },
+        {
+          "chance": 5,
+          "quantity": "1d4",
+          "type": "jewellery"
+        },
+        {
+          "chance": 2,
+          "quantity": "1",
+          "type": "magic_items",
+          "restriction": null
+        }
+      ]
+    },
+    {
+      "letter": "V",
+      "average_gp": 330.0,
+      "category": "group",
+      "entries": [
+        {
+          "chance": 10,
+          "quantity": "1d100",
+          "type": "sp"
+        },
+        {
+          "chance": 5,
+          "quantity": "1d100",
+          "type": "ep"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d100",
+          "type": "gp"
+        },
+        {
+          "chance": 5,
+          "quantity": "1d100",
+          "type": "pp"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d4",
+          "type": "gems"
+        },
+        {
+          "chance": 10,
+          "quantity": "1d4",
+          "type": "jewellery"
+        },
+        {
+          "chance": 5,
+          "quantity": "1",
+          "type": "magic_items",
+          "restriction": null
+        }
+      ]
+    }
+  ]
+}
