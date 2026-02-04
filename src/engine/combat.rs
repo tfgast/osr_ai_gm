@@ -419,7 +419,13 @@ pub fn character_missile_attack_with<R: Rng>(
         return Err(format!("cannot attack dead or nonexistent monster at index {}", monster_idx));
     }
     let range_mod = attack::missile_range_modifier(combat.distance, range.0, range.1, range.2)
-        .ok_or_else(|| format!("target out of range (distance: {}')", combat.distance))?;
+        .ok_or_else(|| {
+            if combat.distance == 0 {
+                "cannot use missile weapons in melee (distance: 0')".to_string()
+            } else {
+                format!("target out of range (distance: {}', max: {}')", combat.distance, range.2)
+            }
+        })?;
 
     let monster = &combat.monsters[monster_idx];
     let target_ac = monster.ac;
@@ -1113,6 +1119,18 @@ mod tests {
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("out of range"));
+    }
+
+    #[test]
+    fn missile_attack_melee_range_error() {
+        let mut combat = CombatState::new(vec![test_goblin()], 0);
+        let fighter = test_fighter();
+        let mut rng = test_rng();
+        let result = character_missile_attack_with(
+            &mut combat, &fighter, 0, "1d6", 1, (50, 100, 150), &mut rng,
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("cannot use missile weapons in melee"));
     }
 
     // --- Monster Attack ---
