@@ -105,6 +105,11 @@ pub fn advance_dungeon_turn_with<R: Rng>(
         time.total_turns, current_room_name
     ));
 
+    // Always show light status so the GM can track torch burn
+    if let Some(summary) = time.light_summary() {
+        result.msg(summary);
+    }
+
     // Wandering monster check every 2 turns (1-in-6)
     if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
         result.msg(format!(
@@ -172,6 +177,11 @@ pub fn search_room_with<R: Rng>(
         result.msg("Search reveals nothing.");
     }
 
+    // Always show light status so the GM can track torch burn
+    if let Some(summary) = time.light_summary() {
+        result.msg(summary);
+    }
+
     // Wandering monster check (search consumes a turn)
     if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
         result.msg(format!(
@@ -217,6 +227,11 @@ pub fn listen_at_door_with<R: Rng>(
         result.msg("You hear sounds beyond the door!");
     } else {
         result.msg("You hear nothing.");
+    }
+
+    // Always show light status so the GM can track torch burn
+    if let Some(summary) = time.light_summary() {
+        result.msg(summary);
     }
 
     // Wandering monster check (listening consumes a turn)
@@ -377,6 +392,11 @@ pub fn move_through_door_with<R: Rng>(
     let light_msgs = time.advance_turn();
     for msg in light_msgs {
         result.msg(msg);
+    }
+
+    // Always show light status so the GM can track torch burn
+    if let Some(summary) = time.light_summary() {
+        result.msg(summary);
     }
 
     // Wandering monster check (moving consumes a turn)
@@ -875,5 +895,88 @@ mod tests {
             }
         }
         assert!(triggered, "moving into trap room should eventually trigger a trap");
+    }
+
+    #[test]
+    fn explore_output_includes_torch_status() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Torch, "Arden");
+
+        let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        let output = format!("{}", result);
+        assert!(
+            output.contains("Torch: 5 turns remaining"),
+            "explore output should show torch status, got: {}",
+            output
+        );
+    }
+
+    #[test]
+    fn search_output_includes_torch_status() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Torch, "Arden");
+
+        let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+        let output = format!("{}", result);
+        assert!(
+            output.contains("Torch: 5 turns remaining"),
+            "search output should show torch status, got: {}",
+            output
+        );
+    }
+
+    #[test]
+    fn listen_output_includes_torch_status() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let dungeon = test_dungeon();
+        time.light(LightSourceKind::Torch, "Arden");
+
+        let result = listen_at_door_with(&mut rng, &mut time, &dungeon, 1, false);
+        let output = format!("{}", result);
+        assert!(
+            output.contains("Torch: 5 turns remaining"),
+            "listen output should show torch status, got: {}",
+            output
+        );
+    }
+
+    #[test]
+    fn move_output_includes_torch_status() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Brin");
+        dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        let output = format!("{}", result.unwrap());
+        assert!(
+            output.contains("Lantern: 23 turns remaining"),
+            "move output should show lantern status, got: {}",
+            output
+        );
+    }
+
+    #[test]
+    fn explore_no_torch_status_in_darkness() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        // No light source — should show DARKNESS, not torch status
+
+        let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        let output = format!("{}", result);
+        assert!(output.contains("DARKNESS"), "should mention darkness");
+        assert!(
+            !output.contains("turns remaining"),
+            "should not show torch status in darkness, got: {}",
+            output
+        );
     }
 }

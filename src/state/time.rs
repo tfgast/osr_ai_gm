@@ -1,6 +1,15 @@
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
+/// Capitalize the first letter of a string.
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().to_string() + c.as_str(),
+    }
+}
+
 /// Light source types with their duration in dungeon turns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LightSourceKind {
@@ -186,6 +195,30 @@ impl TimeTracker {
         self.total_turns / 144 + 1
     }
 
+    /// One-line light summary for exploration output.
+    /// Returns None when no lights are active (caller handles darkness).
+    pub fn light_summary(&self) -> Option<String> {
+        if self.lights.is_empty() {
+            return None;
+        }
+        if self.lights.len() == 1 {
+            let l = &self.lights[0];
+            let plural = if l.remaining_turns == 1 { "" } else { "s" };
+            return Some(format!(
+                "{}: {} turn{} remaining",
+                capitalize(l.kind.name()),
+                l.remaining_turns,
+                plural,
+            ));
+        }
+        // Multiple light sources
+        let parts: Vec<String> = self.lights
+            .iter()
+            .map(|l| format!("{}'s {} ({} turns)", l.carrier, l.kind.name(), l.remaining_turns))
+            .collect();
+        Some(format!("Light: {}", parts.join(", ")))
+    }
+
     /// Format a status display.
     pub fn status(&self) -> String {
         let mut out = format!(
@@ -332,5 +365,59 @@ mod tests {
             tracker.advance_turn();
         }
         assert_eq!(tracker.current_day(), 2);
+    }
+
+    #[test]
+    fn light_summary_none_when_no_lights() {
+        let tracker = TimeTracker::new();
+        assert!(tracker.light_summary().is_none());
+    }
+
+    #[test]
+    fn light_summary_single_torch() {
+        let mut tracker = TimeTracker::new();
+        tracker.light(LightSourceKind::Torch, "Arden");
+        let summary = tracker.light_summary().unwrap();
+        assert_eq!(summary, "Torch: 6 turns remaining");
+    }
+
+    #[test]
+    fn light_summary_single_torch_after_advance() {
+        let mut tracker = TimeTracker::new();
+        tracker.light(LightSourceKind::Torch, "Arden");
+        tracker.advance_turn();
+        let summary = tracker.light_summary().unwrap();
+        assert_eq!(summary, "Torch: 5 turns remaining");
+    }
+
+    #[test]
+    fn light_summary_singular_turn() {
+        let mut tracker = TimeTracker::new();
+        tracker.light(LightSourceKind::Torch, "Arden");
+        // 6-turn torch: 5 advances brings remaining to 1
+        for _ in 0..5 {
+            tracker.advance_turn();
+        }
+        let summary = tracker.light_summary().unwrap();
+        assert_eq!(summary, "Torch: 1 turn remaining");
+    }
+
+    #[test]
+    fn light_summary_single_lantern() {
+        let mut tracker = TimeTracker::new();
+        tracker.light(LightSourceKind::Lantern, "Brin");
+        let summary = tracker.light_summary().unwrap();
+        assert_eq!(summary, "Lantern: 24 turns remaining");
+    }
+
+    #[test]
+    fn light_summary_multiple_sources() {
+        let mut tracker = TimeTracker::new();
+        tracker.light(LightSourceKind::Torch, "Arden");
+        tracker.light(LightSourceKind::Lantern, "Brin");
+        let summary = tracker.light_summary().unwrap();
+        assert!(summary.starts_with("Light: "));
+        assert!(summary.contains("Arden's torch (6 turns)"));
+        assert!(summary.contains("Brin's lantern (24 turns)"));
     }
 }
