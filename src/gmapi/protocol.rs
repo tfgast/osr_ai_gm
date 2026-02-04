@@ -46,6 +46,10 @@ pub enum GMCommand {
         class: Class,
         #[serde(default)]
         alignment: Alignment,
+        /// Optional pre-rolled ability scores [STR, INT, WIS, DEX, CON, CHA].
+        /// Each score must be 3-18. If omitted, abilities are rolled randomly.
+        #[serde(default)]
+        abilities: Option<[i32; 6]>,
     },
 
     // -- GM-only: encounter & combat --
@@ -353,10 +357,26 @@ mod tests {
         let json = r#"{"id":"3","command":{"type":"CreateCharacter","params":{"name":"Aldric","class":"Fighter"}}}"#;
         let req = parse_request(json).unwrap();
         match &req.command {
-            GMCommand::CreateCharacter { name, class, alignment } => {
+            GMCommand::CreateCharacter { name, class, alignment, abilities } => {
                 assert_eq!(name, "Aldric");
                 assert_eq!(*class, Class::Fighter);
                 assert_eq!(*alignment, Alignment::default()); // default
+                assert!(abilities.is_none()); // default
+            }
+            _ => panic!("expected CreateCharacter"),
+        }
+    }
+
+    #[test]
+    fn parse_create_character_with_abilities() {
+        let json = r#"{"id":"4","command":{"type":"CreateCharacter","params":{"name":"Hoyret","class":"Ranger","alignment":"Neutral","abilities":[12,13,11,12,5,6]}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::CreateCharacter { name, class, alignment, abilities } => {
+                assert_eq!(name, "Hoyret");
+                assert_eq!(*class, Class::Ranger);
+                assert_eq!(*alignment, Alignment::Neutral);
+                assert_eq!(*abilities, Some([12, 13, 11, 12, 5, 6]));
             }
             _ => panic!("expected CreateCharacter"),
         }

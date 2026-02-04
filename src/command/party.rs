@@ -7,12 +7,13 @@ use crate::rules::class::{self, Class};
 pub struct ChargenCommand;
 impl Command for ChargenCommand {
     fn name(&self) -> &str { "chargen" }
-    fn help(&self) -> &str { "Create a character and add to party (chargen <name> <class> [alignment])" }
+    fn help(&self) -> &str { "Create a character and add to party (chargen <name> <class> [alignment] [--abilities S I W D C Ch])" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error(
-                "usage: chargen <name> <class> [alignment]\n  \
+                "usage: chargen <name> <class> [alignment] [--abilities STR INT WIS DEX CON CHA]\n  \
                  alignment: Lawful, Neutral, Chaotic (default: Neutral)\n  \
+                 --abilities: provide 6 pre-rolled scores (3-18) in order: STR INT WIS DEX CON CHA\n  \
                  Use 'classes' to list available classes."
             );
         }
@@ -23,7 +24,12 @@ impl Command for ChargenCommand {
                 "unknown class '{}'. Use 'classes' to list available classes.", args[1]
             )),
         };
-        let alignment: Alignment = if args.len() >= 3 {
+
+        // Find --abilities flag position to separate alignment from ability scores
+        let abilities_pos = args.iter().position(|&a| a == "--abilities");
+        let positional_end = abilities_pos.unwrap_or(args.len());
+
+        let alignment: Alignment = if positional_end >= 3 {
             match args[2].parse() {
                 Ok(a) => a,
                 Err(e) => return CommandResult::error(e),
@@ -32,9 +38,29 @@ impl Command for ChargenCommand {
             Alignment::default()
         };
 
-        let mut abilities = chargen::roll_abilities();
+        let mut abilities = if let Some(pos) = abilities_pos {
+            let scores = &args[pos + 1..];
+            if scores.len() != 6 {
+                return CommandResult::error(
+                    "--abilities requires exactly 6 scores: STR INT WIS DEX CON CHA"
+                );
+            }
+            let mut vals = [0i32; 6];
+            for (i, &s) in scores.iter().enumerate() {
+                match s.parse::<i32>() {
+                    Ok(v) if (3..=18).contains(&v) => vals[i] = v,
+                    _ => return CommandResult::error(format!(
+                        "ability scores must be 3-18, got '{}'", s
+                    )),
+                }
+            }
+            vals
+        } else {
+            chargen::roll_abilities()
+        };
         let mut out = String::new();
-        out.push_str(&format!("Rolled abilities: STR {} INT {} WIS {} DEX {} CON {} CHA {}\n",
+        let label = if abilities_pos.is_some() { "Provided abilities" } else { "Rolled abilities" };
+        out.push_str(&format!("{}: STR {} INT {} WIS {} DEX {} CON {} CHA {}\n", label,
             abilities[0], abilities[1], abilities[2],
             abilities[3], abilities[4], abilities[5]));
 

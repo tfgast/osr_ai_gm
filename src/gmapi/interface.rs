@@ -28,8 +28,8 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::QueryWilderness => query_wilderness(id, state),
 
         // -- Character management --
-        GMCommand::CreateCharacter { name, class, alignment } => {
-            create_character(id, state, name, *class, *alignment)
+        GMCommand::CreateCharacter { name, class, alignment, abilities } => {
+            create_character(id, state, name, *class, *alignment, abilities.as_ref())
         }
 
         // -- Combat --
@@ -227,16 +227,30 @@ fn query_wilderness(id: &str, state: &GameState) -> GMResponse {
 // Character management
 // =============================================================================
 
-fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, alignment: Alignment) -> GMResponse {
-    let mut abilities = chargen::roll_abilities();
+fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, alignment: Alignment, provided_abilities: Option<&[i32; 6]>) -> GMResponse {
+    // Validate provided abilities if present
+    if let Some(abs) = provided_abilities {
+        for &score in abs {
+            if !(3..=18).contains(&score) {
+                return GMResponse::err(
+                    id,
+                    format!("ability scores must be 3-18, got {}.", score),
+                    state.mode.clone(),
+                );
+            }
+        }
+    }
+
+    let mut abilities = provided_abilities.copied().unwrap_or_else(chargen::roll_abilities);
     let def = class::class_def(class);
     if !def.racial_modifiers.is_empty() {
         class::apply_racial_modifiers(class, &mut abilities);
     }
     if !class::meets_requirements(class, &abilities) {
+        let source = if provided_abilities.is_some() { "provided" } else { "rolled" };
         return GMResponse::err(
             id,
-            format!("rolled abilities do not meet requirements for {}.", class.name()),
+            format!("{} abilities do not meet requirements for {}.", source, class.name()),
             state.mode.clone(),
         );
     }
@@ -1161,6 +1175,7 @@ mod tests {
             name: "Aldric".to_string(),
             class: Class::Fighter,
             alignment: Alignment::Lawful,
+            abilities: None,
         }), &mut state);
         // Character creation might fail due to random ability rolls not meeting requirements.
         // So we just verify the response is well-formed.

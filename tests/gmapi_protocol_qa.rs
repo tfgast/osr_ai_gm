@@ -376,12 +376,45 @@ fn create_character_happy_path() {
         name: "Aldric".to_string(),
         class: Class::Fighter,
         alignment: Alignment::Lawful,
+        abilities: None,
     }), &mut state);
     assert_response_format(&resp, "cc1");
     // Fighter has no ability requirements, so creation always succeeds.
     assert!(resp.success, "Fighter creation should always succeed (no requirements)");
     assert!(resp.data.is_some(), "success should include character sheet");
     assert_eq!(state.party.members.len(), 1);
+}
+
+#[test]
+fn create_character_with_abilities() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("cc_ab", GMCommand::CreateCharacter {
+        name: "Hoyret".to_string(),
+        class: Class::Ranger,
+        alignment: Alignment::Neutral,
+        abilities: Some([13, 13, 13, 13, 13, 13]),
+    }), &mut state);
+    assert_response_format(&resp, "cc_ab");
+    assert!(resp.success, "creation with valid abilities should succeed");
+    assert_eq!(state.party.members.len(), 1);
+    let c = &state.party.members[0];
+    assert_eq!(c.name, "Hoyret");
+    assert_eq!(c.abilities.strength, 13);
+    assert_eq!(c.abilities.intelligence, 13);
+}
+
+#[test]
+fn create_character_abilities_out_of_range() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("cc_bad", GMCommand::CreateCharacter {
+        name: "BadStats".to_string(),
+        class: Class::Fighter,
+        alignment: Alignment::Neutral,
+        abilities: Some([20, 10, 10, 10, 10, 10]),
+    }), &mut state);
+    assert_response_format(&resp, "cc_bad");
+    assert!(!resp.success, "ability score 20 should be rejected");
+    assert!(resp.error.as_ref().unwrap().contains("3-18"));
 }
 
 #[test]
