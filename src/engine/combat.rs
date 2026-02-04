@@ -56,6 +56,21 @@ impl fmt::Display for AttackResult {
     }
 }
 
+/// Result of a coup de grace (auto-kill of a helpless creature).
+#[derive(Debug, Clone)]
+pub struct CoupDeGraceResult {
+    pub attacker: String,
+    pub target: String,
+    pub target_was_helpless: bool,
+}
+
+impl fmt::Display for CoupDeGraceResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} dispatches the helpless {} — KILLED (auto-kill)",
+            self.attacker, self.target)
+    }
+}
+
 /// Result of a morale check.
 #[derive(Debug, Clone)]
 pub struct MoraleResult {
@@ -231,6 +246,71 @@ pub fn resolve_character_attack(
         let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
         Ok(character_melee_attack(combat, character, monster_idx, weapon.damage, str_mod))
     }
+}
+
+// =============================================================================
+// Coup de Grace (Auto-kill helpless creatures)
+// =============================================================================
+
+/// Automatically kill a helpless monster (sleeping, paralyzed, held, etc.).
+///
+/// Per OSE rules, helpless creatures can be dispatched without an attack roll.
+/// The monster is killed instantly regardless of HP.
+pub fn coup_de_grace(
+    combat: &mut CombatState,
+    character: &Character,
+    monster_idx: usize,
+) -> Result<CoupDeGraceResult, String> {
+    if monster_idx >= combat.monsters.len() {
+        return Err(format!("monster index {} out of range (0-{})",
+            monster_idx, combat.monsters.len() - 1));
+    }
+    if !combat.monsters[monster_idx].is_alive() {
+        return Err(format!("{} is already dead.", combat.monsters[monster_idx].name));
+    }
+    if !character.is_alive() {
+        return Err(format!("{} is dead and cannot attack.", character.name));
+    }
+    if !combat.monsters[monster_idx].helpless {
+        return Err(format!("{} is not helpless. Use a normal attack.",
+            combat.monsters[monster_idx].name));
+    }
+
+    let target_name = combat.monsters[monster_idx].name.clone();
+
+    // Instant kill — set HP to 0 and clear helpless state
+    combat.monsters[monster_idx].hp = 0;
+    combat.monsters[monster_idx].helpless = false;
+
+    let result = CoupDeGraceResult {
+        attacker: character.name.clone(),
+        target: target_name,
+        target_was_helpless: true,
+    };
+    combat.log.push(format!("{}", result));
+    Ok(result)
+}
+
+/// Mark a monster as helpless (sleeping, paralyzed, held, etc.).
+/// Helpless monsters can be auto-killed with coup_de_grace.
+pub fn set_monster_helpless(combat: &mut CombatState, monster_idx: usize, helpless: bool) -> Result<String, String> {
+    if monster_idx >= combat.monsters.len() {
+        return Err(format!("monster index {} out of range (0-{})",
+            monster_idx, combat.monsters.len() - 1));
+    }
+    if !combat.monsters[monster_idx].is_alive() {
+        return Err(format!("{} is already dead.", combat.monsters[monster_idx].name));
+    }
+
+    combat.monsters[monster_idx].helpless = helpless;
+    let name = &combat.monsters[monster_idx].name;
+    let msg = if helpless {
+        format!("{} is now helpless (can be auto-killed).", name)
+    } else {
+        format!("{} is no longer helpless.", name)
+    };
+    combat.log.push(msg.clone());
+    Ok(msg)
 }
 
 // =============================================================================
@@ -760,7 +840,14 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
     out.push_str("\nMonsters:\n");
     for (i, m) in combat.monsters.iter().enumerate() {
         let status = if m.is_alive() {
-            format!("HP {}/{}, AC {}", m.hp, m.max_hp, m.ac)
+            let mut s = format!("HP {}/{}, AC {}", m.hp, m.max_hp, m.ac);
+            if m.helpless {
+                s.push_str(" [HELPLESS]");
+            }
+            if m.turned {
+                s.push_str(" [TURNED]");
+            }
+            s
         } else {
             "DEAD".to_string()
         };
@@ -855,6 +942,7 @@ mod tests {
             damage: "1d6".to_string(),
             morale: 7, xp_value: 5,
             turned: false,
+            helpless: false,
         }
     }
 
@@ -867,6 +955,7 @@ mod tests {
             damage: "1d6".to_string(),
             morale: 12, xp_value: 10,
             turned: false,
+            helpless: false,
         }
     }
 
@@ -879,6 +968,7 @@ mod tests {
             damage: "1d10".to_string(),
             morale: 10, xp_value: 125,
             turned: false,
+            helpless: false,
         }
     }
 
@@ -1499,6 +1589,7 @@ mod tests {
             damage: "1d12".to_string(),
             morale: 12, xp_value: 500,
             turned: false,
+            helpless: false,
         };
         // Also add a weak skeleton
         let mut combat = CombatState::new(
@@ -1611,6 +1702,7 @@ mod tests {
             damage: "1d10".to_string(),
             morale: 10, xp_value: 125,
             turned: false,
+            helpless: false,
         };
         let mut combat = CombatState::new(vec![ogre.clone(), ogre.clone(), ogre], 10);
         // Create a very weak character (1 HP, bad AC)
@@ -1961,5 +2053,129 @@ mod tests {
         // Verify combat log captured all events
         assert!(combat.log.len() >= 3, "should have at least 3 log entries");
         assert!(combat.log[0].contains("Round 1"));
+    }
+
+    // --- Coup de Grace (Auto-kill helpless) ---
+
+    #[test]
+    fn coup_de_grace_kills_helpless_monster() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        combat.monsters[0].helpless = true;
+        let fighter = test_fighter();
+
+        let result = coup_de_grace(&mut combat, &fighter, 0).unwrap();
+        assert!(result.target_was_helpless);
+        assert_eq!(result.attacker, "Grond");
+        assert_eq!(result.target, "Goblin");
+        assert!(!combat.monsters[0].is_alive());
+        assert_eq!(combat.monsters[0].hp, 0);
+    }
+
+    #[test]
+    fn coup_de_grace_fails_on_non_helpless() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        let fighter = test_fighter();
+
+        let result = coup_de_grace(&mut combat, &fighter, 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not helpless"));
+    }
+
+    #[test]
+    fn coup_de_grace_fails_on_dead_monster() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        combat.monsters[0].hp = 0;
+        combat.monsters[0].helpless = true;
+        let fighter = test_fighter();
+
+        let result = coup_de_grace(&mut combat, &fighter, 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("already dead"));
+    }
+
+    #[test]
+    fn coup_de_grace_fails_on_dead_character() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        combat.monsters[0].helpless = true;
+        let mut fighter = test_fighter();
+        fighter.hp = 0;
+
+        let result = coup_de_grace(&mut combat, &fighter, 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("dead and cannot attack"));
+    }
+
+    #[test]
+    fn coup_de_grace_clears_helpless_flag() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        combat.monsters[0].helpless = true;
+        let fighter = test_fighter();
+
+        coup_de_grace(&mut combat, &fighter, 0).unwrap();
+        assert!(!combat.monsters[0].helpless);
+    }
+
+    #[test]
+    fn coup_de_grace_logs_result() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        combat.monsters[0].helpless = true;
+        let fighter = test_fighter();
+
+        coup_de_grace(&mut combat, &fighter, 0).unwrap();
+        assert!(combat.log.last().unwrap().contains("dispatches"));
+        assert!(combat.log.last().unwrap().contains("auto-kill"));
+    }
+
+    #[test]
+    fn set_helpless_marks_monster() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        assert!(!combat.monsters[0].helpless);
+
+        let msg = set_monster_helpless(&mut combat, 0, true).unwrap();
+        assert!(msg.contains("helpless"));
+        assert!(combat.monsters[0].helpless);
+    }
+
+    #[test]
+    fn set_helpless_unmarks_monster() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        combat.monsters[0].helpless = true;
+
+        let msg = set_monster_helpless(&mut combat, 0, false).unwrap();
+        assert!(msg.contains("no longer helpless"));
+        assert!(!combat.monsters[0].helpless);
+    }
+
+    #[test]
+    fn set_helpless_fails_on_dead() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        combat.monsters[0].hp = 0;
+
+        let result = set_monster_helpless(&mut combat, 0, true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn combat_status_shows_helpless() {
+        let mut combat = CombatState::new(vec![test_goblin()], 10);
+        combat.monsters[0].helpless = true;
+        let party = vec![test_fighter()];
+
+        let status = combat_status(&combat, &party);
+        assert!(status.contains("[HELPLESS]"));
+    }
+
+    #[test]
+    fn coup_de_grace_display() {
+        let result = CoupDeGraceResult {
+            attacker: "Grond".to_string(),
+            target: "Goblin".to_string(),
+            target_was_helpless: true,
+        };
+        let display = format!("{}", result);
+        assert!(display.contains("dispatches"));
+        assert!(display.contains("Grond"));
+        assert!(display.contains("Goblin"));
+        assert!(display.contains("auto-kill"));
     }
 }

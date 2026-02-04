@@ -40,6 +40,8 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(CombatStatusCommand));
     registry.register(Box::new(CombatLogCommand));
     registry.register(Box::new(EndCombatCommand));
+    registry.register(Box::new(SetHelplessCommand));
+    registry.register(Box::new(KillCommand));
     // Inventory
     registry.register(Box::new(BuyCommand));
     registry.register(Box::new(DropCommand));

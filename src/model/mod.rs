@@ -97,6 +97,10 @@ pub struct Monster {
     /// Whether this monster has been turned by a cleric.
     #[serde(default)]
     pub turned: bool,
+    /// Whether this monster is helpless (sleeping, paralyzed, held, etc.).
+    /// Helpless creatures can be auto-killed without an attack roll.
+    #[serde(default)]
+    pub helpless: bool,
 }
 
 impl Monster {
@@ -114,11 +118,17 @@ impl Monster {
             morale: 7,
             xp_value: 0,
             turned: false,
+            helpless: false,
         }
     }
 
     pub fn is_alive(&self) -> bool {
         self.hp > 0
+    }
+
+    /// Check if this monster is helpless (sleeping, paralyzed, held, etc.).
+    pub fn is_helpless(&self) -> bool {
+        self.helpless
     }
 }
 

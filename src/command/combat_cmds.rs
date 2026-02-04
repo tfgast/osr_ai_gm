@@ -121,26 +121,19 @@ impl Command for InitiativeCommand {
 pub struct AttackCommand;
 impl Command for AttackCommand {
     fn name(&self) -> &str { "attack" }
-    fn help(&self) -> &str { "Melee/missile attack (attack <character> <monster_idx> [weapon])" }
+    fn help(&self) -> &str { "Melee/missile attack (attack <character> <monster_idx> [weapon]). Auto-kills helpless targets." }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error(
                 "usage: attack <character_name> <monster_index> [weapon_name]\n  \
-                 Default weapon: sword (1d8 melee). Use weapon name for others."
+                 Default weapon: sword (1d8 melee). Use weapon name for others.\n  \
+                 Helpless targets (sleeping, paralyzed, etc.) are auto-killed."
             );
         }
         let char_name = args[0];
         let monster_idx: usize = match args[1].parse() {
             Ok(n) => n,
             _ => return CommandResult::error("monster_index must be a number"),
-        };
-        let weapon_name = if args.len() >= 3 { args[2..].join(" ") } else { "sword".to_string() };
-
-        let weapon = match equipment::find_weapon(&weapon_name) {
-            Some(w) => w,
-            None => return CommandResult::error(format!(
-                "unknown weapon '{}'. Try: sword, mace, dagger, short bow, etc.", weapon_name
-            )),
         };
 
         let character = match state.party.find_member(char_name) {
@@ -150,11 +143,33 @@ impl Command for AttackCommand {
             )),
         };
 
-        let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
         let combat = match state.combat.as_mut() {
             Some(c) => c,
             None => return CommandResult::error("no active combat. Use 'start_combat' first."),
         };
+
+        // Check if target is helpless — auto-kill without attack roll
+        if monster_idx < combat.monsters.len()
+            && combat.monsters[monster_idx].is_alive()
+            && combat.monsters[monster_idx].helpless
+        {
+            match combat::coup_de_grace(combat, &character, monster_idx) {
+                Ok(result) => return CommandResult::ok(format!("{}", result)),
+                Err(e) => return CommandResult::error(e),
+            }
+        }
+
+        // Normal attack resolution
+        let weapon_name = if args.len() >= 3 { args[2..].join(" ") } else { "sword".to_string() };
+
+        let weapon = match equipment::find_weapon(&weapon_name) {
+            Some(w) => w,
+            None => return CommandResult::error(format!(
+                "unknown weapon '{}'. Try: sword, mace, dagger, short bow, etc.", weapon_name
+            )),
+        };
+
+        let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
 
         match combat::resolve_character_attack(combat, &character, monster_idx, &weapon, rest_penalty) {
             Ok(result) => CommandResult::ok(format!("{}", result)),
@@ -507,5 +522,73 @@ impl Command for CombatLogCommand {
             out.push_str(&format!("  {}. {}\n", i + 1, entry));
         }
         CommandResult::ok(out)
+    }
+}
+
+pub struct SetHelplessCommand;
+impl Command for SetHelplessCommand {
+    fn name(&self) -> &str { "set_helpless" }
+    fn help(&self) -> &str { "Mark monster as helpless/sleeping (set_helpless <monster_idx> [false])" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error(
+                "usage: set_helpless <monster_index> [false]\n  \
+                 Mark a monster as helpless (sleeping, paralyzed, held, etc.).\n  \
+                 Helpless creatures can be auto-killed with any attack.\n  \
+                 Use 'set_helpless <idx> false' to remove the helpless condition."
+            );
+        }
+        let monster_idx: usize = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("monster_index must be a number"),
+        };
+        let helpless = args.get(1).is_none_or(|s| *s != "false");
+
+        let combat = match state.combat.as_mut() {
+            Some(c) => c,
+            None => return CommandResult::error("no active combat."),
+        };
+
+        match combat::set_monster_helpless(combat, monster_idx, helpless) {
+            Ok(msg) => CommandResult::ok(msg),
+            Err(e) => CommandResult::error(e),
+        }
+    }
+}
+
+pub struct KillCommand;
+impl Command for KillCommand {
+    fn name(&self) -> &str { "kill" }
+    fn help(&self) -> &str { "Auto-kill a helpless monster (kill <character> <monster_idx>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error(
+                "usage: kill <character_name> <monster_index>\n  \
+                 Instantly kill a helpless monster (sleeping, paralyzed, held, etc.).\n  \
+                 The monster must be marked as helpless first with 'set_helpless'."
+            );
+        }
+        let char_name = args[0];
+        let monster_idx: usize = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("monster_index must be a number"),
+        };
+
+        let character = match state.party.find_member(char_name) {
+            Some(c) => c.clone(),
+            None => return CommandResult::error(format!(
+                "no party member named '{}'.", char_name
+            )),
+        };
+
+        let combat = match state.combat.as_mut() {
+            Some(c) => c,
+            None => return CommandResult::error("no active combat."),
+        };
+
+        match combat::coup_de_grace(combat, &character, monster_idx) {
+            Ok(result) => CommandResult::ok(format!("{}", result)),
+            Err(e) => CommandResult::error(e),
+        }
     }
 }
