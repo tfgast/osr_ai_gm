@@ -11,6 +11,7 @@ use command::party::*;
 use command::combat_cmds::*;
 use command::exploration_cmds::*;
 use command::encounter_cmds::*;
+use command::inventory_cmds::*;
 use command::wilderness_cmds::*;
 use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, RulingCommand};
 use command::system::*;
@@ -38,6 +39,11 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(CombatStatusCommand));
     registry.register(Box::new(CombatLogCommand));
     registry.register(Box::new(EndCombatCommand));
+    // Inventory
+    registry.register(Box::new(BuyCommand));
+    registry.register(Box::new(DropCommand));
+    registry.register(Box::new(LootCommand));
+    registry.register(Box::new(EquipCommand));
     // Dungeon Exploration
     registry.register(Box::new(EnterDungeonCommand));
     registry.register(Box::new(LightCommand));
