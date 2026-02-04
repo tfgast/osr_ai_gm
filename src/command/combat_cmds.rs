@@ -243,7 +243,7 @@ impl Command for MoraleCommand {
         let morale_score = if let Some(name) = args.first() {
             let name_lower = name.to_lowercase();
             match combat.monsters.iter()
-                .find(|m| m.is_alive() && m.name.to_lowercase() == name_lower)
+                .find(|m| m.is_alive() && m.name.to_lowercase().starts_with(&name_lower))
             {
                 Some(m) => m.morale,
                 None => return CommandResult::error(format!("no living monster named '{}'.", name)),
