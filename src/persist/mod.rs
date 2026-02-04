@@ -31,6 +31,9 @@ pub struct GameState {
     pub wilderness: Option<WildernessState>,
     #[serde(default)]
     pub mode: GameMode,
+    /// Mode before combat started, restored when combat ends.
+    #[serde(default)]
+    pub pre_combat_mode: Option<GameMode>,
 }
 
 fn default_version() -> u32 { 0 }
@@ -47,6 +50,7 @@ impl GameState {
             dungeon: None,
             wilderness: None,
             mode: GameMode::default(),
+            pre_combat_mode: None,
         }
     }
 

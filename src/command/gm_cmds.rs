@@ -63,6 +63,7 @@ impl Command for SpawnEncounterCommand {
         let combat_state = CombatState::new(monsters, distance);
         let status = combat::combat_status(&combat_state, &state.party.members);
         state.combat = Some(combat_state);
+        state.pre_combat_mode = Some(state.mode.clone());
         state.mode = GameMode::Combat;
 
         let mut out = format!("Encounter spawned! {} {}(s) at {}' distance.\n\n",

@@ -2519,11 +2519,11 @@ fn mode_transitions() {
     }), &mut state);
     assert_eq!(resp.mode, GameMode::Combat);
 
-    // Combat -> Idle (via EndCombat)
+    // Combat -> Exploration (restores pre-combat mode)
     let resp = handle_request(&req("4", GMCommand::EndCombat), &mut state);
-    assert_eq!(resp.mode, GameMode::Idle);
+    assert_eq!(resp.mode, GameMode::Exploration);
 
-    // Idle -> Wilderness
+    // Exploration -> Wilderness
     let resp = handle_request(&req("5", GMCommand::EnterWilderness {
         terrain: Terrain::Forest,
     }), &mut state);

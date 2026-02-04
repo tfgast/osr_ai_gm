@@ -295,6 +295,7 @@ fn spawn_encounter(
     let combat_state = CombatState::new(monsters, distance);
     let status = combat::combat_status(&combat_state, &state.party.members);
     state.combat = Some(combat_state);
+    state.pre_combat_mode = Some(state.mode.clone());
     state.mode = GameMode::Combat;
 
     GMResponse::ok_with_data(
@@ -423,7 +424,7 @@ fn end_combat(id: &str, state: &mut GameState) -> GMResponse {
         .map(|m| m.xp_value)
         .sum();
     let dead_party = state.party.members.iter().filter(|c| !c.is_alive()).count();
-    state.mode = GameMode::Idle;
+    state.mode = state.pre_combat_mode.take().unwrap_or(GameMode::Idle);
 
     GMResponse::ok_with_data(
         id,
@@ -901,6 +902,7 @@ fn spawn_monster(id: &str, state: &mut GameState, name: &str, count: u32, distan
     let combat_state = CombatState::new(monsters, distance);
     let status = combat::combat_status(&combat_state, &state.party.members);
     state.combat = Some(combat_state);
+    state.pre_combat_mode = Some(state.mode.clone());
     state.mode = GameMode::Combat;
 
     let mut msg = format!("combat started: {} {}(s) at {}' distance.", count, def.name, distance);

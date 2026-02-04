@@ -196,7 +196,7 @@ fn full_dungeon_session() {
     // -- STEP 12: End combat --
     let resp = handle_request(&req("25", GMCommand::EndCombat), &mut state);
     assert!(resp.success, "end combat failed: {}", resp.message);
-    assert_eq!(state.mode, GameMode::Idle);
+    assert_eq!(state.mode, GameMode::Exploration);
     let data = resp.data.unwrap();
     let total_xp = data["total_xp"].as_u64().unwrap();
 
@@ -617,7 +617,7 @@ fn complete_ose_session() {
     // End combat
     let resp = handle_request(&req("c9", GMCommand::EndCombat), &mut state);
     assert!(resp.success);
-    assert_eq!(state.mode, GameMode::Idle);
+    assert_eq!(state.mode, GameMode::Exploration);
     let data = resp.data.unwrap();
     let monster_xp = data["total_xp"].as_u64().unwrap();
 
@@ -1068,10 +1068,10 @@ fn mode_transition_idle_exploration_combat_exploration() {
     }), &mut state);
     assert!(resp.success);
 
-    // Combat -> Idle (EndCombat resets to Idle)
+    // Combat -> Exploration (EndCombat restores pre-combat mode)
     let resp = handle_request(&req("7", GMCommand::EndCombat), &mut state);
     assert!(resp.success);
-    assert_eq!(state.mode, GameMode::Idle);
+    assert_eq!(state.mode, GameMode::Exploration);
 
     // Dungeon state should still be present — exploration can resume
     assert!(state.dungeon.is_some(), "dungeon state should survive combat");
@@ -1144,10 +1144,10 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
     }), &mut state);
     assert!(resp.success);
 
-    // Combat -> Idle
+    // Combat -> Wilderness (EndCombat restores pre-combat mode)
     let resp = handle_request(&req("7", GMCommand::EndCombat), &mut state);
     assert!(resp.success);
-    assert_eq!(state.mode, GameMode::Idle);
+    assert_eq!(state.mode, GameMode::Wilderness);
 
     // Wilderness state should still be present
     assert!(state.wilderness.is_some(), "wilderness state should survive combat");
@@ -1426,10 +1426,10 @@ fn session_a_dungeon_crawl() {
     let resp = handle_request(&req("a28", GMCommand::CheckMorale), &mut state);
     assert!(resp.success);
 
-    // End combat
+    // End combat — restores Exploration mode
     let resp = handle_request(&req("a29", GMCommand::EndCombat), &mut state);
     assert!(resp.success);
-    assert_eq!(state.mode, GameMode::Idle);
+    assert_eq!(state.mode, GameMode::Exploration);
     let combat_data = resp.data.unwrap();
     let monster_xp = combat_data["total_xp"].as_u64().unwrap();
     // monster_xp may be 0 if no goblins were killed (attack rolls are random)
@@ -1651,10 +1651,10 @@ fn session_b_wilderness_travel() {
     let reaction = data["reaction"].as_str().unwrap();
     assert!(!reaction.is_empty());
 
-    // End combat (simulate evasion by ending)
+    // End combat — restores Wilderness mode
     let resp = handle_request(&req("b10", GMCommand::EndCombat), &mut state);
     assert!(resp.success);
-    assert_eq!(state.mode, GameMode::Idle);
+    assert_eq!(state.mode, GameMode::Wilderness);
 }
 
 // ===========================================================================

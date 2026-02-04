@@ -77,6 +77,7 @@ impl Command for StartCombatCommand {
         let combat_state = CombatState::new(monsters, distance);
         let status = combat::combat_status(&combat_state, &state.party.members);
         state.combat = Some(combat_state);
+        state.pre_combat_mode = Some(state.mode.clone());
         state.mode = GameMode::Combat;
 
         let mut out = format!("Combat started! {} {}(s) at {}' distance.\n",
@@ -393,7 +394,7 @@ impl Command for EndCombatCommand {
             return CommandResult::error("no active combat.");
         }
         let combat = state.combat.take().unwrap();
-        state.mode = GameMode::Idle;
+        state.mode = state.pre_combat_mode.take().unwrap_or(GameMode::Idle);
         let dead_monsters = combat.monsters.iter().filter(|m| !m.is_alive()).count();
         let total_xp: u64 = combat.monsters.iter()
             .filter(|m| !m.is_alive())

@@ -12,6 +12,7 @@ use command::combat_cmds::*;
 use command::exploration_cmds::*;
 use command::encounter_cmds::*;
 use command::wilderness_cmds::*;
+use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, RulingCommand};
 use command::system::*;
 use persist::GameState;
 use std::io::{self, BufRead, Write};
@@ -59,6 +60,10 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(ForageCommand));
     registry.register(Box::new(HuntCommand));
     registry.register(Box::new(WildernessStatusCommand));
+    // GM
+    registry.register(Box::new(AdvanceTurnCommand));
+    registry.register(Box::new(AwardXpCommand));
+    registry.register(Box::new(RulingCommand));
     // System
     registry.register(Box::new(RollCommand));
     registry.register(Box::new(SaveCommand));
