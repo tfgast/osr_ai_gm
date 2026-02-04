@@ -3,7 +3,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use crate::model::Party;
+use crate::model::{Party, CombatState};
 
 /// The full game state that gets persisted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,6 +12,8 @@ pub struct GameState {
     pub turn: u64,
     pub dungeon_level: u32,
     pub notes: Vec<String>,
+    #[serde(default)]
+    pub combat: Option<CombatState>,
 }
 
 impl GameState {
@@ -21,6 +23,7 @@ impl GameState {
             turn: 0,
             dungeon_level: 0,
             notes: Vec::new(),
+            combat: None,
         }
     }
 }

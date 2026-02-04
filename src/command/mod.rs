@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use crate::persist::GameState;
 
 /// Result of executing a command.
 #[derive(Debug)]
@@ -38,8 +39,8 @@ pub trait Command {
     /// Brief help text.
     fn help(&self) -> &str;
 
-    /// Execute the command with the given arguments.
-    fn execute(&self, args: &[&str]) -> CommandResult;
+    /// Execute the command with the given arguments and mutable game state.
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult;
 }
 
 /// Registry that maps command names to command implementations.
@@ -58,9 +59,9 @@ impl CommandRegistry {
         self.commands.insert(cmd.name().to_string(), cmd);
     }
 
-    pub fn dispatch(&self, name: &str, args: &[&str]) -> CommandResult {
+    pub fn dispatch(&self, name: &str, args: &[&str], state: &mut GameState) -> CommandResult {
         match self.commands.get(name) {
-            Some(cmd) => cmd.execute(args),
+            Some(cmd) => cmd.execute(args, state),
             None => CommandResult::error(format!("unknown command: '{}'. Type 'help' for commands.", name)),
         }
     }
@@ -88,7 +89,7 @@ mod tests {
     impl Command for TestCmd {
         fn name(&self) -> &str { "test" }
         fn help(&self) -> &str { "a test command" }
-        fn execute(&self, args: &[&str]) -> CommandResult {
+        fn execute(&self, args: &[&str], _state: &mut GameState) -> CommandResult {
             CommandResult::ok(format!("args: {:?}", args))
         }
     }
@@ -97,7 +98,8 @@ mod tests {
     fn registry_dispatch() {
         let mut reg = CommandRegistry::new();
         reg.register(Box::new(TestCmd));
-        let result = reg.dispatch("test", &["a", "b"]);
+        let mut state = GameState::new();
+        let result = reg.dispatch("test", &["a", "b"], &mut state);
         assert!(!result.quit);
         assert!(result.output.contains("a"));
     }
@@ -105,7 +107,8 @@ mod tests {
     #[test]
     fn unknown_command() {
         let reg = CommandRegistry::new();
-        let result = reg.dispatch("nope", &[]);
+        let mut state = GameState::new();
+        let result = reg.dispatch("nope", &[], &mut state);
         assert!(result.output.contains("unknown command"));
     }
 }

@@ -138,6 +138,10 @@ impl Party {
     pub fn find_member(&self, name: &str) -> Option<&Character> {
         self.members.iter().find(|c| c.name.eq_ignore_ascii_case(name))
     }
+
+    pub fn find_member_mut(&mut self, name: &str) -> Option<&mut Character> {
+        self.members.iter_mut().find(|c| c.name.eq_ignore_ascii_case(name))
+    }
 }
 
 impl Default for Party {
@@ -185,6 +189,48 @@ impl Spell {
             duration: String::new(),
             description: String::new(),
         }
+    }
+}
+
+/// State of an active combat encounter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CombatState {
+    pub round: u32,
+    pub monsters: Vec<Monster>,
+    pub party_initiative: i32,
+    pub monster_initiative: i32,
+    pub distance: u32,
+    pub log: Vec<String>,
+    /// Characters who declared spells this round (for disruption tracking).
+    #[serde(default)]
+    pub spell_declarations: Vec<String>,
+    /// Characters whose spells were disrupted this round.
+    #[serde(default)]
+    pub disrupted: Vec<String>,
+}
+
+impl CombatState {
+    pub fn new(monsters: Vec<Monster>, distance: u32) -> Self {
+        CombatState {
+            round: 0,
+            monsters,
+            party_initiative: 0,
+            monster_initiative: 0,
+            distance,
+            log: Vec::new(),
+            spell_declarations: Vec::new(),
+            disrupted: Vec::new(),
+        }
+    }
+
+    pub fn living_monsters(&self) -> Vec<(usize, &Monster)> {
+        self.monsters.iter().enumerate()
+            .filter(|(_, m)| m.is_alive())
+            .collect()
+    }
+
+    pub fn living_monster_count(&self) -> usize {
+        self.monsters.iter().filter(|m| m.is_alive()).count()
     }
 }
 
