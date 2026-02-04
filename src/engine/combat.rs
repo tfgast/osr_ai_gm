@@ -553,7 +553,7 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
         } else {
             "DEAD".to_string()
         };
-        out.push_str(&format!("  {} ({}) — {}\n", c.name, c.class, status));
+        out.push_str(&format!("  {} ({}) — {}\n", c.name, c.class.name(), status));
     }
 
     out.push_str("\nMonsters:\n");
@@ -588,6 +588,7 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
 mod tests {
     use super::*;
     use crate::model::{AbilityScores, Monster};
+    use crate::rules::class::Class;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
@@ -598,7 +599,7 @@ mod tests {
     fn test_fighter() -> Character {
         Character {
             name: "Grond".to_string(),
-            class: "Fighter".to_string(),
+            class: Class::Fighter,
             level: 1,
             abilities: AbilityScores {
                 strength: 16, intelligence: 10, wisdom: 10,
@@ -614,7 +615,7 @@ mod tests {
     fn test_cleric() -> Character {
         Character {
             name: "Brother Aldric".to_string(),
-            class: "Cleric".to_string(),
+            class: Class::Cleric,
             level: 3,
             abilities: AbilityScores {
                 strength: 12, intelligence: 10, wisdom: 16,
@@ -630,7 +631,7 @@ mod tests {
     fn test_magic_user() -> Character {
         Character {
             name: "Elara".to_string(),
-            class: "Magic-User".to_string(),
+            class: Class::MagicUser,
             level: 1,
             abilities: AbilityScores {
                 strength: 8, intelligence: 16, wisdom: 10,

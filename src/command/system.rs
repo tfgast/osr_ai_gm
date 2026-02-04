@@ -52,19 +52,16 @@ impl Command for LoadCommand {
     }
 }
 
-pub struct HelpCommand {
-    pub commands: Vec<(String, String)>,
-}
+pub struct HelpCommand;
 
 impl Command for HelpCommand {
     fn name(&self) -> &str { "help" }
     fn help(&self) -> &str { "Show available commands" }
     fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
-        let mut out = String::from("Available commands:\n");
-        for (name, help) in &self.commands {
-            out.push_str(&format!("  {:18} {}\n", name, help));
-        }
-        CommandResult::ok(out)
+        // Help is handled by CommandRegistry::dispatch() which has access to
+        // the full command list. This execute() is only reached if the command
+        // is invoked outside the registry (which shouldn't happen in practice).
+        CommandResult::ok("Type 'help' for available commands.")
     }
 }
 

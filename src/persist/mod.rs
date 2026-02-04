@@ -9,9 +9,15 @@ use crate::state::game::GameMode;
 use crate::state::time::TimeTracker;
 use crate::state::wilderness::WildernessState;
 
+/// Current save file format version.
+pub const SAVE_VERSION: u32 = 1;
+
 /// The full game state that gets persisted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
+    /// Save file format version. Used for forward-compatible loading.
+    #[serde(default = "default_version")]
+    pub version: u32,
     pub party: Party,
     pub dungeon_level: u32,
     pub notes: Vec<String>,
@@ -27,9 +33,12 @@ pub struct GameState {
     pub mode: GameMode,
 }
 
+fn default_version() -> u32 { 0 }
+
 impl GameState {
     pub fn new() -> Self {
         GameState {
+            version: SAVE_VERSION,
             party: Party::new(),
             dungeon_level: 0,
             notes: Vec::new(),
@@ -54,10 +63,24 @@ impl Default for GameState {
 }
 
 /// Save game state to a JSON file.
+/// Uses atomic write (write-to-temp-then-rename) to prevent corruption.
 pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
     let json = serde_json::to_string_pretty(state)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    fs::write(path, json)
+
+    // Write to a temporary file in the same directory, then rename.
+    // This ensures the save is atomic — either the old file remains or
+    // the new one replaces it; a crash mid-write won't corrupt data.
+    let parent = path.parent().unwrap_or(Path::new("."));
+    let tmp_path = parent.join(format!(
+        ".{}.tmp",
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("save")
+    ));
+    fs::write(&tmp_path, &json)?;
+    fs::rename(&tmp_path, path)?;
+    Ok(())
 }
 
 /// Load game state from a JSON file.
@@ -72,6 +95,7 @@ pub fn load(path: &Path) -> io::Result<GameState> {
 mod tests {
     use super::*;
     use crate::model::Character;
+    use crate::rules::class::Class;
     use std::path::PathBuf;
 
     #[test]
@@ -80,7 +104,7 @@ mod tests {
         let path = dir.join("osr_ai_gm_test_save.json");
 
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Aldric", "Fighter"));
+        state.party.add_member(Character::new("Aldric", Class::Fighter));
         state.time = Some(TimeTracker::new());
         for _ in 0..42 {
             state.time.as_mut().unwrap().advance_turn();

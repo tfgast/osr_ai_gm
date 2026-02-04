@@ -17,56 +17,6 @@ use persist::GameState;
 use std::io::{self, BufRead, Write};
 
 fn build_registry() -> CommandRegistry {
-    let commands_info: Vec<(String, String)> = vec![
-        // Character & Party
-        ("chargen".into(), "Create a character and add to party".into()),
-        ("classes".into(), "List all character classes".into()),
-        ("eligible".into(), "Show eligible classes for ability scores".into()),
-        ("party".into(), "Show party members".into()),
-        // Combat
-        ("start_combat".into(), "Start combat encounter".into()),
-        ("initiative".into(), "Roll group initiative".into()),
-        ("attack".into(), "Melee/missile attack".into()),
-        ("monster_attack".into(), "Monster attacks character".into()),
-        ("morale".into(), "Check monster morale".into()),
-        ("turn_undead".into(), "Cleric turns undead".into()),
-        ("retreat".into(), "Retreat from combat".into()),
-        ("withdrawal".into(), "Fighting withdrawal".into()),
-        ("declare_spell".into(), "Declare spell casting".into()),
-        ("combat_status".into(), "Show combat status".into()),
-        ("combat_log".into(), "Show combat log".into()),
-        ("end_combat".into(), "End combat encounter".into()),
-        // Dungeon Exploration
-        ("enter_dungeon".into(), "Enter dungeon exploration mode".into()),
-        ("light".into(), "Light a torch or lantern".into()),
-        ("explore".into(), "Advance one dungeon turn".into()),
-        ("search".into(), "Search current room for secrets".into()),
-        ("listen".into(), "Listen at a door".into()),
-        ("force_door".into(), "Force open a door".into()),
-        ("add_room".into(), "Add a room to dungeon".into()),
-        ("add_door".into(), "Add a door between rooms".into()),
-        ("move".into(), "Move through a door".into()),
-        ("rest".into(), "Rest for one turn".into()),
-        ("exploration_status".into(), "Show exploration state".into()),
-        // Encounter
-        ("surprise".into(), "Roll surprise check".into()),
-        ("reaction".into(), "Roll NPC reaction".into()),
-        ("evade".into(), "Attempt to evade encounter".into()),
-        // Wilderness
-        ("enter_wilderness".into(), "Enter wilderness travel mode".into()),
-        ("add_hex".into(), "Add hex to wilderness map".into()),
-        ("travel".into(), "Travel to a hex".into()),
-        ("forage".into(), "Forage for food".into()),
-        ("hunt".into(), "Hunt for game".into()),
-        ("wilderness_status".into(), "Show wilderness status".into()),
-        // System
-        ("roll".into(), "Roll dice (e.g., roll 2d6+3)".into()),
-        ("save".into(), "Save game state".into()),
-        ("load".into(), "Load game state".into()),
-        ("help".into(), "Show available commands".into()),
-        ("quit".into(), "Exit the game".into()),
-    ];
-
     let mut registry = CommandRegistry::new();
     // Character & Party
     registry.register(Box::new(ChargenCommand));
@@ -113,7 +63,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(RollCommand));
     registry.register(Box::new(SaveCommand));
     registry.register(Box::new(LoadCommand));
-    registry.register(Box::new(HelpCommand { commands: commands_info }));
+    registry.register(Box::new(HelpCommand));
     registry.register(Box::new(QuitCommand));
     registry
 }

@@ -26,8 +26,16 @@ pub fn str_open_doors(score: i32) -> u32 {
     }
 }
 
-/// DEX AC modifier (lower is better in descending AC).
-pub fn dex_ac_mod(score: i32) -> i32 {
+/// DEX modifier (AC and missile attacks).
+///
+/// Returns a signed modifier: +3 for DEX 18, -3 for DEX 3.
+/// For AC (descending): subtract this from AC, so positive = better (lower) AC.
+/// For missile attacks: add directly as attack bonus.
+///
+/// Note: OSE publishes the AC column with inverted signs (-3 for DEX 18)
+/// because descending AC treats negative as better. We use a single positive
+/// convention here and subtract in `calculate_ac`.
+pub fn dex_mod(score: i32) -> i32 {
     match score {
         3 => -3,
         4..=5 => -2,
@@ -40,19 +48,13 @@ pub fn dex_ac_mod(score: i32) -> i32 {
     }
 }
 
-/// DEX missile attack modifier.
-pub fn dex_missile_mod(score: i32) -> i32 {
-    match score {
-        3 => -3,
-        4..=5 => -2,
-        6..=8 => -1,
-        9..=12 => 0,
-        13..=15 => 1,
-        16..=17 => 2,
-        18 => 3,
-        _ => 0,
-    }
-}
+/// Deprecated alias for [`dex_mod`]. Use `dex_mod` instead.
+#[inline]
+pub fn dex_ac_mod(score: i32) -> i32 { dex_mod(score) }
+
+/// Deprecated alias for [`dex_mod`]. Use `dex_mod` instead.
+#[inline]
+pub fn dex_missile_mod(score: i32) -> i32 { dex_mod(score) }
 
 /// DEX initiative modifier (optional individual initiative rule).
 pub fn dex_init_mod(score: i32) -> i32 {

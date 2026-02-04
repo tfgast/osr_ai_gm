@@ -112,15 +112,15 @@ pub fn backstab_multiplier(level: u32) -> u32 {
 pub const BACKSTAB_ATTACK_BONUS: i32 = 4;
 
 /// Whether a class has thief skills.
-pub fn has_thief_skills(class: &str) -> bool {
-    let lower = class.to_lowercase().replace(['-', '_', ' '], "");
-    matches!(lower.as_str(), "thief" | "acrobat" | "assassin" | "halforc" | "bard")
+pub fn has_thief_skills(class: crate::rules::class::Class) -> bool {
+    use crate::rules::class::Class;
+    matches!(class, Class::Thief | Class::Acrobat | Class::Assassin | Class::HalfOrc | Class::Bard)
 }
 
 /// Whether a class can backstab.
-pub fn can_backstab(class: &str) -> bool {
-    let lower = class.to_lowercase().replace(['-', '_', ' '], "");
-    matches!(lower.as_str(), "thief" | "assassin")
+pub fn can_backstab(class: crate::rules::class::Class) -> bool {
+    use crate::rules::class::Class;
+    matches!(class, Class::Thief | Class::Assassin)
 }
 
 #[cfg(test)]
@@ -205,19 +205,21 @@ mod tests {
 
     #[test]
     fn thief_has_skills() {
-        assert!(has_thief_skills("Thief"));
-        assert!(has_thief_skills("Assassin"));
-        assert!(has_thief_skills("Acrobat"));
-        assert!(!has_thief_skills("Fighter"));
-        assert!(!has_thief_skills("Cleric"));
+        use crate::rules::class::Class;
+        assert!(has_thief_skills(Class::Thief));
+        assert!(has_thief_skills(Class::Assassin));
+        assert!(has_thief_skills(Class::Acrobat));
+        assert!(!has_thief_skills(Class::Fighter));
+        assert!(!has_thief_skills(Class::Cleric));
     }
 
     #[test]
     fn thief_can_backstab() {
-        assert!(can_backstab("Thief"));
-        assert!(can_backstab("Assassin"));
-        assert!(!can_backstab("Acrobat"));
-        assert!(!can_backstab("Fighter"));
+        use crate::rules::class::Class;
+        assert!(can_backstab(Class::Thief));
+        assert!(can_backstab(Class::Assassin));
+        assert!(!can_backstab(Class::Acrobat));
+        assert!(!can_backstab(Class::Fighter));
     }
 
     #[test]

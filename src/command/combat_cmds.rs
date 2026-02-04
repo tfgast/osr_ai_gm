@@ -292,6 +292,14 @@ impl Command for TurnUndeadCommand {
             )),
         };
 
+        // Only Clerics and Paladins can turn undead per OSE rules
+        if !matches!(character.class, crate::rules::class::Class::Cleric | crate::rules::class::Class::Paladin) {
+            return CommandResult::error(format!(
+                "{} ({}) cannot turn undead. Only Clerics and Paladins can turn undead.",
+                character.name, character.class.name()
+            ));
+        }
+
         let combat = match state.combat.as_mut() {
             Some(c) => c,
             None => return CommandResult::error("no active combat."),

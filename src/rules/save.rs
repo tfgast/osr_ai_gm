@@ -17,7 +17,7 @@ impl SavingThrows {
 }
 
 /// Each class maps to one of these save table groups.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SaveCategory {
     Thief,       // Acrobat, Assassin, Bard, Thief
     Barbarian,

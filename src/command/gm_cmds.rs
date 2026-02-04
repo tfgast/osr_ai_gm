@@ -170,11 +170,12 @@ pub const GM_ONLY_COMMANDS: &[&str] = &[
 mod tests {
     use super::*;
     use crate::model::Character;
+    use crate::rules::class::Class;
 
     #[test]
     fn spawn_encounter_basic() {
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Aldric", "Fighter"));
+        state.party.add_member(Character::new("Aldric", Class::Fighter));
         let cmd = SpawnEncounterCommand;
         let result = cmd.execute(
             &["goblin", "3", "1", "6", "3", "1d6", "7", "60"],
@@ -197,7 +198,7 @@ mod tests {
     #[test]
     fn award_xp_basic() {
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Aldric", "Fighter"));
+        state.party.add_member(Character::new("Aldric", Class::Fighter));
         let cmd = AwardXpCommand;
         let result = cmd.execute(&["Aldric", "500"], &mut state);
         assert!(result.output.contains("500 XP"));

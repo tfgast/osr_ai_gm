@@ -232,8 +232,9 @@ pub fn force_door_with<R: Rng>(
     let roll: u32 = rng.gen_range(1..=6);
 
     if roll <= threshold {
-        // Access door again mutably
-        let door = dungeon.find_door_mut(door_id).unwrap();
+        // Access door again mutably (safe: existence confirmed above)
+        let door = dungeon.find_door_mut(door_id)
+            .expect("door verified to exist above");
         door.state = DoorState::Open;
         format!(
             "{} forces door {} open! (rolled {} vs {})",
@@ -360,6 +361,7 @@ pub fn exploration_status(time: &TimeTracker, dungeon: &DungeonState) -> String 
 mod tests {
     use super::*;
     use crate::model::AbilityScores;
+    use crate::rules::class::Class;
     use crate::state::dungeon::{Door, Room};
     use crate::state::time::LightSourceKind;
     use rand::rngs::StdRng;
@@ -382,7 +384,7 @@ mod tests {
     }
 
     fn test_character() -> Character {
-        let mut c = Character::new("Arden", "Fighter");
+        let mut c = Character::new("Arden", Class::Fighter);
         c.abilities = AbilityScores {
             strength: 14,
             intelligence: 10,

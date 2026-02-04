@@ -43,8 +43,7 @@ pub struct WeaponDef {
 }
 
 /// All weapons from OSE Reference Booklet p22-23.
-pub fn weapons() -> Vec<WeaponDef> {
-    vec![
+pub const WEAPONS: &[WeaponDef] = &[
         WeaponDef {
             name: "Battle axe", cost_gp: 7, weight_coins: 50, damage: "1d8",
             qualities: WeaponQualities::melee_2h_slow(),
@@ -140,8 +139,10 @@ pub fn weapons() -> Vec<WeaponDef> {
             qualities: WeaponQualities::melee_blunt(),
             range: (0, 0, 0),
         },
-    ]
-}
+    ];
+
+/// Backward-compat wrapper. Prefer `WEAPONS` directly.
+pub fn weapons() -> &'static [WeaponDef] { WEAPONS }
 
 /// Armour definition.
 #[derive(Debug, Clone)]
@@ -154,15 +155,16 @@ pub struct ArmourDef {
 }
 
 /// All armour types from OSE Reference Booklet p22.
-pub fn armour() -> Vec<ArmourDef> {
-    vec![
-        ArmourDef { name: "None",       ac: 9, cost_gp: 0,  weight_coins: 0,   is_shield: false },
-        ArmourDef { name: "Leather",    ac: 7, cost_gp: 20, weight_coins: 200, is_shield: false },
-        ArmourDef { name: "Chain mail", ac: 5, cost_gp: 40, weight_coins: 400, is_shield: false },
-        ArmourDef { name: "Plate mail", ac: 3, cost_gp: 60, weight_coins: 500, is_shield: false },
-        ArmourDef { name: "Shield",     ac: 0, cost_gp: 10, weight_coins: 100, is_shield: true  },
-    ]
-}
+pub const ARMOUR: &[ArmourDef] = &[
+    ArmourDef { name: "None",       ac: 9, cost_gp: 0,  weight_coins: 0,   is_shield: false },
+    ArmourDef { name: "Leather",    ac: 7, cost_gp: 20, weight_coins: 200, is_shield: false },
+    ArmourDef { name: "Chain mail", ac: 5, cost_gp: 40, weight_coins: 400, is_shield: false },
+    ArmourDef { name: "Plate mail", ac: 3, cost_gp: 60, weight_coins: 500, is_shield: false },
+    ArmourDef { name: "Shield",     ac: 0, cost_gp: 10, weight_coins: 100, is_shield: true  },
+];
+
+/// Backward-compat wrapper. Prefer `ARMOUR` directly.
+pub fn armour() -> &'static [ArmourDef] { ARMOUR }
 
 /// Adventuring gear item.
 #[derive(Debug, Clone)]
@@ -172,34 +174,35 @@ pub struct GearDef {
 }
 
 /// All adventuring gear from OSE Reference Booklet p22.
-pub fn gear() -> Vec<GearDef> {
-    vec![
-        GearDef { name: "Backpack",                cost_gp: 5 },
-        GearDef { name: "Crowbar",                 cost_gp: 10 },
-        GearDef { name: "Garlic",                  cost_gp: 5 },
-        GearDef { name: "Grappling hook",          cost_gp: 25 },
-        GearDef { name: "Hammer (small)",          cost_gp: 2 },
-        GearDef { name: "Holy symbol",             cost_gp: 25 },
-        GearDef { name: "Holy water (vial)",       cost_gp: 25 },
-        GearDef { name: "Iron spikes (12)",        cost_gp: 1 },
-        GearDef { name: "Lantern",                 cost_gp: 10 },
-        GearDef { name: "Mirror (hand-sized)",     cost_gp: 5 },
-        GearDef { name: "Oil (1 flask)",           cost_gp: 2 },
-        GearDef { name: "Pole (10')",              cost_gp: 1 },
-        GearDef { name: "Rations (iron, 7 days)",  cost_gp: 15 },
-        GearDef { name: "Rations (standard, 7 days)", cost_gp: 5 },
-        GearDef { name: "Rope (50')",              cost_gp: 1 },
-        GearDef { name: "Sack (large)",            cost_gp: 2 },
-        GearDef { name: "Sack (small)",            cost_gp: 1 },
-        GearDef { name: "Stakes (3) and mallet",   cost_gp: 3 },
-        GearDef { name: "Thieves' tools",          cost_gp: 25 },
-        GearDef { name: "Tinder box (flint & steel)", cost_gp: 3 },
-        GearDef { name: "Torches (6)",             cost_gp: 1 },
-        GearDef { name: "Waterskin",               cost_gp: 1 },
-        GearDef { name: "Wine (2 pints)",          cost_gp: 1 },
-        GearDef { name: "Wolfsbane (1 bunch)",     cost_gp: 10 },
-    ]
-}
+pub const GEAR: &[GearDef] = &[
+    GearDef { name: "Backpack",                cost_gp: 5 },
+    GearDef { name: "Crowbar",                 cost_gp: 10 },
+    GearDef { name: "Garlic",                  cost_gp: 5 },
+    GearDef { name: "Grappling hook",          cost_gp: 25 },
+    GearDef { name: "Hammer (small)",          cost_gp: 2 },
+    GearDef { name: "Holy symbol",             cost_gp: 25 },
+    GearDef { name: "Holy water (vial)",       cost_gp: 25 },
+    GearDef { name: "Iron spikes (12)",        cost_gp: 1 },
+    GearDef { name: "Lantern",                 cost_gp: 10 },
+    GearDef { name: "Mirror (hand-sized)",     cost_gp: 5 },
+    GearDef { name: "Oil (1 flask)",           cost_gp: 2 },
+    GearDef { name: "Pole (10')",              cost_gp: 1 },
+    GearDef { name: "Rations (iron, 7 days)",  cost_gp: 15 },
+    GearDef { name: "Rations (standard, 7 days)", cost_gp: 5 },
+    GearDef { name: "Rope (50')",              cost_gp: 1 },
+    GearDef { name: "Sack (large)",            cost_gp: 2 },
+    GearDef { name: "Sack (small)",            cost_gp: 1 },
+    GearDef { name: "Stakes (3) and mallet",   cost_gp: 3 },
+    GearDef { name: "Thieves' tools",          cost_gp: 25 },
+    GearDef { name: "Tinder box (flint & steel)", cost_gp: 3 },
+    GearDef { name: "Torches (6)",             cost_gp: 1 },
+    GearDef { name: "Waterskin",               cost_gp: 1 },
+    GearDef { name: "Wine (2 pints)",          cost_gp: 1 },
+    GearDef { name: "Wolfsbane (1 bunch)",     cost_gp: 10 },
+];
+
+/// Backward-compat wrapper. Prefer `GEAR` directly.
+pub fn gear() -> &'static [GearDef] { GEAR }
 
 /// Ammunition definition.
 #[derive(Debug, Clone)]
@@ -209,28 +212,29 @@ pub struct AmmoDef {
 }
 
 /// All ammunition types from OSE Reference Booklet p22.
-pub fn ammunition() -> Vec<AmmoDef> {
-    vec![
-        AmmoDef { name: "Arrows (quiver of 20)",     cost_gp: 5 },
-        AmmoDef { name: "Crossbow bolts (case of 30)", cost_gp: 10 },
-        AmmoDef { name: "Silver tipped arrow (1)",    cost_gp: 5 },
-        AmmoDef { name: "Sling stones",               cost_gp: 0 },
-    ]
-}
+pub const AMMUNITION: &[AmmoDef] = &[
+    AmmoDef { name: "Arrows (quiver of 20)",     cost_gp: 5 },
+    AmmoDef { name: "Crossbow bolts (case of 30)", cost_gp: 10 },
+    AmmoDef { name: "Silver tipped arrow (1)",    cost_gp: 5 },
+    AmmoDef { name: "Sling stones",               cost_gp: 0 },
+];
+
+/// Backward-compat wrapper. Prefer `AMMUNITION` directly.
+pub fn ammunition() -> &'static [AmmoDef] { AMMUNITION }
 
 /// Look up a weapon by name (case-insensitive).
-pub fn find_weapon(name: &str) -> Option<WeaponDef> {
-    weapons().into_iter().find(|w| w.name.eq_ignore_ascii_case(name))
+pub fn find_weapon(name: &str) -> Option<&'static WeaponDef> {
+    WEAPONS.iter().find(|w| w.name.eq_ignore_ascii_case(name))
 }
 
 /// Look up armour by name (case-insensitive).
-pub fn find_armour(name: &str) -> Option<ArmourDef> {
-    armour().into_iter().find(|a| a.name.eq_ignore_ascii_case(name))
+pub fn find_armour(name: &str) -> Option<&'static ArmourDef> {
+    ARMOUR.iter().find(|a| a.name.eq_ignore_ascii_case(name))
 }
 
 /// Look up gear by name (case-insensitive).
-pub fn find_gear(name: &str) -> Option<GearDef> {
-    gear().into_iter().find(|g| g.name.eq_ignore_ascii_case(name))
+pub fn find_gear(name: &str) -> Option<&'static GearDef> {
+    GEAR.iter().find(|g| g.name.eq_ignore_ascii_case(name))
 }
 
 /// Calculate AC from armour and shield, plus DEX modifier.

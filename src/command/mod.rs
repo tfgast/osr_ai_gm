@@ -67,6 +67,13 @@ impl CommandRegistry {
     }
 
     pub fn dispatch(&self, name: &str, args: &[&str], state: &mut GameState) -> CommandResult {
+        if name == "help" {
+            let mut out = String::from("Available commands:\n");
+            for (cmd_name, help) in self.commands() {
+                out.push_str(&format!("  {:18} {}\n", cmd_name, help));
+            }
+            return CommandResult::ok(out);
+        }
         match self.commands.get(name) {
             Some(cmd) => cmd.execute(args, state),
             None => CommandResult::error(format!("unknown command: '{}'. Type 'help' for commands.", name)),

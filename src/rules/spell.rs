@@ -5,7 +5,7 @@
 pub type SpellSlots = [u32; 6];
 
 /// Which spell list a class uses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SpellListType {
     None,
     Cleric,     // Cleric, Paladin
@@ -16,7 +16,7 @@ pub enum SpellListType {
 }
 
 /// Spell progression category — classes sharing a table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SpellProgression {
     Bard,
     Cleric,

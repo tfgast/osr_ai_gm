@@ -6,6 +6,7 @@ use osr_ai_gm::gmapi::protocol::{GMCommand, GMRequest};
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{Character, AbilityScores};
+use osr_ai_gm::rules::class::Class;
 use osr_ai_gm::state::game::GameMode;
 
 fn req(id: &str, command: GMCommand) -> GMRequest {
@@ -14,7 +15,7 @@ fn req(id: &str, command: GMCommand) -> GMRequest {
 
 /// Helper: create a fighter with known ability scores (bypasses random rolls).
 fn make_fighter(name: &str) -> Character {
-    let mut c = Character::new(name, "Fighter");
+    let mut c = Character::new(name, Class::Fighter);
     c.abilities = AbilityScores {
         strength: 16, intelligence: 10, wisdom: 10,
         dexterity: 12, constitution: 14, charisma: 12,
@@ -31,7 +32,7 @@ fn make_fighter(name: &str) -> Character {
 
 /// Helper: create a thief with known ability scores.
 fn make_thief(name: &str) -> Character {
-    let mut c = Character::new(name, "Thief");
+    let mut c = Character::new(name, Class::Thief);
     c.abilities = AbilityScores {
         strength: 10, intelligence: 12, wisdom: 10,
         dexterity: 16, constitution: 10, charisma: 10,
@@ -48,7 +49,7 @@ fn make_thief(name: &str) -> Character {
 
 /// Helper: create a cleric with known ability scores.
 fn make_cleric(name: &str) -> Character {
-    let mut c = Character::new(name, "Cleric");
+    let mut c = Character::new(name, Class::Cleric);
     c.abilities = AbilityScores {
         strength: 12, intelligence: 10, wisdom: 16,
         dexterity: 10, constitution: 12, charisma: 14,

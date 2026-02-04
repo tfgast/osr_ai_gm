@@ -19,7 +19,7 @@ pub fn roll_abilities() -> [i32; 6] {
 }
 
 pub fn roll_abilities_with<R: Rng>(rng: &mut R) -> [i32; 6] {
-    let expr = dice::parse("3d6").unwrap();
+    let expr = dice::parse("3d6").expect("hardcoded dice expression '3d6'");
     let mut abilities = [0i32; 6];
     for slot in &mut abilities {
         *slot = dice::roll_with(&expr, rng).total;
@@ -46,11 +46,12 @@ pub fn roll_gold(notation: &str) -> u32 {
 pub fn roll_gold_with<R: Rng>(notation: &str, rng: &mut R) -> u32 {
     if let Some((dice_part, mult_str)) = notation.rsplit_once('x') {
         let multiplier: u32 = mult_str.parse().unwrap_or(1);
-        let expr = dice::parse(dice_part).unwrap();
-        (dice::roll_with(&expr, rng).total as u32) * multiplier
+        let expr = dice::parse(dice_part).expect("valid dice notation in starting_gold");
+        let total = dice::roll_with(&expr, rng).total.max(0) as u32;
+        total * multiplier
     } else {
-        let expr = dice::parse(notation).unwrap();
-        dice::roll_with(&expr, rng).total as u32
+        let expr = dice::parse(notation).expect("valid dice notation in starting_gold");
+        dice::roll_with(&expr, rng).total.max(0) as u32
     }
 }
 
@@ -112,7 +113,7 @@ pub fn create_character_with<R: Rng>(
 
     Character {
         name: name.to_string(),
-        class: class.name().to_string(),
+        class,
         level: 1,
         abilities: AbilityScores::from_array(&abilities),
         hp,
@@ -135,7 +136,7 @@ pub fn character_sheet(c: &Character) -> String {
     out.push_str(&format!("=== {} ===\n", c.name));
     out.push_str(&format!(
         "Class: {}  Level: {}  Alignment: {}\n",
-        c.class, c.level, c.alignment
+        c.class.name(), c.level, c.alignment
     ));
     out.push_str(&format!(
         "HP: {}/{}  AC: {}  THAC0: {}\n",
@@ -250,7 +251,7 @@ mod tests {
             "Grond", Class::Fighter, abilities, "Neutral", &mut test_rng(),
         );
         assert_eq!(c.name, "Grond");
-        assert_eq!(c.class, "Fighter");
+        assert_eq!(c.class, Class::Fighter);
         assert_eq!(c.level, 1);
         assert_eq!(c.alignment, "Neutral");
         assert_eq!(c.thac0, 19);
@@ -267,7 +268,7 @@ mod tests {
         let c = create_character_with(
             "Elara", Class::MagicUser, abilities, "Chaotic", &mut test_rng(),
         );
-        assert_eq!(c.class, "Magic-User");
+        assert_eq!(c.class, Class::MagicUser);
         assert!(c.hp >= 1 && c.hp <= 4);
         assert_eq!(c.thac0, 19);
         let saves = c.saving_throws.unwrap();
@@ -283,7 +284,7 @@ mod tests {
         let c = create_character_with(
             "Thorin", Class::Dwarf, abilities, "Lawful", &mut test_rng(),
         );
-        assert_eq!(c.class, "Dwarf");
+        assert_eq!(c.class, Class::Dwarf);
         assert_eq!(c.abilities.constitution, 15);
         assert_eq!(c.abilities.charisma, 9);
         let saves = c.saving_throws.unwrap();

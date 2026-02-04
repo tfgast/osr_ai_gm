@@ -20,11 +20,14 @@ pub enum Class {
     Elf,
     Fighter,
     Gnome,
+    #[serde(rename = "Half-Elf", alias = "HalfElf")]
     HalfElf,
     Halfling,
+    #[serde(rename = "Half-Orc", alias = "HalfOrc")]
     HalfOrc,
     Illusionist,
     Knight,
+    #[serde(rename = "Magic-User", alias = "MagicUser")]
     MagicUser,
     Paladin,
     Ranger,
@@ -101,7 +104,7 @@ impl Class {
 }
 
 /// Combat aptitude tier per OSE Reference Booklet p19.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CombatAptitude {
     Martial,
     SemiMartial,
@@ -109,7 +112,7 @@ pub enum CombatAptitude {
 }
 
 /// Armour restrictions for a class.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArmourPermission {
     Any,        // All armour + shield
     AnyNoShield, // All armour, no shield
@@ -467,10 +470,20 @@ pub fn apply_racial_modifiers(class: Class, abilities: &mut [i32; 6]) {
 }
 
 /// Get all classes that a given set of abilities qualifies for.
+/// For demihuman classes, racial modifiers are applied before checking requirements.
 pub fn eligible_classes(abilities: &[i32; 6]) -> Vec<Class> {
     Class::ALL.iter()
         .copied()
-        .filter(|&c| meets_requirements(c, abilities))
+        .filter(|&c| {
+            let def = class_def(c);
+            if def.racial_modifiers.is_empty() {
+                meets_requirements(c, abilities)
+            } else {
+                let mut modified = *abilities;
+                apply_racial_modifiers(c, &mut modified);
+                meets_requirements(c, &modified)
+            }
+        })
         .collect()
 }
 

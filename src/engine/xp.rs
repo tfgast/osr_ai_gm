@@ -2,7 +2,7 @@
 
 use rand::Rng;
 use crate::model::Character;
-use crate::rules::class::{Class, class_def};
+use crate::rules::class::class_def;
 use crate::rules::xp::{check_level_up, prime_req_xp_modifier, adjust_xp};
 use crate::rules::ability::con_hp_mod;
 use crate::rules::save::saving_throws;
@@ -31,10 +31,10 @@ pub fn award_xp(character: &mut Character, treasure_gp: u64, monster_xp: u64) ->
 pub fn award_xp_with<R: Rng>(rng: &mut R, character: &mut Character, treasure_gp: u64, monster_xp: u64) -> XpAwardResult {
     let base_xp = treasure_gp + monster_xp;
 
-    let class = Class::parse(&character.class);
+    let cls = character.class;
     let abilities = character.abilities.to_array();
 
-    let modifier_pct = class.map_or(0, |c| prime_req_xp_modifier(c, &abilities));
+    let modifier_pct = prime_req_xp_modifier(cls, &abilities);
     let adjusted_xp = adjust_xp(base_xp, modifier_pct);
 
     character.xp += adjusted_xp;
@@ -45,7 +45,7 @@ pub fn award_xp_with<R: Rng>(rng: &mut R, character: &mut Character, treasure_gp
     let mut new_level = character.level;
     let mut hp_gained = 0i32;
 
-    if let Some(cls) = class {
+    {
         while let Some(next_level) = check_level_up(cls, new_level, character.xp) {
             leveled_up = true;
             new_level = next_level;
@@ -85,11 +85,12 @@ pub fn award_xp_with<R: Rng>(rng: &mut R, character: &mut Character, treasure_gp
 mod tests {
     use super::*;
     use crate::model::AbilityScores;
+    use crate::rules::class::Class;
     use rand::SeedableRng;
     use rand::rngs::StdRng;
 
     fn make_fighter(xp: u64, level: u32) -> Character {
-        let mut c = Character::new("Test", "Fighter");
+        let mut c = Character::new("Test", Class::Fighter);
         c.abilities = AbilityScores {
             strength: 16, intelligence: 10, wisdom: 10,
             dexterity: 10, constitution: 14, charisma: 10,
@@ -157,7 +158,7 @@ mod tests {
     #[test]
     fn hp_gain_minimum_1() {
         let mut rng = StdRng::seed_from_u64(42);
-        let mut c = Character::new("Sickly", "Fighter");
+        let mut c = Character::new("Sickly", Class::Fighter);
         c.abilities = AbilityScores {
             strength: 10, intelligence: 10, wisdom: 10,
             dexterity: 10, constitution: 3, charisma: 10, // CON 3 = -3 HP mod
@@ -176,7 +177,7 @@ mod tests {
     #[test]
     fn low_prime_req_penalty() {
         let mut rng = StdRng::seed_from_u64(42);
-        let mut c = Character::new("Weak", "Fighter");
+        let mut c = Character::new("Weak", Class::Fighter);
         c.abilities = AbilityScores {
             strength: 5, intelligence: 10, wisdom: 10,
             dexterity: 10, constitution: 10, charisma: 10,
@@ -190,7 +191,7 @@ mod tests {
     #[test]
     fn thief_xp_with_dex_prime() {
         let mut rng = StdRng::seed_from_u64(42);
-        let mut thief = Character::new("Sneaky", "Thief");
+        let mut thief = Character::new("Sneaky", Class::Thief);
         thief.abilities = AbilityScores {
             strength: 10, intelligence: 10, wisdom: 10,
             dexterity: 16, constitution: 10, charisma: 10,

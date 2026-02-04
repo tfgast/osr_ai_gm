@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::rules::class::Class;
 use crate::rules::save::SavingThrows;
 
 /// Character ability scores.
@@ -32,7 +33,7 @@ impl AbilityScores {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Character {
     pub name: String,
-    pub class: String,
+    pub class: Class,
     pub level: u32,
     pub abilities: AbilityScores,
     pub hp: i32,
@@ -54,10 +55,10 @@ pub struct Character {
 }
 
 impl Character {
-    pub fn new(name: &str, class: &str) -> Self {
+    pub fn new(name: &str, class: Class) -> Self {
         Character {
             name: name.to_string(),
-            class: class.to_string(),
+            class,
             level: 1,
             abilities: AbilityScores::default(),
             hp: 1,
@@ -283,9 +284,9 @@ mod tests {
 
     #[test]
     fn character_creation() {
-        let c = Character::new("Theron", "Fighter");
+        let c = Character::new("Theron", Class::Fighter);
         assert_eq!(c.name, "Theron");
-        assert_eq!(c.class, "Fighter");
+        assert_eq!(c.class, Class::Fighter);
         assert_eq!(c.level, 1);
         assert!(c.is_alive());
     }
@@ -293,8 +294,8 @@ mod tests {
     #[test]
     fn party_operations() {
         let mut party = Party::new();
-        party.add_member(Character::new("Arden", "Cleric"));
-        party.add_member(Character::new("Brin", "Thief"));
+        party.add_member(Character::new("Arden", Class::Cleric));
+        party.add_member(Character::new("Brin", Class::Thief));
         assert_eq!(party.members.len(), 2);
         assert!(party.find_member("arden").is_some());
         assert!(party.find_member("nobody").is_none());
@@ -302,10 +303,25 @@ mod tests {
 
     #[test]
     fn serialization_roundtrip() {
-        let c = Character::new("Test", "Magic-User");
+        let c = Character::new("Test", Class::MagicUser);
         let json = serde_json::to_string(&c).unwrap();
         let c2: Character = serde_json::from_str(&json).unwrap();
         assert_eq!(c.name, c2.name);
         assert_eq!(c.class, c2.class);
+    }
+
+    #[test]
+    fn backward_compat_class_string() {
+        // Old saves stored class as a string like "Magic-User"
+        let old_json = r#"{
+            "name": "OldChar",
+            "class": "Magic-User",
+            "level": 1,
+            "abilities": {"strength":10,"intelligence":10,"wisdom":10,"dexterity":10,"constitution":10,"charisma":10},
+            "hp": 5, "max_hp": 5, "ac": 9, "xp": 0,
+            "inventory": [], "spells": []
+        }"#;
+        let c: Character = serde_json::from_str(old_json).unwrap();
+        assert_eq!(c.class, Class::MagicUser);
     }
 }

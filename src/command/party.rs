@@ -141,7 +141,7 @@ impl Command for PartyCommand {
                 "DEAD".to_string()
             };
             out.push_str(&format!("  {} ({} L{}) — {}\n",
-                c.name, c.class, c.level, status));
+                c.name, c.class.name(), c.level, status));
         }
         CommandResult::ok(out)
     }

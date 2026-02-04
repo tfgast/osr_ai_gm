@@ -130,7 +130,7 @@ fn query_party(id: &str, state: &GameState) -> GMResponse {
     let members: Vec<serde_json::Value> = state.party.members.iter().map(|c| {
         serde_json::json!({
             "name": c.name,
-            "class": c.class,
+            "class": c.class.name(),
             "level": c.level,
             "hp": c.hp,
             "max_hp": c.max_hp,
@@ -420,6 +420,10 @@ fn turn_undead(id: &str, state: &mut GameState, char_name: &str, monster_idx: us
         Some(c) => c.clone(),
         None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
     };
+    // Only Clerics and Paladins can turn undead per OSE rules
+    if !matches!(character.class, Class::Cleric | Class::Paladin) {
+        return GMResponse::err(id, format!("{} ({}) cannot turn undead. Only Clerics and Paladins can turn undead.", character.name, character.class.name()), state.mode.clone());
+    }
     let combat_state = match state.combat.as_mut() {
         Some(c) => c,
         None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
@@ -760,8 +764,8 @@ fn thief_skill_check(id: &str, state: &GameState, char_name: &str, skill_name: &
         Some(c) => c,
         None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
     };
-    if !thief::has_thief_skills(&character.class) {
-        return GMResponse::err(id, format!("{} ({}) does not have thief skills.", character.name, character.class), state.mode.clone());
+    if !thief::has_thief_skills(character.class) {
+        return GMResponse::err(id, format!("{} ({}) does not have thief skills.", character.name, character.class.name()), state.mode.clone());
     }
     let skill = match skill_name.to_lowercase().replace([' ', '_', '-'], "").as_str() {
         "climbwalls" | "climb" => thief::ThiefSkill::ClimbWalls,
@@ -808,8 +812,8 @@ fn backstab(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize
         Some(c) => c.clone(),
         None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
     };
-    if !thief::can_backstab(&character.class) {
-        return GMResponse::err(id, format!("{} ({}) cannot backstab.", character.name, character.class), state.mode.clone());
+    if !thief::can_backstab(character.class) {
+        return GMResponse::err(id, format!("{} ({}) cannot backstab.", character.name, character.class.name()), state.mode.clone());
     }
     let combat_state = match state.combat.as_mut() {
         Some(c) => c,
@@ -1061,10 +1065,7 @@ fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
         Some(c) => c,
         None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
     };
-    let cls = match Class::parse(&character.class) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("unknown class '{}'.", character.class), state.mode.clone()),
-    };
+    let cls = character.class;
     match crate::rules::xp::check_level_up(cls, character.level, character.xp) {
         Some(_next_level) => {
             let result = xp::award_xp(character, 0, 0);
@@ -1436,7 +1437,7 @@ mod tests {
     fn full_combat_sequence() {
         let mut state = GameState::new();
         // Add a character
-        let mut c = crate::model::Character::new("Aldric", "Fighter");
+        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
         c.hp = 10;
         c.max_hp = 10;
         c.thac0 = 19;
