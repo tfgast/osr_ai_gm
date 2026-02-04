@@ -125,7 +125,7 @@ static MONSTERS: [MonsterDef; 30] = [
     },
     MonsterDef {
         name: "Ghoul",
-        hit_dice: "2",
+        hit_dice: "2*",
         ac: 6,
         attacks: &["Claw", "Claw", "Bite"],
         damage: "1d3",
@@ -149,13 +149,13 @@ static MONSTERS: [MonsterDef; 30] = [
     },
     MonsterDef {
         name: "Gelatinous Cube",
-        hit_dice: "4",
+        hit_dice: "4*",
         ac: 8,
         attacks: &["Touch"],
         damage: "2d4",
         movement: 60,
         morale: 12,
-        xp_value: 75,
+        xp_value: 125,
         num_appearing: "1",
         special: "Surprise on 1-4. Paralysis on hit (save vs Paralysis). Immune to lightning, cold",
     },
@@ -173,7 +173,7 @@ static MONSTERS: [MonsterDef; 30] = [
     },
     MonsterDef {
         name: "Wight",
-        hit_dice: "3",
+        hit_dice: "3*",
         ac: 5,
         attacks: &["Touch"],
         damage: "Energy drain",
@@ -185,13 +185,13 @@ static MONSTERS: [MonsterDef; 30] = [
     },
     MonsterDef {
         name: "Wraith",
-        hit_dice: "4",
+        hit_dice: "4**",
         ac: 3,
         attacks: &["Touch"],
         damage: "1d6 + energy drain",
         movement: 120,
         morale: 12,
-        xp_value: 75,
+        xp_value: 175,
         num_appearing: "1d4",
         special: "Undead. Energy drain: drains 1 level. Only hit by silver or magic weapons",
     },
@@ -221,13 +221,13 @@ static MONSTERS: [MonsterDef; 30] = [
     },
     MonsterDef {
         name: "Troll",
-        hit_dice: "6+3",
+        hit_dice: "6+3*",
         ac: 4,
         attacks: &["Claw", "Claw", "Bite"],
         damage: "1d6",
         movement: 120,
         morale: 10,
-        xp_value: 275,
+        xp_value: 650,
         num_appearing: "1d8",
         special: "Regenerate 3 HP/round. Only killed by fire or acid",
     },
@@ -245,67 +245,67 @@ static MONSTERS: [MonsterDef; 30] = [
     },
     MonsterDef {
         name: "Mummy",
-        hit_dice: "5+1",
+        hit_dice: "5+1*",
         ac: 3,
         attacks: &["Touch"],
         damage: "1d12",
         movement: 60,
         morale: 12,
-        xp_value: 300,
+        xp_value: 400,
         num_appearing: "1d4",
         special: "Undead. Disease on hit. Only hit by magic weapons (half damage). Immune to sleep, charm, hold",
     },
     MonsterDef {
         name: "Spectre",
-        hit_dice: "6",
+        hit_dice: "6**",
         ac: 2,
         attacks: &["Touch"],
         damage: "1d8 + energy drain",
         movement: 150,
         morale: 11,
-        xp_value: 275,
+        xp_value: 725,
         num_appearing: "1d4",
         special: "Undead. Energy drain: 2 levels per hit. Only hit by magic weapons",
     },
     MonsterDef {
         name: "Vampire",
-        hit_dice: "7-9",
+        hit_dice: "7-9**",
         ac: 2,
         attacks: &["Touch or Bite"],
         damage: "1d10 + energy drain",
         movement: 120,
         morale: 11,
-        xp_value: 450,
+        xp_value: 1250,
         num_appearing: "1d4",
         special: "Undead. Energy drain: 2 levels. Charm gaze. Regenerate 3 HP/round. Shapechange",
     },
     MonsterDef {
         name: "Green Dragon",
-        hit_dice: "8",
+        hit_dice: "8**",
         ac: 1,
         attacks: &["Claw", "Claw", "Bite"],
         damage: "1d6+1",
         movement: 90,
         morale: 9,
-        xp_value: 650,
+        xp_value: 1750,
         num_appearing: "1d4",
         special: "Breath weapon: chlorine gas cone 50'x40', damage = current HP. Fly 240'",
     },
     MonsterDef {
         name: "Red Dragon",
-        hit_dice: "10",
+        hit_dice: "10**",
         ac: -1,
         attacks: &["Claw", "Claw", "Bite"],
         damage: "1d8",
         movement: 90,
         morale: 10,
-        xp_value: 900,
+        xp_value: 2300,
         num_appearing: "1d4",
         special: "Breath weapon: fire cone 90'x30', damage = current HP. Fly 240'",
     },
     MonsterDef {
         name: "Giant Spider",
-        hit_dice: "3",
+        hit_dice: "3*",
         ac: 6,
         attacks: &["Bite"],
         damage: "2d6",
@@ -341,31 +341,31 @@ static MONSTERS: [MonsterDef; 30] = [
     },
     MonsterDef {
         name: "Basilisk",
-        hit_dice: "6+1",
+        hit_dice: "6+1**",
         ac: 4,
         attacks: &["Bite + Gaze"],
         damage: "1d10",
         movement: 60,
         morale: 9,
-        xp_value: 275,
+        xp_value: 950,
         num_appearing: "1d6",
         special: "Petrifying gaze (save vs Petrify or turned to stone). Petrifying touch",
     },
     MonsterDef {
         name: "Cockatrice",
-        hit_dice: "5",
+        hit_dice: "5**",
         ac: 6,
         attacks: &["Beak"],
         damage: "1d6",
         movement: 90,
         morale: 7,
-        xp_value: 175,
+        xp_value: 425,
         num_appearing: "1d4",
         special: "Petrifying touch (save vs Petrify or turned to stone). Fly 180'",
     },
     MonsterDef {
         name: "Harpy",
-        hit_dice: "3",
+        hit_dice: "3*",
         ac: 7,
         attacks: &["Claw", "Claw", "Weapon"],
         damage: "1d4",
@@ -377,13 +377,13 @@ static MONSTERS: [MonsterDef; 30] = [
     },
     MonsterDef {
         name: "Medusa",
-        hit_dice: "4",
+        hit_dice: "4**",
         ac: 8,
         attacks: &["Snake bites"],
         damage: "1d6 + poison",
         movement: 90,
         morale: 8,
-        xp_value: 75,
+        xp_value: 175,
         num_appearing: "1d3",
         special: "Petrifying gaze (save vs Petrify). Poison snake hair (save vs Poison or die in 1 turn)",
     },
@@ -450,13 +450,13 @@ mod tests {
     fn troll_regenerates() {
         let m = find_monster("Troll").unwrap();
         assert!(m.special.contains("Regenerate"));
-        assert_eq!(m.hit_dice, "6+3");
+        assert_eq!(m.hit_dice, "6+3*");
     }
 
     #[test]
     fn red_dragon_stats() {
         let m = find_monster("Red Dragon").unwrap();
-        assert_eq!(m.hit_dice, "10");
+        assert_eq!(m.hit_dice, "10**");
         assert_eq!(m.ac, -1);
         assert!(m.special.contains("fire"));
     }
@@ -464,7 +464,7 @@ mod tests {
     #[test]
     fn gelatinous_cube_stats() {
         let m = find_monster("Gelatinous Cube").unwrap();
-        assert_eq!(m.hit_dice, "4");
+        assert_eq!(m.hit_dice, "4*");
         assert_eq!(m.ac, 8);
         assert!(m.special.contains("Paralysis"));
     }

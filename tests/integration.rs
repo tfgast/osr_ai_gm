@@ -286,7 +286,7 @@ fn thief_skill_checks() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert_eq!(data["target"], 1); // level 1 hear noise = 1-in-6
+    assert_eq!(data["target"], 2); // level 1 hear noise = 1-2 on d6
 }
 
 // ===========================================================================

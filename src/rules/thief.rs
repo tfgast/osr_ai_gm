@@ -59,7 +59,7 @@ pub fn skill_chance(skill: ThiefSkill, level: u32) -> u32 {
             10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75
         ][lvl],
         ThiefSkill::HearNoise => [
-            1,   1,   1,   2,   2,   2,   3,   3,   3,   4,   4,   4,   5,   5
+            2,   2,   3,   3,   3,   3,   4,   4,   4,   4,   5,   5,   5,   5
         ][lvl],
         ThiefSkill::HideShadows => [
             10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75
@@ -145,8 +145,8 @@ mod tests {
     fn hear_noise_d6() {
         assert!(ThiefSkill::HearNoise.is_d6());
         assert!(!ThiefSkill::ClimbWalls.is_d6());
-        assert_eq!(skill_chance(ThiefSkill::HearNoise, 1), 1);
-        assert_eq!(skill_chance(ThiefSkill::HearNoise, 4), 2);
+        assert_eq!(skill_chance(ThiefSkill::HearNoise, 1), 2);
+        assert_eq!(skill_chance(ThiefSkill::HearNoise, 4), 3);
         assert_eq!(skill_chance(ThiefSkill::HearNoise, 10), 4);
         assert_eq!(skill_chance(ThiefSkill::HearNoise, 14), 5);
     }
@@ -232,9 +232,9 @@ mod tests {
 
     #[test]
     fn hear_noise_d6_check() {
-        let result = check_skill(ThiefSkill::HearNoise, 1, 1); // target 1, roll 1
+        let result = check_skill(ThiefSkill::HearNoise, 1, 2); // target 2, roll 2
         assert!(result.success);
-        let result = check_skill(ThiefSkill::HearNoise, 1, 2); // target 1, roll 2
+        let result = check_skill(ThiefSkill::HearNoise, 1, 3); // target 2, roll 3
         assert!(!result.success);
     }
 }
