@@ -3,6 +3,7 @@ use crate::persist::GameState;
 use crate::engine::chargen;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::{self, Class};
+use crate::rules::xp::xp_for_level;
 
 pub struct ChargenCommand;
 impl Command for ChargenCommand {
@@ -159,7 +160,13 @@ impl Command for PartyCommand {
         let mut out = format!("Party ({} members):\n", state.party.members.len());
         for c in &state.party.members {
             let status = if c.is_alive() {
-                format!("HP {}/{}, AC {}, THAC0 {}", c.hp, c.max_hp, c.ac, c.thac0)
+                let next_level_xp = xp_for_level(c.class, c.level + 1);
+                let xp_str = if next_level_xp == u64::MAX {
+                    format!("{}", c.xp) // At max level, just show current XP
+                } else {
+                    format!("{}/{}", c.xp, next_level_xp)
+                };
+                format!("HP {}/{}, AC {}, THAC0 {}, XP {}", c.hp, c.max_hp, c.ac, c.thac0, xp_str)
             } else {
                 "DEAD".to_string()
             };
