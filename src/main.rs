@@ -51,6 +51,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(RestCommand));
     registry.register(Box::new(ExplorationStatusCommand));
     // Encounter
+    registry.register(Box::new(EncounterCommand));
     registry.register(Box::new(SurpriseCommand));
     registry.register(Box::new(ReactionCommand));
     registry.register(Box::new(EvadeCommand));
