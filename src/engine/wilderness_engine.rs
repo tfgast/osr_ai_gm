@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use crate::model::Party;
 use crate::rules::encounter;
 use crate::state::wilderness::{Terrain, WildernessState};
 
@@ -13,6 +14,10 @@ pub struct TravelResult {
     pub encounters: Vec<encounter::EncounterEntry>,
     /// Whether foraging was attempted and succeeded.
     pub foraged: Option<bool>,
+    /// Rations consumed this day.
+    pub rations_consumed: u32,
+    /// Whether party is starving (no rations available).
+    pub starving: bool,
 }
 
 impl TravelResult {
@@ -22,6 +27,8 @@ impl TravelResult {
             lost: false,
             encounters: Vec::new(),
             foraged: None,
+            rations_consumed: 0,
+            starving: false,
         }
     }
 
@@ -40,20 +47,22 @@ impl std::fmt::Display for TravelResult {
 }
 
 /// Travel one day in the wilderness.
-/// Checks for getting lost, encounter, and advances position.
+/// Checks for getting lost, encounter, consumes rations, and advances position.
 pub fn travel_day(
     wilderness: &mut WildernessState,
+    party: &mut Party,
     dest_x: i32,
     dest_y: i32,
     movement_rate: u32,
 ) -> TravelResult {
-    travel_day_with(&mut rand::thread_rng(), wilderness, dest_x, dest_y, movement_rate)
+    travel_day_with(&mut rand::thread_rng(), wilderness, party, dest_x, dest_y, movement_rate)
 }
 
 /// Testable version.
 pub fn travel_day_with<R: Rng>(
     rng: &mut R,
     wilderness: &mut WildernessState,
+    party: &mut Party,
     dest_x: i32,
     dest_y: i32,
     movement_rate: u32,
@@ -68,6 +77,33 @@ pub fn travel_day_with<R: Rng>(
         "Day {}: Travelling through {} terrain.",
         wilderness.travel_day, terrain.name()
     ));
+
+    // Consume rations: 1 person-day per living party member
+    let party_size = party.members.iter().filter(|c| c.is_alive()).count() as u32;
+    if party_size > 0 {
+        if party.rations >= party_size {
+            party.rations -= party_size;
+            result.rations_consumed = party_size;
+            result.msg(format!(
+                "Consumed {} rations ({} remaining).",
+                party_size, party.rations
+            ));
+        } else if party.rations > 0 {
+            // Partial rations
+            result.rations_consumed = party.rations;
+            party.rations = 0;
+            result.starving = true;
+            result.msg(format!(
+                "Only {} rations available for {} party members. The party is STARVING!",
+                result.rations_consumed, party_size
+            ));
+        } else {
+            // No rations at all
+            result.rations_consumed = 0;
+            result.starving = true;
+            result.msg("No rations! The party is STARVING!");
+        }
+    }
 
     // Check for getting lost
     let lost_chance = terrain.lost_chance();
@@ -172,20 +208,33 @@ pub fn travel_day_with<R: Rng>(
     result
 }
 
+/// Result of a foraging attempt.
+#[derive(Debug)]
+pub struct ForageResult {
+    pub message: String,
+    /// Person-days of food found (0 if unsuccessful).
+    pub quantity: u32,
+    pub success: bool,
+}
+
 /// Attempt to forage for food in the current hex.
 /// Takes a full day (no travel). Chance varies by terrain.
-pub fn forage(wilderness: &WildernessState) -> String {
-    forage_with(&mut rand::thread_rng(), wilderness)
+pub fn forage(wilderness: &WildernessState, party: &mut Party) -> ForageResult {
+    forage_with(&mut rand::thread_rng(), wilderness, party)
 }
 
 /// Testable version.
-pub fn forage_with<R: Rng>(rng: &mut R, wilderness: &WildernessState) -> String {
+pub fn forage_with<R: Rng>(rng: &mut R, wilderness: &WildernessState, party: &mut Party) -> ForageResult {
     let terrain = wilderness.current_hex()
         .map(|h| h.terrain)
         .unwrap_or(Terrain::Clear);
 
     if !terrain.can_forage() {
-        return format!("Cannot forage in {} terrain.", terrain.name());
+        return ForageResult {
+            message: format!("Cannot forage in {} terrain.", terrain.name()),
+            quantity: 0,
+            success: false,
+        };
     }
 
     let chance = terrain.forage_chance();
@@ -193,48 +242,79 @@ pub fn forage_with<R: Rng>(rng: &mut R, wilderness: &WildernessState) -> String 
 
     if roll <= chance {
         let quantity: u32 = rng.gen_range(1..=6);
-        format!(
-            "Foraging successful! Found enough food for {} person-days. (rolled {} vs {}-in-6, quantity: 1d6={})",
-            quantity, roll, chance, quantity
-        )
+        party.rations += quantity;
+        ForageResult {
+            message: format!(
+                "Foraging successful! Found {} person-days of food. (rolled {} vs {}-in-6, quantity: 1d6={})\nRations: {} (+{})",
+                quantity, roll, chance, quantity, party.rations, quantity
+            ),
+            quantity,
+            success: true,
+        }
     } else {
-        format!(
-            "Foraging unsuccessful. No food found. (rolled {} vs {}-in-6)",
-            roll, chance
-        )
+        ForageResult {
+            message: format!(
+                "Foraging unsuccessful. No food found. (rolled {} vs {}-in-6)",
+                roll, chance
+            ),
+            quantity: 0,
+            success: false,
+        }
     }
+}
+
+/// Result of a hunting attempt.
+#[derive(Debug)]
+pub struct HuntResult {
+    pub message: String,
+    /// Person-days of food obtained (0 if unsuccessful).
+    pub quantity: u32,
+    pub success: bool,
 }
 
 /// Attempt to hunt. Similar to foraging but can be done in more terrain.
 /// Takes a full day. 1-in-6 base chance.
-pub fn hunt(wilderness: &WildernessState) -> String {
-    hunt_with(&mut rand::thread_rng(), wilderness)
+pub fn hunt(wilderness: &WildernessState, party: &mut Party) -> HuntResult {
+    hunt_with(&mut rand::thread_rng(), wilderness, party)
 }
 
 /// Testable version.
-pub fn hunt_with<R: Rng>(rng: &mut R, wilderness: &WildernessState) -> String {
+pub fn hunt_with<R: Rng>(rng: &mut R, wilderness: &WildernessState, party: &mut Party) -> HuntResult {
     let terrain = wilderness.current_hex()
         .map(|h| h.terrain)
         .unwrap_or(Terrain::Clear);
 
     if terrain == Terrain::Ocean {
-        return "Cannot hunt on the open ocean.".to_string();
+        return HuntResult {
+            message: "Cannot hunt on the open ocean.".to_string(),
+            quantity: 0,
+            success: false,
+        };
     }
 
     let roll: u32 = rng.gen_range(1..=6);
     if roll == 1 {
         let quantity: u32 = rng.gen_range(1..=6);
-        format!(
-            "Hunt successful! Killed game sufficient for {} person-days of food. (rolled {}, quantity: 1d6={})",
-            quantity, roll, quantity
-        )
+        party.rations += quantity;
+        HuntResult {
+            message: format!(
+                "Hunt successful! Killed game sufficient for {} person-days of food. (rolled {}, quantity: 1d6={})\nRations: {} (+{})",
+                quantity, roll, quantity, party.rations, quantity
+            ),
+            quantity,
+            success: true,
+        }
     } else {
-        format!("Hunt unsuccessful. No game found. (rolled {})", roll)
+        HuntResult {
+            message: format!("Hunt unsuccessful. No game found. (rolled {})", roll),
+            quantity: 0,
+            success: false,
+        }
     }
 }
 
 /// Display wilderness travel status.
-pub fn wilderness_status(wilderness: &WildernessState, movement_rate: u32) -> String {
+pub fn wilderness_status(wilderness: &WildernessState, party: &Party, movement_rate: u32) -> String {
     let mut out = wilderness.status();
     let terrain = wilderness.current_hex()
         .map(|h| h.terrain)
@@ -244,12 +324,20 @@ pub fn wilderness_status(wilderness: &WildernessState, movement_rate: u32) -> St
         "\nTravel speed: {} hexes/day (movement {}', terrain: {})",
         hexes, movement_rate, terrain.name()
     ));
+    let party_size = party.members.iter().filter(|c| c.is_alive()).count() as u32;
+    let days_of_food = if party_size > 0 { party.rations / party_size } else { 0 };
+    out.push_str(&format!(
+        "\nRations: {} person-days ({} days for party of {})",
+        party.rations, days_of_food, party_size
+    ));
     out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::Character;
+    use crate::rules::class::Class;
     use crate::state::wilderness::HexCell;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
@@ -268,11 +356,19 @@ mod tests {
         ws
     }
 
+    fn test_party() -> Party {
+        let mut party = Party::new();
+        party.add_member(Character::new("Test", Class::Fighter));
+        party.rations = 10; // Start with some rations
+        party
+    }
+
     #[test]
     fn travel_day_basic() {
         let mut rng = test_rng();
         let mut ws = test_wilderness();
-        let result = travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+        let mut party = test_party();
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
         assert!(!result.messages.is_empty());
         assert!(result.messages.iter().any(|m| m.contains("Day 1")));
     }
@@ -281,7 +377,8 @@ mod tests {
     fn travel_increments_day() {
         let mut rng = test_rng();
         let mut ws = test_wilderness();
-        travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+        let mut party = test_party();
+        travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
         assert_eq!(ws.travel_day, 2);
     }
 
@@ -292,11 +389,12 @@ mod tests {
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             // Travel through swamp (2-in-6 lost chance)
             ws.move_to(0, 1).unwrap();
             let start_x = ws.current_x;
             let start_y = ws.current_y;
-            let result = travel_day_with(&mut rng, &mut ws, 1, 1, 120);
+            let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 1, 120);
             if result.lost {
                 lost_count += 1;
                 // When lost, party should have moved to a random adjacent hex
@@ -315,7 +413,8 @@ mod tests {
         for seed in 0..200 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
-            let result = travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+            let mut party = test_party();
+            let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
             if !result.encounters.is_empty() {
                 encounter_days += 1;
             }
@@ -331,9 +430,10 @@ mod tests {
         for seed in 0..500 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             // Forest has 2-in-6 encounter chance per check
             ws.move_to(1, 0).unwrap();
-            let result = travel_day_with(&mut rng, &mut ws, 0, 0, 120);
+            let result = travel_day_with(&mut rng, &mut ws, &mut party, 0, 0, 120);
             if result.encounters.len() > 1 {
                 multi_encounter_days += 1;
             }
@@ -347,9 +447,10 @@ mod tests {
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             ws.move_to(1, 0).unwrap(); // Forest
-            let result = forage_with(&mut rng, &ws);
-            if result.contains("successful!") {
+            let result = forage_with(&mut rng, &ws, &mut party);
+            if result.message.contains("successful!") {
                 success = true;
                 break;
             }
@@ -361,39 +462,45 @@ mod tests {
     fn forage_in_ocean_fails() {
         let mut ws = WildernessState::new();
         ws.add_hex(HexCell::new(0, 0, Terrain::Ocean)).unwrap();
-        let result = forage_with(&mut test_rng(), &ws);
-        assert!(result.contains("Cannot forage"));
+        let mut party = test_party();
+        let result = forage_with(&mut test_rng(), &ws, &mut party);
+        assert!(result.message.contains("Cannot forage"));
     }
 
     #[test]
     fn hunt_basic() {
         let mut rng = test_rng();
         let ws = test_wilderness();
-        let result = hunt_with(&mut rng, &ws);
-        assert!(result.contains("Hunt") || result.contains("hunt"));
+        let mut party = test_party();
+        let result = hunt_with(&mut rng, &ws, &mut party);
+        assert!(result.message.contains("Hunt") || result.message.contains("hunt"));
     }
 
     #[test]
     fn hunt_ocean_fails() {
         let mut ws = WildernessState::new();
         ws.add_hex(HexCell::new(0, 0, Terrain::Ocean)).unwrap();
-        let result = hunt_with(&mut test_rng(), &ws);
-        assert!(result.contains("Cannot hunt"));
+        let mut party = test_party();
+        let result = hunt_with(&mut test_rng(), &ws, &mut party);
+        assert!(result.message.contains("Cannot hunt"));
     }
 
     #[test]
     fn wilderness_status_display() {
         let ws = test_wilderness();
-        let status = wilderness_status(&ws, 120);
+        let party = test_party();
+        let status = wilderness_status(&ws, &party, 120);
         assert!(status.contains("Clear"));
         assert!(status.contains("hexes/day"));
+        assert!(status.contains("Rations"));
     }
 
     #[test]
     fn travel_to_invalid_hex_reports_error() {
         let mut rng = test_rng();
         let mut ws = test_wilderness();
-        let result = travel_day_with(&mut rng, &mut ws, 99, 99, 120);
+        let mut party = test_party();
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 99, 99, 120);
         // Should get a message about not being able to travel there
         // (unless lost, in which case travel doesn't attempt the move)
         if !result.lost {
@@ -419,7 +526,8 @@ mod tests {
         for seed in 0..500 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
-            let result = travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+            let mut party = test_party();
+            let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
             if !result.lost {
                 // Party should be in forest now
                 assert_eq!(ws.current_x, 1);
@@ -460,6 +568,7 @@ mod tests {
         ws.add_hex(HexCell::new(3, 0, Terrain::Clear)).unwrap();
         ws.add_hex(HexCell::new(4, 0, Terrain::Clear)).unwrap();
         ws.add_hex(HexCell::new(5, 0, Terrain::Clear)).unwrap();
+        let mut party = test_party();
 
         // At 120' movement on clear terrain, travel speed is 4 hexes/day
         let hexes = WildernessState::hexes_per_day(120, Terrain::Clear);
@@ -467,7 +576,7 @@ mod tests {
 
         // Trying to travel 5 hexes away should be blocked
         let mut rng = test_rng();
-        let result = travel_day_with(&mut rng, &mut ws, 5, 0, 120);
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 5, 0, 120);
         if !result.lost {
             assert!(
                 result.messages.iter().any(|m| m.contains("exceeds travel range")),
@@ -487,7 +596,8 @@ mod tests {
             // Clear terrain
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
-            let result = travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+            let mut party = test_party();
+            let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
             if result.lost {
                 clear_lost += 1;
             }
@@ -495,8 +605,9 @@ mod tests {
             // Swamp terrain
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             ws.move_to(0, 1).unwrap(); // Move to swamp
-            let result = travel_day_with(&mut rng, &mut ws, 1, 1, 120);
+            let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 1, 120);
             if result.lost {
                 swamp_lost += 1;
             }
@@ -514,12 +625,13 @@ mod tests {
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             ws.move_to(1, 0).unwrap(); // Forest (2-in-6 forage chance)
-            let result = forage_with(&mut rng, &ws);
-            if result.contains("successful!") {
+            let result = forage_with(&mut rng, &ws, &mut party);
+            if result.message.contains("successful!") {
                 // Should mention person-days quantity
                 assert!(
-                    result.contains("person-days"),
+                    result.message.contains("person-days"),
                     "successful forage should report quantity in person-days"
                 );
                 found_quantity = true;
@@ -535,10 +647,11 @@ mod tests {
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let ws = test_wilderness(); // Clear terrain, hunting allowed
-            let result = hunt_with(&mut rng, &ws);
-            if result.contains("successful!") {
+            let mut party = test_party();
+            let result = hunt_with(&mut rng, &ws, &mut party);
+            if result.message.contains("successful!") {
                 assert!(
-                    result.contains("person-days"),
+                    result.message.contains("person-days"),
                     "successful hunt should report food quantity in person-days"
                 );
                 found_quantity = true;
@@ -552,26 +665,29 @@ mod tests {
     fn forage_barren_terrain_fails() {
         let mut ws = WildernessState::new();
         ws.add_hex(HexCell::new(0, 0, Terrain::Barren)).unwrap();
-        let result = forage_with(&mut test_rng(), &ws);
-        assert!(result.contains("Cannot forage"), "should not be able to forage in barren terrain");
+        let mut party = test_party();
+        let result = forage_with(&mut test_rng(), &ws, &mut party);
+        assert!(result.message.contains("Cannot forage"), "should not be able to forage in barren terrain");
     }
 
     #[test]
     fn forage_city_terrain_fails() {
         let mut ws = WildernessState::new();
         ws.add_hex(HexCell::new(0, 0, Terrain::City)).unwrap();
-        let result = forage_with(&mut test_rng(), &ws);
-        assert!(result.contains("Cannot forage"), "should not be able to forage in city terrain");
+        let mut party = test_party();
+        let result = forage_with(&mut test_rng(), &ws, &mut party);
+        assert!(result.message.contains("Cannot forage"), "should not be able to forage in city terrain");
     }
 
     #[test]
     fn travel_day_increments_day_counter() {
         let mut rng = test_rng();
         let mut ws = test_wilderness();
+        let mut party = test_party();
         assert_eq!(ws.travel_day, 1);
-        travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+        travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
         assert_eq!(ws.travel_day, 2);
-        travel_day_with(&mut StdRng::seed_from_u64(99), &mut ws, 0, 0, 120);
+        travel_day_with(&mut StdRng::seed_from_u64(99), &mut ws, &mut party, 0, 0, 120);
         assert_eq!(ws.travel_day, 3);
     }
 
@@ -583,5 +699,141 @@ mod tests {
         assert_eq!(slow, 2);
         assert_eq!(fast, 4);
         assert!(fast > slow, "faster party should cover more hexes per day");
+    }
+
+    // =========================================================================
+    // Supply/Ration tracking tests
+    // =========================================================================
+
+    #[test]
+    fn travel_consumes_rations() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 10;
+
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+
+        // Party has 1 member, should consume 1 ration
+        assert_eq!(result.rations_consumed, 1);
+        assert_eq!(party.rations, 9);
+        assert!(!result.starving);
+    }
+
+    #[test]
+    fn travel_larger_party_consumes_more_rations() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = Party::new();
+        party.add_member(Character::new("Fighter", Class::Fighter));
+        party.add_member(Character::new("Cleric", Class::Cleric));
+        party.add_member(Character::new("Thief", Class::Thief));
+        party.rations = 20;
+
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+
+        // Party has 3 members, should consume 3 rations
+        assert_eq!(result.rations_consumed, 3);
+        assert_eq!(party.rations, 17);
+        assert!(!result.starving);
+    }
+
+    #[test]
+    fn travel_no_rations_causes_starvation() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 0;
+
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+
+        assert!(result.starving);
+        assert_eq!(result.rations_consumed, 0);
+        assert!(result.messages.iter().any(|m| m.contains("STARVING")));
+    }
+
+    #[test]
+    fn travel_partial_rations_causes_starvation() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = Party::new();
+        party.add_member(Character::new("Fighter", Class::Fighter));
+        party.add_member(Character::new("Cleric", Class::Cleric));
+        party.add_member(Character::new("Thief", Class::Thief));
+        party.rations = 2; // Only 2 rations for 3 people
+
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+
+        assert!(result.starving);
+        assert_eq!(result.rations_consumed, 2);
+        assert_eq!(party.rations, 0);
+    }
+
+    #[test]
+    fn forage_adds_rations_to_party() {
+        let mut success = false;
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            let mut party = test_party();
+            party.rations = 5;
+            ws.move_to(1, 0).unwrap(); // Forest (2-in-6 forage chance)
+
+            let result = forage_with(&mut rng, &ws, &mut party);
+            if result.success {
+                assert!(result.quantity > 0);
+                assert!(party.rations > 5, "rations should increase on successful forage");
+                assert_eq!(party.rations, 5 + result.quantity);
+                success = true;
+                break;
+            }
+        }
+        assert!(success, "should eventually succeed at foraging");
+    }
+
+    #[test]
+    fn hunt_adds_rations_to_party() {
+        let mut success = false;
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let ws = test_wilderness();
+            let mut party = test_party();
+            party.rations = 3;
+
+            let result = hunt_with(&mut rng, &ws, &mut party);
+            if result.success {
+                assert!(result.quantity > 0);
+                assert!(party.rations > 3, "rations should increase on successful hunt");
+                assert_eq!(party.rations, 3 + result.quantity);
+                success = true;
+                break;
+            }
+        }
+        assert!(success, "should eventually succeed at hunting");
+    }
+
+    #[test]
+    fn wilderness_status_shows_rations() {
+        let ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 15;
+
+        let status = wilderness_status(&ws, &party, 120);
+        assert!(status.contains("Rations: 15"));
+        assert!(status.contains("person-days"));
+    }
+
+    #[test]
+    fn empty_party_consumes_no_rations() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = Party::new(); // No members
+        party.rations = 10;
+
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+
+        assert_eq!(result.rations_consumed, 0);
+        assert_eq!(party.rations, 10);
+        assert!(!result.starving);
     }
 }

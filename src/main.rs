@@ -14,7 +14,7 @@ use command::encounter_cmds::*;
 use command::inventory_cmds::*;
 use command::retainer_cmds::*;
 use command::wilderness_cmds::*;
-use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, RulingCommand, HealCommand, DamageCommand, SetHpCommand};
+use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, RulingCommand, HealCommand, DamageCommand, SetHpCommand, SetRationsCommand, AddRationsCommand};
 use command::system::*;
 use persist::GameState;
 use std::io::{self, BufRead, Write};
@@ -83,6 +83,8 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(HealCommand));
     registry.register(Box::new(DamageCommand));
     registry.register(Box::new(SetHpCommand));
+    registry.register(Box::new(SetRationsCommand));
+    registry.register(Box::new(AddRationsCommand));
     // Notes
     registry.register(Box::new(NoteCommand));
     registry.register(Box::new(NotesCommand));

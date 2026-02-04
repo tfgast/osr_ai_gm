@@ -138,6 +138,9 @@ pub struct Party {
     pub members: Vec<Character>,
     pub gold: u64,
     pub marching_order: Vec<String>,
+    /// Rations in person-days of food.
+    #[serde(default)]
+    pub rations: u32,
 }
 
 impl Party {
@@ -146,6 +149,7 @@ impl Party {
             members: Vec::new(),
             gold: 0,
             marching_order: Vec::new(),
+            rations: 0,
         }
     }
 

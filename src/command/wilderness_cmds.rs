@@ -81,11 +81,11 @@ impl Command for TravelCommand {
             .map(|c| c.movement_rate)
             .min()
             .unwrap_or(120);
-        let ws = match state.wilderness.as_mut() {
-            Some(w) => w,
-            None => return CommandResult::error("not in wilderness mode."),
-        };
-        let result = wilderness_engine::travel_day(ws, x, y, party_movement);
+        if state.wilderness.is_none() {
+            return CommandResult::error("not in wilderness mode.");
+        }
+        let ws = state.wilderness.as_mut().unwrap();
+        let result = wilderness_engine::travel_day(ws, &mut state.party, x, y, party_movement);
         CommandResult::ok(format!("{}", result))
     }
 }
@@ -95,12 +95,12 @@ impl Command for ForageCommand {
     fn name(&self) -> &str { "forage" }
     fn help(&self) -> &str { "Forage for food in the current hex (takes a full day)" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        let ws = match state.wilderness.as_ref() {
-            Some(w) => w,
-            None => return CommandResult::error("not in wilderness mode."),
-        };
-        let result = wilderness_engine::forage(ws);
-        CommandResult::ok(result)
+        if state.wilderness.is_none() {
+            return CommandResult::error("not in wilderness mode.");
+        }
+        let ws = state.wilderness.as_ref().unwrap();
+        let result = wilderness_engine::forage(ws, &mut state.party);
+        CommandResult::ok(result.message)
     }
 }
 
@@ -109,12 +109,12 @@ impl Command for HuntCommand {
     fn name(&self) -> &str { "hunt" }
     fn help(&self) -> &str { "Hunt for game in the current hex (takes a full day)" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        let ws = match state.wilderness.as_ref() {
-            Some(w) => w,
-            None => return CommandResult::error("not in wilderness mode."),
-        };
-        let result = wilderness_engine::hunt(ws);
-        CommandResult::ok(result)
+        if state.wilderness.is_none() {
+            return CommandResult::error("not in wilderness mode.");
+        }
+        let ws = state.wilderness.as_ref().unwrap();
+        let result = wilderness_engine::hunt(ws, &mut state.party);
+        CommandResult::ok(result.message)
     }
 }
 
@@ -132,7 +132,7 @@ impl Command for WildernessStatusCommand {
             .map(|c| c.movement_rate)
             .min()
             .unwrap_or(120);
-        let status = wilderness_engine::wilderness_status(ws, party_movement);
+        let status = wilderness_engine::wilderness_status(ws, &state.party, party_movement);
         CommandResult::ok(status)
     }
 }

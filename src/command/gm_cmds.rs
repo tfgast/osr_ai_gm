@@ -239,6 +239,49 @@ impl Command for SetHpCommand {
     }
 }
 
+/// GM command: set the party's rations.
+pub struct SetRationsCommand;
+impl Command for SetRationsCommand {
+    fn name(&self) -> &str { "set_rations" }
+    fn help(&self) -> &str { "GM: set party rations (set_rations <amount>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error("usage: set_rations <amount>");
+        }
+        let amount: u32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("amount must be a non-negative integer"),
+        };
+        let old = state.party.rations;
+        state.party.rations = amount;
+        CommandResult::ok(format!(
+            "Rations set to {} person-days (was {}).",
+            amount, old
+        ))
+    }
+}
+
+/// GM command: add rations to the party's supplies.
+pub struct AddRationsCommand;
+impl Command for AddRationsCommand {
+    fn name(&self) -> &str { "add_rations" }
+    fn help(&self) -> &str { "GM: add rations (add_rations <amount>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error("usage: add_rations <amount>");
+        }
+        let amount: u32 = match args[0].parse() {
+            Ok(n) if n >= 1 => n,
+            _ => return CommandResult::error("amount must be a positive integer"),
+        };
+        state.party.rations += amount;
+        CommandResult::ok(format!(
+            "Added {} rations. Total: {} person-days.",
+            amount, state.party.rations
+        ))
+    }
+}
+
 /// List of command names that require GM privileges.
 pub const GM_ONLY_COMMANDS: &[&str] = &[
     "spawn_encounter",
@@ -249,6 +292,8 @@ pub const GM_ONLY_COMMANDS: &[&str] = &[
     "heal",
     "damage",
     "set_hp",
+    "set_rations",
+    "add_rations",
 ];
 
 #[cfg(test)]
@@ -456,5 +501,67 @@ mod tests {
         let cmd = SetHpCommand;
         let result = cmd.execute(&["Aldric"], &mut state);
         assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn set_rations_basic() {
+        let mut state = GameState::new();
+        state.party.rations = 5;
+        let cmd = SetRationsCommand;
+        let result = cmd.execute(&["20"], &mut state);
+        assert!(result.output.contains("set to 20"));
+        assert!(result.output.contains("was 5"));
+        assert_eq!(state.party.rations, 20);
+    }
+
+    #[test]
+    fn set_rations_zero() {
+        let mut state = GameState::new();
+        state.party.rations = 10;
+        let cmd = SetRationsCommand;
+        let result = cmd.execute(&["0"], &mut state);
+        assert!(result.output.contains("set to 0"));
+        assert_eq!(state.party.rations, 0);
+    }
+
+    #[test]
+    fn set_rations_missing_args() {
+        let mut state = GameState::new();
+        let cmd = SetRationsCommand;
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn add_rations_basic() {
+        let mut state = GameState::new();
+        state.party.rations = 5;
+        let cmd = AddRationsCommand;
+        let result = cmd.execute(&["10"], &mut state);
+        assert!(result.output.contains("Added 10"));
+        assert!(result.output.contains("Total: 15"));
+        assert_eq!(state.party.rations, 15);
+    }
+
+    #[test]
+    fn add_rations_missing_args() {
+        let mut state = GameState::new();
+        let cmd = AddRationsCommand;
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn add_rations_invalid_amount() {
+        let mut state = GameState::new();
+        let cmd = AddRationsCommand;
+        let result = cmd.execute(&["0"], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn gm_commands_include_rations() {
+        assert!(GM_ONLY_COMMANDS.contains(&"set_rations"));
+        assert!(GM_ONLY_COMMANDS.contains(&"add_rations"));
     }
 }

@@ -213,7 +213,7 @@ fn query_wilderness(id: &str, state: &GameState) -> GMResponse {
         .map(|c| c.movement_rate)
         .min()
         .unwrap_or(120);
-    let status = wilderness_engine::wilderness_status(ws, party_movement);
+    let status = wilderness_engine::wilderness_status(ws, &state.party, party_movement);
     GMResponse::ok_with_data(
         id, status, state.mode.clone(),
         serde_json::json!({
@@ -674,11 +674,11 @@ fn travel(id: &str, state: &mut GameState, x: i32, y: i32) -> GMResponse {
         .map(|c| c.movement_rate)
         .min()
         .unwrap_or(120);
-    let ws = match state.wilderness.as_mut() {
-        Some(w) => w,
-        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
-    };
-    let result = wilderness_engine::travel_day(ws, x, y, party_movement);
+    if state.wilderness.is_none() {
+        return GMResponse::err(id, "not in wilderness mode.", state.mode.clone());
+    }
+    let ws = state.wilderness.as_mut().unwrap();
+    let result = wilderness_engine::travel_day(ws, &mut state.party, x, y, party_movement);
     let has_encounter = !result.encounters.is_empty();
     let encounters_json: Vec<serde_json::Value> = result.encounters.iter().map(|enc| {
         serde_json::json!({
@@ -691,6 +691,9 @@ fn travel(id: &str, state: &mut GameState, x: i32, y: i32) -> GMResponse {
         "lost": result.lost,
         "has_encounter": has_encounter,
         "encounters": encounters_json,
+        "rations_consumed": result.rations_consumed,
+        "starving": result.starving,
+        "rations_remaining": state.party.rations,
     });
     GMResponse::ok_with_data(id, format!("{}", result), state.mode.clone(), data)
 }
