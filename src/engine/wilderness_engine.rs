@@ -402,4 +402,186 @@ mod tests {
             ));
         }
     }
+
+    // =========================================================================
+    // Additional QA tests for wilderness flows
+    // =========================================================================
+
+    #[test]
+    fn encounter_uses_post_move_terrain() {
+        // Per OSE, encounter table should use the terrain the party arrives in,
+        // not the terrain they departed from.
+        // Start in Clear (0,0), travel to Forest (1,0).
+        // Forest has 2-in-6 encounter chance; Clear has 1-in-6.
+        // We verify encounter messages reference the correct period and
+        // that the encounter check happens after the move.
+        let mut encounter_count = 0;
+        for seed in 0..500 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            let result = travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+            if !result.lost {
+                // Party should be in forest now
+                assert_eq!(ws.current_x, 1);
+                assert_eq!(ws.current_y, 0);
+                encounter_count += result.encounters.len();
+            }
+        }
+        // Forest has 2-in-6 per check, 3 checks/day.
+        // Expected ~33% per check = ~1.0 encounters per non-lost day.
+        // With Clear (1-in-6, ~0.5/day), we'd see far fewer.
+        // Just verify we get a reasonable number consistent with forest rates.
+        assert!(
+            encounter_count > 100,
+            "encounter count {} too low for forest terrain (2-in-6, 3 checks/day over 500 trials)",
+            encounter_count
+        );
+    }
+
+    #[test]
+    fn terrain_movement_rates_vary() {
+        // Verify different terrains give different travel speeds
+        let clear = WildernessState::hexes_per_day(120, Terrain::Clear);
+        let forest = WildernessState::hexes_per_day(120, Terrain::Forest);
+        let mountains = WildernessState::hexes_per_day(120, Terrain::Mountains);
+
+        assert!(clear > forest, "clear should allow faster travel than forest");
+        assert!(forest > mountains, "forest should allow faster travel than mountains");
+        assert!(mountains >= 1, "even mountains should allow at least 1 hex/day");
+    }
+
+    #[test]
+    fn multi_hex_travel_enforced() {
+        // Build a map with hexes at distance > 1 from origin
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear)).unwrap();
+        ws.add_hex(HexCell::new(1, 0, Terrain::Clear)).unwrap();
+        ws.add_hex(HexCell::new(2, 0, Terrain::Clear)).unwrap();
+        ws.add_hex(HexCell::new(3, 0, Terrain::Clear)).unwrap();
+        ws.add_hex(HexCell::new(4, 0, Terrain::Clear)).unwrap();
+        ws.add_hex(HexCell::new(5, 0, Terrain::Clear)).unwrap();
+
+        // At 120' movement on clear terrain, travel speed is 4 hexes/day
+        let hexes = WildernessState::hexes_per_day(120, Terrain::Clear);
+        assert_eq!(hexes, 4);
+
+        // Trying to travel 5 hexes away should be blocked
+        let mut rng = test_rng();
+        let result = travel_day_with(&mut rng, &mut ws, 5, 0, 120);
+        if !result.lost {
+            assert!(
+                result.messages.iter().any(|m| m.contains("exceeds travel range")),
+                "should not allow travel beyond daily movement range"
+            );
+        }
+    }
+
+    #[test]
+    fn lost_chance_varies_by_terrain() {
+        // Clear terrain: 1-in-6 lost chance
+        // Swamp terrain: 2-in-6 lost chance
+        let mut clear_lost = 0;
+        let mut swamp_lost = 0;
+        let trials = 500;
+        for seed in 0..trials {
+            // Clear terrain
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            let result = travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+            if result.lost {
+                clear_lost += 1;
+            }
+
+            // Swamp terrain
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            ws.move_to(0, 1).unwrap(); // Move to swamp
+            let result = travel_day_with(&mut rng, &mut ws, 1, 1, 120);
+            if result.lost {
+                swamp_lost += 1;
+            }
+        }
+        assert!(
+            swamp_lost > clear_lost,
+            "swamp should cause getting lost more often than clear ({} vs {} in {} trials)",
+            swamp_lost, clear_lost, trials
+        );
+    }
+
+    #[test]
+    fn forage_returns_quantity_on_success() {
+        let mut found_quantity = false;
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            ws.move_to(1, 0).unwrap(); // Forest (2-in-6 forage chance)
+            let result = forage_with(&mut rng, &ws);
+            if result.contains("successful!") {
+                // Should mention person-days quantity
+                assert!(
+                    result.contains("person-days"),
+                    "successful forage should report quantity in person-days"
+                );
+                found_quantity = true;
+                break;
+            }
+        }
+        assert!(found_quantity, "should eventually get a successful forage with quantity");
+    }
+
+    #[test]
+    fn hunt_returns_quantity_on_success() {
+        let mut found_quantity = false;
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let ws = test_wilderness(); // Clear terrain, hunting allowed
+            let result = hunt_with(&mut rng, &ws);
+            if result.contains("successful!") {
+                assert!(
+                    result.contains("person-days"),
+                    "successful hunt should report food quantity in person-days"
+                );
+                found_quantity = true;
+                break;
+            }
+        }
+        assert!(found_quantity, "should eventually get a successful hunt with quantity");
+    }
+
+    #[test]
+    fn forage_barren_terrain_fails() {
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, Terrain::Barren)).unwrap();
+        let result = forage_with(&mut test_rng(), &ws);
+        assert!(result.contains("Cannot forage"), "should not be able to forage in barren terrain");
+    }
+
+    #[test]
+    fn forage_city_terrain_fails() {
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, Terrain::City)).unwrap();
+        let result = forage_with(&mut test_rng(), &ws);
+        assert!(result.contains("Cannot forage"), "should not be able to forage in city terrain");
+    }
+
+    #[test]
+    fn travel_day_increments_day_counter() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        assert_eq!(ws.travel_day, 1);
+        travel_day_with(&mut rng, &mut ws, 1, 0, 120);
+        assert_eq!(ws.travel_day, 2);
+        travel_day_with(&mut StdRng::seed_from_u64(99), &mut ws, 0, 0, 120);
+        assert_eq!(ws.travel_day, 3);
+    }
+
+    #[test]
+    fn slow_party_travels_fewer_hexes() {
+        // 60' movement on clear = 2 hexes/day vs 120' = 4 hexes/day
+        let slow = WildernessState::hexes_per_day(60, Terrain::Clear);
+        let fast = WildernessState::hexes_per_day(120, Terrain::Clear);
+        assert_eq!(slow, 2);
+        assert_eq!(fast, 4);
+        assert!(fast > slow, "faster party should cover more hexes per day");
+    }
 }

@@ -973,3 +973,278 @@ fn wilderness_encounter() {
     let resp = handle_request(&req("4", GMCommand::QueryWilderness), &mut state);
     assert!(resp.success);
 }
+
+// ===========================================================================
+// INTEGRATION TEST: Mode transition Idle -> Exploration -> Combat -> Exploration
+// ===========================================================================
+
+#[test]
+fn mode_transition_idle_exploration_combat_exploration() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    assert_eq!(state.mode, GameMode::Idle);
+
+    // Idle -> Exploration
+    let resp = handle_request(&req("1", GMCommand::EnterDungeon {
+        level: 1,
+        room_name: "Entrance".to_string(),
+    }), &mut state);
+    assert!(resp.success, "enter dungeon failed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    // Light a torch so exploration works
+    let resp = handle_request(&req("2", GMCommand::Light {
+        source: "lantern".to_string(),
+        carrier: "Aldric".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Advance a turn to verify exploration works
+    let resp = handle_request(&req("3", GMCommand::AdvanceTurn), &mut state);
+    assert!(resp.success);
+    let dungeon_turn = state.time.as_ref().unwrap().total_turns;
+    assert!(dungeon_turn > 0, "turns should have advanced");
+
+    // Exploration -> Combat (spawn encounter)
+    let resp = handle_request(&req("4", GMCommand::SpawnEncounter {
+        name: "skeleton".to_string(),
+        count: 2,
+        hit_dice: "1".to_string(),
+        ac: 7,
+        hp: 4,
+        damage: "1d6".to_string(),
+        morale: 12,
+        distance: 5,
+        xp_value: Some(10),
+    }), &mut state);
+    assert!(resp.success, "spawn encounter failed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    // Verify dungeon state is preserved during combat
+    assert!(state.dungeon.is_some(), "dungeon state should persist during combat");
+    assert!(state.time.is_some(), "time tracker should persist during combat");
+    assert_eq!(
+        state.time.as_ref().unwrap().total_turns, dungeon_turn,
+        "dungeon turn count should not change during combat"
+    );
+
+    // Perform combat actions
+    let resp = handle_request(&req("5", GMCommand::RollInitiative), &mut state);
+    assert!(resp.success);
+    let resp = handle_request(&req("6", GMCommand::Attack {
+        character: "Aldric".to_string(),
+        monster_idx: 0,
+        weapon: "sword".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Combat -> Idle (EndCombat resets to Idle)
+    let resp = handle_request(&req("7", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Idle);
+
+    // Dungeon state should still be present — exploration can resume
+    assert!(state.dungeon.is_some(), "dungeon state should survive combat");
+    assert!(state.time.is_some(), "time tracker should survive combat");
+
+    // Verify exploration still works after combat
+    let resp = handle_request(&req("8", GMCommand::AdvanceTurn), &mut state);
+    assert!(resp.success, "should be able to explore after combat: {}", resp.message);
+}
+
+// ===========================================================================
+// INTEGRATION TEST: Mode transition Idle -> Wilderness -> Combat -> Wilderness
+// ===========================================================================
+
+#[test]
+fn mode_transition_idle_wilderness_combat_wilderness() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Ranger"));
+    assert_eq!(state.mode, GameMode::Idle);
+
+    // Idle -> Wilderness
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: "forest".to_string(),
+    }), &mut state);
+    assert!(resp.success, "enter wilderness failed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    // Add adjacent hexes for travel
+    let resp = handle_request(&req("2", GMCommand::AddHex {
+        x: 1, y: 0,
+        terrain: "hills".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Travel to verify wilderness works
+    let resp = handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(resp.success);
+    let travel_day = state.wilderness.as_ref().unwrap().travel_day;
+    assert!(travel_day > 1, "travel day should have incremented");
+
+    // Wilderness -> Combat (encounter during travel)
+    let resp = handle_request(&req("4", GMCommand::SpawnEncounter {
+        name: "wolf".to_string(),
+        count: 3,
+        hit_dice: "2".to_string(),
+        ac: 7,
+        hp: 6,
+        damage: "1d6".to_string(),
+        morale: 8,
+        distance: 5,
+        xp_value: Some(20),
+    }), &mut state);
+    assert!(resp.success, "spawn encounter failed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    // Wilderness state should persist during combat
+    assert!(state.wilderness.is_some(), "wilderness state should persist during combat");
+    assert_eq!(
+        state.wilderness.as_ref().unwrap().travel_day, travel_day,
+        "travel day should not change during combat"
+    );
+
+    // Combat actions
+    let resp = handle_request(&req("5", GMCommand::RollInitiative), &mut state);
+    assert!(resp.success);
+    let resp = handle_request(&req("6", GMCommand::Attack {
+        character: "Ranger".to_string(),
+        monster_idx: 0,
+        weapon: "sword".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Combat -> Idle
+    let resp = handle_request(&req("7", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Idle);
+
+    // Wilderness state should still be present
+    assert!(state.wilderness.is_some(), "wilderness state should survive combat");
+    assert_eq!(
+        state.wilderness.as_ref().unwrap().travel_day, travel_day,
+        "travel day should be preserved after combat"
+    );
+
+    // Add another hex and verify wilderness travel still works after combat
+    let _resp = handle_request(&req("8", GMCommand::AddHex {
+        x: 0, y: 0,
+        terrain: "clear".to_string(),
+    }), &mut state);
+    // This might fail since (0,0) was the original hex — that's fine, just test travel
+    let resp = handle_request(&req("9", GMCommand::Travel { x: 0, y: 0 }), &mut state);
+    assert!(resp.success, "should be able to travel after combat: {}", resp.message);
+}
+
+// ===========================================================================
+// INTEGRATION TEST: Full dungeon exploration flow with light, rest, doors
+// ===========================================================================
+
+#[test]
+fn dungeon_exploration_flow() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    state.party.add_member(make_thief("Shadow"));
+
+    // Enter dungeon
+    let resp = handle_request(&req("1", GMCommand::EnterDungeon {
+        level: 1,
+        room_name: "Entry Hall".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    // Without light, advance turn should warn about darkness
+    let resp = handle_request(&req("2", GMCommand::AdvanceTurn), &mut state);
+    assert!(resp.success);
+    assert!(resp.message.contains("DARKNESS"), "should warn about darkness");
+
+    // Light a torch
+    let resp = handle_request(&req("3", GMCommand::Light {
+        source: "torch".to_string(),
+        carrier: "Aldric".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Now exploration should work
+    let resp = handle_request(&req("4", GMCommand::AdvanceTurn), &mut state);
+    assert!(resp.success);
+    assert!(!resp.message.contains("DARKNESS"), "should not be in darkness with torch");
+
+    // Build out the dungeon
+    handle_request(&req("5a", GMCommand::AddRoom { id: 1, name: "Guard Room".to_string() }), &mut state);
+    handle_request(&req("5b", GMCommand::AddDoor {
+        id: 0, room_a: 0, room_b: 1, state: "closed".to_string(),
+    }), &mut state);
+
+    // Search the room
+    let resp = handle_request(&req("6", GMCommand::Search { is_elf: false }), &mut state);
+    assert!(resp.success);
+
+    // Check exploration status
+    let resp = handle_request(&req("7", GMCommand::QueryExploration), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["has_light"].as_bool().unwrap(), "should have light");
+    assert!(data["total_turns"].as_u64().unwrap() > 0);
+
+    // Advance enough turns to need rest (5 turns of activity)
+    // We've already used some turns, advance until rest is needed
+    let time = state.time.as_ref().unwrap();
+    let turns_until_rest = if time.turns_since_rest >= 5 { 0 } else { 5 - time.turns_since_rest };
+    for i in 0..turns_until_rest {
+        handle_request(&req(&format!("r{}", i), GMCommand::AdvanceTurn), &mut state);
+    }
+
+    // Verify rest penalty
+    assert!(
+        state.time.as_ref().unwrap().needs_rest(),
+        "should need rest after 5 turns of activity"
+    );
+}
+
+// ===========================================================================
+// INTEGRATION TEST: Wilderness multi-day travel
+// ===========================================================================
+
+#[test]
+fn wilderness_multi_day_travel() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Explorer"));
+
+    // Enter wilderness
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: "clear".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Build a hex path
+    handle_request(&req("2a", GMCommand::AddHex { x: 1, y: 0, terrain: "clear".to_string() }), &mut state);
+    handle_request(&req("2b", GMCommand::AddHex { x: 1, y: 1, terrain: "forest".to_string() }), &mut state);
+    handle_request(&req("2c", GMCommand::AddHex { x: 0, y: 1, terrain: "mountains".to_string() }), &mut state);
+
+    // Day 1: travel to (1,0) — clear terrain
+    let resp = handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(resp.success);
+    let ws = state.wilderness.as_ref().unwrap();
+    assert_eq!(ws.travel_day, 2, "should be day 2 after first travel");
+
+    // Day 2: travel to (1,1) — forest terrain
+    let resp = handle_request(&req("4", GMCommand::Travel { x: 1, y: 1 }), &mut state);
+    assert!(resp.success);
+    let ws = state.wilderness.as_ref().unwrap();
+    assert_eq!(ws.travel_day, 3, "should be day 3 after second travel");
+
+    // Day 3: travel to (0,1) — mountains
+    let resp = handle_request(&req("5", GMCommand::Travel { x: 0, y: 1 }), &mut state);
+    assert!(resp.success);
+    let ws = state.wilderness.as_ref().unwrap();
+    assert_eq!(ws.travel_day, 4, "should be day 4 after third travel");
+
+    // Verify final position
+    let resp = handle_request(&req("6", GMCommand::QueryWilderness), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    // Position might be different if party got lost, but travel_day should still advance
+    assert_eq!(data["travel_day"], 4);
+}

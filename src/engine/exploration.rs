@@ -653,4 +653,227 @@ mod tests {
         assert!(status.contains("Turn:"));
         assert!(status.contains("Level: 1"));
     }
+
+    // =========================================================================
+    // Additional QA tests for exploration flows
+    // =========================================================================
+
+    #[test]
+    fn torch_expires_during_exploration() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Torch, "Arden");
+
+        // Torch lasts 6 turns; after 6 advance_turn calls, light should be gone
+        for _ in 0..6 {
+            advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        }
+        assert!(!time.has_light(), "torch should be expired after 6 turns");
+        // Next turn should be blocked by darkness
+        let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        assert!(result.messages.iter().any(|m| m.contains("DARKNESS")));
+    }
+
+    #[test]
+    fn lantern_lasts_longer_than_torch() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Brin");
+
+        // After 6 turns (torch would be dead), lantern still active
+        for _ in 0..6 {
+            advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        }
+        assert!(time.has_light(), "lantern should still be active after 6 turns");
+
+        // After 24 turns total, lantern expires
+        for _ in 0..18 {
+            advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        }
+        assert!(!time.has_light(), "lantern should expire after 24 turns");
+    }
+
+    #[test]
+    fn stuck_door_treated_as_closed_for_forcing() {
+        // Stuck doors behave like closed doors for force_door
+        let mut found_success = false;
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut dungeon = test_dungeon();
+            // Add a stuck door
+            dungeon.add_door(Door::new(3, 0, 3, DoorState::Stuck).unwrap()).unwrap();
+            let character = test_character();
+            let result = force_door_with(&mut rng, &mut dungeon, 3, &character);
+            if result.contains("forces door 3 open") {
+                found_success = true;
+                break;
+            }
+        }
+        assert!(found_success, "should eventually force a stuck door open");
+    }
+
+    #[test]
+    fn elf_has_better_secret_door_detection() {
+        // Elf gets 2-in-6, non-elf gets 1-in-6
+        let mut elf_finds = 0;
+        let mut human_finds = 0;
+        let trials = 500;
+        for seed in 0..trials {
+            // Elf search
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut time = TimeTracker::new();
+            let mut dungeon = test_dungeon();
+            time.light(LightSourceKind::Lantern, "Test");
+            dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+            dungeon.move_to(1).unwrap();
+            let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, true);
+            if format!("{}", result).contains("Secret door found") {
+                elf_finds += 1;
+            }
+
+            // Human search with same seed
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut time = TimeTracker::new();
+            let mut dungeon = test_dungeon();
+            time.light(LightSourceKind::Lantern, "Test");
+            dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+            dungeon.move_to(1).unwrap();
+            let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+            if format!("{}", result).contains("Secret door found") {
+                human_finds += 1;
+            }
+        }
+        assert!(
+            elf_finds > human_finds,
+            "elf should find secret doors more often ({} vs {} in {} trials)",
+            elf_finds, human_finds, trials
+        );
+    }
+
+    #[test]
+    fn move_to_nonexistent_room_fails() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Try to move through a non-existent door
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 99);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn move_through_door_not_connected_to_current_room() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+        // Door 2 connects rooms 1-3, but party is in room 0
+        dungeon.find_door_mut(2).unwrap().state = DoorState::Open;
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 2);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not connected"));
+    }
+
+    #[test]
+    fn door_auto_closes_after_passing() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Open door 0 and move through it
+        dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        assert_eq!(dungeon.current_room, Some(1));
+        // Per OSE, door should auto-close after passing through
+        assert_eq!(
+            dungeon.doors.iter().find(|d| d.id == 0).unwrap().state,
+            DoorState::Closed,
+            "door should auto-close after passing through per OSE rules"
+        );
+    }
+
+    #[test]
+    fn rest_requirement_message_after_5_turns() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Advance 5 turns to trigger rest requirement
+        for _ in 0..5 {
+            advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        }
+        assert!(time.needs_rest(), "should need rest after 5 turns");
+        assert_eq!(time.rest_penalty(), -1, "should have -1 penalty");
+
+        // 6th turn should mention rest requirement
+        let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        assert!(
+            result.messages.iter().any(|m| m.contains("must rest")),
+            "should warn about rest requirement"
+        );
+    }
+
+    #[test]
+    fn wandering_monster_never_on_odd_turns() {
+        // Wandering monsters only checked on even turns (every 2 turns)
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut time = TimeTracker::new();
+            let mut dungeon = test_dungeon();
+            time.light(LightSourceKind::Lantern, "Test");
+
+            // Turn 1 (odd) — should never trigger encounter from advance_dungeon_turn
+            let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+            assert!(
+                result.encounter.is_none(),
+                "turn 1 (odd) should never have wandering monster (seed {})",
+                seed
+            );
+        }
+    }
+
+    #[test]
+    fn search_consumes_a_turn() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        let turns_before = time.total_turns;
+        search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+        assert_eq!(time.total_turns, turns_before + 1, "search should consume one turn");
+    }
+
+    #[test]
+    fn move_through_door_triggers_trap() {
+        let mut triggered = false;
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut time = TimeTracker::new();
+            let mut dungeon = test_dungeon();
+            time.light(LightSourceKind::Lantern, "Test");
+
+            // Move to room 1 first, then through door 2 to trap room 3
+            dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+            dungeon.move_to(1).unwrap();
+
+            let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 2);
+            assert!(result.is_ok());
+            let output = format!("{}", result.unwrap());
+            if output.contains("TRAP TRIGGERED") {
+                triggered = true;
+                // Verify trap_triggered flag is set
+                assert!(dungeon.find_room(3).unwrap().trap_triggered);
+                break;
+            }
+        }
+        assert!(triggered, "moving into trap room should eventually trigger a trap");
+    }
 }
