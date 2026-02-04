@@ -3,6 +3,7 @@ use crate::persist::GameState;
 use crate::engine::combat;
 use crate::model::{CombatState, Monster};
 use crate::rules::{equipment, monster as monster_db};
+use crate::state::game::GameMode;
 
 pub struct StartCombatCommand;
 impl Command for StartCombatCommand {
@@ -76,6 +77,7 @@ impl Command for StartCombatCommand {
         let combat_state = CombatState::new(monsters, distance);
         let status = combat::combat_status(&combat_state, &state.party.members);
         state.combat = Some(combat_state);
+        state.mode = GameMode::Combat;
 
         let mut out = format!("Combat started! {} {}(s) at {}' distance.\n",
             count, name, distance);
@@ -391,6 +393,7 @@ impl Command for EndCombatCommand {
             return CommandResult::error("no active combat.");
         }
         let combat = state.combat.take().unwrap();
+        state.mode = GameMode::Idle;
         let dead_monsters = combat.monsters.iter().filter(|m| !m.is_alive()).count();
         let total_xp: u64 = combat.monsters.iter()
             .filter(|m| !m.is_alive())

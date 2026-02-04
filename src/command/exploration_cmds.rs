@@ -2,6 +2,7 @@ use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::engine::exploration;
 use crate::state::dungeon::{DungeonState, Room, Door, DoorState};
+use crate::state::game::GameMode;
 use crate::state::time::{TimeTracker, LightSourceKind};
 
 pub struct EnterDungeonCommand;
@@ -27,6 +28,7 @@ impl Command for EnterDungeonCommand {
         state.dungeon = Some(dungeon);
         state.time = Some(time);
         state.dungeon_level = level;
+        state.mode = GameMode::Exploration;
 
         CommandResult::ok(format!(
             "Entered dungeon level {}. Starting room: {}.\n\
