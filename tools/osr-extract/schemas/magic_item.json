@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OSE Magic Item",
+  "description": "Magic item definition for Old-School Essentials",
+  "type": "object",
+  "required": ["name", "category"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Magic item name"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["armor", "miscellaneous", "potion", "ring", "rod", "staff", "wand", "scroll", "sword", "weapon"],
+      "description": "Item category"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Full item description"
+    },
+    "properties": {
+      "type": "array",
+      "description": "Item properties as key-value pairs",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": ["string", "null"],
+            "description": "Property name/label"
+          },
+          "value": {
+            "type": "string",
+            "description": "Property description"
+          }
+        },
+        "required": ["value"]
+      }
+    },
+    "cursed": {
+      "type": "boolean",
+      "description": "Whether this is a cursed item",
+      "default": false
+    }
+  }
+}
