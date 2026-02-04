@@ -1,0 +1,111 @@
+use std::collections::HashMap;
+
+/// Result of executing a command.
+#[derive(Debug)]
+pub struct CommandResult {
+    pub output: String,
+    pub quit: bool,
+}
+
+impl CommandResult {
+    pub fn ok(output: impl Into<String>) -> Self {
+        CommandResult {
+            output: output.into(),
+            quit: false,
+        }
+    }
+
+    pub fn quit() -> Self {
+        CommandResult {
+            output: "Goodbye.".to_string(),
+            quit: true,
+        }
+    }
+
+    pub fn error(msg: impl Into<String>) -> Self {
+        CommandResult {
+            output: format!("Error: {}", msg.into()),
+            quit: false,
+        }
+    }
+}
+
+/// A command that can be executed in the CLI shell.
+pub trait Command {
+    /// The command name (what the user types).
+    fn name(&self) -> &str;
+
+    /// Brief help text.
+    fn help(&self) -> &str;
+
+    /// Execute the command with the given arguments.
+    fn execute(&self, args: &[&str]) -> CommandResult;
+}
+
+/// Registry that maps command names to command implementations.
+pub struct CommandRegistry {
+    commands: HashMap<String, Box<dyn Command>>,
+}
+
+impl CommandRegistry {
+    pub fn new() -> Self {
+        CommandRegistry {
+            commands: HashMap::new(),
+        }
+    }
+
+    pub fn register(&mut self, cmd: Box<dyn Command>) {
+        self.commands.insert(cmd.name().to_string(), cmd);
+    }
+
+    pub fn dispatch(&self, name: &str, args: &[&str]) -> CommandResult {
+        match self.commands.get(name) {
+            Some(cmd) => cmd.execute(args),
+            None => CommandResult::error(format!("unknown command: '{}'. Type 'help' for commands.", name)),
+        }
+    }
+
+    pub fn commands(&self) -> Vec<(&str, &str)> {
+        let mut cmds: Vec<(&str, &str)> = self.commands.values()
+            .map(|c| (c.name(), c.help()))
+            .collect();
+        cmds.sort_by_key(|(name, _)| *name);
+        cmds
+    }
+}
+
+impl Default for CommandRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestCmd;
+    impl Command for TestCmd {
+        fn name(&self) -> &str { "test" }
+        fn help(&self) -> &str { "a test command" }
+        fn execute(&self, args: &[&str]) -> CommandResult {
+            CommandResult::ok(format!("args: {:?}", args))
+        }
+    }
+
+    #[test]
+    fn registry_dispatch() {
+        let mut reg = CommandRegistry::new();
+        reg.register(Box::new(TestCmd));
+        let result = reg.dispatch("test", &["a", "b"]);
+        assert!(!result.quit);
+        assert!(result.output.contains("a"));
+    }
+
+    #[test]
+    fn unknown_command() {
+        let reg = CommandRegistry::new();
+        let result = reg.dispatch("nope", &[]);
+        assert!(result.output.contains("unknown command"));
+    }
+}
