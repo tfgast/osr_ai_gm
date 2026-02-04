@@ -158,6 +158,87 @@ impl Command for RulingCommand {
     }
 }
 
+/// GM command: heal a character.
+pub struct HealCommand;
+impl Command for HealCommand {
+    fn name(&self) -> &str { "heal" }
+    fn help(&self) -> &str { "GM: heal a character (heal <character> <amount>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: heal <character_name> <amount>");
+        }
+        let amount: i32 = match args[1].parse() {
+            Ok(n) if n >= 1 => n,
+            _ => return CommandResult::error("amount must be a positive integer"),
+        };
+        let character = match state.party.find_member_mut(args[0]) {
+            Some(c) => c,
+            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
+        };
+        let old_hp = character.hp;
+        character.hp = (character.hp + amount).min(character.max_hp);
+        let healed = character.hp - old_hp;
+        CommandResult::ok(format!(
+            "{} healed {} HP ({} -> {}/{}).",
+            character.name, healed, old_hp, character.hp, character.max_hp
+        ))
+    }
+}
+
+/// GM command: damage a character.
+pub struct DamageCommand;
+impl Command for DamageCommand {
+    fn name(&self) -> &str { "damage" }
+    fn help(&self) -> &str { "GM: damage a character (damage <character> <amount>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: damage <character_name> <amount>");
+        }
+        let amount: i32 = match args[1].parse() {
+            Ok(n) if n >= 1 => n,
+            _ => return CommandResult::error("amount must be a positive integer"),
+        };
+        let character = match state.party.find_member_mut(args[0]) {
+            Some(c) => c,
+            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
+        };
+        let old_hp = character.hp;
+        character.hp -= amount;
+        let status = if character.is_alive() { "wounded" } else { "DEAD" };
+        CommandResult::ok(format!(
+            "{} takes {} damage ({} -> {}/{}). Status: {}.",
+            character.name, amount, old_hp, character.hp, character.max_hp, status
+        ))
+    }
+}
+
+/// GM command: set a character's HP to an exact value.
+pub struct SetHpCommand;
+impl Command for SetHpCommand {
+    fn name(&self) -> &str { "set_hp" }
+    fn help(&self) -> &str { "GM: set HP (set_hp <character> <amount>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: set_hp <character_name> <amount>");
+        }
+        let amount: i32 = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("amount must be an integer"),
+        };
+        let character = match state.party.find_member_mut(args[0]) {
+            Some(c) => c,
+            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
+        };
+        let old_hp = character.hp;
+        character.hp = amount;
+        let status = if character.is_alive() { "alive" } else { "DEAD" };
+        CommandResult::ok(format!(
+            "{} HP set to {} (was {}). Max HP: {}. Status: {}.",
+            character.name, character.hp, old_hp, character.max_hp, status
+        ))
+    }
+}
+
 /// List of command names that require GM privileges.
 pub const GM_ONLY_COMMANDS: &[&str] = &[
     "spawn_encounter",
@@ -165,6 +246,9 @@ pub const GM_ONLY_COMMANDS: &[&str] = &[
     "roll_reaction",
     "award_xp",
     "ruling",
+    "heal",
+    "damage",
+    "set_hp",
 ];
 
 #[cfg(test)]
@@ -240,5 +324,137 @@ mod tests {
         assert!(GM_ONLY_COMMANDS.contains(&"spawn_encounter"));
         assert!(GM_ONLY_COMMANDS.contains(&"award_xp"));
         assert!(GM_ONLY_COMMANDS.contains(&"ruling"));
+        assert!(GM_ONLY_COMMANDS.contains(&"heal"));
+        assert!(GM_ONLY_COMMANDS.contains(&"damage"));
+        assert!(GM_ONLY_COMMANDS.contains(&"set_hp"));
+    }
+
+    #[test]
+    fn heal_basic() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.hp = 3;
+        c.max_hp = 10;
+        state.party.add_member(c);
+        let cmd = HealCommand;
+        let result = cmd.execute(&["Aldric", "5"], &mut state);
+        assert!(result.output.contains("healed 5 HP"));
+        assert_eq!(state.party.find_member("Aldric").unwrap().hp, 8);
+    }
+
+    #[test]
+    fn heal_capped_at_max() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.hp = 8;
+        c.max_hp = 10;
+        state.party.add_member(c);
+        let cmd = HealCommand;
+        let result = cmd.execute(&["Aldric", "20"], &mut state);
+        assert!(result.output.contains("healed 2 HP"));
+        assert_eq!(state.party.find_member("Aldric").unwrap().hp, 10);
+    }
+
+    #[test]
+    fn heal_no_character() {
+        let mut state = GameState::new();
+        let cmd = HealCommand;
+        let result = cmd.execute(&["Nobody", "5"], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn heal_missing_args() {
+        let mut state = GameState::new();
+        let cmd = HealCommand;
+        let result = cmd.execute(&["Aldric"], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn damage_basic() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.hp = 10;
+        c.max_hp = 10;
+        state.party.add_member(c);
+        let cmd = DamageCommand;
+        let result = cmd.execute(&["Aldric", "3"], &mut state);
+        assert!(result.output.contains("takes 3 damage"));
+        assert!(result.output.contains("wounded"));
+        assert_eq!(state.party.find_member("Aldric").unwrap().hp, 7);
+    }
+
+    #[test]
+    fn damage_kills() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.hp = 3;
+        c.max_hp = 10;
+        state.party.add_member(c);
+        let cmd = DamageCommand;
+        let result = cmd.execute(&["Aldric", "5"], &mut state);
+        assert!(result.output.contains("DEAD"));
+        assert_eq!(state.party.find_member("Aldric").unwrap().hp, -2);
+    }
+
+    #[test]
+    fn damage_no_character() {
+        let mut state = GameState::new();
+        let cmd = DamageCommand;
+        let result = cmd.execute(&["Nobody", "5"], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn damage_missing_args() {
+        let mut state = GameState::new();
+        let cmd = DamageCommand;
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn set_hp_basic() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.hp = 5;
+        c.max_hp = 10;
+        state.party.add_member(c);
+        let cmd = SetHpCommand;
+        let result = cmd.execute(&["Aldric", "8"], &mut state);
+        assert!(result.output.contains("HP set to 8"));
+        assert!(result.output.contains("was 5"));
+        assert!(result.output.contains("alive"));
+        assert_eq!(state.party.find_member("Aldric").unwrap().hp, 8);
+    }
+
+    #[test]
+    fn set_hp_to_zero() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.hp = 5;
+        c.max_hp = 10;
+        state.party.add_member(c);
+        let cmd = SetHpCommand;
+        let result = cmd.execute(&["Aldric", "0"], &mut state);
+        assert!(result.output.contains("DEAD"));
+        assert_eq!(state.party.find_member("Aldric").unwrap().hp, 0);
+    }
+
+    #[test]
+    fn set_hp_no_character() {
+        let mut state = GameState::new();
+        let cmd = SetHpCommand;
+        let result = cmd.execute(&["Nobody", "5"], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn set_hp_missing_args() {
+        let mut state = GameState::new();
+        let cmd = SetHpCommand;
+        let result = cmd.execute(&["Aldric"], &mut state);
+        assert!(result.output.contains("Error"));
     }
 }
