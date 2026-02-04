@@ -1,7 +1,7 @@
 use super::{Command, CommandResult};
 use crate::model::Item;
 use crate::persist::GameState;
-use crate::rules::equipment::{self, AMMUNITION};
+use crate::rules::equipment::{self, AMMUNITION, ARMOUR, GEAR, WEAPONS};
 
 /// Look up an item across all equipment tables.
 /// Returns (name, cost_gp, weight as f32).
@@ -23,6 +23,41 @@ fn find_buyable(name: &str) -> Option<(&'static str, u32, f32)> {
     None
 }
 
+/// Find equipment names that contain the query as a substring (case-insensitive).
+/// Returns up to 3 suggestions.
+fn suggest_equipment(query: &str) -> Vec<&'static str> {
+    let query_lower = query.to_lowercase();
+    let mut suggestions: Vec<&'static str> = Vec::new();
+
+    // Check weapons
+    for w in WEAPONS {
+        if w.name.to_lowercase().contains(&query_lower) {
+            suggestions.push(w.name);
+        }
+    }
+    // Check armour (skip "None")
+    for a in ARMOUR {
+        if a.cost_gp > 0 && a.name.to_lowercase().contains(&query_lower) {
+            suggestions.push(a.name);
+        }
+    }
+    // Check gear
+    for g in GEAR {
+        if g.name.to_lowercase().contains(&query_lower) {
+            suggestions.push(g.name);
+        }
+    }
+    // Check ammunition
+    for a in AMMUNITION {
+        if a.name.to_lowercase().contains(&query_lower) {
+            suggestions.push(a.name);
+        }
+    }
+
+    suggestions.truncate(3);
+    suggestions
+}
+
 pub struct BuyCommand;
 impl Command for BuyCommand {
     fn name(&self) -> &str { "buy" }
@@ -36,9 +71,20 @@ impl Command for BuyCommand {
 
         let (canonical_name, cost, weight) = match find_buyable(&item_name) {
             Some(info) => info,
-            None => return CommandResult::error(format!(
-                "unknown item '{}'. Check equipment tables.", item_name
-            )),
+            None => {
+                let suggestions = suggest_equipment(&item_name);
+                if suggestions.is_empty() {
+                    return CommandResult::error(format!(
+                        "unknown item '{}'. Check equipment tables.", item_name
+                    ));
+                } else {
+                    return CommandResult::error(format!(
+                        "unknown item '{}'. Did you mean: {}?",
+                        item_name,
+                        suggestions.join(", ")
+                    ));
+                }
+            }
         };
 
         let character = match state.party.find_member_mut(char_name) {
@@ -364,5 +410,57 @@ mod tests {
         let result = cmd.execute(&["Aldric", "Arrows", "(quiver", "of", "20)"], &mut state);
         assert!(result.output.contains("buys Arrows (quiver of 20)"));
         assert!(result.output.contains("5 gp"));
+    }
+
+    #[test]
+    fn buy_suggests_chain_mail() {
+        let cmd = BuyCommand;
+        let mut state = state_with_fighter();
+        let result = cmd.execute(&["Aldric", "chain"], &mut state);
+        assert!(result.output.contains("Error"));
+        assert!(result.output.contains("Did you mean"));
+        assert!(result.output.contains("Chain mail"));
+    }
+
+    #[test]
+    fn buy_suggests_arrows() {
+        let cmd = BuyCommand;
+        let mut state = state_with_fighter();
+        let result = cmd.execute(&["Aldric", "arrows"], &mut state);
+        assert!(result.output.contains("Error"));
+        assert!(result.output.contains("Did you mean"));
+        assert!(result.output.contains("Arrows (quiver of 20)"));
+    }
+
+    #[test]
+    fn buy_suggests_rope() {
+        let cmd = BuyCommand;
+        let mut state = state_with_fighter();
+        // "rope" doesn't exactly match "Rope (50')" so should suggest
+        let result = cmd.execute(&["Aldric", "rope"], &mut state);
+        assert!(result.output.contains("Error"));
+        assert!(result.output.contains("Did you mean"));
+        assert!(result.output.contains("Rope (50')"));
+    }
+
+    #[test]
+    fn suggest_equipment_finds_partial_matches() {
+        let suggestions = suggest_equipment("bow");
+        assert!(suggestions.contains(&"Long bow"));
+        assert!(suggestions.contains(&"Short bow"));
+        assert!(suggestions.contains(&"Crossbow"));
+    }
+
+    #[test]
+    fn suggest_equipment_case_insensitive() {
+        let suggestions = suggest_equipment("CHAIN");
+        assert!(suggestions.contains(&"Chain mail"));
+    }
+
+    #[test]
+    fn suggest_equipment_limits_to_three() {
+        // "sword" matches Sword, Short sword, Two-handed sword, Silver dagger doesn't match
+        let suggestions = suggest_equipment("sword");
+        assert!(suggestions.len() <= 3);
     }
 }
