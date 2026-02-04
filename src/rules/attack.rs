@@ -77,6 +77,7 @@ pub fn monster_thac0(hd: u32) -> u32 {
 /// - `"3*"` → 3 (asterisk for special abilities ignored)
 /// - `"1/2"` → 1 (fractional HD treated as 1)
 /// - `"1-1"` → 0 (1 HD minus 1 = less than 1, attacks as 0 HD)
+/// - `"7-9**"` → 8 (range of HD, returns midpoint)
 pub fn parse_monster_hd(hd_str: &str) -> u32 {
     let s = hd_str.trim();
     // Handle fractional HD like "1/2"
@@ -89,8 +90,14 @@ pub fn parse_monster_hd(hd_str: &str) -> u32 {
     // Strip asterisks and check for minus modifier
     let rest: String = s.chars().skip(num_str.len()).filter(|c| *c != '*').collect();
     if let Some(stripped) = rest.strip_prefix('-') {
-        let penalty: u32 = stripped.trim().parse().unwrap_or(0);
-        base.saturating_sub(penalty)
+        let val: u32 = stripped.trim().parse().unwrap_or(0);
+        if val > base {
+            // Range like "7-9": return midpoint
+            (base + val) / 2
+        } else {
+            // Penalty like "1-1": subtract
+            base.saturating_sub(val)
+        }
     } else {
         base
     }
@@ -250,6 +257,16 @@ mod tests {
     fn parse_hd_with_penalty() {
         // "1-1" = less than 1 HD, attacks as 0 HD (THAC0 20)
         assert_eq!(parse_monster_hd("1-1"), 0);
+    }
+
+    #[test]
+    fn parse_hd_range() {
+        // "7-9**" = vampire, 7 to 9 HD range, midpoint = 8
+        assert_eq!(parse_monster_hd("7-9**"), 8);
+        // Range without asterisks
+        assert_eq!(parse_monster_hd("7-9"), 8);
+        // Even range
+        assert_eq!(parse_monster_hd("6-8"), 7);
     }
 
     #[test]
