@@ -8,7 +8,7 @@ use crate::rules::xp::xp_for_level;
 pub struct ChargenCommand;
 impl Command for ChargenCommand {
     fn name(&self) -> &str { "chargen" }
-    fn help(&self) -> &str { "Create a character and add to party (chargen <name> <class> [alignment] [--abilities S I W D C Ch])" }
+    fn help(&self) -> &str { "Create a character (chargen <name> <class> [alignment] [--abilities ...]; quote names with spaces)" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error(

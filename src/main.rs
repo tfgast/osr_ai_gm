@@ -19,6 +19,58 @@ use command::system::*;
 use persist::GameState;
 use std::io::{self, BufRead, Write};
 
+/// Parse a command line into arguments, respecting quoted strings.
+/// Supports both single and double quotes. Quotes can be escaped with backslash.
+fn parse_args(input: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut quote_char = '"';
+    let mut has_content = false; // Track if we've seen any content (including empty quotes)
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' if in_quotes => {
+                // Handle escaped characters inside quotes
+                if let Some(&next) = chars.peek() {
+                    if next == quote_char || next == '\\' {
+                        current.push(chars.next().unwrap());
+                    } else {
+                        current.push(c);
+                    }
+                } else {
+                    current.push(c);
+                }
+            }
+            '"' | '\'' if !in_quotes => {
+                in_quotes = true;
+                quote_char = c;
+                has_content = true; // Opening a quote means we have an arg (even if empty)
+            }
+            c if in_quotes && c == quote_char => {
+                in_quotes = false;
+            }
+            ' ' | '\t' if !in_quotes => {
+                if has_content {
+                    args.push(std::mem::take(&mut current));
+                    has_content = false;
+                }
+            }
+            _ => {
+                current.push(c);
+                has_content = true;
+            }
+        }
+    }
+
+    if has_content {
+        args.push(current);
+    }
+
+    args
+}
+
 fn build_registry() -> CommandRegistry {
     let mut registry = CommandRegistry::new();
     // Character & Party
@@ -120,11 +172,16 @@ fn main() {
             continue;
         }
 
-        let parts: Vec<&str> = trimmed.split_whitespace().collect();
-        let cmd_name = parts[0];
-        let args = &parts[1..];
+        let parts = parse_args(trimmed);
+        if parts.is_empty() {
+            print!("> ");
+            let _ = stdout.flush();
+            continue;
+        }
+        let cmd_name = &parts[0];
+        let args: Vec<&str> = parts[1..].iter().map(|s| s.as_str()).collect();
 
-        let result = registry.dispatch(cmd_name, args, &mut state);
+        let result = registry.dispatch(cmd_name, &args, &mut state);
         println!("{}", result.output);
 
         if result.quit {
@@ -133,5 +190,71 @@ fn main() {
 
         print!("> ");
         let _ = stdout.flush();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_args_simple() {
+        let args = parse_args("chargen Grond Fighter Lawful");
+        assert_eq!(args, vec!["chargen", "Grond", "Fighter", "Lawful"]);
+    }
+
+    #[test]
+    fn parse_args_double_quotes() {
+        let args = parse_args(r#"chargen "Brother Marcus" Cleric Lawful"#);
+        assert_eq!(args, vec!["chargen", "Brother Marcus", "Cleric", "Lawful"]);
+    }
+
+    #[test]
+    fn parse_args_single_quotes() {
+        let args = parse_args("chargen 'Brother Marcus' Cleric Lawful");
+        assert_eq!(args, vec!["chargen", "Brother Marcus", "Cleric", "Lawful"]);
+    }
+
+    #[test]
+    fn parse_args_mixed_quotes() {
+        let args = parse_args(r#"chargen "Sir O'Brien" Fighter Lawful"#);
+        assert_eq!(args, vec!["chargen", "Sir O'Brien", "Fighter", "Lawful"]);
+    }
+
+    #[test]
+    fn parse_args_escaped_quote() {
+        let args = parse_args(r#"note "The sign says \"Beware!\"""#);
+        assert_eq!(args, vec!["note", r#"The sign says "Beware!""#]);
+    }
+
+    #[test]
+    fn parse_args_empty() {
+        let args = parse_args("");
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn parse_args_whitespace_only() {
+        let args = parse_args("   ");
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn parse_args_extra_whitespace() {
+        let args = parse_args("  chargen   Grond   Fighter  ");
+        assert_eq!(args, vec!["chargen", "Grond", "Fighter"]);
+    }
+
+    #[test]
+    fn parse_args_empty_quotes() {
+        let args = parse_args(r#"chargen "" Fighter"#);
+        assert_eq!(args, vec!["chargen", "", "Fighter"]);
+    }
+
+    #[test]
+    fn parse_args_adjacent_to_quotes() {
+        // "prefix"suffix should become prefixsuffix
+        let args = parse_args(r#"chargen pre"fix suf"fix Fighter"#);
+        assert_eq!(args, vec!["chargen", "prefix suffix", "Fighter"]);
     }
 }
