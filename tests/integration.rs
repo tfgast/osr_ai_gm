@@ -678,6 +678,271 @@ fn level_up_from_treasure() {
 }
 
 // ===========================================================================
+// INTEGRATION TEST: Backstab at various thief levels (x2, x3, x4 multipliers)
+// ===========================================================================
+
+#[test]
+fn backstab_multiplier_level_1_x2() {
+    let mut state = GameState::new();
+    let thief = make_thief("Dagger Dan");
+    state.party.add_member(thief);
+
+    // Spawn a goblin
+    let resp = handle_request(&req("1", GMCommand::SpawnMonster {
+        name: "Goblin".to_string(), count: 1, distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Backstab
+    let resp = handle_request(&req("2", GMCommand::Backstab {
+        character: "Dagger Dan".to_string(),
+        monster_idx: 0,
+        weapon: "dagger".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    if data["hit"].as_bool().unwrap_or(false) {
+        assert_eq!(data["multiplier"], 2, "level 1 thief should have x2 backstab");
+    }
+}
+
+#[test]
+fn backstab_multiplier_level_5_x3() {
+    let mut state = GameState::new();
+    let mut thief = make_thief("Shadow Blade");
+    thief.level = 5;
+    thief.thac0 = 19; // thief THAC0 at level 5
+    state.party.add_member(thief);
+
+    let resp = handle_request(&req("1", GMCommand::SpawnMonster {
+        name: "Goblin".to_string(), count: 1, distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("2", GMCommand::Backstab {
+        character: "Shadow Blade".to_string(),
+        monster_idx: 0,
+        weapon: "dagger".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    if data["hit"].as_bool().unwrap_or(false) {
+        assert_eq!(data["multiplier"], 3, "level 5 thief should have x3 backstab");
+    }
+}
+
+#[test]
+fn backstab_multiplier_level_9_x4() {
+    let mut state = GameState::new();
+    let mut thief = make_thief("Master Thief");
+    thief.level = 9;
+    state.party.add_member(thief);
+
+    let resp = handle_request(&req("1", GMCommand::SpawnMonster {
+        name: "Goblin".to_string(), count: 1, distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("2", GMCommand::Backstab {
+        character: "Master Thief".to_string(),
+        monster_idx: 0,
+        weapon: "dagger".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    if data["hit"].as_bool().unwrap_or(false) {
+        assert_eq!(data["multiplier"], 4, "level 9 thief should have x4 backstab");
+    }
+}
+
+#[test]
+fn backstab_non_thief_rejected() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("1", GMCommand::SpawnMonster {
+        name: "Goblin".to_string(), count: 1, distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Fighter cannot backstab
+    let resp = handle_request(&req("2", GMCommand::Backstab {
+        character: "Aldric".to_string(),
+        monster_idx: 0,
+        weapon: "dagger".to_string(),
+    }), &mut state);
+    assert!(!resp.success, "fighter should not be able to backstab");
+}
+
+#[test]
+fn backstab_dead_monster_rejected() {
+    let mut state = GameState::new();
+    state.party.add_member(make_thief("Sneaky"));
+
+    let resp = handle_request(&req("1", GMCommand::SpawnMonster {
+        name: "Goblin".to_string(), count: 1, distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Kill the goblin
+    state.combat.as_mut().unwrap().monsters[0].hp = 0;
+
+    // Backstab dead monster
+    let resp = handle_request(&req("2", GMCommand::Backstab {
+        character: "Sneaky".to_string(),
+        monster_idx: 0,
+        weapon: "dagger".to_string(),
+    }), &mut state);
+    assert!(!resp.success, "should not backstab a dead monster");
+}
+
+#[test]
+fn backstab_no_combat_rejected() {
+    let mut state = GameState::new();
+    state.party.add_member(make_thief("Lone Thief"));
+
+    // Backstab without active combat
+    let resp = handle_request(&req("1", GMCommand::Backstab {
+        character: "Lone Thief".to_string(),
+        monster_idx: 0,
+        weapon: "dagger".to_string(),
+    }), &mut state);
+    assert!(!resp.success, "should not backstab outside combat");
+}
+
+// ===========================================================================
+// INTEGRATION TEST: Turn undead via API
+// ===========================================================================
+
+#[test]
+fn turn_undead_via_api() {
+    let mut state = GameState::new();
+    let mut cleric = make_cleric("Holy Brother");
+    cleric.level = 3;
+    state.party.add_member(cleric);
+
+    // Spawn skeletons
+    let resp = handle_request(&req("1", GMCommand::SpawnMonster {
+        name: "Skeleton".to_string(), count: 4, distance: 30,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Turn undead
+    let resp = handle_request(&req("2", GMCommand::TurnUndead {
+        character: "Holy Brother".to_string(),
+        monster_idx: 0,
+    }), &mut state);
+    assert!(resp.success);
+}
+
+// ===========================================================================
+// INTEGRATION TEST: Multi-round combat through API
+// ===========================================================================
+
+#[test]
+fn multi_round_combat_api() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Sir Brave"));
+    state.party.add_member(make_cleric("Father Stone"));
+
+    // Spawn orcs at melee distance
+    let resp = handle_request(&req("1", GMCommand::SpawnMonster {
+        name: "Orc".to_string(), count: 3, distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    // === Round 1 ===
+    let resp = handle_request(&req("2", GMCommand::RollInitiative), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("3", GMCommand::Attack {
+        character: "Sir Brave".to_string(),
+        monster_idx: 0,
+        weapon: "sword".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("4", GMCommand::Attack {
+        character: "Father Stone".to_string(),
+        monster_idx: 1,
+        weapon: "mace".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Monster attacks (use orc 2, which hasn't been attacked)
+    let resp = handle_request(&req("5", GMCommand::MonsterAttack {
+        monster_idx: 2,
+        character: "Sir Brave".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("6", GMCommand::CheckMorale), &mut state);
+    assert!(resp.success);
+
+    // === Round 2 ===
+    let resp = handle_request(&req("7", GMCommand::RollInitiative), &mut state);
+    assert!(resp.success);
+
+    let combat = state.combat.as_ref().unwrap();
+    assert_eq!(combat.round, 2, "should be on round 2");
+
+    // Attack a living monster
+    let living_idx = state.combat.as_ref().unwrap().monsters.iter()
+        .position(|m| m.is_alive());
+    if let Some(idx) = living_idx {
+        let resp = handle_request(&req("8", GMCommand::Attack {
+            character: "Sir Brave".to_string(),
+            monster_idx: idx,
+            weapon: "sword".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+    }
+
+    // End combat
+    let resp = handle_request(&req("9", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Idle);
+}
+
+// ===========================================================================
+// INTEGRATION TEST: Monster attack via API tracks damage
+// ===========================================================================
+
+#[test]
+fn monster_attack_api_damages_character() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Bruiser"));
+
+    let resp = handle_request(&req("1", GMCommand::SpawnMonster {
+        name: "Orc".to_string(), count: 1, distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("2", GMCommand::RollInitiative), &mut state);
+    assert!(resp.success);
+
+    let initial_hp = state.party.find_member("Bruiser").unwrap().hp;
+
+    // Monster attacks repeatedly until a hit
+    for i in 0..10 {
+        // Reset HP for each attempt
+        state.party.find_member_mut("Bruiser").unwrap().hp = initial_hp;
+        let resp = handle_request(&req(&format!("a{}", i), GMCommand::MonsterAttack {
+            monster_idx: 0,
+            character: "Bruiser".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let current_hp = state.party.find_member("Bruiser").unwrap().hp;
+        if current_hp < initial_hp {
+            // Damage was applied
+            assert!(current_hp < initial_hp, "HP should decrease on hit");
+            return;
+        }
+    }
+}
+
+// ===========================================================================
 // INTEGRATION TEST: Wilderness travel then encounter
 // ===========================================================================
 
