@@ -5,6 +5,7 @@ use std::path::Path;
 
 use crate::model::{Party, CombatState};
 use crate::state::dungeon::DungeonState;
+use crate::state::game::GameMode;
 use crate::state::time::TimeTracker;
 use crate::state::wilderness::WildernessState;
 
@@ -23,6 +24,8 @@ pub struct GameState {
     pub dungeon: Option<DungeonState>,
     #[serde(default)]
     pub wilderness: Option<WildernessState>,
+    #[serde(default)]
+    pub mode: GameMode,
 }
 
 impl GameState {
@@ -36,6 +39,7 @@ impl GameState {
             time: None,
             dungeon: None,
             wilderness: None,
+            mode: GameMode::default(),
         }
     }
 }

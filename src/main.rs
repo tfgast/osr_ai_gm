@@ -1,12 +1,15 @@
 pub mod command;
 pub mod dice;
 pub mod engine;
+pub mod gmapi;
 pub mod model;
 pub mod persist;
 pub mod rules;
+pub mod session;
 pub mod state;
 
 use command::{Command, CommandRegistry, CommandResult};
+use command::gm_cmds;
 use persist::GameState;
 use std::io::{self, BufRead, Write};
 use engine::chargen;
@@ -21,6 +24,7 @@ use engine::combat;
 use state::dungeon::{DungeonState, Room, Door, DoorState};
 use state::time::{TimeTracker, LightSourceKind};
 use state::wilderness::{WildernessState, HexCell, Terrain};
+use gmapi::protocol::{self, GMCommand};
 
 // =============================================================================
 // Existing commands (updated to take &mut GameState)
@@ -1233,6 +1237,12 @@ fn build_registry() -> CommandRegistry {
         ("forage".into(), "Forage for food".into()),
         ("hunt".into(), "Hunt for game".into()),
         ("wilderness_status".into(), "Show wilderness status".into()),
+        // GM-only
+        ("spawn_encounter".into(), "GM: spawn monsters".into()),
+        ("advance_turn".into(), "GM: advance one dungeon turn".into()),
+        ("roll_reaction".into(), "GM: roll NPC reaction".into()),
+        ("award_xp".into(), "GM: award XP to character".into()),
+        ("ruling".into(), "GM: record a ruling".into()),
         // System
         ("roll".into(), "Roll dice (e.g., roll 2d6+3)".into()),
         ("save".into(), "Save game state".into()),
@@ -1283,6 +1293,12 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(ForageCommand));
     registry.register(Box::new(HuntCommand));
     registry.register(Box::new(WildernessStatusCommand));
+    // GM-only
+    registry.register(Box::new(gm_cmds::SpawnEncounterCommand));
+    registry.register(Box::new(gm_cmds::AdvanceTurnCommand));
+    registry.register(Box::new(gm_cmds::RollReactionCommand));
+    registry.register(Box::new(gm_cmds::AwardXpCommand));
+    registry.register(Box::new(gm_cmds::RulingCommand));
     // System
     registry.register(Box::new(RollCommand));
     registry.register(Box::new(SaveCommand));
@@ -1293,6 +1309,18 @@ fn build_registry() -> CommandRegistry {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let json_mode = args.iter().any(|a| a == "--json");
+
+    if json_mode {
+        run_json_mode();
+    } else {
+        run_cli_mode();
+    }
+}
+
+/// Interactive CLI mode for human players (original behavior).
+fn run_cli_mode() {
     println!("OSR AI Game Master v{}", env!("CARGO_PKG_VERSION"));
     println!("Type 'help' for available commands, 'quit' to exit.\n");
 
@@ -1327,5 +1355,45 @@ fn main() {
 
         print!("> ");
         let _ = stdout.flush();
+    }
+}
+
+/// JSON pipe mode for AI GM — reads GMRequest JSON lines, writes GMResponse JSON lines.
+fn run_json_mode() {
+    let mut state = GameState::new();
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    for line in stdin.lock().lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => break,
+        };
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let request = match protocol::parse_request(trimmed) {
+            Ok(r) => r,
+            Err(e) => {
+                let resp = gmapi::protocol::GMResponse::err(
+                    "?", e, state.mode.clone(),
+                );
+                println!("{}", protocol::serialize_response(&resp));
+                let _ = stdout.flush();
+                continue;
+            }
+        };
+
+        let is_quit = matches!(request.command, GMCommand::Quit);
+        let response = gmapi::interface::handle_request(&request, &mut state);
+        println!("{}", protocol::serialize_response(&response));
+        let _ = stdout.flush();
+
+        if is_quit {
+            break;
+        }
     }
 }

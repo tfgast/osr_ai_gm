@@ -1,3 +1,5 @@
+pub mod gm_cmds;
+
 use std::collections::HashMap;
 use crate::persist::GameState;
 
