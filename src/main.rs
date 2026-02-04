@@ -4,16 +4,23 @@ pub mod engine;
 pub mod model;
 pub mod persist;
 pub mod rules;
+pub mod state;
 
 use command::{Command, CommandRegistry, CommandResult};
 use persist::GameState;
 use std::io::{self, BufRead, Write};
 use engine::chargen;
+use engine::encounter_engine;
+use engine::exploration;
+use engine::wilderness_engine;
 use rules::class::{self, Class};
 use rules::ability;
 use rules::equipment;
 use model::{CombatState, Monster};
 use engine::combat;
+use state::dungeon::{DungeonState, Room, Door, DoorState};
+use state::time::{TimeTracker, LightSourceKind};
+use state::wilderness::{WildernessState, HexCell, Terrain};
 
 // =============================================================================
 // Existing commands (updated to take &mut GameState)
@@ -691,6 +698,495 @@ impl Command for CombatLogCommand {
 }
 
 // =============================================================================
+// Exploration commands
+// =============================================================================
+
+struct EnterDungeonCommand;
+impl Command for EnterDungeonCommand {
+    fn name(&self) -> &str { "enter_dungeon" }
+    fn help(&self) -> &str { "Enter dungeon exploration mode (enter_dungeon <level> <room_name>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error("usage: enter_dungeon <level> [room_name]");
+        }
+        let level: u32 = match args[0].parse() {
+            Ok(n) if n >= 1 => n,
+            _ => return CommandResult::error("level must be a positive integer"),
+        };
+        let room_name = if args.len() > 1 { args[1..].join(" ") } else { "Entrance".to_string() };
+
+        let mut dungeon = DungeonState::new(level);
+        dungeon.add_room(Room::new(0, &room_name));
+        dungeon.explore_current();
+
+        let time = TimeTracker::new();
+
+        state.dungeon = Some(dungeon);
+        state.time = Some(time);
+        state.dungeon_level = level;
+
+        CommandResult::ok(format!(
+            "Entered dungeon level {}. Starting room: {}.\n\
+             Use 'light torch <carrier>' or 'light lantern <carrier>' to light the way.\n\
+             Use 'explore' to advance a dungeon turn.",
+            level, room_name
+        ))
+    }
+}
+
+struct LightCommand;
+impl Command for LightCommand {
+    fn name(&self) -> &str { "light" }
+    fn help(&self) -> &str { "Light a torch or lantern (light torch|lantern <carrier_name>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: light torch|lantern <carrier_name>");
+        }
+        let kind = match args[0].to_lowercase().as_str() {
+            "torch" => LightSourceKind::Torch,
+            "lantern" => LightSourceKind::Lantern,
+            _ => return CommandResult::error("light source must be 'torch' or 'lantern'"),
+        };
+        let carrier = args[1];
+        let time = match state.time.as_mut() {
+            Some(t) => t,
+            None => return CommandResult::error("not in exploration mode. Use 'enter_dungeon' first."),
+        };
+        time.light(kind, carrier);
+        CommandResult::ok(format!(
+            "{} lights a {} ({} turns).",
+            carrier, kind.name(), kind.max_turns()
+        ))
+    }
+}
+
+struct ExploreCommand;
+impl Command for ExploreCommand {
+    fn name(&self) -> &str { "explore" }
+    fn help(&self) -> &str { "Advance one dungeon turn of exploration" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let level = state.dungeon_level;
+        let time = match state.time.as_mut() {
+            Some(t) => t,
+            None => return CommandResult::error("not in exploration mode."),
+        };
+        let dungeon = match state.dungeon.as_mut() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        let result = exploration::advance_dungeon_turn(time, dungeon, level);
+        CommandResult::ok(format!("{}", result))
+    }
+}
+
+struct SearchCommand;
+impl Command for SearchCommand {
+    fn name(&self) -> &str { "search" }
+    fn help(&self) -> &str { "Search the current room (1-in-6, elves 2-in-6). Takes one turn." }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        let is_elf = args.first().map(|a| a.eq_ignore_ascii_case("elf")).unwrap_or(false);
+        let time = match state.time.as_mut() {
+            Some(t) => t,
+            None => return CommandResult::error("not in exploration mode."),
+        };
+        let dungeon = match state.dungeon.as_mut() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        let result = exploration::search_room(time, dungeon, is_elf);
+        CommandResult::ok(result)
+    }
+}
+
+struct ListenCommand;
+impl Command for ListenCommand {
+    fn name(&self) -> &str { "listen" }
+    fn help(&self) -> &str { "Listen at a door (1-in-6, demihumans 2-in-6)" }
+    fn execute(&self, args: &[&str], _state: &mut GameState) -> CommandResult {
+        let is_demihuman = args.first()
+            .map(|a| a.eq_ignore_ascii_case("demihuman") || a.eq_ignore_ascii_case("elf"))
+            .unwrap_or(false);
+        let result = exploration::listen_at_door(is_demihuman);
+        CommandResult::ok(result)
+    }
+}
+
+struct ForceDoorCommand;
+impl Command for ForceDoorCommand {
+    fn name(&self) -> &str { "force_door" }
+    fn help(&self) -> &str { "Force open a door (force_door <door_id> <character_name>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: force_door <door_id> <character_name>");
+        }
+        let door_id: u32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("door_id must be a number"),
+        };
+        let char_name = args[1];
+        let character = match state.party.find_member(char_name) {
+            Some(c) => c.clone(),
+            None => return CommandResult::error(format!("no party member named '{}'.", char_name)),
+        };
+        let dungeon = match state.dungeon.as_mut() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        let result = exploration::force_door(dungeon, door_id, &character);
+        CommandResult::ok(result)
+    }
+}
+
+struct AddRoomCommand;
+impl Command for AddRoomCommand {
+    fn name(&self) -> &str { "add_room" }
+    fn help(&self) -> &str { "Add a room to dungeon (add_room <id> <name>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: add_room <id> <name>");
+        }
+        let id: u32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("room id must be a number"),
+        };
+        let name = args[1..].join(" ");
+        let dungeon = match state.dungeon.as_mut() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        dungeon.add_room(Room::new(id, &name));
+        CommandResult::ok(format!("Added room {}: {}", id, name))
+    }
+}
+
+struct AddDoorCommand;
+impl Command for AddDoorCommand {
+    fn name(&self) -> &str { "add_door" }
+    fn help(&self) -> &str { "Add a door (add_door <id> <room_a> <room_b> [open|closed|stuck|locked|secret])" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 3 {
+            return CommandResult::error(
+                "usage: add_door <id> <room_a> <room_b> [open|closed|stuck|locked|secret]"
+            );
+        }
+        let id: u32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("door id must be a number"),
+        };
+        let room_a: u32 = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("room_a must be a number"),
+        };
+        let room_b: u32 = match args[2].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("room_b must be a number"),
+        };
+        let door_state = if args.len() > 3 {
+            match args[3].to_lowercase().as_str() {
+                "open" => DoorState::Open,
+                "closed" => DoorState::Closed,
+                "stuck" => DoorState::Stuck,
+                "locked" => DoorState::Locked,
+                "secret" => DoorState::Secret,
+                _ => return CommandResult::error("state must be open, closed, stuck, locked, or secret"),
+            }
+        } else {
+            DoorState::Closed
+        };
+        let dungeon = match state.dungeon.as_mut() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        dungeon.add_door(Door::new(id, room_a, room_b, door_state));
+        CommandResult::ok(format!("Added door {} between rooms {} and {} ({:?})", id, room_a, room_b, door_state))
+    }
+}
+
+struct MoveRoomCommand;
+impl Command for MoveRoomCommand {
+    fn name(&self) -> &str { "move" }
+    fn help(&self) -> &str { "Move through a door (move <door_id>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error("usage: move <door_id>");
+        }
+        let door_id: u32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("door_id must be a number"),
+        };
+        let time = match state.time.as_mut() {
+            Some(t) => t,
+            None => return CommandResult::error("not in exploration mode."),
+        };
+        let dungeon = match state.dungeon.as_mut() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        match exploration::move_through_door(time, dungeon, door_id) {
+            Ok(msg) => CommandResult::ok(msg),
+            Err(e) => CommandResult::error(e),
+        }
+    }
+}
+
+struct RestCommand;
+impl Command for RestCommand {
+    fn name(&self) -> &str { "rest" }
+    fn help(&self) -> &str { "Rest for one turn (required after 5 turns of activity)" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let time = match state.time.as_mut() {
+            Some(t) => t,
+            None => return CommandResult::error("not in exploration mode."),
+        };
+        time.rest();
+        CommandResult::ok("Party rests for one turn. Activity counter reset.")
+    }
+}
+
+struct ExplorationStatusCommand;
+impl Command for ExplorationStatusCommand {
+    fn name(&self) -> &str { "exploration_status" }
+    fn help(&self) -> &str { "Show current exploration state (time, light, dungeon map)" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let time = match state.time.as_ref() {
+            Some(t) => t,
+            None => return CommandResult::error("not in exploration mode."),
+        };
+        let dungeon = match state.dungeon.as_ref() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        let status = exploration::exploration_status(time, dungeon);
+        CommandResult::ok(status)
+    }
+}
+
+// Encounter commands
+struct SurpriseCommand;
+impl Command for SurpriseCommand {
+    fn name(&self) -> &str { "surprise" }
+    fn help(&self) -> &str { "Roll surprise for an encounter (1-2 on d6 = surprised)" }
+    fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
+        let (result, p, m) = encounter_engine::check_surprise();
+        CommandResult::ok(format!(
+            "Party roll: {}  Monster roll: {}\n{}",
+            p, m, result
+        ))
+    }
+}
+
+struct ReactionCommand;
+impl Command for ReactionCommand {
+    fn name(&self) -> &str { "reaction" }
+    fn help(&self) -> &str { "Roll NPC reaction (reaction <character_name>). Uses CHA modifier." }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error("usage: reaction <character_name>");
+        }
+        let character = match state.party.find_member(args[0]) {
+            Some(c) => c,
+            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
+        };
+        let cha = character.abilities.charisma;
+        let (reaction, raw, modified) = encounter_engine::reaction_roll(cha);
+        let cha_mod = ability::cha_reaction_mod(cha);
+        CommandResult::ok(format!(
+            "{} speaks (CHA {}, modifier {:+}).\n\
+             Reaction roll: {} (2d6) {:+} = {}\n{}",
+            character.name, cha, cha_mod, raw, cha_mod, modified, reaction
+        ))
+    }
+}
+
+struct EvadeCommand;
+impl Command for EvadeCommand {
+    fn name(&self) -> &str { "evade" }
+    fn help(&self) -> &str { "Attempt to evade an encounter (evade <monster_count> <monster_movement>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: evade <monster_count> <monster_movement>");
+        }
+        let monster_count: u32 = match args[0].parse() {
+            Ok(n) if n >= 1 => n,
+            _ => return CommandResult::error("monster_count must be a positive integer"),
+        };
+        let monster_movement: u32 = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("monster_movement must be a non-negative integer"),
+        };
+        let party_size = state.party.members.iter().filter(|c| c.is_alive()).count() as u32;
+        if party_size == 0 {
+            return CommandResult::error("no living party members.");
+        }
+        let party_movement = state.party.members.iter()
+            .filter(|c| c.is_alive())
+            .map(|c| c.movement_rate)
+            .min()
+            .unwrap_or(120);
+        let result = encounter_engine::attempt_evasion(
+            party_size, party_movement, monster_count, monster_movement,
+        );
+        CommandResult::ok(format!(
+            "Party ({} members, {}' movement) vs {} monsters ({}' movement)\n{}",
+            party_size, party_movement, monster_count, monster_movement, result
+        ))
+    }
+}
+
+// Wilderness commands
+struct EnterWildernessCommand;
+impl Command for EnterWildernessCommand {
+    fn name(&self) -> &str { "enter_wilderness" }
+    fn help(&self) -> &str { "Enter wilderness travel mode (enter_wilderness <terrain>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        let terrain = if args.is_empty() {
+            Terrain::Clear
+        } else {
+            match args[0].to_lowercase().as_str() {
+                "clear" => Terrain::Clear,
+                "forest" => Terrain::Forest,
+                "hills" => Terrain::Hills,
+                "mountains" => Terrain::Mountains,
+                "desert" => Terrain::Desert,
+                "swamp" => Terrain::Swamp,
+                "jungle" => Terrain::Jungle,
+                "ocean" => Terrain::Ocean,
+                "river" => Terrain::River,
+                "barren" => Terrain::Barren,
+                "city" => Terrain::City,
+                _ => return CommandResult::error(
+                    "terrain must be: clear, forest, hills, mountains, desert, swamp, jungle, ocean, river, barren, city"
+                ),
+            }
+        };
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, terrain));
+        state.wilderness = Some(ws);
+        CommandResult::ok(format!(
+            "Entered wilderness. Starting hex: (0, 0) — {}.\n\
+             Use 'add_hex' to build the map, 'travel' to move.",
+            terrain.name()
+        ))
+    }
+}
+
+struct AddHexCommand;
+impl Command for AddHexCommand {
+    fn name(&self) -> &str { "add_hex" }
+    fn help(&self) -> &str { "Add a hex to the wilderness map (add_hex <x> <y> <terrain>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 3 {
+            return CommandResult::error("usage: add_hex <x> <y> <terrain>");
+        }
+        let x: i32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("x must be an integer"),
+        };
+        let y: i32 = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("y must be an integer"),
+        };
+        let terrain = match args[2].to_lowercase().as_str() {
+            "clear" => Terrain::Clear,
+            "forest" => Terrain::Forest,
+            "hills" => Terrain::Hills,
+            "mountains" => Terrain::Mountains,
+            "desert" => Terrain::Desert,
+            "swamp" => Terrain::Swamp,
+            "jungle" => Terrain::Jungle,
+            "ocean" => Terrain::Ocean,
+            "river" => Terrain::River,
+            "barren" => Terrain::Barren,
+            "city" => Terrain::City,
+            _ => return CommandResult::error("invalid terrain type"),
+        };
+        let ws = match state.wilderness.as_mut() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        ws.add_hex(HexCell::new(x, y, terrain));
+        CommandResult::ok(format!("Added hex ({}, {}) — {}.", x, y, terrain.name()))
+    }
+}
+
+struct TravelCommand;
+impl Command for TravelCommand {
+    fn name(&self) -> &str { "travel" }
+    fn help(&self) -> &str { "Travel to a wilderness hex (travel <x> <y>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: travel <x> <y>");
+        }
+        let x: i32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("x must be an integer"),
+        };
+        let y: i32 = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("y must be an integer"),
+        };
+        let party_movement = state.party.members.iter()
+            .filter(|c| c.is_alive())
+            .map(|c| c.movement_rate)
+            .min()
+            .unwrap_or(120);
+        let ws = match state.wilderness.as_mut() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let result = wilderness_engine::travel_day(ws, x, y, party_movement);
+        CommandResult::ok(format!("{}", result))
+    }
+}
+
+struct ForageCommand;
+impl Command for ForageCommand {
+    fn name(&self) -> &str { "forage" }
+    fn help(&self) -> &str { "Forage for food in the current hex (takes a full day)" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let ws = match state.wilderness.as_ref() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let result = wilderness_engine::forage(ws);
+        CommandResult::ok(result)
+    }
+}
+
+struct HuntCommand;
+impl Command for HuntCommand {
+    fn name(&self) -> &str { "hunt" }
+    fn help(&self) -> &str { "Hunt for game in the current hex (takes a full day)" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let ws = match state.wilderness.as_ref() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let result = wilderness_engine::hunt(ws);
+        CommandResult::ok(result)
+    }
+}
+
+struct WildernessStatusCommand;
+impl Command for WildernessStatusCommand {
+    fn name(&self) -> &str { "wilderness_status" }
+    fn help(&self) -> &str { "Show current wilderness travel status" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let ws = match state.wilderness.as_ref() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let party_movement = state.party.members.iter()
+            .filter(|c| c.is_alive())
+            .map(|c| c.movement_rate)
+            .min()
+            .unwrap_or(120);
+        let status = wilderness_engine::wilderness_status(ws, party_movement);
+        CommandResult::ok(status)
+    }
+}
+
+// =============================================================================
 // Registry & Main
 // =============================================================================
 
@@ -714,6 +1210,29 @@ fn build_registry() -> CommandRegistry {
         ("combat_status".into(), "Show combat status".into()),
         ("combat_log".into(), "Show combat log".into()),
         ("end_combat".into(), "End combat encounter".into()),
+        // Dungeon Exploration
+        ("enter_dungeon".into(), "Enter dungeon exploration mode".into()),
+        ("light".into(), "Light a torch or lantern".into()),
+        ("explore".into(), "Advance one dungeon turn".into()),
+        ("search".into(), "Search current room for secrets".into()),
+        ("listen".into(), "Listen at a door".into()),
+        ("force_door".into(), "Force open a door".into()),
+        ("add_room".into(), "Add a room to dungeon".into()),
+        ("add_door".into(), "Add a door between rooms".into()),
+        ("move".into(), "Move through a door".into()),
+        ("rest".into(), "Rest for one turn".into()),
+        ("exploration_status".into(), "Show exploration state".into()),
+        // Encounter
+        ("surprise".into(), "Roll surprise check".into()),
+        ("reaction".into(), "Roll NPC reaction".into()),
+        ("evade".into(), "Attempt to evade encounter".into()),
+        // Wilderness
+        ("enter_wilderness".into(), "Enter wilderness travel mode".into()),
+        ("add_hex".into(), "Add hex to wilderness map".into()),
+        ("travel".into(), "Travel to a hex".into()),
+        ("forage".into(), "Forage for food".into()),
+        ("hunt".into(), "Hunt for game".into()),
+        ("wilderness_status".into(), "Show wilderness status".into()),
         // System
         ("roll".into(), "Roll dice (e.g., roll 2d6+3)".into()),
         ("save".into(), "Save game state".into()),
@@ -741,6 +1260,29 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(CombatStatusCommand));
     registry.register(Box::new(CombatLogCommand));
     registry.register(Box::new(EndCombatCommand));
+    // Dungeon Exploration
+    registry.register(Box::new(EnterDungeonCommand));
+    registry.register(Box::new(LightCommand));
+    registry.register(Box::new(ExploreCommand));
+    registry.register(Box::new(SearchCommand));
+    registry.register(Box::new(ListenCommand));
+    registry.register(Box::new(ForceDoorCommand));
+    registry.register(Box::new(AddRoomCommand));
+    registry.register(Box::new(AddDoorCommand));
+    registry.register(Box::new(MoveRoomCommand));
+    registry.register(Box::new(RestCommand));
+    registry.register(Box::new(ExplorationStatusCommand));
+    // Encounter
+    registry.register(Box::new(SurpriseCommand));
+    registry.register(Box::new(ReactionCommand));
+    registry.register(Box::new(EvadeCommand));
+    // Wilderness
+    registry.register(Box::new(EnterWildernessCommand));
+    registry.register(Box::new(AddHexCommand));
+    registry.register(Box::new(TravelCommand));
+    registry.register(Box::new(ForageCommand));
+    registry.register(Box::new(HuntCommand));
+    registry.register(Box::new(WildernessStatusCommand));
     // System
     registry.register(Box::new(RollCommand));
     registry.register(Box::new(SaveCommand));

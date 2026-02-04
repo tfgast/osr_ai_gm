@@ -1,0 +1,289 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+
+/// Terrain types for wilderness hexes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Terrain {
+    Clear,
+    Forest,
+    Hills,
+    Mountains,
+    Desert,
+    Swamp,
+    Jungle,
+    Ocean,
+    River,
+    Barren,
+    City,
+}
+
+impl Terrain {
+    pub fn name(self) -> &'static str {
+        match self {
+            Terrain::Clear => "Clear",
+            Terrain::Forest => "Forest",
+            Terrain::Hills => "Hills",
+            Terrain::Mountains => "Mountains",
+            Terrain::Desert => "Desert",
+            Terrain::Swamp => "Swamp",
+            Terrain::Jungle => "Jungle",
+            Terrain::Ocean => "Ocean",
+            Terrain::River => "River",
+            Terrain::Barren => "Barren",
+            Terrain::City => "City",
+        }
+    }
+
+    /// Movement cost multiplier (fraction of daily movement used per hex).
+    /// Base movement: 1 hex per day at movement rate 120'.
+    /// Returns (numerator, denominator) for the cost fraction.
+    pub fn movement_cost(self) -> (u32, u32) {
+        match self {
+            Terrain::Clear | Terrain::City => (1, 1),
+            Terrain::Barren | Terrain::Hills => (3, 2),    // 1.5x cost
+            Terrain::Forest | Terrain::River => (3, 2),     // 1.5x cost
+            Terrain::Desert => (2, 1),                      // 2x cost
+            Terrain::Mountains | Terrain::Jungle => (2, 1), // 2x cost
+            Terrain::Swamp => (2, 1),                       // 2x cost
+            Terrain::Ocean => (1, 1),                       // ship travel
+        }
+    }
+
+    /// Chance of getting lost (X-in-6). 0 means never lost.
+    pub fn lost_chance(self) -> u32 {
+        match self {
+            Terrain::Clear | Terrain::City | Terrain::Barren => 1,
+            Terrain::Forest | Terrain::River | Terrain::Hills => 2,
+            Terrain::Desert | Terrain::Ocean => 2,
+            Terrain::Swamp | Terrain::Jungle => 3,
+            Terrain::Mountains => 2,
+        }
+    }
+
+    /// Whether foraging is possible in this terrain.
+    pub fn can_forage(self) -> bool {
+        match self {
+            Terrain::Ocean | Terrain::City | Terrain::Barren => false,
+            _ => true,
+        }
+    }
+
+    /// Chance of successful foraging (X-in-6).
+    pub fn forage_chance(self) -> u32 {
+        match self {
+            Terrain::Forest | Terrain::Jungle | Terrain::River => 2,
+            Terrain::Clear | Terrain::Hills => 1,
+            Terrain::Swamp => 1,
+            Terrain::Desert | Terrain::Mountains => 1,
+            _ => 0,
+        }
+    }
+}
+
+/// A hex cell on the wilderness map.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexCell {
+    pub x: i32,
+    pub y: i32,
+    pub terrain: Terrain,
+    pub description: String,
+}
+
+impl HexCell {
+    pub fn new(x: i32, y: i32, terrain: Terrain) -> Self {
+        HexCell {
+            x,
+            y,
+            terrain,
+            description: String::new(),
+        }
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self {
+        self.description = desc.to_string();
+        self
+    }
+
+    pub fn coord(&self) -> (i32, i32) {
+        (self.x, self.y)
+    }
+}
+
+/// Tracks wilderness exploration state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WildernessState {
+    pub hexes: Vec<HexCell>,
+    /// Current hex coordinates.
+    pub current_x: i32,
+    pub current_y: i32,
+    /// Hexes that have been visited.
+    pub explored: HashSet<(i32, i32)>,
+    /// Days spent travelling.
+    pub travel_day: u32,
+    /// Whether the party is currently lost.
+    pub lost: bool,
+    /// Log of travel events.
+    pub log: Vec<String>,
+}
+
+impl WildernessState {
+    pub fn new() -> Self {
+        WildernessState {
+            hexes: Vec::new(),
+            current_x: 0,
+            current_y: 0,
+            explored: HashSet::new(),
+            travel_day: 1,
+            lost: false,
+            log: Vec::new(),
+        }
+    }
+
+    /// Add a hex to the map.
+    pub fn add_hex(&mut self, hex: HexCell) {
+        self.hexes.push(hex);
+    }
+
+    /// Find a hex by coordinates.
+    pub fn find_hex(&self, x: i32, y: i32) -> Option<&HexCell> {
+        self.hexes.iter().find(|h| h.x == x && h.y == y)
+    }
+
+    /// Get the current hex.
+    pub fn current_hex(&self) -> Option<&HexCell> {
+        self.find_hex(self.current_x, self.current_y)
+    }
+
+    /// Move to a hex by coordinates.
+    pub fn move_to(&mut self, x: i32, y: i32) -> Result<(), String> {
+        if self.hexes.iter().any(|h| h.x == x && h.y == y) {
+            self.current_x = x;
+            self.current_y = y;
+            self.explored.insert((x, y));
+            Ok(())
+        } else {
+            Err(format!("hex ({}, {}) does not exist on the map", x, y))
+        }
+    }
+
+    /// Daily travel speed in hexes based on party movement rate and terrain.
+    /// Base: movement_rate / 120 hexes per day (on clear terrain).
+    /// A party with 120' movement covers 1 hex/day on clear terrain,
+    /// or 24 miles / 6-mile hex = 4 hexes at scale, but OSE uses 1 hex = 6 miles,
+    /// and base overland travel = 24 miles/day for 120' movement = 4 hexes.
+    /// However, different scales exist. We use: movement_rate / 30 = miles/day,
+    /// then miles/day / 6 = hexes/day (for 6-mile hexes).
+    pub fn hexes_per_day(movement_rate: u32, terrain: Terrain) -> u32 {
+        // Base miles per day = movement_rate * 24 / 120 (OSE overland: 24 miles at 120')
+        // = movement_rate / 5 miles per day
+        // Hexes per day at 6 miles/hex = miles / 6
+        let base_miles = movement_rate as u64 / 5;
+        let (cost_num, cost_den) = terrain.movement_cost();
+        // Effective miles = base_miles * cost_den / cost_num
+        let effective_miles = base_miles * cost_den as u64 / cost_num as u64;
+        let hexes = effective_miles / 6;
+        if hexes < 1 { 1 } else { hexes as u32 }
+    }
+
+    /// Status display.
+    pub fn status(&self) -> String {
+        let terrain_name = self.current_hex()
+            .map(|h| h.terrain.name())
+            .unwrap_or("unknown");
+        let mut out = format!(
+            "Position: ({}, {})  Terrain: {}  Day: {}",
+            self.current_x, self.current_y, terrain_name, self.travel_day
+        );
+        if self.lost {
+            out.push_str("  [LOST]");
+        }
+        out.push_str(&format!("\nExplored: {} hexes", self.explored.len()));
+        out
+    }
+}
+
+impl Default for WildernessState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn terrain_movement_costs() {
+        assert_eq!(Terrain::Clear.movement_cost(), (1, 1));
+        assert_eq!(Terrain::Forest.movement_cost(), (3, 2));
+        assert_eq!(Terrain::Mountains.movement_cost(), (2, 1));
+    }
+
+    #[test]
+    fn terrain_lost_chances() {
+        assert_eq!(Terrain::Clear.lost_chance(), 1);
+        assert_eq!(Terrain::Forest.lost_chance(), 2);
+        assert_eq!(Terrain::Swamp.lost_chance(), 3);
+    }
+
+    #[test]
+    fn terrain_foraging() {
+        assert!(Terrain::Forest.can_forage());
+        assert!(!Terrain::Ocean.can_forage());
+        assert_eq!(Terrain::Forest.forage_chance(), 2);
+    }
+
+    #[test]
+    fn hex_movement() {
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
+        ws.add_hex(HexCell::new(1, 0, Terrain::Forest));
+        ws.move_to(1, 0).unwrap();
+        assert_eq!(ws.current_x, 1);
+        assert!(ws.explored.contains(&(1, 0)));
+    }
+
+    #[test]
+    fn hex_movement_invalid() {
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
+        assert!(ws.move_to(5, 5).is_err());
+    }
+
+    #[test]
+    fn travel_speed_clear() {
+        // 120' movement on clear terrain: 24 miles/day / 6 = 4 hexes
+        let hexes = WildernessState::hexes_per_day(120, Terrain::Clear);
+        assert_eq!(hexes, 4);
+    }
+
+    #[test]
+    fn travel_speed_forest() {
+        // 120' on forest: 24 * 2/3 = 16 miles / 6 = 2.6 -> 2 hexes
+        let hexes = WildernessState::hexes_per_day(120, Terrain::Forest);
+        assert_eq!(hexes, 2);
+    }
+
+    #[test]
+    fn travel_speed_mountains() {
+        // 120' on mountains: 24 / 2 = 12 miles / 6 = 2 hexes
+        let hexes = WildernessState::hexes_per_day(120, Terrain::Mountains);
+        assert_eq!(hexes, 2);
+    }
+
+    #[test]
+    fn travel_speed_slow_party() {
+        // 60' movement on clear: 12 miles/day / 6 = 2 hexes
+        let hexes = WildernessState::hexes_per_day(60, Terrain::Clear);
+        assert_eq!(hexes, 2);
+    }
+
+    #[test]
+    fn status_display() {
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
+        let s = ws.status();
+        assert!(s.contains("Clear"));
+        assert!(s.contains("(0, 0)"));
+    }
+}

@@ -4,6 +4,9 @@ use std::io;
 use std::path::Path;
 
 use crate::model::{Party, CombatState};
+use crate::state::dungeon::DungeonState;
+use crate::state::time::TimeTracker;
+use crate::state::wilderness::WildernessState;
 
 /// The full game state that gets persisted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,6 +17,12 @@ pub struct GameState {
     pub notes: Vec<String>,
     #[serde(default)]
     pub combat: Option<CombatState>,
+    #[serde(default)]
+    pub time: Option<TimeTracker>,
+    #[serde(default)]
+    pub dungeon: Option<DungeonState>,
+    #[serde(default)]
+    pub wilderness: Option<WildernessState>,
 }
 
 impl GameState {
@@ -24,6 +33,9 @@ impl GameState {
             dungeon_level: 0,
             notes: Vec::new(),
             combat: None,
+            time: None,
+            dungeon: None,
+            wilderness: None,
         }
     }
 }
