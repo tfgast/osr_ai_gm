@@ -12,7 +12,7 @@ use std::fmt;
 
 use crate::dice;
 use crate::model::{Character, CombatState};
-use crate::rules::attack;
+use crate::rules::{ability, attack, equipment};
 use crate::rules::turn::{self, TurnResult};
 
 /// Result of a single attack (melee or missile).
@@ -178,6 +178,58 @@ fn disrupt_caster(combat: &mut CombatState, character_name: &str) {
     if is_casting && !already_disrupted {
         combat.disrupted.push(character_name.to_string());
         combat.log.push(format!("{}'s spell is DISRUPTED!", character_name));
+    }
+}
+
+// =============================================================================
+// Unified Character Attack Resolution
+// =============================================================================
+
+/// Resolve a character's attack against a monster, handling weapon type,
+/// distance, ability modifiers, and rest penalty.
+///
+/// Both the CLI and GM API must call this function to ensure consistent
+/// combat rules regardless of entry point.
+pub fn resolve_character_attack(
+    combat: &mut CombatState,
+    character: &Character,
+    monster_idx: usize,
+    weapon: &equipment::WeaponDef,
+    rest_penalty: i32,
+) -> Result<AttackResult, String> {
+    if monster_idx >= combat.monsters.len() {
+        return Err(format!("monster index {} out of range (0-{})",
+            monster_idx, combat.monsters.len() - 1));
+    }
+    if !combat.monsters[monster_idx].is_alive() {
+        return Err(format!("{} is already dead.", combat.monsters[monster_idx].name));
+    }
+    if !character.is_alive() {
+        return Err(format!("{} is dead and cannot attack.", character.name));
+    }
+
+    if weapon.qualities.missile && !weapon.qualities.melee {
+        // Pure missile weapon
+        let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
+        character_missile_attack(combat, character, monster_idx, weapon.damage, dex_mod, weapon.range)
+    } else if weapon.qualities.missile && weapon.qualities.melee {
+        // Versatile weapon (e.g., dagger, spear) — melee if close, missile if far
+        if combat.distance <= 5 {
+            let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
+            Ok(character_melee_attack(combat, character, monster_idx, weapon.damage, str_mod))
+        } else {
+            let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
+            character_missile_attack(combat, character, monster_idx, weapon.damage, dex_mod, weapon.range)
+        }
+    } else {
+        // Pure melee weapon
+        if combat.distance > 5 {
+            return Err(format!(
+                "{} is a melee weapon but monsters are {}' away. Move closer or use a missile weapon.",
+                weapon.name, combat.distance));
+        }
+        let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
+        Ok(character_melee_attack(combat, character, monster_idx, weapon.damage, str_mod))
     }
 }
 

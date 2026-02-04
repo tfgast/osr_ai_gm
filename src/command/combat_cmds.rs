@@ -2,7 +2,7 @@ use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::engine::combat;
 use crate::model::{CombatState, Monster};
-use crate::rules::{ability, equipment, monster as monster_db};
+use crate::rules::{equipment, monster as monster_db};
 
 pub struct StartCombatCommand;
 impl Command for StartCombatCommand {
@@ -147,67 +147,15 @@ impl Command for AttackCommand {
             )),
         };
 
+        let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
         let combat = match state.combat.as_mut() {
             Some(c) => c,
             None => return CommandResult::error("no active combat. Use 'start_combat' first."),
         };
 
-        if monster_idx >= combat.monsters.len() {
-            return CommandResult::error(format!(
-                "monster index {} out of range (0-{})",
-                monster_idx, combat.monsters.len() - 1
-            ));
-        }
-        if !combat.monsters[monster_idx].is_alive() {
-            return CommandResult::error(format!(
-                "{} is already dead.", combat.monsters[monster_idx].name
-            ));
-        }
-        if !character.is_alive() {
-            return CommandResult::error(format!("{} is dead and cannot attack.", character.name));
-        }
-
-        // Per OSE, -1 to attack and damage when rest is overdue
-        let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
-
-        if weapon.qualities.missile && !weapon.qualities.melee {
-            let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
-            match combat::character_missile_attack(
-                combat, &character, monster_idx,
-                weapon.damage, dex_mod, weapon.range,
-            ) {
-                Ok(result) => CommandResult::ok(format!("{}", result)),
-                Err(e) => CommandResult::error(e),
-            }
-        } else if weapon.qualities.missile && weapon.qualities.melee {
-            if combat.distance <= 5 {
-                let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
-                let result = combat::character_melee_attack(
-                    combat, &character, monster_idx, weapon.damage, str_mod,
-                );
-                CommandResult::ok(format!("{}", result))
-            } else {
-                let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
-                match combat::character_missile_attack(
-                    combat, &character, monster_idx,
-                    weapon.damage, dex_mod, weapon.range,
-                ) {
-                    Ok(result) => CommandResult::ok(format!("{}", result)),
-                    Err(e) => CommandResult::error(e),
-                }
-            }
-        } else {
-            if combat.distance > 5 {
-                return CommandResult::error(format!(
-                    "{} is a melee weapon but monsters are {}' away. Move closer or use a missile weapon.",
-                    weapon.name, combat.distance
-                ));
-            }
-            let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
-            let result = combat::character_melee_attack(
-                combat, &character, monster_idx, weapon.damage, str_mod,
-            );
-            CommandResult::ok(format!("{}", result))
+        match combat::resolve_character_attack(combat, &character, monster_idx, &weapon, rest_penalty) {
+            Ok(result) => CommandResult::ok(format!("{}", result)),
+            Err(e) => CommandResult::error(e),
         }
     }
 }

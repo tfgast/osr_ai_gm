@@ -343,41 +343,16 @@ fn attack(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize, 
         Some(c) => c.clone(),
         None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
     };
+    let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
     let combat_state = match state.combat.as_mut() {
         Some(c) => c,
         None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
     };
-    if monster_idx >= combat_state.monsters.len() {
-        return GMResponse::err(id, format!("monster index {} out of range.", monster_idx), state.mode.clone());
-    }
-    if !combat_state.monsters[monster_idx].is_alive() {
-        return GMResponse::err(id, format!("{} is already dead.", combat_state.monsters[monster_idx].name), state.mode.clone());
-    }
-    if !character.is_alive() {
-        return GMResponse::err(id, format!("{} is dead.", character.name), state.mode.clone());
-    }
 
-    let result_msg = if weapon.qualities.missile && !weapon.qualities.melee {
-        let dex_mod = ability::dex_missile_mod(character.abilities.dexterity);
-        match combat::character_missile_attack(combat_state, &character, monster_idx, weapon.damage, dex_mod, weapon.range) {
-            Ok(r) => format!("{}", r),
-            Err(e) => return GMResponse::err(id, e, state.mode.clone()),
-        }
-    } else if weapon.qualities.missile && weapon.qualities.melee && combat_state.distance > 5 {
-        let dex_mod = ability::dex_missile_mod(character.abilities.dexterity);
-        match combat::character_missile_attack(combat_state, &character, monster_idx, weapon.damage, dex_mod, weapon.range) {
-            Ok(r) => format!("{}", r),
-            Err(e) => return GMResponse::err(id, e, state.mode.clone()),
-        }
-    } else if !weapon.qualities.missile && combat_state.distance > 5 {
-        return GMResponse::err(id, format!("{} is a melee weapon but monsters are {}' away.", weapon.name, combat_state.distance), state.mode.clone());
-    } else {
-        let str_mod = ability::str_melee_mod(character.abilities.strength);
-        let r = combat::character_melee_attack(combat_state, &character, monster_idx, weapon.damage, str_mod);
-        format!("{}", r)
-    };
-
-    GMResponse::ok(id, result_msg, state.mode.clone())
+    match combat::resolve_character_attack(combat_state, &character, monster_idx, &weapon, rest_penalty) {
+        Ok(result) => GMResponse::ok(id, format!("{}", result), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e, state.mode.clone()),
+    }
 }
 
 fn monster_attack(id: &str, state: &mut GameState, monster_idx: usize, char_name: &str) -> GMResponse {
