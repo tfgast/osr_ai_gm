@@ -141,6 +141,10 @@ pub struct Party {
     /// Rations in person-days of food.
     #[serde(default)]
     pub rations: u32,
+    /// Consecutive days without adequate food.
+    /// Per OSE rules: after 1+ days, penalties apply.
+    #[serde(default)]
+    pub days_without_food: u32,
 }
 
 impl Party {
@@ -150,6 +154,7 @@ impl Party {
             gold: 0,
             marching_order: Vec::new(),
             rations: 0,
+            days_without_food: 0,
         }
     }
 

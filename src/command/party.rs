@@ -173,6 +173,18 @@ impl Command for PartyCommand {
             out.push_str(&format!("  {} ({} L{}) — {}\n",
                 c.name, c.class.name(), c.level, status));
         }
+        // Show starvation status if applicable
+        if state.party.days_without_food > 0 {
+            let penalty = state.party.days_without_food.min(4) as i32;
+            out.push_str(&format!(
+                "\n[STARVING] {} days without food — -{} penalty to attacks/saves",
+                state.party.days_without_food, penalty
+            ));
+            if state.party.days_without_food >= 3 {
+                out.push_str(" — taking HP damage!");
+            }
+            out.push('\n');
+        }
         CommandResult::ok(out)
     }
 }

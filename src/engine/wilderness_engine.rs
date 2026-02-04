@@ -18,6 +18,8 @@ pub struct TravelResult {
     pub rations_consumed: u32,
     /// Whether party is starving (no rations available).
     pub starving: bool,
+    /// HP damage dealt due to starvation this day.
+    pub starvation_damage: u32,
 }
 
 impl TravelResult {
@@ -29,6 +31,7 @@ impl TravelResult {
             foraged: None,
             rations_consumed: 0,
             starving: false,
+            starvation_damage: 0,
         }
     }
 
@@ -103,6 +106,48 @@ pub fn travel_day_with<R: Rng>(
             result.starving = true;
             result.msg("No rations! The party is STARVING!");
         }
+    }
+
+    // Update starvation tracking and apply effects
+    if result.starving {
+        party.days_without_food += 1;
+        let days = party.days_without_food;
+
+        // Per OSE rules: penalties accumulate with each day without food
+        // Day 1+: -1 to attack rolls and saving throws per day
+        let penalty = days.min(4) as i32; // Cap at -4 per typical OSE
+        result.msg(format!(
+            "Starvation day {}: -{}penalty to attack rolls and saving throws.",
+            days, penalty
+        ));
+
+        // After 3+ days without food: 1d4 HP damage per day
+        if days >= 3 {
+            let hp_damage: u32 = rng.gen_range(1..=4);
+            result.starvation_damage = hp_damage;
+            result.msg(format!(
+                "Severe starvation! Each party member takes {} HP damage.",
+                hp_damage
+            ));
+            // Apply damage to all living party members
+            for member in party.members.iter_mut().filter(|c| c.is_alive()) {
+                member.hp = (member.hp - hp_damage as i32).max(0);
+            }
+            // Check for deaths
+            let dead: Vec<String> = party.members.iter()
+                .filter(|c| c.hp <= 0)
+                .map(|c| c.name.clone())
+                .collect();
+            if !dead.is_empty() {
+                result.msg(format!("Died from starvation: {}.", dead.join(", ")));
+            }
+        }
+    } else {
+        // Reset starvation counter when adequately fed
+        if party.days_without_food > 0 {
+            result.msg("The party is well-fed. Starvation effects end.");
+        }
+        party.days_without_food = 0;
     }
 
     // Check for getting lost
@@ -330,7 +375,24 @@ pub fn wilderness_status(wilderness: &WildernessState, party: &Party, movement_r
         "\nRations: {} person-days ({} days for party of {})",
         party.rations, days_of_food, party_size
     ));
+    // Show starvation status
+    if party.days_without_food > 0 {
+        let penalty = starvation_penalty(party.days_without_food);
+        out.push_str(&format!(
+            "\n[STARVING] {} days without food — {} penalty to attacks/saves",
+            party.days_without_food, penalty
+        ));
+        if party.days_without_food >= 3 {
+            out.push_str(" — taking HP damage!");
+        }
+    }
     out
+}
+
+/// Calculate the attack/save penalty for starvation.
+/// Per OSE: -1 per day without food, capped at -4.
+pub fn starvation_penalty(days_without_food: u32) -> i32 {
+    -(days_without_food.min(4) as i32)
 }
 
 #[cfg(test)]
@@ -835,5 +897,136 @@ mod tests {
         assert_eq!(result.rations_consumed, 0);
         assert_eq!(party.rations, 10);
         assert!(!result.starving);
+    }
+
+    // =========================================================================
+    // Starvation mechanic tests
+    // =========================================================================
+
+    #[test]
+    fn starvation_tracks_days_without_food() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 0;
+
+        assert_eq!(party.days_without_food, 0);
+
+        // Day 1 without food
+        travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+        assert_eq!(party.days_without_food, 1);
+
+        // Day 2 without food
+        let mut rng2 = StdRng::seed_from_u64(99);
+        travel_day_with(&mut rng2, &mut ws, &mut party, 0, 0, 120);
+        assert_eq!(party.days_without_food, 2);
+    }
+
+    #[test]
+    fn starvation_resets_when_fed() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 0;
+        party.days_without_food = 2; // Already starving for 2 days
+
+        // Give them food
+        party.rations = 10;
+
+        // Travel with food
+        travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+        assert_eq!(party.days_without_food, 0);
+    }
+
+    #[test]
+    fn starvation_penalty_calculation() {
+        assert_eq!(starvation_penalty(0), 0);
+        assert_eq!(starvation_penalty(1), -1);
+        assert_eq!(starvation_penalty(2), -2);
+        assert_eq!(starvation_penalty(3), -3);
+        assert_eq!(starvation_penalty(4), -4);
+        assert_eq!(starvation_penalty(5), -4); // Capped at -4
+        assert_eq!(starvation_penalty(10), -4);
+    }
+
+    #[test]
+    fn starvation_causes_hp_damage_after_3_days() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 0;
+        party.days_without_food = 2; // Already 2 days without food
+        let initial_hp = party.members[0].hp;
+
+        // Day 3 - should take damage
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+
+        assert_eq!(party.days_without_food, 3);
+        assert!(result.starvation_damage > 0);
+        assert!(result.starvation_damage <= 4); // 1d4 damage
+        assert!(party.members[0].hp < initial_hp);
+    }
+
+    #[test]
+    fn starvation_no_hp_damage_first_two_days() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 0;
+        let initial_hp = party.members[0].hp;
+
+        // Day 1 - no HP damage yet
+        let result1 = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+        assert_eq!(result1.starvation_damage, 0);
+        assert_eq!(party.members[0].hp, initial_hp);
+
+        // Day 2 - still no HP damage
+        let mut rng2 = StdRng::seed_from_u64(99);
+        let result2 = travel_day_with(&mut rng2, &mut ws, &mut party, 0, 0, 120);
+        assert_eq!(result2.starvation_damage, 0);
+        assert_eq!(party.members[0].hp, initial_hp);
+    }
+
+    #[test]
+    fn wilderness_status_shows_starvation() {
+        let ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 0;
+        party.days_without_food = 2;
+
+        let status = wilderness_status(&ws, &party, 120);
+        assert!(status.contains("[STARVING]"));
+        assert!(status.contains("2 days without food"));
+        assert!(status.contains("-2 penalty"));
+    }
+
+    #[test]
+    fn wilderness_status_shows_hp_damage_warning() {
+        let ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 0;
+        party.days_without_food = 3;
+
+        let status = wilderness_status(&ws, &party, 120);
+        assert!(status.contains("HP damage"));
+    }
+
+    #[test]
+    fn starvation_can_kill() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 0;
+        party.days_without_food = 2;
+        party.members[0].hp = 1; // Very low HP
+
+        // Day 3 with 1 HP - damage will likely kill
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+
+        // Character should be dead or very close
+        assert!(result.starvation_damage > 0);
+        if result.starvation_damage >= 1 {
+            assert!(party.members[0].hp <= 0);
+        }
     }
 }
