@@ -3,6 +3,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use crate::engine::retainer::Retainer;
 use crate::model::{Party, CombatState};
 use crate::state::dungeon::DungeonState;
 use crate::state::game::GameMode;
@@ -34,6 +35,9 @@ pub struct GameState {
     /// Mode before combat started, restored when combat ends.
     #[serde(default)]
     pub pre_combat_mode: Option<GameMode>,
+    /// Hired retainers (NPC followers).
+    #[serde(default)]
+    pub retainers: Vec<Retainer>,
 }
 
 fn default_version() -> u32 { 0 }
@@ -51,6 +55,7 @@ impl GameState {
             wilderness: None,
             mode: GameMode::default(),
             pre_combat_mode: None,
+            retainers: Vec::new(),
         }
     }
 

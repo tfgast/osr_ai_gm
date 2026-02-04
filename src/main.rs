@@ -12,6 +12,7 @@ use command::combat_cmds::*;
 use command::exploration_cmds::*;
 use command::encounter_cmds::*;
 use command::inventory_cmds::*;
+use command::retainer_cmds::*;
 use command::wilderness_cmds::*;
 use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, RulingCommand, HealCommand, DamageCommand, SetHpCommand};
 use command::system::*;
@@ -68,6 +69,11 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(ForageCommand));
     registry.register(Box::new(HuntCommand));
     registry.register(Box::new(WildernessStatusCommand));
+    // Retainers
+    registry.register(Box::new(HireCommand));
+    registry.register(Box::new(RetainersCommand));
+    registry.register(Box::new(DismissCommand));
+    registry.register(Box::new(RetainerMoraleCommand));
     // GM
     registry.register(Box::new(AdvanceTurnCommand));
     registry.register(Box::new(AwardXpCommand));

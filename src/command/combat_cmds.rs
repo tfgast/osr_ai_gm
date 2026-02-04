@@ -1,6 +1,6 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
-use crate::engine::combat;
+use crate::engine::{combat, retainer};
 use crate::model::{CombatState, Monster};
 use crate::rules::{equipment, monster as monster_db};
 use crate::state::game::GameMode;
@@ -443,6 +443,38 @@ impl Command for EndCombatCommand {
         );
         if total_xp > 0 {
             out.push_str(&format!("\nTotal XP from defeated monsters: {}", total_xp));
+            // Half-share XP for surviving retainers
+            let living_retainers: Vec<&str> = state.retainers.iter()
+                .filter(|r| r.is_alive())
+                .map(|r| r.name.as_str())
+                .collect();
+            if !living_retainers.is_empty() {
+                let half_xp = retainer::retainer_xp_share(total_xp);
+                out.push_str(&format!(
+                    "\nRetainer XP (half share): {} each for {}",
+                    half_xp,
+                    living_retainers.join(", ")
+                ));
+            }
+        }
+        // Retainer loyalty checks at end of combat
+        if !state.retainers.is_empty() {
+            let living: Vec<(String, u32)> = state.retainers.iter()
+                .filter(|r| r.is_alive())
+                .map(|r| (r.name.clone(), r.loyalty))
+                .collect();
+            if !living.is_empty() {
+                out.push_str("\n\nRetainer loyalty checks:");
+                for (name, loyalty) in &living {
+                    let result = retainer::loyalty_check(*loyalty);
+                    let desc = match result {
+                        retainer::LoyaltyResult::Loyal => "LOYAL",
+                        retainer::LoyaltyResult::Wavering => "WAVERING",
+                        retainer::LoyaltyResult::Disloyal => "DISLOYAL — may leave!",
+                    };
+                    out.push_str(&format!("\n  {} (loyalty {}): {}", name, loyalty, desc));
+                }
+            }
         }
         let dead_party = state.party.members.iter().filter(|c| !c.is_alive()).count();
         if dead_party > 0 {
