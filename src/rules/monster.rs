@@ -490,4 +490,56 @@ mod tests {
             assert!(m.xp_value > 0, "{} has 0 XP", m.name);
         }
     }
+
+    /// Table-driven test pinning HD and XP for every monster entry.
+    #[test]
+    fn pinned_hd_and_xp() {
+        let expected: &[(&str, &str, u64)] = &[
+            ("Kobold", "1/2", 5),
+            ("Giant Rat", "1/2", 5),
+            ("Goblin", "1-1", 5),
+            ("Skeleton", "1", 10),
+            ("Zombie", "2", 20),
+            ("Orc", "1", 10),
+            ("Hobgoblin", "1+1", 15),
+            ("Gnoll", "2", 20),
+            ("Ghoul", "2*", 25),
+            ("Bugbear", "3+1", 50),
+            ("Gelatinous Cube", "4*", 125),
+            ("Ogre", "4+1", 125),
+            ("Wight", "3*", 50),
+            ("Wraith", "4**", 175),
+            ("Gargoyle", "4", 75),
+            ("Owlbear", "5", 175),
+            ("Troll", "6+3*", 650),
+            ("Minotaur", "6", 275),
+            ("Mummy", "5+1*", 400),
+            ("Spectre", "6**", 725),
+            ("Vampire", "7-9**", 1250),
+            ("Green Dragon", "8**", 1750),
+            ("Red Dragon", "10**", 2300),
+            ("Giant Spider", "3*", 50),
+            ("Carrion Crawler", "3+1", 50),
+            ("Rust Monster", "5", 175),
+            ("Basilisk", "6+1**", 950),
+            ("Cockatrice", "5**", 425),
+            ("Harpy", "3*", 50),
+            ("Medusa", "4**", 175),
+        ];
+
+        assert_eq!(
+            expected.len(),
+            all_monsters().len(),
+            "expected table has {} entries but MONSTERS has {}",
+            expected.len(),
+            all_monsters().len(),
+        );
+
+        for &(name, hd, xp) in expected {
+            let m = find_monster(name)
+                .unwrap_or_else(|| panic!("monster '{}' not found", name));
+            assert_eq!(m.hit_dice, hd, "{}: hit_dice", name);
+            assert_eq!(m.xp_value, xp, "{}: xp_value", name);
+        }
+    }
 }
