@@ -1445,6 +1445,65 @@ fn travel_not_in_wilderness() {
 }
 
 // ===========================================================================
+// 24b. Orient
+// ===========================================================================
+
+#[test]
+fn orient_when_lost_happy_path() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+
+    // Set the party as lost
+    state.wilderness.as_mut().unwrap().lost = true;
+
+    let resp = handle_request(&req("o1", GMCommand::Orient), &mut state);
+    assert_response_format(&resp, "o1");
+    assert!(resp.success);
+
+    let data = resp.data.unwrap();
+    assert!(data["success"].as_bool().is_some());
+    assert!(data["terrain"].as_str().is_some());
+    assert!(data["lost"].as_bool().is_some());
+    assert!(data["travel_day"].as_u64().is_some());
+}
+
+#[test]
+fn orient_when_not_lost() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+
+    // Party is not lost by default
+    assert!(!state.wilderness.as_ref().unwrap().lost);
+
+    let resp = handle_request(&req("o2", GMCommand::Orient), &mut state);
+    assert!(resp.success); // Command succeeds but orient attempt fails
+    let data = resp.data.unwrap();
+    assert!(!data["success"].as_bool().unwrap()); // Orient fails when not lost
+    assert!(resp.message.contains("not lost"));
+}
+
+#[test]
+fn orient_not_in_wilderness() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("o3", GMCommand::Orient), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not in wilderness"));
+}
+
+#[test]
+fn orient_advances_travel_day() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+    state.wilderness.as_mut().unwrap().lost = true;
+    let start_day = state.wilderness.as_ref().unwrap().travel_day;
+
+    handle_request(&req("o4", GMCommand::Orient), &mut state);
+
+    let end_day = state.wilderness.as_ref().unwrap().travel_day;
+    assert_eq!(end_day, start_day + 1, "orient should advance the day");
+}
+
+// ===========================================================================
 // 25. RollSurprise
 // ===========================================================================
 

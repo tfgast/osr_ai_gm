@@ -69,6 +69,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::EnterWilderness { terrain } => enter_wilderness(id, state, *terrain),
         GMCommand::AddHex { x, y, terrain } => add_hex(id, state, *x, *y, *terrain),
         GMCommand::Travel { x, y } => travel(id, state, *x, *y),
+        GMCommand::Orient => orient(id, state),
 
         // -- Encounter resolution --
         GMCommand::RollSurprise => roll_surprise(id, state),
@@ -696,6 +697,21 @@ fn travel(id: &str, state: &mut GameState, x: i32, y: i32) -> GMResponse {
         "rations_remaining": state.party.rations,
     });
     GMResponse::ok_with_data(id, format!("{}", result), state.mode.clone(), data)
+}
+
+fn orient(id: &str, state: &mut GameState) -> GMResponse {
+    let ws = match state.wilderness.as_mut() {
+        Some(w) => w,
+        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
+    };
+    let result = wilderness_engine::orient(ws);
+    let data = serde_json::json!({
+        "success": result.success,
+        "terrain": result.terrain.name(),
+        "lost": ws.lost,
+        "travel_day": ws.travel_day,
+    });
+    GMResponse::ok_with_data(id, result.message, state.mode.clone(), data)
 }
 
 // =============================================================================

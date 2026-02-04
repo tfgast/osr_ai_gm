@@ -136,3 +136,17 @@ impl Command for WildernessStatusCommand {
         CommandResult::ok(status)
     }
 }
+
+pub struct OrientCommand;
+impl Command for OrientCommand {
+    fn name(&self) -> &str { "orient" }
+    fn help(&self) -> &str { "Attempt to find bearings when lost (takes a full day)" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let ws = match state.wilderness.as_mut() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let result = wilderness_engine::orient(ws);
+        CommandResult::ok(result.message)
+    }
+}

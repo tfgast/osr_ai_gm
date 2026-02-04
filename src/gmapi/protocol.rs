@@ -151,6 +151,8 @@ pub enum GMCommand {
     },
     /// Travel to a hex.
     Travel { x: i32, y: i32 },
+    /// Attempt to orient when lost (takes a full day).
+    Orient,
 
     // -- GM-only: encounter resolution --
     /// Roll surprise.

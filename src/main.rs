@@ -122,6 +122,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(TravelCommand));
     registry.register(Box::new(ForageCommand));
     registry.register(Box::new(HuntCommand));
+    registry.register(Box::new(OrientCommand));
     registry.register(Box::new(WildernessStatusCommand));
     // Retainers
     registry.register(Box::new(HireCommand));

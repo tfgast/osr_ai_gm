@@ -358,6 +358,79 @@ pub fn hunt_with<R: Rng>(rng: &mut R, wilderness: &WildernessState, party: &mut 
     }
 }
 
+/// Result of an orient attempt.
+#[derive(Debug)]
+pub struct OrientResult {
+    pub message: String,
+    /// Whether the attempt succeeded.
+    pub success: bool,
+    /// The terrain where orientation was attempted.
+    pub terrain: Terrain,
+}
+
+/// Attempt to orient and find bearings when lost.
+/// Takes a full day. Success chance varies by terrain.
+/// Per OSE: easier terrain is easier to navigate out of.
+pub fn orient(wilderness: &mut WildernessState) -> OrientResult {
+    orient_with(&mut rand::thread_rng(), wilderness)
+}
+
+/// Testable version.
+pub fn orient_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState) -> OrientResult {
+    let terrain = wilderness.current_hex()
+        .map(|h| h.terrain)
+        .unwrap_or(Terrain::Clear);
+
+    if !wilderness.lost {
+        return OrientResult {
+            message: "The party is not lost.".to_string(),
+            success: false,
+            terrain,
+        };
+    }
+
+    // Success chance: 6 minus terrain's lost_chance gives X-in-6.
+    // Clear/City/Hills/Mountains have 1-in-6 lost chance -> 5-in-6 orient success
+    // Forest/Swamp/Jungle/etc have 2-in-6 lost chance -> 4-in-6 orient success
+    let orient_chance = 6 - terrain.lost_chance();
+    let roll: u32 = rng.gen_range(1..=6);
+
+    wilderness.travel_day += 1;
+
+    if roll <= orient_chance {
+        wilderness.lost = false;
+        wilderness.log(format!(
+            "Day {}: Oriented successfully in {} terrain.",
+            wilderness.travel_day - 1, terrain.name()
+        ));
+        OrientResult {
+            message: format!(
+                "Day {}: Spent the day finding bearings in {} terrain.\n\
+                 Orientation successful! (rolled {} vs {}-in-6)\n\
+                 The party is no longer lost.",
+                wilderness.travel_day - 1, terrain.name(), roll, orient_chance
+            ),
+            success: true,
+            terrain,
+        }
+    } else {
+        wilderness.log(format!(
+            "Day {}: Failed to orient in {} terrain.",
+            wilderness.travel_day - 1, terrain.name()
+        ));
+        OrientResult {
+            message: format!(
+                "Day {}: Spent the day trying to find bearings in {} terrain.\n\
+                 Orientation failed. (rolled {} vs {}-in-6)\n\
+                 The party remains lost.",
+                wilderness.travel_day - 1, terrain.name(), roll, orient_chance
+            ),
+            success: false,
+            terrain,
+        }
+    }
+}
+
 /// Display wilderness travel status.
 pub fn wilderness_status(wilderness: &WildernessState, party: &Party, movement_rate: u32) -> String {
     let mut out = wilderness.status();
@@ -1028,5 +1101,105 @@ mod tests {
         if result.starvation_damage >= 1 {
             assert!(party.members[0].hp <= 0);
         }
+    }
+
+    // =========================================================================
+    // Orient (navigation out of being lost) tests
+    // =========================================================================
+
+    #[test]
+    fn orient_when_not_lost_fails() {
+        let mut ws = test_wilderness();
+        ws.lost = false;
+        let result = orient_with(&mut test_rng(), &mut ws);
+        assert!(!result.success);
+        assert!(result.message.contains("not lost"));
+    }
+
+    #[test]
+    fn orient_when_lost_can_succeed() {
+        let mut success_count = 0;
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            ws.lost = true;
+            let result = orient_with(&mut rng, &mut ws);
+            if result.success {
+                success_count += 1;
+                assert!(!ws.lost, "lost flag should be cleared on success");
+                assert!(result.message.contains("no longer lost"));
+            }
+        }
+        // Clear terrain: 5-in-6 success rate (~83%)
+        assert!(success_count > 50, "should succeed often in clear terrain");
+    }
+
+    #[test]
+    fn orient_advances_travel_day() {
+        let mut ws = test_wilderness();
+        ws.lost = true;
+        let start_day = ws.travel_day;
+        orient_with(&mut test_rng(), &mut ws);
+        assert_eq!(ws.travel_day, start_day + 1, "orient should advance the day");
+    }
+
+    #[test]
+    fn orient_harder_in_difficult_terrain() {
+        // Compare success rates in clear vs swamp terrain
+        let mut clear_success = 0;
+        let mut swamp_success = 0;
+        let trials = 500;
+
+        for seed in 0..trials {
+            // Clear terrain
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            ws.lost = true;
+            let result = orient_with(&mut rng, &mut ws);
+            if result.success {
+                clear_success += 1;
+            }
+
+            // Swamp terrain
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            ws.move_to(0, 1).unwrap(); // Swamp
+            ws.lost = true;
+            let result = orient_with(&mut rng, &mut ws);
+            if result.success {
+                swamp_success += 1;
+            }
+        }
+
+        assert!(
+            clear_success > swamp_success,
+            "should be easier to orient in clear ({}) than swamp ({})",
+            clear_success, swamp_success
+        );
+    }
+
+    #[test]
+    fn orient_failure_keeps_lost_status() {
+        // Find a seed that causes failure
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut ws = test_wilderness();
+            ws.lost = true;
+            let result = orient_with(&mut rng, &mut ws);
+            if !result.success {
+                assert!(ws.lost, "lost flag should remain on failure");
+                assert!(result.message.contains("remains lost"));
+                return;
+            }
+        }
+        panic!("should find at least one failure case");
+    }
+
+    #[test]
+    fn orient_logs_attempt() {
+        let mut ws = test_wilderness();
+        ws.lost = true;
+        orient_with(&mut test_rng(), &mut ws);
+        assert!(!ws.log.is_empty(), "orient should add to the log");
     }
 }
