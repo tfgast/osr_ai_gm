@@ -239,9 +239,23 @@ pub fn resolve_character_attack(
     } else {
         // Pure melee weapon
         if combat.distance > 10 {
+            // Find missile weapons in character's inventory
+            let missile_weapons: Vec<&str> = character.inventory.iter()
+                .filter_map(|item| equipment::find_weapon(&item.name))
+                .filter(|w| w.qualities.missile)
+                .map(|w| w.name)
+                .collect();
+
+            let missile_hint = if missile_weapons.is_empty() {
+                String::new()
+            } else {
+                format!(" Available missile weapons: {}.", missile_weapons.join(", "))
+            };
+
             return Err(format!(
-                "{} is a melee weapon but monsters are {}' away. Move closer or use a missile weapon.",
-                weapon.name, combat.distance));
+                "{} is a melee weapon but monsters are {}' away. \
+                Use \"close {}\" to move into melee range, or attack with a missile weapon.{}",
+                weapon.name, combat.distance, character.name, missile_hint));
         }
         let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
         Ok(character_melee_attack(combat, character, monster_idx, weapon.damage, str_mod))
@@ -2216,5 +2230,26 @@ mod tests {
         assert!(display.contains("Grond"));
         assert!(display.contains("Goblin"));
         assert!(display.contains("auto-kill"));
+    }
+
+    #[test]
+    fn melee_at_distance_error_suggests_close_and_missile_weapons() {
+        use crate::model::Item;
+
+        let mut combat = CombatState::new(vec![test_goblin()], 60);
+        let mut fighter = test_fighter();
+        // Give the fighter a melee weapon and a missile weapon
+        fighter.inventory.push(Item::new("Sword", 6.0, 10));
+        fighter.inventory.push(Item::new("Short bow", 3.0, 25));
+
+        let sword = equipment::find_weapon("Sword").unwrap();
+        let result = resolve_character_attack(&mut combat, &fighter, 0, sword, 0);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        // Should suggest using close command
+        assert!(err.contains("close Grond"), "Error should suggest close command: {}", err);
+        // Should list available missile weapons
+        assert!(err.contains("Short bow"), "Error should list missile weapons: {}", err);
     }
 }
