@@ -231,7 +231,7 @@ pub fn class_def(class: Class) -> ClassDef {
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategory::Drow,
             spell_progression: SpellProgression::Drow,
-            spell_list: SpellListType::Cleric,
+            spell_list: SpellListType::DrowArcaneAndDivine,
             starting_gold: "3d6x10", is_demihuman: true,
         },
         Class::Druid => ClassDef {

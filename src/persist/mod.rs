@@ -13,7 +13,6 @@ use crate::state::wilderness::WildernessState;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     pub party: Party,
-    pub turn: u64,
     pub dungeon_level: u32,
     pub notes: Vec<String>,
     #[serde(default)]
@@ -32,7 +31,6 @@ impl GameState {
     pub fn new() -> Self {
         GameState {
             party: Party::new(),
-            turn: 0,
             dungeon_level: 0,
             notes: Vec::new(),
             combat: None,
@@ -41,6 +39,11 @@ impl GameState {
             wilderness: None,
             mode: GameMode::default(),
         }
+    }
+
+    /// Single source of truth for the turn counter (delegates to TimeTracker).
+    pub fn turn(&self) -> u32 {
+        self.time.as_ref().map(|t| t.total_turns).unwrap_or(0)
     }
 }
 
@@ -78,14 +81,17 @@ mod tests {
 
         let mut state = GameState::new();
         state.party.add_member(Character::new("Aldric", "Fighter"));
-        state.turn = 42;
+        state.time = Some(TimeTracker::new());
+        for _ in 0..42 {
+            state.time.as_mut().unwrap().advance_turn();
+        }
         state.dungeon_level = 3;
         state.notes.push("Entered the crypt.".to_string());
 
         save(&state, &path).unwrap();
         let loaded = load(&path).unwrap();
 
-        assert_eq!(loaded.turn, 42);
+        assert_eq!(loaded.turn(), 42);
         assert_eq!(loaded.dungeon_level, 3);
         assert_eq!(loaded.party.members.len(), 1);
         assert_eq!(loaded.party.members[0].name, "Aldric");

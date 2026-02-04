@@ -192,6 +192,27 @@ impl Spell {
     }
 }
 
+/// Combat phases per OSE round sequence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CombatPhase {
+    /// Before initiative — declare spells and retreats.
+    Declaration,
+    /// Roll initiative for both sides.
+    Initiative,
+    /// Winning side: morale checks.
+    Morale,
+    /// Winning side: movement.
+    Movement,
+    /// Winning side: missile attacks.
+    Missile,
+    /// Winning side: magic (spells resolve).
+    Magic,
+    /// Winning side: melee attacks.
+    Melee,
+    /// Round complete.
+    EndOfRound,
+}
+
 /// State of an active combat encounter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
@@ -207,6 +228,9 @@ pub struct CombatState {
     /// Characters whose spells were disrupted this round.
     #[serde(default)]
     pub disrupted: Vec<String>,
+    /// Current combat phase.
+    #[serde(default = "CombatState::default_phase")]
+    pub phase: CombatPhase,
 }
 
 impl CombatState {
@@ -220,7 +244,26 @@ impl CombatState {
             log: Vec::new(),
             spell_declarations: Vec::new(),
             disrupted: Vec::new(),
+            phase: CombatPhase::Declaration,
         }
+    }
+
+    fn default_phase() -> CombatPhase {
+        CombatPhase::Declaration
+    }
+
+    /// Advance to the next combat phase.
+    pub fn advance_phase(&mut self) {
+        self.phase = match self.phase {
+            CombatPhase::Declaration => CombatPhase::Initiative,
+            CombatPhase::Initiative => CombatPhase::Morale,
+            CombatPhase::Morale => CombatPhase::Movement,
+            CombatPhase::Movement => CombatPhase::Missile,
+            CombatPhase::Missile => CombatPhase::Magic,
+            CombatPhase::Magic => CombatPhase::Melee,
+            CombatPhase::Melee => CombatPhase::EndOfRound,
+            CombatPhase::EndOfRound => CombatPhase::Declaration,
+        };
     }
 
     pub fn living_monsters(&self) -> Vec<(usize, &Monster)> {

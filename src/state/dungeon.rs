@@ -6,7 +6,7 @@ use std::collections::HashSet;
 pub enum DoorState {
     /// Standard door — must force open (2-in-6 base, modified by STR).
     Closed,
-    /// Door is open (forced or otherwise).
+    /// Door is open (forced or otherwise). Per OSE, doors close automatically.
     Open,
     /// Stuck shut — requires forcing.
     Stuck,
@@ -14,6 +14,8 @@ pub enum DoorState {
     Locked,
     /// Secret door — must be found by searching (1-in-6, elves 2-in-6).
     Secret,
+    /// Spiked open — door has been held with iron spikes, won't auto-close.
+    Spiked,
 }
 
 /// A door in the dungeon.
@@ -36,7 +38,7 @@ impl Door {
 
     /// Whether the party can attempt to pass through this door.
     pub fn is_passable(&self) -> bool {
-        self.state == DoorState::Open
+        self.state == DoorState::Open || self.state == DoorState::Spiked
     }
 }
 
@@ -115,15 +117,27 @@ impl DungeonState {
         self.explored.insert(self.current_room);
     }
 
-    /// Move to a room by ID.
+    /// Move to a room by ID. Requires a passable door connecting the
+    /// current room to the destination (prevents teleportation).
     pub fn move_to(&mut self, room_id: u32) -> Result<(), String> {
-        if self.rooms.iter().any(|r| r.id == room_id) {
-            self.current_room = room_id;
-            self.explored.insert(room_id);
-            Ok(())
-        } else {
-            Err(format!("room {} does not exist", room_id))
+        if !self.rooms.iter().any(|r| r.id == room_id) {
+            return Err(format!("room {} does not exist", room_id));
         }
+        // Check that a passable door connects current room to destination
+        let connected = self.doors.iter().any(|d| {
+            d.is_passable()
+                && ((d.room_a == self.current_room && d.room_b == room_id)
+                    || (d.room_b == self.current_room && d.room_a == room_id))
+        });
+        if !connected {
+            return Err(format!(
+                "no open door between room {} and room {}",
+                self.current_room, room_id
+            ));
+        }
+        self.current_room = room_id;
+        self.explored.insert(room_id);
+        Ok(())
     }
 
     /// Find a room by ID.
@@ -173,6 +187,7 @@ impl DungeonState {
                     DoorState::Stuck => "stuck",
                     DoorState::Locked => "locked",
                     DoorState::Secret => "secret",
+                    DoorState::Spiked => "spiked open",
                 };
                 out.push_str(&format!("\n  Door {} → {} ({}) [{}]", d.id, dest, dest_name, state));
             }
@@ -202,9 +217,11 @@ mod tests {
     }
 
     #[test]
-    fn move_to_room() {
+    fn move_to_room_through_open_door() {
         let mut ds = sample_dungeon();
         assert_eq!(ds.current_room, 0);
+        // Open the door first
+        ds.find_door_mut(0).unwrap().state = DoorState::Open;
         ds.move_to(1).unwrap();
         assert_eq!(ds.current_room, 1);
         assert!(ds.explored.contains(&1));
@@ -214,6 +231,20 @@ mod tests {
     fn move_to_nonexistent_fails() {
         let mut ds = sample_dungeon();
         assert!(ds.move_to(99).is_err());
+    }
+
+    #[test]
+    fn move_to_without_open_door_fails() {
+        let mut ds = sample_dungeon();
+        // Door 0 is closed — can't move through
+        assert!(ds.move_to(1).is_err());
+    }
+
+    #[test]
+    fn move_to_nonadjacent_fails() {
+        let mut ds = sample_dungeon();
+        // No door from room 0 to room 2
+        assert!(ds.move_to(2).is_err());
     }
 
     #[test]
@@ -228,6 +259,8 @@ mod tests {
     #[test]
     fn secret_door_discovered() {
         let mut ds = sample_dungeon();
+        // Open door 0 so we can move to room 1
+        ds.find_door_mut(0).unwrap().state = DoorState::Open;
         ds.move_to(1).unwrap();
         // Secret door to room 2 is not discovered
         let doors = ds.doors_from_current();

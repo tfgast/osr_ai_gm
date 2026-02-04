@@ -39,77 +39,77 @@ pub fn saving_throws(cat: SaveCategory, level: u32) -> SavingThrows {
     use SaveCategory::*;
     match cat {
         Thief => match level {
-            1..=4 => SavingThrows::new(13, 14, 13, 16, 15),
+            0..=4 => SavingThrows::new(13, 14, 13, 16, 15),
             5..=8 => SavingThrows::new(12, 13, 11, 14, 13),
             9..=12 => SavingThrows::new(10, 11, 9, 12, 10),
             _ => SavingThrows::new(8, 9, 7, 10, 8),
         },
         Barbarian => match level {
-            1..=3 => SavingThrows::new(10, 13, 12, 15, 16),
+            0..=3 => SavingThrows::new(10, 13, 12, 15, 16),
             4..=6 => SavingThrows::new(8, 11, 10, 13, 13),
             7..=9 => SavingThrows::new(6, 9, 8, 10, 10),
             10..=12 => SavingThrows::new(4, 7, 6, 8, 7),
             _ => SavingThrows::new(3, 5, 4, 5, 5),
         },
         Cleric => match level {
-            1..=4 => SavingThrows::new(11, 12, 14, 16, 15),
+            0..=4 => SavingThrows::new(11, 12, 14, 16, 15),
             5..=8 => SavingThrows::new(9, 10, 12, 14, 12),
             9..=12 => SavingThrows::new(6, 7, 9, 11, 9),
             _ => SavingThrows::new(3, 5, 7, 8, 7),
         },
         Drow => match level {
-            1..=3 => SavingThrows::new(12, 13, 13, 15, 12),
+            0..=3 => SavingThrows::new(12, 13, 13, 15, 12),
             4..=6 => SavingThrows::new(10, 11, 11, 13, 10),
             7..=9 => SavingThrows::new(8, 9, 9, 10, 8),
             _ => SavingThrows::new(6, 7, 8, 8, 6),
         },
         Dwarf => match level {
-            1..=3 => SavingThrows::new(8, 9, 10, 13, 12),
+            0..=3 => SavingThrows::new(8, 9, 10, 13, 12),
             4..=6 => SavingThrows::new(6, 7, 8, 10, 10),
             7..=9 => SavingThrows::new(4, 5, 6, 7, 8),
             _ => SavingThrows::new(2, 3, 4, 4, 6),
         },
         Elf => match level {
-            1..=3 => SavingThrows::new(12, 13, 13, 15, 15),
+            0..=3 => SavingThrows::new(12, 13, 13, 15, 15),
             4..=6 => SavingThrows::new(10, 11, 11, 13, 12),
             7..=9 => SavingThrows::new(8, 9, 9, 10, 10),
             _ => SavingThrows::new(6, 7, 8, 8, 8),
         },
         Fighter => match level {
-            1..=3 => SavingThrows::new(12, 13, 14, 15, 16),
+            0..=3 => SavingThrows::new(12, 13, 14, 15, 16),
             4..=6 => SavingThrows::new(10, 11, 12, 13, 14),
             7..=9 => SavingThrows::new(8, 9, 10, 10, 12),
             10..=12 => SavingThrows::new(6, 7, 8, 8, 10),
             _ => SavingThrows::new(4, 5, 6, 5, 8),
         },
         Gnome => match level {
-            1..=5 => SavingThrows::new(8, 9, 10, 14, 11),
+            0..=5 => SavingThrows::new(8, 9, 10, 14, 11),
             _ => SavingThrows::new(6, 7, 8, 11, 9),
         },
         HalfElf => match level {
-            1..=3 => SavingThrows::new(12, 13, 13, 15, 15),
+            0..=3 => SavingThrows::new(12, 13, 13, 15, 15),
             4..=6 => SavingThrows::new(10, 11, 11, 13, 12),
             7..=9 => SavingThrows::new(8, 9, 9, 10, 10),
             _ => SavingThrows::new(6, 7, 8, 8, 8),
         },
         HalfOrc => match level {
-            1..=4 => SavingThrows::new(13, 14, 13, 16, 15),
+            0..=4 => SavingThrows::new(13, 14, 13, 16, 15),
             _ => SavingThrows::new(12, 13, 11, 14, 13),
         },
         MagicUser => match level {
-            1..=5 => SavingThrows::new(13, 14, 13, 16, 15),
+            0..=5 => SavingThrows::new(13, 14, 13, 16, 15),
             6..=10 => SavingThrows::new(11, 12, 11, 14, 12),
             _ => SavingThrows::new(8, 9, 8, 11, 8),
         },
         Paladin => match level {
-            1..=3 => SavingThrows::new(10, 11, 12, 13, 14),
+            0..=3 => SavingThrows::new(10, 11, 12, 13, 14),
             4..=6 => SavingThrows::new(8, 9, 10, 11, 12),
             7..=9 => SavingThrows::new(6, 7, 8, 8, 10),
             10..=12 => SavingThrows::new(4, 5, 6, 6, 8),
             _ => SavingThrows::new(2, 3, 4, 3, 6),
         },
         Svirfneblin => match level {
-            1..=3 => SavingThrows::new(8, 9, 10, 14, 11),
+            0..=3 => SavingThrows::new(8, 9, 10, 14, 11),
             4..=6 => SavingThrows::new(6, 7, 8, 11, 9),
             _ => SavingThrows::new(4, 5, 6, 9, 7),
         },
@@ -119,6 +119,15 @@ pub fn saving_throws(cat: SaveCategory, level: u32) -> SavingThrows {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn level_0_gets_worst_saves() {
+        // Level 0 should use the first (worst) tier, not the last (best)
+        let s = saving_throws(SaveCategory::Fighter, 0);
+        assert_eq!(s, SavingThrows::new(12, 13, 14, 15, 16)); // same as level 1-3
+        let s = saving_throws(SaveCategory::Thief, 0);
+        assert_eq!(s, SavingThrows::new(13, 14, 13, 16, 15)); // same as level 1-4
+    }
 
     #[test]
     fn thief_saves_level_1() {

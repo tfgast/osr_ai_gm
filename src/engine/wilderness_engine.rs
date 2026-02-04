@@ -90,16 +90,27 @@ pub fn travel_day_with<R: Rng>(
             hexes, movement_rate
         ));
 
-        // Attempt to move to destination
-        match wilderness.move_to(dest_x, dest_y) {
-            Ok(()) => {
-                result.msg(format!(
-                    "Arrived at ({}, {}).",
-                    dest_x, dest_y
-                ));
-            }
-            Err(e) => {
-                result.msg(format!("Cannot travel there: {}", e));
+        // Enforce travel range — destination must be within hexes_per_day distance
+        let dx = (dest_x - wilderness.current_x).unsigned_abs();
+        let dy = (dest_y - wilderness.current_y).unsigned_abs();
+        let distance = dx.max(dy);
+        if distance > hexes {
+            result.msg(format!(
+                "Destination ({}, {}) is {} hexes away — exceeds travel range of {} hexes/day.",
+                dest_x, dest_y, distance, hexes
+            ));
+        } else {
+            // Attempt to move to destination
+            match wilderness.move_to(dest_x, dest_y) {
+                Ok(()) => {
+                    result.msg(format!(
+                        "Arrived at ({}, {}).",
+                        dest_x, dest_y
+                    ));
+                }
+                Err(e) => {
+                    result.msg(format!("Cannot travel there: {}", e));
+                }
             }
         }
     }
@@ -326,7 +337,9 @@ mod tests {
         // Should get a message about not being able to travel there
         // (unless lost, in which case travel doesn't attempt the move)
         if !result.lost {
-            assert!(result.messages.iter().any(|m| m.contains("Cannot travel")));
+            assert!(result.messages.iter().any(|m|
+                m.contains("exceeds travel range") || m.contains("Cannot travel")
+            ));
         }
     }
 }

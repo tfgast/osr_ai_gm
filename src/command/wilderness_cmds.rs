@@ -1,0 +1,156 @@
+use super::{Command, CommandResult};
+use crate::persist::GameState;
+use crate::engine::wilderness_engine;
+use crate::state::wilderness::{WildernessState, HexCell, Terrain};
+
+pub struct EnterWildernessCommand;
+impl Command for EnterWildernessCommand {
+    fn name(&self) -> &str { "enter_wilderness" }
+    fn help(&self) -> &str { "Enter wilderness travel mode (enter_wilderness <terrain>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        let terrain = if args.is_empty() {
+            Terrain::Clear
+        } else {
+            match args[0].to_lowercase().as_str() {
+                "clear" => Terrain::Clear,
+                "forest" => Terrain::Forest,
+                "hills" => Terrain::Hills,
+                "mountains" => Terrain::Mountains,
+                "desert" => Terrain::Desert,
+                "swamp" => Terrain::Swamp,
+                "jungle" => Terrain::Jungle,
+                "ocean" => Terrain::Ocean,
+                "river" => Terrain::River,
+                "barren" => Terrain::Barren,
+                "city" => Terrain::City,
+                _ => return CommandResult::error(
+                    "terrain must be: clear, forest, hills, mountains, desert, swamp, jungle, ocean, river, barren, city"
+                ),
+            }
+        };
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, terrain));
+        state.wilderness = Some(ws);
+        CommandResult::ok(format!(
+            "Entered wilderness. Starting hex: (0, 0) — {}.\n\
+             Use 'add_hex' to build the map, 'travel' to move.",
+            terrain.name()
+        ))
+    }
+}
+
+pub struct AddHexCommand;
+impl Command for AddHexCommand {
+    fn name(&self) -> &str { "add_hex" }
+    fn help(&self) -> &str { "Add a hex to the wilderness map (add_hex <x> <y> <terrain>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 3 {
+            return CommandResult::error("usage: add_hex <x> <y> <terrain>");
+        }
+        let x: i32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("x must be an integer"),
+        };
+        let y: i32 = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("y must be an integer"),
+        };
+        let terrain = match args[2].to_lowercase().as_str() {
+            "clear" => Terrain::Clear,
+            "forest" => Terrain::Forest,
+            "hills" => Terrain::Hills,
+            "mountains" => Terrain::Mountains,
+            "desert" => Terrain::Desert,
+            "swamp" => Terrain::Swamp,
+            "jungle" => Terrain::Jungle,
+            "ocean" => Terrain::Ocean,
+            "river" => Terrain::River,
+            "barren" => Terrain::Barren,
+            "city" => Terrain::City,
+            _ => return CommandResult::error("invalid terrain type"),
+        };
+        let ws = match state.wilderness.as_mut() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        ws.add_hex(HexCell::new(x, y, terrain));
+        CommandResult::ok(format!("Added hex ({}, {}) — {}.", x, y, terrain.name()))
+    }
+}
+
+pub struct TravelCommand;
+impl Command for TravelCommand {
+    fn name(&self) -> &str { "travel" }
+    fn help(&self) -> &str { "Travel to a wilderness hex (travel <x> <y>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: travel <x> <y>");
+        }
+        let x: i32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("x must be an integer"),
+        };
+        let y: i32 = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("y must be an integer"),
+        };
+        let party_movement = state.party.members.iter()
+            .filter(|c| c.is_alive())
+            .map(|c| c.movement_rate)
+            .min()
+            .unwrap_or(120);
+        let ws = match state.wilderness.as_mut() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let result = wilderness_engine::travel_day(ws, x, y, party_movement);
+        CommandResult::ok(format!("{}", result))
+    }
+}
+
+pub struct ForageCommand;
+impl Command for ForageCommand {
+    fn name(&self) -> &str { "forage" }
+    fn help(&self) -> &str { "Forage for food in the current hex (takes a full day)" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let ws = match state.wilderness.as_ref() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let result = wilderness_engine::forage(ws);
+        CommandResult::ok(result)
+    }
+}
+
+pub struct HuntCommand;
+impl Command for HuntCommand {
+    fn name(&self) -> &str { "hunt" }
+    fn help(&self) -> &str { "Hunt for game in the current hex (takes a full day)" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let ws = match state.wilderness.as_ref() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let result = wilderness_engine::hunt(ws);
+        CommandResult::ok(result)
+    }
+}
+
+pub struct WildernessStatusCommand;
+impl Command for WildernessStatusCommand {
+    fn name(&self) -> &str { "wilderness_status" }
+    fn help(&self) -> &str { "Show current wilderness travel status" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        let ws = match state.wilderness.as_ref() {
+            Some(w) => w,
+            None => return CommandResult::error("not in wilderness mode."),
+        };
+        let party_movement = state.party.members.iter()
+            .filter(|c| c.is_alive())
+            .map(|c| c.movement_rate)
+            .min()
+            .unwrap_or(120);
+        let status = wilderness_engine::wilderness_status(ws, party_movement);
+        CommandResult::ok(status)
+    }
+}

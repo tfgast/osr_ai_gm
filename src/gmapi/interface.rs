@@ -109,7 +109,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 fn query_state(id: &str, state: &GameState) -> GMResponse {
     let data = serde_json::json!({
         "mode": format!("{}", state.mode),
-        "turn": state.turn,
+        "turn": state.turn(),
         "dungeon_level": state.dungeon_level,
         "party_size": state.party.members.len(),
         "has_combat": state.combat.is_some(),
@@ -406,7 +406,12 @@ fn check_morale(id: &str, state: &mut GameState) -> GMResponse {
     if combat_state.living_monster_count() == 0 {
         return GMResponse::err(id, "no living monsters.", state.mode.clone());
     }
-    let result = combat::check_morale(combat_state);
+    let morale_score = combat_state.monsters.iter()
+        .filter(|m| m.is_alive())
+        .map(|m| m.morale)
+        .max()
+        .unwrap_or(6);
+    let result = combat::check_morale(combat_state, morale_score);
     GMResponse::ok(id, format!("{}", result), state.mode.clone())
 }
 
@@ -535,6 +540,7 @@ fn add_door(id: &str, state: &mut GameState, door_id: u32, room_a: u32, room_b: 
 }
 
 fn move_room(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
+    let dungeon_level = state.dungeon_level;
     let time = match state.time.as_mut() {
         Some(t) => t,
         None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
@@ -543,13 +549,14 @@ fn move_room(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
         Some(d) => d,
         None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
     };
-    match exploration::move_through_door(time, dungeon, door_id) {
-        Ok(msg) => GMResponse::ok(id, msg, state.mode.clone()),
+    match exploration::move_through_door(time, dungeon, dungeon_level, door_id) {
+        Ok(result) => GMResponse::ok(id, format!("{}", result), state.mode.clone()),
         Err(e) => GMResponse::err(id, e, state.mode.clone()),
     }
 }
 
 fn search(id: &str, state: &mut GameState, is_elf: bool) -> GMResponse {
+    let dungeon_level = state.dungeon_level;
     let time = match state.time.as_mut() {
         Some(t) => t,
         None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
@@ -558,8 +565,8 @@ fn search(id: &str, state: &mut GameState, is_elf: bool) -> GMResponse {
         Some(d) => d,
         None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
     };
-    let result = exploration::search_room(time, dungeon, is_elf);
-    GMResponse::ok(id, result, state.mode.clone())
+    let result = exploration::search_room(time, dungeon, dungeon_level, is_elf);
+    GMResponse::ok(id, format!("{}", result), state.mode.clone())
 }
 
 fn light(id: &str, state: &mut GameState, source: &str, carrier: &str) -> GMResponse {
@@ -1116,7 +1123,7 @@ fn load_game(id: &str, state: &mut GameState, path: &str) -> GMResponse {
         Ok(loaded) => {
             let msg = format!(
                 "loaded: turn {}, dungeon level {}, {} party members.",
-                loaded.turn, loaded.dungeon_level, loaded.party.members.len(),
+                loaded.turn(), loaded.dungeon_level, loaded.party.members.len(),
             );
             *state = loaded;
             GMResponse::ok(id, msg, state.mode.clone())

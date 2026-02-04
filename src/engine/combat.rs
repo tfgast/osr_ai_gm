@@ -138,6 +138,7 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
     combat.round += 1;
     combat.spell_declarations.clear();
     combat.disrupted.clear();
+    combat.phase = crate::model::CombatPhase::Morale;
 
     let winner = if party > monsters {
         "Party acts first"
@@ -390,25 +391,20 @@ pub fn monster_attack_with<R: Rng>(
 // Morale
 // =============================================================================
 
-/// Check morale for the monster group.
+/// Check morale for a specific monster type.
 ///
-/// Per OSE, morale is checked when:
+/// Per OSE, morale is checked per monster type — each type uses its own
+/// morale score. Checked when:
 /// - First monster in the group is killed
 /// - Half or more of the group has been defeated
 ///
-/// Roll 2d6: if result > morale score, monsters flee.
+/// Roll 2d6: if result > morale score, monsters of that type flee.
 /// Morale 2 = always flees, Morale 12 = never flees.
-pub fn check_morale(combat: &mut CombatState) -> MoraleResult {
-    check_morale_with(combat, &mut rand::thread_rng())
+pub fn check_morale(combat: &mut CombatState, morale_score: u32) -> MoraleResult {
+    check_morale_with(combat, morale_score, &mut rand::thread_rng())
 }
 
-pub fn check_morale_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> MoraleResult {
-    let morale_score = combat.monsters.iter()
-        .filter(|m| m.is_alive())
-        .map(|m| m.morale)
-        .max()
-        .unwrap_or(7);
-
+pub fn check_morale_with<R: Rng>(combat: &mut CombatState, morale_score: u32, rng: &mut R) -> MoraleResult {
     let d1 = rng.gen_range(1..=6i32);
     let d2 = rng.gen_range(1..=6i32);
     let roll = d1 + d2;
@@ -525,7 +521,17 @@ pub fn retreat(combat: &mut CombatState, character: &Character) -> String {
 /// Format combat status for display.
 pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
     let mut out = String::new();
-    out.push_str(&format!("=== Combat — Round {} ===\n", combat.round));
+    let phase_name = match combat.phase {
+        crate::model::CombatPhase::Declaration => "Declaration",
+        crate::model::CombatPhase::Initiative => "Initiative",
+        crate::model::CombatPhase::Morale => "Morale",
+        crate::model::CombatPhase::Movement => "Movement",
+        crate::model::CombatPhase::Missile => "Missile",
+        crate::model::CombatPhase::Magic => "Magic",
+        crate::model::CombatPhase::Melee => "Melee",
+        crate::model::CombatPhase::EndOfRound => "End of Round",
+    };
+    out.push_str(&format!("=== Combat — Round {} ({}) ===\n", combat.round, phase_name));
     out.push_str(&format!("Distance: {}'\n", combat.distance));
 
     if combat.round > 0 {
@@ -802,9 +808,9 @@ mod tests {
         let result = monster_attack_with(&mut combat, 0, &mut fighter, &mut rng);
         assert_eq!(result.attacker, "Goblin");
         assert_eq!(result.target, "Grond");
-        // Goblin HD "1-1" -> hd 1 -> THAC0 19
-        // vs Fighter AC 3 -> target number 16
-        assert_eq!(result.target_number, 16);
+        // Goblin HD "1-1" -> hd 0 -> THAC0 20
+        // vs Fighter AC 3 -> target number 17
+        assert_eq!(result.target_number, 17);
     }
 
     #[test]
@@ -871,11 +877,13 @@ mod tests {
     // --- Morale ---
 
     #[test]
-    fn morale_check_uses_highest_score() {
+    fn morale_check_per_type() {
         let mut combat = CombatState::new(vec![test_goblin(), test_skeleton()], 10);
-        let result = check_morale_with(&mut combat, &mut test_rng());
-        // Skeleton has morale 12, goblin 7 — uses 12
-        assert_eq!(result.morale_score, 12);
+        // Check goblin morale (7) separately from skeleton morale (12)
+        let goblin_result = check_morale_with(&mut combat, 7, &mut test_rng());
+        assert_eq!(goblin_result.morale_score, 7);
+        let skeleton_result = check_morale_with(&mut combat, 12, &mut test_rng());
+        assert_eq!(skeleton_result.morale_score, 12);
     }
 
     #[test]
@@ -883,7 +891,7 @@ mod tests {
         let mut combat = CombatState::new(vec![test_goblin()], 10);
         let mut rng = test_rng();
         for _ in 0..100 {
-            let result = check_morale_with(&mut combat, &mut rng);
+            let result = check_morale_with(&mut combat, 7, &mut rng);
             assert!(result.roll >= 2 && result.roll <= 12);
         }
     }
@@ -993,10 +1001,10 @@ mod tests {
             monster_attack_with(&mut combat, 2, &mut fighter, &mut rng);
         }
 
-        // 5. Check morale if any goblins died
+        // 5. Check morale if any goblins died (per-type: goblin morale is 7)
         let dead_goblins = combat.monsters.iter().filter(|m| !m.is_alive()).count();
         if dead_goblins > 0 {
-            let _morale = check_morale_with(&mut combat, &mut rng);
+            let _morale = check_morale_with(&mut combat, 7, &mut rng);
             // Morale result logged
         }
 

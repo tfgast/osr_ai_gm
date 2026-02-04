@@ -42,8 +42,8 @@ impl Terrain {
             Terrain::Clear | Terrain::City => (1, 1),
             Terrain::Barren | Terrain::Hills => (3, 2),    // 1.5x cost
             Terrain::Forest | Terrain::River => (3, 2),     // 1.5x cost
-            Terrain::Desert => (2, 1),                      // 2x cost
-            Terrain::Mountains | Terrain::Jungle => (2, 1), // 2x cost
+            Terrain::Desert | Terrain::Jungle => (2, 1),     // 2x cost
+            Terrain::Mountains => (3, 1),                   // 3x cost (~1 hex/day at 120')
             Terrain::Swamp => (2, 1),                       // 2x cost
             Terrain::Ocean => (1, 1),                       // ship travel
         }
@@ -52,11 +52,10 @@ impl Terrain {
     /// Chance of getting lost (X-in-6). 0 means never lost.
     pub fn lost_chance(self) -> u32 {
         match self {
-            Terrain::Clear | Terrain::City | Terrain::Barren => 1,
-            Terrain::Forest | Terrain::River | Terrain::Hills => 2,
-            Terrain::Desert | Terrain::Ocean => 2,
-            Terrain::Swamp | Terrain::Jungle => 3,
-            Terrain::Mountains => 2,
+            Terrain::Clear | Terrain::City | Terrain::Barren
+            | Terrain::Hills | Terrain::Mountains => 1,
+            Terrain::Forest | Terrain::River | Terrain::Desert
+            | Terrain::Ocean | Terrain::Swamp | Terrain::Jungle => 2,
         }
     }
 
@@ -154,16 +153,31 @@ impl WildernessState {
         self.find_hex(self.current_x, self.current_y)
     }
 
-    /// Move to a hex by coordinates.
+    /// Move to a hex by coordinates. Destination must be adjacent
+    /// to the current hex (prevents teleportation).
     pub fn move_to(&mut self, x: i32, y: i32) -> Result<(), String> {
-        if self.hexes.iter().any(|h| h.x == x && h.y == y) {
-            self.current_x = x;
-            self.current_y = y;
-            self.explored.insert((x, y));
-            Ok(())
-        } else {
-            Err(format!("hex ({}, {}) does not exist on the map", x, y))
+        if !self.hexes.iter().any(|h| h.x == x && h.y == y) {
+            return Err(format!("hex ({}, {}) does not exist on the map", x, y));
         }
+        if !Self::is_adjacent(self.current_x, self.current_y, x, y) {
+            return Err(format!(
+                "hex ({}, {}) is not adjacent to ({}, {})",
+                x, y, self.current_x, self.current_y
+            ));
+        }
+        self.current_x = x;
+        self.current_y = y;
+        self.explored.insert((x, y));
+        Ok(())
+    }
+
+    /// Check if two hex coordinates are adjacent (including same hex).
+    /// Uses offset coordinates where adjacent hexes differ by at most 1
+    /// in each axis.
+    fn is_adjacent(x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
+        let dx = (x2 - x1).abs();
+        let dy = (y2 - y1).abs();
+        dx <= 1 && dy <= 1
     }
 
     /// Daily travel speed in hexes based on party movement rate and terrain.
@@ -216,14 +230,17 @@ mod tests {
     fn terrain_movement_costs() {
         assert_eq!(Terrain::Clear.movement_cost(), (1, 1));
         assert_eq!(Terrain::Forest.movement_cost(), (3, 2));
-        assert_eq!(Terrain::Mountains.movement_cost(), (2, 1));
+        assert_eq!(Terrain::Mountains.movement_cost(), (3, 1));
     }
 
     #[test]
     fn terrain_lost_chances() {
         assert_eq!(Terrain::Clear.lost_chance(), 1);
+        assert_eq!(Terrain::Hills.lost_chance(), 1);
+        assert_eq!(Terrain::Mountains.lost_chance(), 1);
         assert_eq!(Terrain::Forest.lost_chance(), 2);
-        assert_eq!(Terrain::Swamp.lost_chance(), 3);
+        assert_eq!(Terrain::Swamp.lost_chance(), 2);
+        assert_eq!(Terrain::Jungle.lost_chance(), 2);
     }
 
     #[test]
@@ -251,6 +268,15 @@ mod tests {
     }
 
     #[test]
+    fn hex_movement_nonadjacent_fails() {
+        let mut ws = WildernessState::new();
+        ws.add_hex(HexCell::new(0, 0, Terrain::Clear));
+        ws.add_hex(HexCell::new(3, 0, Terrain::Hills));
+        // (3,0) exists but is not adjacent to (0,0)
+        assert!(ws.move_to(3, 0).is_err());
+    }
+
+    #[test]
     fn travel_speed_clear() {
         // 120' movement on clear terrain: 24 miles/day / 6 = 4 hexes
         let hexes = WildernessState::hexes_per_day(120, Terrain::Clear);
@@ -266,9 +292,9 @@ mod tests {
 
     #[test]
     fn travel_speed_mountains() {
-        // 120' on mountains: 24 / 2 = 12 miles / 6 = 2 hexes
+        // 120' on mountains: 24 / 3 = 8 miles / 6 = 1.3 -> 1 hex
         let hexes = WildernessState::hexes_per_day(120, Terrain::Mountains);
-        assert_eq!(hexes, 2);
+        assert_eq!(hexes, 1);
     }
 
     #[test]

@@ -1,4 +1,9 @@
-pub mod gm_cmds;
+pub mod party;
+pub mod combat_cmds;
+pub mod exploration_cmds;
+pub mod encounter_cmds;
+pub mod wilderness_cmds;
+pub mod system;
 
 use std::collections::HashMap;
 use crate::persist::GameState;

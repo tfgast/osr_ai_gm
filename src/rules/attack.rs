@@ -63,7 +63,9 @@ pub fn monster_thac0(hd: u32) -> u32 {
         4..=6 => 17,
         7..=9 => 14,
         10..=12 => 12,
-        _ => 10,
+        13..=15 => 10,
+        16..=18 => 8,
+        _ => 6,
     }
 }
 
@@ -74,7 +76,7 @@ pub fn monster_thac0(hd: u32) -> u32 {
 /// - `"1+1"` → 1 (bonus HP ignored for THAC0/turning)
 /// - `"3*"` → 3 (asterisk for special abilities ignored)
 /// - `"1/2"` → 1 (fractional HD treated as 1)
-/// - `"1-1"` → 1 (negative bonus ignored)
+/// - `"1-1"` → 0 (1 HD minus 1 = less than 1, attacks as 0 HD)
 pub fn parse_monster_hd(hd_str: &str) -> u32 {
     let s = hd_str.trim();
     // Handle fractional HD like "1/2"
@@ -83,8 +85,15 @@ pub fn parse_monster_hd(hd_str: &str) -> u32 {
     }
     // Take leading digits before any +, -, or * modifier
     let num_str: String = s.chars().take_while(|c| c.is_ascii_digit()).collect();
-    let n = num_str.parse().unwrap_or(1);
-    if n == 0 { 1 } else { n }
+    let base: u32 = num_str.parse().unwrap_or(1);
+    // Strip asterisks and check for minus modifier
+    let rest: String = s.chars().skip(num_str.len()).filter(|c| *c != '*').collect();
+    if let Some(stripped) = rest.strip_prefix('-') {
+        let penalty: u32 = stripped.trim().parse().unwrap_or(0);
+        base.saturating_sub(penalty)
+    } else {
+        base
+    }
 }
 
 #[cfg(test)]
@@ -239,7 +248,8 @@ mod tests {
 
     #[test]
     fn parse_hd_with_penalty() {
-        assert_eq!(parse_monster_hd("1-1"), 1);
+        // "1-1" = less than 1 HD, attacks as 0 HD (THAC0 20)
+        assert_eq!(parse_monster_hd("1-1"), 0);
     }
 
     #[test]
@@ -296,7 +306,12 @@ mod tests {
     }
 
     #[test]
+    fn monster_thac0_16hd() {
+        assert_eq!(monster_thac0(16), 8);
+    }
+
+    #[test]
     fn monster_thac0_20hd() {
-        assert_eq!(monster_thac0(20), 10);
+        assert_eq!(monster_thac0(20), 6);
     }
 }

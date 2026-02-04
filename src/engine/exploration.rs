@@ -6,6 +6,23 @@ use crate::rules::encounter;
 use crate::state::dungeon::{DoorState, DungeonState};
 use crate::state::time::TimeTracker;
 
+/// Check for wandering monsters (1-in-6 every 2 turns).
+/// Should be called after any action that consumes a dungeon turn.
+fn check_wandering_monster<R: Rng>(
+    rng: &mut R,
+    time: &TimeTracker,
+    dungeon_level: u32,
+) -> Option<encounter::EncounterEntry> {
+    if time.total_turns % 2 == 0 {
+        let roll: u32 = rng.gen_range(1..=6);
+        if roll == 1 {
+            let table_roll: u32 = rng.gen_range(1..=20);
+            return Some(encounter::dungeon_encounter(dungeon_level, table_roll).clone());
+        }
+    }
+    None
+}
+
 /// Result of a dungeon exploration action.
 #[derive(Debug)]
 pub struct ExplorationResult {
@@ -86,17 +103,12 @@ pub fn advance_dungeon_turn_with<R: Rng>(
     ));
 
     // Wandering monster check every 2 turns (1-in-6)
-    if time.total_turns % 2 == 0 {
-        let roll: u32 = rng.gen_range(1..=6);
-        if roll == 1 {
-            let table_roll: u32 = rng.gen_range(1..=20);
-            let entry = encounter::dungeon_encounter(dungeon_level, table_roll);
-            result.msg(format!(
-                "Wandering monster! {} ({} appearing)",
-                entry.name, entry.number
-            ));
-            result.encounter = Some(entry.clone());
-        }
+    if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
+        result.msg(format!(
+            "Wandering monster! {} ({} appearing)",
+            entry.name, entry.number
+        ));
+        result.encounter = Some(entry);
     }
 
     result
@@ -104,9 +116,9 @@ pub fn advance_dungeon_turn_with<R: Rng>(
 
 /// Search the current room for secret doors and hidden features.
 /// Base chance: 1-in-6 (elves get 2-in-6).
-/// Takes one turn.
-pub fn search_room(time: &mut TimeTracker, dungeon: &mut DungeonState, is_elf: bool) -> String {
-    search_room_with(&mut rand::thread_rng(), time, dungeon, is_elf)
+/// Takes one turn. Also checks for wandering monsters.
+pub fn search_room(time: &mut TimeTracker, dungeon: &mut DungeonState, dungeon_level: u32, is_elf: bool) -> ExplorationResult {
+    search_room_with(&mut rand::thread_rng(), time, dungeon, dungeon_level, is_elf)
 }
 
 /// Testable version.
@@ -114,13 +126,13 @@ pub fn search_room_with<R: Rng>(
     rng: &mut R,
     time: &mut TimeTracker,
     dungeon: &mut DungeonState,
+    dungeon_level: u32,
     is_elf: bool,
-) -> String {
+) -> ExplorationResult {
+    let mut result = ExplorationResult::new();
     let light_msgs = time.advance_turn();
-    let mut out = String::new();
     for msg in light_msgs {
-        out.push_str(&msg);
-        out.push('\n');
+        result.msg(msg);
     }
 
     let threshold = if is_elf { 2 } else { 1 };
@@ -141,21 +153,30 @@ pub fn search_room_with<R: Rng>(
             {
                 door.discovered = true;
                 found_something = true;
-                out.push_str(&format!(
-                    "Secret door found! Door {} leads to room {}.\n",
+                result.msg(format!(
+                    "Secret door found! Door {} leads to room {}.",
                     door.id,
                     if door.room_a == current { door.room_b } else { door.room_a }
                 ));
             }
         }
         if !found_something {
-            out.push_str("Search successful — but nothing hidden found here.");
+            result.msg("Search successful — but nothing hidden found here.");
         }
     } else {
-        out.push_str("Search reveals nothing.");
+        result.msg("Search reveals nothing.");
     }
 
-    out
+    // Wandering monster check (search consumes a turn)
+    if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
+        result.msg(format!(
+            "Wandering monster! {} ({} appearing)",
+            entry.name, entry.number
+        ));
+        result.encounter = Some(entry);
+    }
+
+    result
 }
 
 /// Listen at a door. Base chance 1-in-6 to hear noises behind it.
@@ -206,9 +227,8 @@ pub fn force_door_with<R: Rng>(
         return "You see no door here.".to_string();
     }
 
-    // Base 2-in-6, STR modifier adjusts threshold
-    let str_mod = ability::str_melee_mod(character.abilities.strength);
-    let threshold = (2 + str_mod).max(1).min(5) as u32;
+    // Use STR open doors chance (X-in-6) per OSE rules
+    let threshold = ability::str_open_doors(character.abilities.strength);
     let roll: u32 = rng.gen_range(1..=6);
 
     if roll <= threshold {
@@ -243,13 +263,14 @@ pub fn check_trap_with<R: Rng>(rng: &mut R, room_name: &str) -> String {
 }
 
 /// Move the party to a new room through a door.
-/// Consumes a turn. Checks for traps in the destination room.
+/// Consumes a turn. Checks for traps and wandering monsters.
 pub fn move_through_door(
     time: &mut TimeTracker,
     dungeon: &mut DungeonState,
+    dungeon_level: u32,
     door_id: u32,
-) -> Result<String, String> {
-    move_through_door_with(&mut rand::thread_rng(), time, dungeon, door_id)
+) -> Result<ExplorationResult, String> {
+    move_through_door_with(&mut rand::thread_rng(), time, dungeon, dungeon_level, door_id)
 }
 
 /// Testable version.
@@ -257,8 +278,9 @@ pub fn move_through_door_with<R: Rng>(
     rng: &mut R,
     time: &mut TimeTracker,
     dungeon: &mut DungeonState,
+    dungeon_level: u32,
     door_id: u32,
-) -> Result<String, String> {
+) -> Result<ExplorationResult, String> {
     let door = match dungeon.doors.iter().find(|d| d.id == door_id) {
         Some(d) => d.clone(),
         None => return Err(format!("Door {} not found.", door_id)),
@@ -278,38 +300,51 @@ pub fn move_through_door_with<R: Rng>(
 
     dungeon.move_to(dest).map_err(|e| e.to_string())?;
 
-    let mut out = String::new();
+    // Per OSE, doors close automatically after passing through (unless spiked)
+    if door.state == DoorState::Open {
+        if let Some(d) = dungeon.find_door_mut(door_id) {
+            d.state = DoorState::Closed;
+        }
+    }
 
-    // Check for trap in new room
-    let has_trap = dungeon.find_room(dest).and_then(|r| r.trap.as_ref()).is_some();
+    let mut result = ExplorationResult::new();
+
+    // Check for trap in new room (only if not already triggered)
+    let has_untriggered_trap = dungeon.find_room(dest)
+        .map(|r| r.trap.is_some() && !r.trap_triggered)
+        .unwrap_or(false);
     let room_name = dungeon.find_room(dest)
         .map(|r| r.name.clone())
         .unwrap_or_else(|| format!("room {}", dest));
 
-    if has_trap {
+    if has_untriggered_trap {
         let trap_msg = check_trap_with(rng, &room_name);
-        out.push_str(&trap_msg);
-        out.push('\n');
         if trap_msg.contains("TRIGGERED") {
             if let Some(room) = dungeon.find_room_mut(dest) {
                 room.trap_triggered = true;
             }
         }
+        result.msg(trap_msg);
     }
 
-    out.push_str(&format!(
-        "Moved to {} (room {}).",
-        room_name, dest
-    ));
+    result.msg(format!("Moved to {} (room {}).", room_name, dest));
 
     // Advance time for the move
     let light_msgs = time.advance_turn();
     for msg in light_msgs {
-        out.push('\n');
-        out.push_str(&msg);
+        result.msg(msg);
     }
 
-    Ok(out)
+    // Wandering monster check (moving consumes a turn)
+    if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
+        result.msg(format!(
+            "Wandering monster! {} ({} appearing)",
+            entry.name, entry.number
+        ));
+        result.encounter = Some(entry);
+    }
+
+    Ok(result)
 }
 
 /// Display the current exploration status.
@@ -422,24 +457,25 @@ mod tests {
         let mut dungeon = test_dungeon();
         time.light(LightSourceKind::Torch, "Arden");
 
-        let result = search_room_with(&mut rng, &mut time, &mut dungeon, false);
-        // Should either find something or not
-        assert!(!result.is_empty());
+        let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+        assert!(!result.messages.is_empty());
     }
 
     #[test]
     fn search_finds_secret_door() {
-        // Seed that gives roll of 1 (success)
         let mut found = false;
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut time = TimeTracker::new();
             let mut dungeon = test_dungeon();
             time.light(LightSourceKind::Lantern, "Test");
+            // Open door 0 so we can move to room 1
+            dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
             dungeon.move_to(1).unwrap(); // Guard Room has secret door
 
-            let result = search_room_with(&mut rng, &mut time, &mut dungeon, false);
-            if result.contains("Secret door found") {
+            let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+            let output = format!("{}", result);
+            if output.contains("Secret door found") {
                 found = true;
                 break;
             }
@@ -513,9 +549,11 @@ mod tests {
         let mut time = TimeTracker::new();
         let mut dungeon = test_dungeon();
         time.light(LightSourceKind::Lantern, "Test");
+        // Open door 0 so we can move to room 1
+        dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
         dungeon.move_to(1).unwrap(); // Move to guard room
 
-        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 2);
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 2);
         assert!(result.is_ok());
         // Should have moved to room 3 (Trap Room)
         assert_eq!(dungeon.current_room, 3);
@@ -528,7 +566,7 @@ mod tests {
         let mut dungeon = test_dungeon();
         time.light(LightSourceKind::Lantern, "Test");
 
-        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 0);
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not open"));
     }

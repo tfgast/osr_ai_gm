@@ -8,10 +8,11 @@ pub type SpellSlots = [u32; 6];
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpellListType {
     None,
-    Cleric,     // Cleric, Drow, Paladin
+    Cleric,     // Cleric, Paladin
     Druid,      // Bard, Druid, Ranger
     Illusionist, // Gnome, Illusionist
     MagicUser,   // Elf, Half-Elf, Magic-User
+    DrowArcaneAndDivine, // Drow: both arcane (magic-user) and divine (cleric)
 }
 
 /// Spell progression category — classes sharing a table.
