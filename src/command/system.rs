@@ -103,14 +103,26 @@ impl Command for NoteDeleteCommand {
         if args.is_empty() {
             return CommandResult::error("usage: note_delete <index>");
         }
-        let index: usize = match args[0].parse() {
-            Ok(n) if n >= 1 && n <= state.notes.len() => n,
-            _ => return CommandResult::error(format!(
-                "index must be 1-{}", state.notes.len()
-            )),
+        if state.notes.is_empty() {
+            return CommandResult::error("no notes to delete");
+        }
+        let n: usize = match args[0].parse() {
+            Ok(n) => n,
+            Err(_) => return CommandResult::error("index must be a positive integer"),
         };
-        let removed = state.notes.remove(index - 1);
-        CommandResult::ok(format!("Deleted note [{}]: {}", index, removed))
+        if n < 1 {
+            return CommandResult::error("notes use 1-based indexing; first note is index 1");
+        }
+        if n > state.notes.len() {
+            return CommandResult::error(format!(
+                "index {} out of range; have {} note{}",
+                n,
+                state.notes.len(),
+                if state.notes.len() == 1 { "" } else { "s" }
+            ));
+        }
+        let removed = state.notes.remove(n - 1);
+        CommandResult::ok(format!("Deleted note [{}]: {}", n, removed))
     }
 }
 
@@ -196,6 +208,7 @@ mod tests {
         let cmd = NoteDeleteCommand;
         let result = cmd.execute(&["0"], &mut state);
         assert!(result.output.contains("Error"));
+        assert!(result.output.contains("1-based indexing"));
         assert_eq!(state.notes.len(), 1);
     }
 
