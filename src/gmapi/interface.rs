@@ -287,7 +287,7 @@ fn spawn_encounter(
     // XP: use explicit value if provided, otherwise look up from monster database
     let xp = xp_value.unwrap_or_else(|| {
         crate::rules::monster::find_monster(name)
-            .map(|m| m.xp_value)
+            .map(|m| m.xp())
             .unwrap_or(0)
     });
     let mut monsters = Vec::new();
@@ -961,9 +961,9 @@ fn spawn_monster(id: &str, state: &mut GameState, name: &str, count: u32, distan
         } else {
             def.name.to_string()
         };
-        let mut m = Monster::new(&monster_name, def.hit_dice);
+        let mut m = Monster::new(&monster_name, &def.hit_dice);
         // Roll HP from hit dice
-        let hd = crate::rules::attack::parse_monster_hd(def.hit_dice);
+        let hd = crate::rules::attack::parse_monster_hd(&def.hit_dice);
         let hp = if hd == 0 {
             // Half HD monsters (kobolds, etc): 1d4
             match dice::roll_str("1d4") {
@@ -978,11 +978,11 @@ fn spawn_monster(id: &str, state: &mut GameState, name: &str, count: u32, distan
         };
         m.hp = hp;
         m.max_hp = hp;
-        m.ac = def.ac;
-        m.damage = def.damage.to_string();
+        m.ac = def.ac();
+        m.damage = def.damage();
         m.morale = def.morale;
-        m.xp_value = def.xp_value;
-        m.attacks = def.attacks.iter().map(|a| a.to_string()).collect();
+        m.xp_value = def.xp();
+        m.attacks = def.attack_names();
         monsters.push(m);
     }
 
@@ -993,8 +993,9 @@ fn spawn_monster(id: &str, state: &mut GameState, name: &str, count: u32, distan
     state.mode = GameMode::Combat;
 
     let mut msg = format!("combat started: {} {}(s) at {}' distance.", count, def.name, distance);
-    if !def.special.is_empty() {
-        msg.push_str(&format!(" Special: {}", def.special));
+    let special = def.special();
+    if !special.is_empty() {
+        msg.push_str(&format!(" Special: {}", special));
     }
 
     GMResponse::ok_with_data(
@@ -1003,8 +1004,8 @@ fn spawn_monster(id: &str, state: &mut GameState, name: &str, count: u32, distan
             "status": status,
             "monster": def.name,
             "hit_dice": def.hit_dice,
-            "ac": def.ac,
-            "special": def.special,
+            "ac": def.ac(),
+            "special": def.special(),
         }),
     )
 }

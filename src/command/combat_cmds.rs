@@ -52,7 +52,7 @@ impl Command for StartCombatCommand {
             }
         } else {
             monster_db::find_monster(name)
-                .map(|m| m.xp_value)
+                .map(|m| m.xp())
                 .unwrap_or(0)
         };
 

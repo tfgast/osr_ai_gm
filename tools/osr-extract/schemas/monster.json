@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OSE Monster",
+  "description": "Monster stat block for Old-School Essentials",
+  "type": "object",
+  "required": ["name", "hit_dice", "armor_class", "attacks", "damage", "movement", "morale", "xp_value"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Monster name"
+    },
+    "hit_dice": {
+      "type": "string",
+      "description": "Hit dice notation (e.g., '1', '1-1', '2+1', '6*', '10**')",
+      "pattern": "^[0-9]+(/[0-9]+)?([+-][0-9]+)?(\\*+)?$"
+    },
+    "armor_class": {
+      "type": "integer",
+      "description": "Armor class (descending, 9 = unarmored)",
+      "minimum": -10,
+      "maximum": 9
+    },
+    "attacks": {
+      "type": "array",
+      "description": "List of attack types",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "damage": {
+      "type": "string",
+      "description": "Damage dice notation (e.g., '1d6', '2d4+1', '1d8 / 1d8 / 2d6')"
+    },
+    "movement": {
+      "type": "integer",
+      "description": "Movement rate in feet per turn",
+      "minimum": 0
+    },
+    "movement_fly": {
+      "type": "integer",
+      "description": "Flying movement rate (if applicable)",
+      "minimum": 0
+    },
+    "movement_swim": {
+      "type": "integer",
+      "description": "Swimming movement rate (if applicable)",
+      "minimum": 0
+    },
+    "morale": {
+      "type": "integer",
+      "description": "Morale rating (2-12)",
+      "minimum": 2,
+      "maximum": 12
+    },
+    "xp_value": {
+      "type": "integer",
+      "description": "Experience points awarded",
+      "minimum": 0
+    },
+    "num_appearing": {
+      "type": "string",
+      "description": "Number appearing (dice notation, e.g., '2d4', '1d6 (3d10)')"
+    },
+    "num_appearing_lair": {
+      "type": "string",
+      "description": "Number appearing in lair (if different)"
+    },
+    "save_as": {
+      "type": "string",
+      "description": "Saves as class/level (e.g., 'F2', 'MU5')"
+    },
+    "alignment": {
+      "type": "string",
+      "enum": ["Lawful", "Neutral", "Chaotic", "Any"],
+      "description": "Monster alignment"
+    },
+    "treasure_type": {
+      "type": "string",
+      "description": "Treasure type letter(s)"
+    },
+    "special": {
+      "type": "string",
+      "description": "Special abilities and notes"
+    },
+    "source": {
+      "type": "string",
+      "description": "Source book reference"
+    }
+  }
+}
