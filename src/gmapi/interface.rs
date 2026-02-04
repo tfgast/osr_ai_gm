@@ -48,6 +48,8 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
             turn_undead(id, state, character, *monster_idx)
         }
         GMCommand::Close { character, feet } => close(id, state, character, *feet),
+        GMCommand::Retreat { character } => retreat(id, state, character),
+        GMCommand::FightingWithdrawal { character } => fighting_withdrawal(id, state, character),
         GMCommand::EndCombat => end_combat(id, state),
 
         // -- Exploration --
@@ -444,6 +446,55 @@ fn close(id: &str, state: &mut GameState, char_name: &str, feet: Option<u32>) ->
         ),
         Err(e) => GMResponse::err(id, e, state.mode.clone()),
     }
+}
+
+fn retreat(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
+    if state.combat.is_none() {
+        return GMResponse::err(id, "no active combat.", state.mode.clone());
+    }
+    let character = match state.party.find_member_mut(char_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    if !character.is_alive() {
+        return GMResponse::err(id, format!("{} is already dead.", character.name), state.mode.clone());
+    }
+    let combat_state = state.combat.as_mut().unwrap();
+    let result = combat::retreat(combat_state, character);
+    GMResponse::ok_with_data(
+        id,
+        format!("{}", result),
+        state.mode.clone(),
+        serde_json::json!({
+            "retreater": result.retreater,
+            "distance_moved": result.distance_moved,
+            "new_distance": result.new_distance,
+            "free_attacks": result.free_attacks.iter().map(|a| serde_json::json!({
+                "attacker": a.attacker,
+                "target": a.target,
+                "roll": a.roll,
+                "modifiers": a.modifiers,
+                "target_number": a.target_number,
+                "hit": a.hit,
+                "damage": a.damage,
+                "target_hp_after": a.target_hp_after,
+                "target_killed": a.target_killed,
+            })).collect::<Vec<_>>(),
+        }),
+    )
+}
+
+fn fighting_withdrawal(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
+    let character = match state.party.find_member(char_name) {
+        Some(c) => c.clone(),
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let combat_state = match state.combat.as_mut() {
+        Some(c) => c,
+        None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
+    };
+    let msg = combat::fighting_withdrawal(combat_state, &character);
+    GMResponse::ok(id, msg, state.mode.clone())
 }
 
 fn end_combat(id: &str, state: &mut GameState) -> GMResponse {
@@ -1262,6 +1313,107 @@ mod tests {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::EndCombat), &mut state);
         assert!(!resp.success);
+    }
+
+    #[test]
+    fn retreat_auto_resolves_free_attacks() {
+        let mut state = GameState::new();
+        // Create a character
+        let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
+            name: "Aldric".to_string(),
+            class: Class::Fighter,
+            alignment: Alignment::Lawful,
+            abilities: None,
+        }), &mut state);
+        assert!(resp.success);
+
+        // Give character lots of HP so they survive the free attacks
+        if let Some(c) = state.party.find_member_mut("Aldric") {
+            c.hp = 100;
+            c.max_hp = 100;
+        }
+
+        // Spawn goblins for combat
+        let resp = handle_request(&make_req("2", GMCommand::SpawnEncounter {
+            name: "Goblin".to_string(),
+            count: 2,
+            hit_dice: "1-1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 10,
+            xp_value: Some(5),
+        }), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.mode, GameMode::Combat);
+
+        // Retreat
+        let resp = handle_request(&make_req("3", GMCommand::Retreat {
+            character: "Aldric".to_string(),
+        }), &mut state);
+        assert!(resp.success, "retreat should succeed: {}", resp.message);
+
+        // Check the response data contains free attacks
+        let data = resp.data.unwrap();
+        assert!(data.get("free_attacks").is_some(), "response should contain free_attacks");
+        let free_attacks = data["free_attacks"].as_array().unwrap();
+        assert_eq!(free_attacks.len(), 2, "both goblins should get free attacks");
+
+        // Each attack should have +2 modifier
+        for atk in free_attacks {
+            assert_eq!(atk["modifiers"], 2, "free attack should be at +2");
+        }
+
+        // Distance should have increased (fighter moves 40' per encounter)
+        assert!(data["new_distance"].as_u64().unwrap() > 10, "distance should increase");
+    }
+
+    #[test]
+    fn fighting_withdrawal_no_free_attacks() {
+        let mut state = GameState::new();
+        // Create a character
+        let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
+            name: "Aldric".to_string(),
+            class: Class::Fighter,
+            alignment: Alignment::Lawful,
+            abilities: None,
+        }), &mut state);
+        assert!(resp.success);
+
+        // Spawn goblin for combat
+        let resp = handle_request(&make_req("2", GMCommand::SpawnEncounter {
+            name: "Goblin".to_string(),
+            count: 1,
+            hit_dice: "1-1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 10,
+            xp_value: Some(5),
+        }), &mut state);
+        assert!(resp.success);
+
+        // Fighting withdrawal
+        let resp = handle_request(&make_req("3", GMCommand::FightingWithdrawal {
+            character: "Aldric".to_string(),
+        }), &mut state);
+        assert!(resp.success, "fighting withdrawal should succeed: {}", resp.message);
+
+        // Message should indicate fighting withdrawal, not free attacks
+        assert!(resp.message.contains("fighting withdrawal"), "message should mention fighting withdrawal");
+        assert!(!resp.message.contains("free attack"), "fighting withdrawal should NOT mention free attacks");
+    }
+
+    #[test]
+    fn retreat_no_combat_error() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::Retreat {
+            character: "Nobody".to_string(),
+        }), &mut state);
+        assert!(!resp.success);
+        assert!(resp.message.contains("no active combat"), "should error: no active combat");
     }
 
     #[test]

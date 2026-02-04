@@ -94,6 +94,14 @@ pub enum GMCommand {
         #[serde(default)]
         feet: Option<u32>,
     },
+    /// Retreat from combat — full speed, enemies get free attack at +2.
+    Retreat {
+        character: String,
+    },
+    /// Fighting withdrawal — half speed, no free attacks.
+    FightingWithdrawal {
+        character: String,
+    },
     /// End the current combat.
     EndCombat,
 

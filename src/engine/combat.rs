@@ -403,6 +403,18 @@ pub fn monster_attack_with<R: Rng>(
     character: &mut Character,
     rng: &mut R,
 ) -> AttackResult {
+    monster_attack_modified_with(combat, monster_idx, character, 0, rng)
+}
+
+/// Resolve a monster's attack against a character with an explicit hit modifier.
+/// Used for normal attacks (modifier=0) and free attacks on retreat (modifier=+2).
+fn monster_attack_modified_with<R: Rng>(
+    combat: &mut CombatState,
+    monster_idx: usize,
+    character: &mut Character,
+    modifier: i32,
+    rng: &mut R,
+) -> AttackResult {
     assert!(
         monster_idx < combat.monsters.len() && combat.monsters[monster_idx].is_alive(),
         "cannot attack with dead or nonexistent monster at index {}",
@@ -416,7 +428,7 @@ pub fn monster_attack_with<R: Rng>(
     let damage_dice = if monster.damage.is_empty() { "1d6" } else { &monster.damage };
 
     let roll = rng.gen_range(1..=20u32);
-    let modifiers = 0i32;
+    let modifiers = modifier;
     let target_num = attack::target_number(thac0, target_ac);
     let hit = attack::hits(thac0, target_ac, modifiers, roll);
 
@@ -631,16 +643,76 @@ pub fn fighting_withdrawal(combat: &mut CombatState, character: &Character) -> S
     msg
 }
 
+/// Result of a retreat attempt with auto-resolved free attacks.
+#[derive(Debug, Clone)]
+pub struct RetreatResult {
+    pub retreater: String,
+    pub distance_moved: u32,
+    pub new_distance: u32,
+    pub free_attacks: Vec<AttackResult>,
+}
+
+impl fmt::Display for RetreatResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{} retreats at full speed ({}', distance now {}').",
+            self.retreater, self.distance_moved, self.new_distance)?;
+        if self.free_attacks.is_empty() {
+            write!(f, "No enemies in melee range for free attacks.")
+        } else {
+            writeln!(f, "Free attacks at +2:")?;
+            for (i, atk) in self.free_attacks.iter().enumerate() {
+                if i > 0 { writeln!(f)?; }
+                write!(f, "  {}", atk)?;
+            }
+            Ok(())
+        }
+    }
+}
+
 /// Resolve retreat for a character.
 /// Full encounter movement speed; enemies in melee get a free attack at +2.
-pub fn retreat(combat: &mut CombatState, character: &Character) -> String {
+/// All living monsters in melee range automatically execute free attacks.
+pub fn retreat(combat: &mut CombatState, character: &mut Character) -> RetreatResult {
+    retreat_with(combat, character, &mut rand::thread_rng())
+}
+
+/// Retreat with deterministic RNG for testing.
+pub fn retreat_with<R: Rng>(
+    combat: &mut CombatState,
+    character: &mut Character,
+    rng: &mut R,
+) -> RetreatResult {
     let encounter_move = character.movement_rate / 3;
     combat.distance = combat.distance.saturating_add(encounter_move);
-    let msg = format!(
-        "{} retreats at full speed ({}', distance now {}'). Enemies in melee get free attack at +2.",
+
+    let retreat_msg = format!(
+        "{} retreats at full speed ({}', distance now {}').",
         character.name, encounter_move, combat.distance);
-    combat.log.push(msg.clone());
-    msg
+    combat.log.push(retreat_msg);
+
+    // All living monsters in melee range get a free attack at +2
+    let mut free_attacks = Vec::new();
+    let alive_monster_indices: Vec<usize> = combat.monsters.iter()
+        .enumerate()
+        .filter(|(_, m)| m.is_alive())
+        .map(|(i, _)| i)
+        .collect();
+
+    for monster_idx in alive_monster_indices {
+        // Character may have died from a previous free attack
+        if !character.is_alive() {
+            break;
+        }
+        let atk = monster_attack_modified_with(combat, monster_idx, character, 2, rng);
+        free_attacks.push(atk);
+    }
+
+    RetreatResult {
+        retreater: character.name.clone(),
+        distance_moved: encounter_move,
+        new_distance: combat.distance,
+        free_attacks,
+    }
 }
 
 // =============================================================================
@@ -1076,12 +1148,12 @@ mod tests {
     #[test]
     fn retreat_speed() {
         let mut combat = CombatState::new(vec![test_goblin()], 10);
-        let fighter = test_fighter();
-        let msg = retreat(&mut combat, &fighter);
+        let mut fighter = test_fighter();
+        let result = retreat_with(&mut combat, &mut fighter, &mut test_rng());
         // encounter movement = 120/3 = 40
-        assert!(msg.contains("40'"));
-        assert!(msg.contains("free attack"));
-        assert_eq!(combat.distance, 50); // 10 + 40
+        assert_eq!(result.distance_moved, 40);
+        assert_eq!(result.new_distance, 50); // 10 + 40
+        assert_eq!(combat.distance, 50);
     }
 
     // --- Status Display ---
@@ -1495,16 +1567,86 @@ mod tests {
     #[test]
     fn retreat_grants_free_attacks() {
         let mut combat = CombatState::new(vec![test_goblin()], 10);
-        let fighter = test_fighter();
-        let msg = retreat(&mut combat, &fighter);
-        assert!(msg.contains("free attack"), "retreat should mention free attacks");
-        assert!(msg.contains("+2"), "free attack should be at +2");
+        let mut fighter = test_fighter();
+        let result = retreat_with(&mut combat, &mut fighter, &mut test_rng());
+        // The goblin should have executed a free attack
+        assert_eq!(result.free_attacks.len(), 1, "goblin should get one free attack");
+        assert_eq!(result.free_attacks[0].modifiers, 2, "free attack should be at +2");
+        assert_eq!(result.free_attacks[0].attacker, "Goblin");
+        assert_eq!(result.free_attacks[0].target, "Grond");
+    }
+
+    #[test]
+    fn retreat_resolves_multiple_free_attacks() {
+        let mut combat = CombatState::new(vec![test_goblin(), test_goblin(), test_goblin()], 10);
+        let mut fighter = test_fighter();
+        let result = retreat_with(&mut combat, &mut fighter, &mut test_rng());
+        // All 3 goblins should attack
+        assert_eq!(result.free_attacks.len(), 3, "all 3 goblins should get free attacks");
+        for atk in &result.free_attacks {
+            assert_eq!(atk.modifiers, 2, "each free attack should be at +2");
+        }
+    }
+
+    #[test]
+    fn retreat_dead_monsters_dont_attack() {
+        let mut combat = CombatState::new(vec![test_goblin(), test_goblin()], 10);
+        // Kill the first goblin
+        combat.monsters[0].hp = 0;
+        let mut fighter = test_fighter();
+        let result = retreat_with(&mut combat, &mut fighter, &mut test_rng());
+        // Only living goblin attacks
+        assert_eq!(result.free_attacks.len(), 1, "only living goblin should attack");
+        assert_eq!(result.free_attacks[0].attacker, "Goblin"); // second goblin also named "Goblin"
+    }
+
+    #[test]
+    fn retreat_stops_if_character_dies() {
+        // Create multiple strong monsters
+        let ogre = Monster {
+            name: "Ogre".to_string(),
+            hit_dice: "4+1".parse().unwrap(),
+            hp: 20, max_hp: 20, ac: 5,
+            attacks: vec!["club".to_string()],
+            damage: "1d10".to_string(),
+            morale: 10, xp_value: 125,
+            turned: false,
+        };
+        let mut combat = CombatState::new(vec![ogre.clone(), ogre.clone(), ogre], 10);
+        // Create a very weak character (1 HP, bad AC)
+        let mut weakling = test_fighter();
+        weakling.hp = 1;
+        weakling.max_hp = 1;
+        weakling.ac = 9; // very bad AC, easier to hit
+
+        // Run multiple times to statistically ensure behavior
+        // Use seeded RNG for reproducibility
+        let mut rng = StdRng::seed_from_u64(12345);
+        let result = retreat_with(&mut combat, &mut weakling, &mut rng);
+
+        // At least one attack should happen (3 ogres)
+        assert!(!result.free_attacks.is_empty(), "at least one attack should happen");
+
+        // If character died during retreat, attacks should stop early
+        if !weakling.is_alive() {
+            // Find the killing attack
+            let killing_idx = result.free_attacks.iter()
+                .position(|a| a.target_killed)
+                .expect("should have a killing attack if character is dead");
+            // No attacks after the killing blow
+            assert_eq!(result.free_attacks.len(), killing_idx + 1,
+                "should stop after killing character");
+        }
+        // Otherwise all 3 attacks should have been made
+        else {
+            assert_eq!(result.free_attacks.len(), 3, "all ogres should attack if character survives");
+        }
     }
 
     #[test]
     fn distance_tracking_across_movements() {
         let mut combat = CombatState::new(vec![test_goblin()], 0);
-        let fighter = test_fighter(); // movement 120, encounter = 40
+        let mut fighter = test_fighter(); // movement 120, encounter = 40
 
         // Fighting withdrawal from distance 0
         fighting_withdrawal(&mut combat, &fighter);
@@ -1515,7 +1657,7 @@ mod tests {
         assert_eq!(combat.distance, 40);
 
         // Full retreat
-        retreat(&mut combat, &fighter);
+        retreat_with(&mut combat, &mut fighter, &mut test_rng());
         assert_eq!(combat.distance, 80); // + 40 encounter move
     }
 
@@ -1523,8 +1665,8 @@ mod tests {
     fn distance_saturating_add() {
         // Distance should use saturating_add to prevent overflow
         let mut combat = CombatState::new(vec![test_goblin()], u32::MAX - 10);
-        let fighter = test_fighter(); // encounter move = 40
-        retreat(&mut combat, &fighter);
+        let mut fighter = test_fighter(); // encounter move = 40
+        retreat_with(&mut combat, &mut fighter, &mut test_rng());
         assert_eq!(combat.distance, u32::MAX); // saturated, not wrapped
     }
 

@@ -302,18 +302,24 @@ impl Command for RetreatCommand {
         if args.is_empty() {
             return CommandResult::error("usage: retreat <character_name>");
         }
-        let character = match state.party.find_member(args[0]) {
-            Some(c) => c.clone(),
+        let char_name = args[0];
+        // Validate combat exists
+        if state.combat.is_none() {
+            return CommandResult::error("no active combat.");
+        }
+        // Validate character exists and is alive
+        let character = match state.party.find_member_mut(char_name) {
+            Some(c) => c,
             None => return CommandResult::error(format!(
-                "no party member named '{}'.", args[0]
+                "no party member named '{}'.", char_name
             )),
         };
-        let combat = match state.combat.as_mut() {
-            Some(c) => c,
-            None => return CommandResult::error("no active combat."),
-        };
-        let msg = combat::retreat(combat, &character);
-        CommandResult::ok(msg)
+        if !character.is_alive() {
+            return CommandResult::error(format!("{} is already dead.", character.name));
+        }
+        let combat = state.combat.as_mut().unwrap();
+        let result = combat::retreat(combat, character);
+        CommandResult::ok(format!("{}", result))
     }
 }
 
