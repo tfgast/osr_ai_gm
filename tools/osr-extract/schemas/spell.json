@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OSE Spell",
+  "description": "Spell definition for Old-School Essentials",
+  "type": "object",
+  "required": ["name", "list", "level", "duration", "range", "description"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Spell name"
+    },
+    "list": {
+      "type": "string",
+      "enum": ["cleric", "druid", "illusionist", "magic_user"],
+      "description": "Spell list this spell belongs to"
+    },
+    "level": {
+      "type": "integer",
+      "description": "Spell level (1-9)",
+      "minimum": 1,
+      "maximum": 9
+    },
+    "duration": {
+      "type": "string",
+      "description": "Spell duration (e.g., 'Instant', '6 turns', 'Permanent')"
+    },
+    "range": {
+      "type": "string",
+      "description": "Spell range (e.g., '60'', 'The caster', 'Touch')"
+    },
+    "description": {
+      "type": "string",
+      "description": "Full spell description"
+    },
+    "reversible": {
+      "type": "boolean",
+      "description": "Whether the spell has a reversed form",
+      "default": false
+    },
+    "reversed_name": {
+      "type": ["string", "null"],
+      "description": "Name of the reversed spell (if reversible)"
+    },
+    "reversed_description": {
+      "type": ["string", "null"],
+      "description": "Description of the reversed spell effect"
+    }
+  }
+}
