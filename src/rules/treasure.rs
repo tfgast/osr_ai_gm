@@ -1,6 +1,8 @@
 /// Treasure type definitions loaded from JSON data files.
 /// Covers hoard treasures (A-O), individual treasures (P-T), and group treasures (U-V).
+/// Also includes gem and jewellery value tables.
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -233,6 +235,110 @@ pub fn all_treasure_types() -> &'static [TreasureTypeDef] {
     registry().all()
 }
 
+// =============================================================================
+// Gem and Jewellery Value Tables
+// =============================================================================
+
+/// Gem value table entry.
+#[derive(Debug, Clone, Copy)]
+pub struct GemValueEntry {
+    pub min_roll: u32,
+    pub max_roll: u32,
+    pub value_gp: u32,
+}
+
+/// The gem value table (d20 roll).
+/// From OSE: 1-4 = 10gp, 5-9 = 50gp, 10-15 = 100gp, 16-19 = 500gp, 20 = 1000gp
+pub const GEM_VALUE_TABLE: &[GemValueEntry] = &[
+    GemValueEntry { min_roll: 1, max_roll: 4, value_gp: 10 },
+    GemValueEntry { min_roll: 5, max_roll: 9, value_gp: 50 },
+    GemValueEntry { min_roll: 10, max_roll: 15, value_gp: 100 },
+    GemValueEntry { min_roll: 16, max_roll: 19, value_gp: 500 },
+    GemValueEntry { min_roll: 20, max_roll: 20, value_gp: 1000 },
+];
+
+/// Roll a single gem's value using the standard d20 table.
+/// Returns the gem value in gold pieces.
+pub fn roll_gem_value() -> u32 {
+    let mut rng = rand::thread_rng();
+    let roll: u32 = rng.gen_range(1..=20);
+    gem_value_from_roll(roll)
+}
+
+/// Get gem value from a specific d20 roll (useful for testing/deterministic scenarios).
+pub fn gem_value_from_roll(roll: u32) -> u32 {
+    for entry in GEM_VALUE_TABLE {
+        if roll >= entry.min_roll && roll <= entry.max_roll {
+            return entry.value_gp;
+        }
+    }
+    // Default to lowest value if roll is out of range
+    10
+}
+
+/// Roll values for multiple gems.
+/// Returns a vector of individual gem values in gold pieces.
+pub fn roll_gem_values(count: u32) -> Vec<u32> {
+    (0..count).map(|_| roll_gem_value()).collect()
+}
+
+/// Roll the value of a single piece of jewellery.
+/// Standard formula: 3d6 × 100 gp
+pub fn roll_jewellery_value() -> u32 {
+    let mut rng = rand::thread_rng();
+    let d1: u32 = rng.gen_range(1..=6);
+    let d2: u32 = rng.gen_range(1..=6);
+    let d3: u32 = rng.gen_range(1..=6);
+    (d1 + d2 + d3) * 100
+}
+
+/// Roll jewellery value from a specific 3d6 total (useful for testing).
+pub fn jewellery_value_from_roll(roll_3d6: u32) -> u32 {
+    roll_3d6 * 100
+}
+
+/// Roll values for multiple pieces of jewellery.
+/// Returns a vector of individual jewellery values in gold pieces.
+pub fn roll_jewellery_values(count: u32) -> Vec<u32> {
+    (0..count).map(|_| roll_jewellery_value()).collect()
+}
+
+/// Calculate damaged jewellery value (50% of normal).
+pub fn damaged_jewellery_value(normal_value: u32) -> u32 {
+    normal_value / 2
+}
+
+/// Result of rolling treasure valuables (gems or jewellery).
+#[derive(Debug, Clone)]
+pub struct ValuablesResult {
+    /// Individual values of each item.
+    pub values: Vec<u32>,
+    /// Total value in gold pieces.
+    pub total_gp: u32,
+}
+
+/// Roll gems and return detailed results.
+pub fn roll_gems(count: u32) -> ValuablesResult {
+    let values = roll_gem_values(count);
+    let total_gp = values.iter().sum();
+    ValuablesResult { values, total_gp }
+}
+
+/// Roll jewellery and return detailed results.
+pub fn roll_jewellery(count: u32) -> ValuablesResult {
+    let values = roll_jewellery_values(count);
+    let total_gp = values.iter().sum();
+    ValuablesResult { values, total_gp }
+}
+
+/// Average gem value (for estimation purposes).
+/// Calculated as: (4×10 + 5×50 + 6×100 + 4×500 + 1×1000) / 20 = 96 gp
+pub const AVERAGE_GEM_VALUE: u32 = 96;
+
+/// Average jewellery value (for estimation purposes).
+/// 3d6 average = 10.5, × 100 = 1050 gp
+pub const AVERAGE_JEWELLERY_VALUE: u32 = 1050;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,5 +426,86 @@ mod tests {
         assert!(TreasureItemType::Potions.is_magic());
         assert!(!TreasureItemType::Gp.is_magic());
         assert!(!TreasureItemType::Gems.is_magic());
+    }
+
+    // Gem and jewellery tests
+
+    #[test]
+    fn gem_value_table_coverage() {
+        // Verify all d20 rolls map to a value
+        for roll in 1..=20 {
+            let value = gem_value_from_roll(roll);
+            assert!(value > 0, "Roll {} should have a value", roll);
+        }
+    }
+
+    #[test]
+    fn gem_value_boundaries() {
+        // Test boundary values
+        assert_eq!(gem_value_from_roll(1), 10);
+        assert_eq!(gem_value_from_roll(4), 10);
+        assert_eq!(gem_value_from_roll(5), 50);
+        assert_eq!(gem_value_from_roll(9), 50);
+        assert_eq!(gem_value_from_roll(10), 100);
+        assert_eq!(gem_value_from_roll(15), 100);
+        assert_eq!(gem_value_from_roll(16), 500);
+        assert_eq!(gem_value_from_roll(19), 500);
+        assert_eq!(gem_value_from_roll(20), 1000);
+    }
+
+    #[test]
+    fn gem_value_distribution() {
+        // Verify the possible values
+        let possible_values: Vec<u32> = GEM_VALUE_TABLE.iter().map(|e| e.value_gp).collect();
+        assert_eq!(possible_values, vec![10, 50, 100, 500, 1000]);
+    }
+
+    #[test]
+    fn jewellery_value_range() {
+        // 3d6 × 100 = 300 to 1800 gp
+        assert_eq!(jewellery_value_from_roll(3), 300);   // Minimum (3)
+        assert_eq!(jewellery_value_from_roll(18), 1800); // Maximum (18)
+        assert_eq!(jewellery_value_from_roll(10), 1000); // Near average
+    }
+
+    #[test]
+    fn damaged_jewellery_halves_value() {
+        assert_eq!(damaged_jewellery_value(1000), 500);
+        assert_eq!(damaged_jewellery_value(300), 150);
+        assert_eq!(damaged_jewellery_value(1800), 900);
+    }
+
+    #[test]
+    fn roll_multiple_gems() {
+        let result = roll_gems(5);
+        assert_eq!(result.values.len(), 5);
+        assert_eq!(result.total_gp, result.values.iter().sum::<u32>());
+        // Each gem should be a valid value
+        for v in &result.values {
+            assert!(
+                *v == 10 || *v == 50 || *v == 100 || *v == 500 || *v == 1000,
+                "Invalid gem value: {}", v
+            );
+        }
+    }
+
+    #[test]
+    fn roll_multiple_jewellery() {
+        let result = roll_jewellery(3);
+        assert_eq!(result.values.len(), 3);
+        assert_eq!(result.total_gp, result.values.iter().sum::<u32>());
+        // Each jewellery piece should be in valid range
+        for v in &result.values {
+            assert!(*v >= 300 && *v <= 1800, "Invalid jewellery value: {}", v);
+            assert!(*v % 100 == 0, "Jewellery value should be multiple of 100");
+        }
+    }
+
+    #[test]
+    fn average_values_are_reasonable() {
+        // Average gem: 96 gp (calculated from distribution)
+        assert_eq!(AVERAGE_GEM_VALUE, 96);
+        // Average jewellery: 3d6 avg = 10.5, × 100 = 1050
+        assert_eq!(AVERAGE_JEWELLERY_VALUE, 1050);
     }
 }

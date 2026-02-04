@@ -1,0 +1,27 @@
+{
+  "source": "Advanced_Fantasy_Referees_Tome_v1-3.md",
+  "gem_value_table": {
+    "description": "Roll d20 to determine individual gem value",
+    "die": "d20",
+    "entries": [
+      { "min": 1, "max": 4, "value_gp": 10 },
+      { "min": 5, "max": 9, "value_gp": 50 },
+      { "min": 10, "max": 15, "value_gp": 100 },
+      { "min": 16, "max": 19, "value_gp": 500 },
+      { "min": 20, "max": 20, "value_gp": 1000 }
+    ],
+    "average_gp": 96
+  },
+  "jewellery": {
+    "description": "Each piece of jewellery is worth 3d6 × 100gp",
+    "dice": "3d6",
+    "multiplier": 100,
+    "average_gp": 1050,
+    "damaged_modifier": 0.5,
+    "damaged_description": "Rough treatment (crushing, fire, lightning) reduces value by 50%"
+  },
+  "notes": {
+    "combining": "When multiple gems/jewellery are indicated, the referee may combine values. Example: five 50gp gems may become a single 250gp gem.",
+    "higher_level": "For characters above 3rd level, the referee may wish to increase jewellery values."
+  }
+}
