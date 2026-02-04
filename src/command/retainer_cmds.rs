@@ -5,6 +5,42 @@ use crate::engine::retainer::{
 use crate::persist::GameState;
 use crate::rules::class::{self, Class};
 
+/// Generate a unique retainer name by auto-numbering if duplicates exist.
+/// E.g., if "Torchbearer" exists, returns "Torchbearer 2".
+/// If "Torchbearer" and "Torchbearer 2" exist, returns "Torchbearer 3".
+fn unique_retainer_name(base_name: &str, existing: &[Retainer]) -> String {
+    // Check if base name (or numbered variants) already exist
+    let base_lower = base_name.to_lowercase();
+
+    // Find all existing names that match the base pattern
+    let mut max_num: u32 = 0;
+    let mut base_exists = false;
+
+    for r in existing {
+        let name_lower = r.name.to_lowercase();
+        if name_lower == base_lower {
+            base_exists = true;
+            if max_num == 0 {
+                max_num = 1; // The base name counts as "1"
+            }
+        } else if let Some(rest) = name_lower.strip_prefix(&base_lower) {
+            // Check for pattern "base N" where N is a number
+            let rest = rest.trim();
+            if let Ok(n) = rest.parse::<u32>() {
+                max_num = max_num.max(n);
+            }
+        }
+    }
+
+    if !base_exists && max_num == 0 {
+        // No conflicts, use the base name as-is
+        base_name.to_string()
+    } else {
+        // Generate the next numbered name
+        format!("{} {}", base_name, max_num + 1)
+    }
+}
+
 pub struct HireCommand;
 impl Command for HireCommand {
     fn name(&self) -> &str { "hire" }
@@ -77,7 +113,7 @@ impl Command for HireCommand {
             HireReaction::Accepts | HireReaction::Eager => {}
         }
 
-        // Create the retainer
+        // Create the retainer with a unique name
         let def = class::class_def(class);
         let base_loyalty = retainer::base_loyalty(cha);
         let loyalty = if reaction == HireReaction::Eager {
@@ -93,8 +129,19 @@ impl Command for HireCommand {
             roll.max(1)
         };
 
+        // Auto-number duplicate names to ensure uniqueness
+        let unique_name = unique_retainer_name(ret_name, &state.retainers);
+
         let wage = retainer::standard_wage(1);
-        let r = Retainer::new(ret_name, class.name(), 1, hp, loyalty, wage);
+        let r = Retainer::new(&unique_name, class.name(), 1, hp, loyalty, wage);
+
+        // Note if the name was auto-numbered
+        if unique_name != ret_name {
+            out.push_str(&format!(
+                "(Named '{}' to distinguish from existing retainer)\n",
+                unique_name
+            ));
+        }
 
         out.push_str(&format!(
             "{} joins as a level 1 {}!\n  HP: {}, Loyalty: {}, Wage: {} gp/month",
@@ -296,5 +343,88 @@ mod tests {
         let result = cmd.execute(&["hrothgar"], &mut state);
         assert!(result.output.contains("dismissed"));
         assert!(state.retainers.is_empty());
+    }
+
+    #[test]
+    fn unique_name_no_conflict() {
+        let existing: Vec<Retainer> = vec![];
+        assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer");
+    }
+
+    #[test]
+    fn unique_name_one_conflict() {
+        let existing = vec![
+            Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25),
+        ];
+        assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer 2");
+    }
+
+    #[test]
+    fn unique_name_multiple_conflicts() {
+        let existing = vec![
+            Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer 2", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer 3", "Fighter", 0, 4, 7, 25),
+        ];
+        assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer 4");
+    }
+
+    #[test]
+    fn unique_name_gap_in_numbering() {
+        // If there's a gap (e.g., 1, 3 but no 2), use max+1
+        let existing = vec![
+            Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer 3", "Fighter", 0, 4, 7, 25),
+        ];
+        assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer 4");
+    }
+
+    #[test]
+    fn unique_name_case_insensitive() {
+        let existing = vec![
+            Retainer::new("TORCHBEARER", "Fighter", 0, 4, 7, 25),
+        ];
+        assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer 2");
+    }
+
+    #[test]
+    fn unique_name_different_names_no_conflict() {
+        let existing = vec![
+            Retainer::new("Guard", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Porter", "Fighter", 0, 4, 7, 25),
+        ];
+        assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer");
+    }
+
+    #[test]
+    fn dismiss_numbered_retainer() {
+        let mut state = GameState::new();
+        state.retainers.push(Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25));
+        state.retainers.push(Retainer::new("Torchbearer 2", "Fighter", 0, 4, 7, 25));
+        state.retainers.push(Retainer::new("Torchbearer 3", "Fighter", 0, 4, 7, 25));
+
+        let cmd = DismissCommand;
+
+        // Dismiss the second one specifically
+        let result = cmd.execute(&["Torchbearer 2"], &mut state);
+        assert!(result.output.contains("dismissed"));
+        assert_eq!(state.retainers.len(), 2);
+        assert_eq!(state.retainers[0].name, "Torchbearer");
+        assert_eq!(state.retainers[1].name, "Torchbearer 3");
+    }
+
+    #[test]
+    fn morale_check_numbered_retainer() {
+        let mut state = GameState::new();
+        state.retainers.push(Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25));
+        state.retainers.push(Retainer::new("Torchbearer 2", "Fighter", 0, 4, 7, 25));
+
+        let cmd = RetainerMoraleCommand;
+
+        // Check morale for a specific numbered retainer
+        let result = cmd.execute(&["Torchbearer 2"], &mut state);
+        assert!(result.output.contains("Torchbearer 2"));
+        // Should only check the one we asked for
+        assert!(!result.output.contains("Torchbearer (loyalty"));
     }
 }
