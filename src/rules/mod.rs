@@ -1,4 +1,5 @@
 pub mod ability;
+pub mod alignment;
 pub mod attack;
 pub mod class;
 pub mod encounter;

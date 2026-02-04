@@ -1,6 +1,7 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::engine::chargen;
+use crate::rules::alignment::Alignment;
 use crate::rules::class::{self, Class};
 
 pub struct ChargenCommand;
@@ -22,17 +23,13 @@ impl Command for ChargenCommand {
                 "unknown class '{}'. Use 'classes' to list available classes.", args[1]
             )),
         };
-        let alignment = if args.len() >= 3 {
-            match args[2].to_lowercase().as_str() {
-                "lawful" | "l" => "Lawful",
-                "neutral" | "n" => "Neutral",
-                "chaotic" | "c" => "Chaotic",
-                _ => return CommandResult::error(
-                    "alignment must be Lawful (L), Neutral (N), or Chaotic (C)"
-                ),
+        let alignment: Alignment = if args.len() >= 3 {
+            match args[2].parse() {
+                Ok(a) => a,
+                Err(e) => return CommandResult::error(e),
             }
         } else {
-            "Neutral"
+            Alignment::default()
         };
 
         let mut abilities = chargen::roll_abilities();

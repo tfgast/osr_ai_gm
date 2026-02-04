@@ -7,12 +7,16 @@
 /// - Response data field contains correct payload types
 /// - mode field accurately reflects GameMode after each command
 
-use osr_ai_gm::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
+use osr_ai_gm::gmapi::protocol::{GMCommand, GMRequest, GMResponse, parse_request};
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{AbilityScores, Character, CombatState, Monster};
+use osr_ai_gm::rules::alignment::Alignment;
 use osr_ai_gm::rules::class::Class;
+use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
+use osr_ai_gm::state::time::LightSourceKind;
+use osr_ai_gm::state::wilderness::Terrain;
 
 // ===========================================================================
 // Test helpers
@@ -32,7 +36,7 @@ fn make_fighter(name: &str) -> Character {
     c.max_hp = 8;
     c.ac = 3;
     c.thac0 = 19;
-    c.alignment = "Lawful".to_string();
+    c.alignment = Alignment::Lawful;
     c.gold_gp = 120;
     c.movement_rate = 60;
     c
@@ -48,7 +52,7 @@ fn make_thief(name: &str) -> Character {
     c.max_hp = 4;
     c.ac = 6;
     c.thac0 = 19;
-    c.alignment = "Neutral".to_string();
+    c.alignment = Alignment::Neutral;
     c.gold_gp = 80;
     c.movement_rate = 120;
     c
@@ -64,7 +68,7 @@ fn make_cleric(name: &str) -> Character {
     c.max_hp = 6;
     c.ac = 4;
     c.thac0 = 19;
-    c.alignment = "Lawful".to_string();
+    c.alignment = Alignment::Lawful;
     c.gold_gp = 100;
     c.movement_rate = 60;
     c
@@ -118,7 +122,7 @@ fn setup_exploration(state: &mut GameState) {
 fn setup_wilderness(state: &mut GameState) {
     state.party.add_member(make_fighter("Aldric"));
     let resp = handle_request(&req("setup", GMCommand::EnterWilderness {
-        terrain: "forest".to_string(),
+        terrain: Terrain::Forest,
     }), state);
     assert!(resp.success, "setup wilderness failed: {}", resp.message);
 }
@@ -361,8 +365,8 @@ fn create_character_happy_path() {
     let mut state = GameState::new();
     let resp = handle_request(&req("cc1", GMCommand::CreateCharacter {
         name: "Aldric".to_string(),
-        class: "Fighter".to_string(),
-        alignment: "Lawful".to_string(),
+        class: Class::Fighter,
+        alignment: Alignment::Lawful,
     }), &mut state);
     assert_response_format(&resp, "cc1");
     // May fail due to random ability rolls, but response should be well-formed
@@ -374,57 +378,44 @@ fn create_character_happy_path() {
 
 #[test]
 fn create_character_invalid_class() {
-    let mut state = GameState::new();
-    let resp = handle_request(&req("cc2", GMCommand::CreateCharacter {
-        name: "BadClass".to_string(),
-        class: "Astronaut".to_string(),
-        alignment: "Neutral".to_string(),
-    }), &mut state);
-    assert_response_format(&resp, "cc2");
-    assert!(!resp.success);
-    assert!(resp.error.unwrap().contains("unknown class"));
+    // Invalid class is now caught at JSON deserialization — the type system
+    // prevents constructing a GMCommand with an invalid Class enum value.
+    let json = r#"{"id":"cc2","command":{"type":"CreateCharacter","params":{"name":"BadClass","class":"Astronaut"}}}"#;
+    let result = parse_request(json);
+    assert!(result.is_err(), "parsing invalid class should fail");
 }
 
 #[test]
 fn create_character_invalid_alignment() {
-    let mut state = GameState::new();
-    let resp = handle_request(&req("cc3", GMCommand::CreateCharacter {
-        name: "BadAlign".to_string(),
-        class: "Fighter".to_string(),
-        alignment: "Evil".to_string(),
-    }), &mut state);
-    assert_response_format(&resp, "cc3");
-    assert!(!resp.success);
-    assert!(resp.error.unwrap().contains("alignment"));
+    // Invalid alignment is caught at JSON deserialization.
+    let json = r#"{"id":"cc3","command":{"type":"CreateCharacter","params":{"name":"BadAlign","class":"Fighter","alignment":"Evil"}}}"#;
+    let result = parse_request(json);
+    assert!(result.is_err(), "parsing invalid alignment should fail");
 }
 
 #[test]
 fn create_character_alignment_abbreviations() {
-    let mut state = GameState::new();
-    // Test "L" abbreviation
-    let resp = handle_request(&req("cc4", GMCommand::CreateCharacter {
-        name: "Knight".to_string(),
-        class: "Fighter".to_string(),
-        alignment: "L".to_string(),
-    }), &mut state);
-    assert_response_format(&resp, "cc4");
-    // Response is well-formed (may fail on ability requirements)
+    // Alignment abbreviations are accepted via serde aliases at parse time.
+    let json_l = r#"{"id":"cc4","command":{"type":"CreateCharacter","params":{"name":"Knight","class":"Fighter","alignment":"L"}}}"#;
+    let req_l = parse_request(json_l).unwrap();
+    match &req_l.command {
+        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, Alignment::Lawful),
+        _ => panic!("expected CreateCharacter"),
+    }
 
-    // Test "C" abbreviation
-    let resp = handle_request(&req("cc5", GMCommand::CreateCharacter {
-        name: "Rogue".to_string(),
-        class: "Thief".to_string(),
-        alignment: "C".to_string(),
-    }), &mut state);
-    assert_response_format(&resp, "cc5");
+    let json_c = r#"{"id":"cc5","command":{"type":"CreateCharacter","params":{"name":"Rogue","class":"Thief","alignment":"C"}}}"#;
+    let req_c = parse_request(json_c).unwrap();
+    match &req_c.command {
+        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, Alignment::Chaotic),
+        _ => panic!("expected CreateCharacter"),
+    }
 
-    // Test "N" abbreviation
-    let resp = handle_request(&req("cc6", GMCommand::CreateCharacter {
-        name: "Druid".to_string(),
-        class: "Cleric".to_string(),
-        alignment: "N".to_string(),
-    }), &mut state);
-    assert_response_format(&resp, "cc6");
+    let json_n = r#"{"id":"cc6","command":{"type":"CreateCharacter","params":{"name":"Druid","class":"Cleric","alignment":"N"}}}"#;
+    let req_n = parse_request(json_n).unwrap();
+    match &req_n.command {
+        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, Alignment::Neutral),
+        _ => panic!("expected CreateCharacter"),
+    }
 }
 
 // ===========================================================================
@@ -437,7 +428,7 @@ fn spawn_encounter_happy_path() {
     let resp = handle_request(&req("se1", GMCommand::SpawnEncounter {
         name: "Orc".to_string(),
         count: 2,
-        hit_dice: "1".to_string(),
+        hit_dice: "1".parse().unwrap(),
         ac: 6,
         hp: 4,
         damage: "1d6".to_string(),
@@ -463,7 +454,7 @@ fn spawn_encounter_combat_already_active() {
     let resp = handle_request(&req("se2", GMCommand::SpawnEncounter {
         name: "Orc".to_string(),
         count: 1,
-        hit_dice: "1".to_string(),
+        hit_dice: "1".parse().unwrap(),
         ac: 6,
         hp: 4,
         damage: "1d6".to_string(),
@@ -482,7 +473,7 @@ fn spawn_encounter_invalid_morale_low() {
     let resp = handle_request(&req("se3", GMCommand::SpawnEncounter {
         name: "Goblin".to_string(),
         count: 1,
-        hit_dice: "1".to_string(),
+        hit_dice: "1".parse().unwrap(),
         ac: 6,
         hp: 3,
         damage: "1d6".to_string(),
@@ -500,7 +491,7 @@ fn spawn_encounter_invalid_morale_high() {
     let resp = handle_request(&req("se4", GMCommand::SpawnEncounter {
         name: "Goblin".to_string(),
         count: 1,
-        hit_dice: "1".to_string(),
+        hit_dice: "1".parse().unwrap(),
         ac: 6,
         hp: 3,
         damage: "1d6".to_string(),
@@ -518,7 +509,7 @@ fn spawn_encounter_morale_boundary_valid() {
     let resp = handle_request(&req("se5", GMCommand::SpawnEncounter {
         name: "Kobold".to_string(),
         count: 1,
-        hit_dice: "1".to_string(),
+        hit_dice: "1".parse().unwrap(),
         ac: 7,
         hp: 2,
         damage: "1d4".to_string(),
@@ -534,7 +525,7 @@ fn spawn_encounter_morale_boundary_valid() {
     let resp = handle_request(&req("se6", GMCommand::SpawnEncounter {
         name: "Dragon".to_string(),
         count: 1,
-        hit_dice: "8".to_string(),
+        hit_dice: "8".parse().unwrap(),
         ac: 2,
         hp: 36,
         damage: "2d8".to_string(),
@@ -551,7 +542,7 @@ fn spawn_encounter_explicit_xp_value() {
     let resp = handle_request(&req("se7", GMCommand::SpawnEncounter {
         name: "Custom Creature".to_string(),
         count: 1,
-        hit_dice: "3".to_string(),
+        hit_dice: "3".parse().unwrap(),
         ac: 5,
         hp: 12,
         damage: "2d6".to_string(),
@@ -570,7 +561,7 @@ fn spawn_encounter_single_monster_no_numbering() {
     let resp = handle_request(&req("se8", GMCommand::SpawnEncounter {
         name: "Troll".to_string(),
         count: 1,
-        hit_dice: "6".to_string(),
+        hit_dice: "6".parse().unwrap(),
         ac: 4,
         hp: 27,
         damage: "2d6".to_string(),
@@ -1132,7 +1123,7 @@ fn add_door_happy_path() {
         id: 0,
         room_a: 0,
         room_b: 1,
-        state: "closed".to_string(),
+        state: DoorState::Closed,
     }), &mut state);
     assert_response_format(&resp, "ad1");
     assert!(resp.success);
@@ -1140,21 +1131,10 @@ fn add_door_happy_path() {
 
 #[test]
 fn add_door_invalid_state() {
-    let mut state = GameState::new();
-    setup_exploration(&mut state);
-    handle_request(&req("setup", GMCommand::AddRoom {
-        id: 1,
-        name: "Test".to_string(),
-    }), &mut state);
-
-    let resp = handle_request(&req("ad2", GMCommand::AddDoor {
-        id: 0,
-        room_a: 0,
-        room_b: 1,
-        state: "broken".to_string(),
-    }), &mut state);
-    assert!(!resp.success);
-    assert!(resp.error.unwrap().contains("door state"));
+    // Invalid door state is now caught at JSON deserialization.
+    let json = r#"{"id":"ad2","command":{"type":"AddDoor","params":{"id":0,"room_a":0,"room_b":1,"state":"broken"}}}"#;
+    let result = parse_request(json);
+    assert!(result.is_err(), "parsing invalid door state should fail");
 }
 
 #[test]
@@ -1169,15 +1149,15 @@ fn add_door_all_valid_states() {
         }), &mut state);
     }
 
-    let states = ["open", "closed", "stuck", "locked", "secret"];
+    let states = [DoorState::Open, DoorState::Closed, DoorState::Stuck, DoorState::Locked, DoorState::Secret];
     for (i, door_state) in states.iter().enumerate() {
         let resp = handle_request(&req(&format!("ad{}", i), GMCommand::AddDoor {
             id: i as u32,
             room_a: i as u32,
             room_b: (i + 1) as u32,
-            state: door_state.to_string(),
+            state: *door_state,
         }), &mut state);
-        assert!(resp.success, "door state '{}' should be valid: {}", door_state, resp.message);
+        assert!(resp.success, "door state '{:?}' should be valid: {}", door_state, resp.message);
     }
 }
 
@@ -1188,7 +1168,7 @@ fn add_door_no_dungeon() {
         id: 0,
         room_a: 0,
         room_b: 1,
-        state: "closed".to_string(),
+        state: DoorState::Closed,
     }), &mut state);
     assert!(!resp.success);
 }
@@ -1203,12 +1183,12 @@ fn move_room_happy_path() {
     setup_exploration(&mut state);
     // Need light to move through doors
     handle_request(&req("s", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Aldric".to_string(),
     }), &mut state);
     handle_request(&req("s", GMCommand::AddRoom { id: 1, name: "Hall".to_string() }), &mut state);
     handle_request(&req("s", GMCommand::AddDoor {
-        id: 0, room_a: 0, room_b: 1, state: "open".to_string(),
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Open,
     }), &mut state);
 
     let resp = handle_request(&req("mr1", GMCommand::MoveRoom { door_id: 0 }), &mut state);
@@ -1264,7 +1244,7 @@ fn light_torch_happy_path() {
     setup_exploration(&mut state);
 
     let resp = handle_request(&req("l1", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert_response_format(&resp, "l1");
@@ -1278,7 +1258,7 @@ fn light_lantern_happy_path() {
     setup_exploration(&mut state);
 
     let resp = handle_request(&req("l2", GMCommand::Light {
-        source: "lantern".to_string(),
+        source: LightSourceKind::Lantern,
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert!(resp.success);
@@ -1287,22 +1267,17 @@ fn light_lantern_happy_path() {
 
 #[test]
 fn light_invalid_source() {
-    let mut state = GameState::new();
-    setup_exploration(&mut state);
-
-    let resp = handle_request(&req("l3", GMCommand::Light {
-        source: "candle".to_string(),
-        carrier: "Aldric".to_string(),
-    }), &mut state);
-    assert!(!resp.success);
-    assert!(resp.error.unwrap().contains("torch' or 'lantern"));
+    // Invalid light source is now caught at JSON deserialization.
+    let json = r#"{"id":"l3","command":{"type":"Light","params":{"source":"candle","carrier":"Aldric"}}}"#;
+    let result = parse_request(json);
+    assert!(result.is_err(), "parsing invalid light source should fail");
 }
 
 #[test]
 fn light_not_exploring() {
     let mut state = GameState::new();
     let resp = handle_request(&req("l4", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert!(!resp.success);
@@ -1316,7 +1291,7 @@ fn light_not_exploring() {
 fn enter_wilderness_happy_path() {
     let mut state = GameState::new();
     let resp = handle_request(&req("ew1", GMCommand::EnterWilderness {
-        terrain: "forest".to_string(),
+        terrain: Terrain::Forest,
     }), &mut state);
     assert_response_format(&resp, "ew1");
     assert!(resp.success);
@@ -1327,26 +1302,25 @@ fn enter_wilderness_happy_path() {
 
 #[test]
 fn enter_wilderness_invalid_terrain() {
-    let mut state = GameState::new();
-    let resp = handle_request(&req("ew2", GMCommand::EnterWilderness {
-        terrain: "lava".to_string(),
-    }), &mut state);
-    assert!(!resp.success);
-    assert!(resp.error.unwrap().contains("invalid terrain"));
+    // Invalid terrain is now caught at JSON deserialization.
+    let json = r#"{"id":"ew2","command":{"type":"EnterWilderness","params":{"terrain":"lava"}}}"#;
+    let result = parse_request(json);
+    assert!(result.is_err(), "parsing invalid terrain should fail");
 }
 
 #[test]
 fn enter_wilderness_all_terrain_types() {
     let terrains = [
-        "clear", "forest", "hills", "mountains", "desert",
-        "swamp", "jungle", "ocean", "river", "barren", "city",
+        Terrain::Clear, Terrain::Forest, Terrain::Hills, Terrain::Mountains,
+        Terrain::Desert, Terrain::Swamp, Terrain::Jungle, Terrain::Ocean,
+        Terrain::River, Terrain::Barren, Terrain::City,
     ];
     for terrain in &terrains {
         let mut state = GameState::new();
         let resp = handle_request(&req("ew", GMCommand::EnterWilderness {
-            terrain: terrain.to_string(),
+            terrain: *terrain,
         }), &mut state);
-        assert!(resp.success, "terrain '{}' should be valid: {}", terrain, resp.message);
+        assert!(resp.success, "terrain '{:?}' should be valid: {}", terrain, resp.message);
         assert_eq!(state.mode, GameMode::Wilderness);
     }
 }
@@ -1361,7 +1335,7 @@ fn add_hex_happy_path() {
     setup_wilderness(&mut state);
 
     let resp = handle_request(&req("ah1", GMCommand::AddHex {
-        x: 1, y: 0, terrain: "hills".to_string(),
+        x: 1, y: 0, terrain: Terrain::Hills,
     }), &mut state);
     assert_response_format(&resp, "ah1");
     assert!(resp.success);
@@ -1371,7 +1345,7 @@ fn add_hex_happy_path() {
 fn add_hex_not_in_wilderness() {
     let mut state = GameState::new();
     let resp = handle_request(&req("ah2", GMCommand::AddHex {
-        x: 1, y: 0, terrain: "hills".to_string(),
+        x: 1, y: 0, terrain: Terrain::Hills,
     }), &mut state);
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("not in wilderness"));
@@ -1379,14 +1353,10 @@ fn add_hex_not_in_wilderness() {
 
 #[test]
 fn add_hex_invalid_terrain() {
-    let mut state = GameState::new();
-    setup_wilderness(&mut state);
-
-    let resp = handle_request(&req("ah3", GMCommand::AddHex {
-        x: 1, y: 0, terrain: "lava".to_string(),
-    }), &mut state);
-    assert!(!resp.success);
-    assert!(resp.error.unwrap().contains("invalid terrain"));
+    // Invalid terrain is now caught at JSON deserialization.
+    let json = r#"{"id":"ah3","command":{"type":"AddHex","params":{"x":1,"y":0,"terrain":"lava"}}}"#;
+    let result = parse_request(json);
+    assert!(result.is_err(), "parsing invalid terrain should fail");
 }
 
 #[test]
@@ -1396,7 +1366,7 @@ fn add_hex_duplicate() {
 
     // (0,0) already exists from setup
     let resp = handle_request(&req("ah4", GMCommand::AddHex {
-        x: 0, y: 0, terrain: "hills".to_string(),
+        x: 0, y: 0, terrain: Terrain::Hills,
     }), &mut state);
     assert!(!resp.success);
 }
@@ -1411,7 +1381,7 @@ fn travel_happy_path() {
     setup_wilderness(&mut state);
     // Add destination hex
     handle_request(&req("s", GMCommand::AddHex {
-        x: 1, y: 0, terrain: "clear".to_string(),
+        x: 1, y: 0, terrain: Terrain::Clear,
     }), &mut state);
 
     let resp = handle_request(&req("t1", GMCommand::Travel { x: 1, y: 0 }), &mut state);
@@ -1987,7 +1957,7 @@ fn hire_retainer_happy_path() {
     let resp = handle_request(&req("hr1", GMCommand::HireRetainer {
         employer: "Father Gregory".to_string(),
         retainer_name: "Hrothgar".to_string(),
-        retainer_class: "Fighter".to_string(),
+        retainer_class: Class::Fighter,
         retainer_level: 1,
     }), &mut state);
     assert_response_format(&resp, "hr1");
@@ -2011,7 +1981,7 @@ fn hire_retainer_unknown_employer() {
     let resp = handle_request(&req("hr2", GMCommand::HireRetainer {
         employer: "Nobody".to_string(),
         retainer_name: "Hrothgar".to_string(),
-        retainer_class: "Fighter".to_string(),
+        retainer_class: Class::Fighter,
         retainer_level: 1,
     }), &mut state);
     assert!(!resp.success);
@@ -2367,7 +2337,7 @@ fn rapid_exploration_sequence() {
 
     // Light torch
     let resp = handle_request(&req("2", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert!(resp.success);
@@ -2386,7 +2356,7 @@ fn rapid_exploration_sequence() {
             id: i,
             room_a: i,
             room_b: i + 1,
-            state: "open".to_string(),
+            state: DoorState::Open,
         }), &mut state);
         assert!(resp.success, "add door {} failed: {}", i, resp.message);
     }
@@ -2547,7 +2517,7 @@ fn mode_transitions() {
 
     // Idle -> Wilderness
     let resp = handle_request(&req("5", GMCommand::EnterWilderness {
-        terrain: "forest".to_string(),
+        terrain: Terrain::Forest,
     }), &mut state);
     assert_eq!(resp.mode, GameMode::Wilderness);
 }

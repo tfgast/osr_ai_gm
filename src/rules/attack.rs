@@ -1,8 +1,148 @@
-/// Attack resolution per OSE combat rules (Reference Booklet p19-20).
+// Attack resolution per OSE combat rules (Reference Booklet p19-20).
+//
+// Uses THAC0 (To Hit AC 0) system with descending AC.
+// Attack succeeds when d20 + modifiers >= THAC0 - target_AC.
+// Natural 1 always misses, natural 20 always hits.
+
+use std::fmt;
+use std::str::FromStr;
+use serde::{Deserialize, Serialize, Deserializer, Serializer};
+
+/// Structured representation of monster Hit Dice.
 ///
-/// Uses THAC0 (To Hit AC 0) system with descending AC.
-/// Attack succeeds when d20 + modifiers >= THAC0 - target_AC.
-/// Natural 1 always misses, natural 20 always hits.
+/// Parses B/X-style HD notation:
+/// - `"2"` — 2 HD
+/// - `"1+1"` — 1 HD with +1 HP bonus
+/// - `"1-1"` — less than 1 HD (attacks as Normal Human)
+/// - `"3*"` — 3 HD with one special ability (affects XP)
+/// - `"6**"` — 6 HD with two special abilities
+/// - `"1/2"` — half a hit die
+/// - `"7-9**"` — HD range (e.g., vampire), with special abilities
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HitDice {
+    /// Base HD number (leading digits).
+    pub base: u32,
+    /// HP modifier: positive for bonus (+1), negative for penalty (-1).
+    /// For ranges like "7-9", this is 0 and `range_end` is set instead.
+    pub modifier: i32,
+    /// Number of special ability asterisks (0, 1, or 2).
+    pub specials: u8,
+    /// True if fractional HD (e.g., "1/2").
+    pub fractional: bool,
+    /// End of HD range for monsters like vampire ("7-9" → range_end = Some(9)).
+    pub range_end: Option<u32>,
+}
+
+impl HitDice {
+    /// The effective HD for combat (THAC0 and turning).
+    ///
+    /// - Fractional HD counts as 1
+    /// - Bonuses are ignored (THAC0 based on base HD only)
+    /// - Penalties subtract from base
+    /// - Ranges return the midpoint
+    pub fn combat_hd(&self) -> u32 {
+        if self.fractional {
+            return 1;
+        }
+        if let Some(end) = self.range_end {
+            return (self.base + end) / 2;
+        }
+        if self.modifier < 0 {
+            self.base.saturating_sub(self.modifier.unsigned_abs())
+        } else {
+            self.base
+        }
+    }
+}
+
+impl FromStr for HitDice {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim();
+        if s.is_empty() {
+            return Err("empty hit dice string".to_string());
+        }
+
+        // Handle fractional HD like "1/2"
+        if s.contains('/') {
+            return Ok(HitDice {
+                base: 1,
+                modifier: 0,
+                specials: 0,
+                fractional: true,
+                range_end: None,
+            });
+        }
+
+        // Count and strip trailing asterisks
+        let specials = s.chars().rev().take_while(|c| *c == '*').count() as u8;
+        let s = &s[..s.len() - specials as usize];
+
+        // Parse leading digits
+        let num_str: String = s.chars().take_while(|c| c.is_ascii_digit()).collect();
+        let base: u32 = num_str.parse().map_err(|_| format!("invalid hit dice: no base number in '{}'", s))?;
+
+        let rest = &s[num_str.len()..];
+
+        if rest.is_empty() {
+            return Ok(HitDice { base, modifier: 0, specials, fractional: false, range_end: None });
+        }
+
+        if let Some(after_plus) = rest.strip_prefix('+') {
+            let bonus: i32 = after_plus.trim().parse()
+                .map_err(|_| format!("invalid hit dice modifier: '{}'", after_plus))?;
+            return Ok(HitDice { base, modifier: bonus, specials, fractional: false, range_end: None });
+        }
+
+        if let Some(after_minus) = rest.strip_prefix('-') {
+            let val: u32 = after_minus.trim().parse()
+                .map_err(|_| format!("invalid hit dice modifier: '{}'", after_minus))?;
+            if val > base {
+                // Range like "7-9"
+                return Ok(HitDice { base, modifier: 0, specials, fractional: false, range_end: Some(val) });
+            } else {
+                // Penalty like "1-1"
+                return Ok(HitDice { base, modifier: -(val as i32), specials, fractional: false, range_end: None });
+            }
+        }
+
+        Err(format!("invalid hit dice notation: '{}'", rest))
+    }
+}
+
+impl fmt::Display for HitDice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.fractional {
+            write!(f, "1/2")?;
+        } else if let Some(end) = self.range_end {
+            write!(f, "{}-{}", self.base, end)?;
+        } else if self.modifier > 0 {
+            write!(f, "{}+{}", self.base, self.modifier)?;
+        } else if self.modifier < 0 {
+            write!(f, "{}{}", self.base, self.modifier)?;
+        } else {
+            write!(f, "{}", self.base)?;
+        }
+        for _ in 0..self.specials {
+            write!(f, "*")?;
+        }
+        Ok(())
+    }
+}
+
+impl Serialize for HitDice {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for HitDice {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        HitDice::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
 
 /// Calculate the target number needed on d20 to hit a given AC.
 /// target_number = THAC0 - target_AC
@@ -69,38 +209,14 @@ pub fn monster_thac0(hd: u32) -> u32 {
     }
 }
 
-/// Parse a monster's hit dice string to get the HD number.
+/// Parse a monster's hit dice string to get the effective HD number.
 ///
-/// Handles common formats:
-/// - `"2"` → 2
-/// - `"1+1"` → 1 (bonus HP ignored for THAC0/turning)
-/// - `"3*"` → 3 (asterisk for special abilities ignored)
-/// - `"1/2"` → 1 (fractional HD treated as 1)
-/// - `"1-1"` → 0 (1 HD minus 1 = less than 1, attacks as 0 HD)
-/// - `"7-9**"` → 8 (range of HD, returns midpoint)
+/// Delegates to `HitDice::from_str` and returns `combat_hd()`.
+/// Kept for backward compatibility with code that only needs the number.
 pub fn parse_monster_hd(hd_str: &str) -> u32 {
-    let s = hd_str.trim();
-    // Handle fractional HD like "1/2"
-    if s.contains('/') {
-        return 1;
-    }
-    // Take leading digits before any +, -, or * modifier
-    let num_str: String = s.chars().take_while(|c| c.is_ascii_digit()).collect();
-    let base: u32 = num_str.parse().unwrap_or(1);
-    // Strip asterisks and check for minus modifier
-    let rest: String = s.chars().skip(num_str.len()).filter(|c| *c != '*').collect();
-    if let Some(stripped) = rest.strip_prefix('-') {
-        let val: u32 = stripped.trim().parse().unwrap_or(0);
-        if val > base {
-            // Range like "7-9": return midpoint
-            (base + val) / 2
-        } else {
-            // Penalty like "1-1": subtract
-            base.saturating_sub(val)
-        }
-    } else {
-        base
-    }
+    hd_str.parse::<HitDice>()
+        .map(|hd| hd.combat_hd())
+        .unwrap_or(1)
 }
 
 #[cfg(test)]
@@ -330,5 +446,87 @@ mod tests {
     #[test]
     fn monster_thac0_20hd() {
         assert_eq!(monster_thac0(20), 6);
+    }
+
+    // --- HitDice ---
+
+    #[test]
+    fn hit_dice_simple() {
+        let hd: HitDice = "2".parse().unwrap();
+        assert_eq!(hd.base, 2);
+        assert_eq!(hd.modifier, 0);
+        assert_eq!(hd.specials, 0);
+        assert_eq!(hd.combat_hd(), 2);
+        assert_eq!(hd.to_string(), "2");
+    }
+
+    #[test]
+    fn hit_dice_with_bonus() {
+        let hd: HitDice = "3+1".parse().unwrap();
+        assert_eq!(hd.base, 3);
+        assert_eq!(hd.modifier, 1);
+        assert_eq!(hd.combat_hd(), 3);
+        assert_eq!(hd.to_string(), "3+1");
+    }
+
+    #[test]
+    fn hit_dice_with_penalty() {
+        let hd: HitDice = "1-1".parse().unwrap();
+        assert_eq!(hd.base, 1);
+        assert_eq!(hd.modifier, -1);
+        assert_eq!(hd.combat_hd(), 0);
+        assert_eq!(hd.to_string(), "1-1");
+    }
+
+    #[test]
+    fn hit_dice_with_special() {
+        let hd: HitDice = "4*".parse().unwrap();
+        assert_eq!(hd.specials, 1);
+        assert_eq!(hd.combat_hd(), 4);
+        assert_eq!(hd.to_string(), "4*");
+    }
+
+    #[test]
+    fn hit_dice_double_special() {
+        let hd: HitDice = "6**".parse().unwrap();
+        assert_eq!(hd.specials, 2);
+        assert_eq!(hd.combat_hd(), 6);
+        assert_eq!(hd.to_string(), "6**");
+    }
+
+    #[test]
+    fn hit_dice_bonus_with_special() {
+        let hd: HitDice = "6+3*".parse().unwrap();
+        assert_eq!(hd.base, 6);
+        assert_eq!(hd.modifier, 3);
+        assert_eq!(hd.specials, 1);
+        assert_eq!(hd.to_string(), "6+3*");
+    }
+
+    #[test]
+    fn hit_dice_range() {
+        let hd: HitDice = "7-9**".parse().unwrap();
+        assert_eq!(hd.base, 7);
+        assert_eq!(hd.range_end, Some(9));
+        assert_eq!(hd.specials, 2);
+        assert_eq!(hd.combat_hd(), 8);
+        assert_eq!(hd.to_string(), "7-9**");
+    }
+
+    #[test]
+    fn hit_dice_fractional() {
+        let hd: HitDice = "1/2".parse().unwrap();
+        assert!(hd.fractional);
+        assert_eq!(hd.combat_hd(), 1);
+        assert_eq!(hd.to_string(), "1/2");
+    }
+
+    #[test]
+    fn hit_dice_serde_roundtrip() {
+        let hd: HitDice = "5+1*".parse().unwrap();
+        let json = serde_json::to_string(&hd).unwrap();
+        assert_eq!(json, "\"5+1*\"");
+        let parsed: HitDice = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, hd);
     }
 }

@@ -1,3 +1,5 @@
+use std::fmt;
+use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -5,17 +7,62 @@ use std::collections::HashSet;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DoorState {
     /// Standard door — must force open (2-in-6 base, modified by STR).
+    #[serde(alias = "closed")]
     Closed,
     /// Door is open (forced or otherwise). Per OSE, doors close automatically.
+    #[serde(alias = "open")]
     Open,
     /// Stuck shut — requires forcing.
+    #[serde(alias = "stuck")]
     Stuck,
     /// Locked — requires a key or thief lockpicking.
+    #[serde(alias = "locked")]
     Locked,
     /// Secret door — must be found by searching (1-in-6, elves 2-in-6).
+    #[serde(alias = "secret")]
     Secret,
     /// Spiked open — door has been held with iron spikes, won't auto-close.
+    #[serde(alias = "spiked")]
     Spiked,
+}
+
+impl Default for DoorState {
+    fn default() -> Self {
+        DoorState::Closed
+    }
+}
+
+impl fmt::Display for DoorState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            DoorState::Closed => "closed",
+            DoorState::Open => "open",
+            DoorState::Stuck => "stuck",
+            DoorState::Locked => "locked",
+            DoorState::Secret => "secret",
+            DoorState::Spiked => "spiked",
+        };
+        f.write_str(name)
+    }
+}
+
+impl FromStr for DoorState {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "open" => Ok(DoorState::Open),
+            "closed" => Ok(DoorState::Closed),
+            "stuck" => Ok(DoorState::Stuck),
+            "locked" => Ok(DoorState::Locked),
+            "secret" => Ok(DoorState::Secret),
+            "spiked" => Ok(DoorState::Spiked),
+            _ => Err(format!(
+                "invalid door state '{}': must be open, closed, stuck, locked, secret, or spiked",
+                s
+            )),
+        }
+    }
 }
 
 /// A door in the dungeon.

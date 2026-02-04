@@ -47,10 +47,9 @@ impl Command for LightCommand {
         if args.len() < 2 {
             return CommandResult::error("usage: light torch|lantern <carrier_name>");
         }
-        let kind = match args[0].to_lowercase().as_str() {
-            "torch" => LightSourceKind::Torch,
-            "lantern" => LightSourceKind::Lantern,
-            _ => return CommandResult::error("light source must be 'torch' or 'lantern'"),
+        let kind: LightSourceKind = match args[0].parse() {
+            Ok(k) => k,
+            Err(e) => return CommandResult::error(e),
         };
         let carrier = args[1];
         let time = match state.time.as_mut() {
@@ -198,18 +197,13 @@ impl Command for AddDoorCommand {
             Ok(n) => n,
             _ => return CommandResult::error("room_b must be a number"),
         };
-        let door_state = if args.len() > 3 {
-            match args[3].to_lowercase().as_str() {
-                "open" => DoorState::Open,
-                "closed" => DoorState::Closed,
-                "stuck" => DoorState::Stuck,
-                "locked" => DoorState::Locked,
-                "secret" => DoorState::Secret,
-                "spiked" => DoorState::Spiked,
-                _ => return CommandResult::error("state must be open, closed, stuck, locked, secret, or spiked"),
+        let door_state: DoorState = if args.len() > 3 {
+            match args[3].parse() {
+                Ok(ds) => ds,
+                Err(e) => return CommandResult::error(e),
             }
         } else {
-            DoorState::Closed
+            DoorState::default()
         };
         let dungeon = match state.dungeon.as_mut() {
             Some(d) => d,

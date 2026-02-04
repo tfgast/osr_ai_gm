@@ -6,8 +6,12 @@ use osr_ai_gm::gmapi::protocol::{GMCommand, GMRequest};
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{Character, AbilityScores};
+use osr_ai_gm::rules::alignment::Alignment;
 use osr_ai_gm::rules::class::Class;
+use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
+use osr_ai_gm::state::time::LightSourceKind;
+use osr_ai_gm::state::wilderness::Terrain;
 
 fn req(id: &str, command: GMCommand) -> GMRequest {
     GMRequest { id: id.to_string(), command }
@@ -24,7 +28,7 @@ fn make_fighter(name: &str) -> Character {
     c.max_hp = 8;
     c.ac = 3;  // plate mail + shield
     c.thac0 = 19;
-    c.alignment = "Lawful".to_string();
+    c.alignment = Alignment::Lawful;
     c.gold_gp = 120;
     c.movement_rate = 60;
     c
@@ -41,7 +45,7 @@ fn make_thief(name: &str) -> Character {
     c.max_hp = 4;
     c.ac = 6;  // leather + DEX
     c.thac0 = 19;
-    c.alignment = "Neutral".to_string();
+    c.alignment = Alignment::Neutral;
     c.gold_gp = 80;
     c.movement_rate = 120;
     c
@@ -58,7 +62,7 @@ fn make_cleric(name: &str) -> Character {
     c.max_hp = 6;
     c.ac = 4;  // chain + shield
     c.thac0 = 19;
-    c.alignment = "Lawful".to_string();
+    c.alignment = Alignment::Lawful;
     c.gold_gp = 100;
     c.movement_rate = 60;
     c
@@ -75,7 +79,7 @@ fn make_magic_user(name: &str) -> Character {
     c.max_hp = 3;
     c.ac = 9;  // no armour
     c.thac0 = 19;
-    c.alignment = "Neutral".to_string();
+    c.alignment = Alignment::Neutral;
     c.gold_gp = 60;
     c.movement_rate = 120;
     c
@@ -105,7 +109,7 @@ fn full_dungeon_session() {
 
     // -- STEP 3: Light a torch --
     let resp = handle_request(&req("11", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert!(resp.success, "light torch failed: {}", resp.message);
@@ -125,7 +129,7 @@ fn full_dungeon_session() {
         id: 0,
         room_a: 0,
         room_b: 1,
-        state: "closed".to_string(),
+        state: DoorState::Closed,
     }), &mut state);
     assert!(resp.success, "add door failed: {}", resp.message);
 
@@ -401,7 +405,7 @@ fn retainer_hiring() {
     let resp = handle_request(&req("1", GMCommand::HireRetainer {
         employer: "Father Gregory".to_string(),
         retainer_name: "Hrothgar".to_string(),
-        retainer_class: "Fighter".to_string(),
+        retainer_class: Class::Fighter,
         retainer_level: 1,
     }), &mut state);
     assert!(resp.success, "hire retainer failed: {}", resp.message);
@@ -529,7 +533,7 @@ fn complete_ose_session() {
 
     // Light source
     let resp = handle_request(&req("d2", GMCommand::Light {
-        source: "lantern".to_string(),
+        source: LightSourceKind::Lantern,
         carrier: "Brother Tomas".to_string(),
     }), &mut state);
     assert!(resp.success);
@@ -540,7 +544,7 @@ fn complete_ose_session() {
 
     // Add rooms
     handle_request(&req("d4", GMCommand::AddRoom { id: 1, name: "Goblin Lair".to_string() }), &mut state);
-    handle_request(&req("d5", GMCommand::AddDoor { id: 0, room_a: 0, room_b: 1, state: "stuck".to_string() }), &mut state);
+    handle_request(&req("d5", GMCommand::AddDoor { id: 0, room_a: 0, room_b: 1, state: DoorState::Stuck }), &mut state);
 
     // Thief listens at the door
     let resp = handle_request(&req("d6", GMCommand::ThiefSkillCheck {
@@ -645,7 +649,7 @@ fn complete_ose_session() {
     let resp = handle_request(&req("r1", GMCommand::HireRetainer {
         employer: "Sir Aldric".to_string(),
         retainer_name: "Bort the Torchbearer".to_string(),
-        retainer_class: "Fighter".to_string(),
+        retainer_class: Class::Fighter,
         retainer_level: 0,
     }), &mut state);
     assert!(resp.success);
@@ -970,7 +974,7 @@ fn wilderness_encounter() {
 
     // Enter wilderness
     let resp = handle_request(&req("1", GMCommand::EnterWilderness {
-        terrain: "forest".to_string(),
+        terrain: Terrain::Forest,
     }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Wilderness);
@@ -978,7 +982,7 @@ fn wilderness_encounter() {
     // Add adjacent hex
     let resp = handle_request(&req("2", GMCommand::AddHex {
         x: 1, y: 0,
-        terrain: "hills".to_string(),
+        terrain: Terrain::Hills,
     }), &mut state);
     assert!(resp.success);
 
@@ -1011,7 +1015,7 @@ fn mode_transition_idle_exploration_combat_exploration() {
 
     // Light a torch so exploration works
     let resp = handle_request(&req("2", GMCommand::Light {
-        source: "lantern".to_string(),
+        source: LightSourceKind::Lantern,
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert!(resp.success);
@@ -1026,7 +1030,7 @@ fn mode_transition_idle_exploration_combat_exploration() {
     let resp = handle_request(&req("4", GMCommand::SpawnEncounter {
         name: "skeleton".to_string(),
         count: 2,
-        hit_dice: "1".to_string(),
+        hit_dice: "1".parse().unwrap(),
         ac: 7,
         hp: 4,
         damage: "1d6".to_string(),
@@ -1081,7 +1085,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
 
     // Idle -> Wilderness
     let resp = handle_request(&req("1", GMCommand::EnterWilderness {
-        terrain: "forest".to_string(),
+        terrain: Terrain::Forest,
     }), &mut state);
     assert!(resp.success, "enter wilderness failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Wilderness);
@@ -1089,7 +1093,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
     // Add adjacent hexes for travel
     let resp = handle_request(&req("2", GMCommand::AddHex {
         x: 1, y: 0,
-        terrain: "hills".to_string(),
+        terrain: Terrain::Hills,
     }), &mut state);
     assert!(resp.success);
 
@@ -1103,7 +1107,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
     let resp = handle_request(&req("4", GMCommand::SpawnEncounter {
         name: "wolf".to_string(),
         count: 3,
-        hit_dice: "2".to_string(),
+        hit_dice: "2".parse().unwrap(),
         ac: 7,
         hp: 6,
         damage: "1d6".to_string(),
@@ -1146,7 +1150,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
     // Add another hex and verify wilderness travel still works after combat
     let _resp = handle_request(&req("8", GMCommand::AddHex {
         x: 0, y: 0,
-        terrain: "clear".to_string(),
+        terrain: Terrain::Clear,
     }), &mut state);
     // This might fail since (0,0) was the original hex — that's fine, just test travel
     let resp = handle_request(&req("9", GMCommand::Travel { x: 0, y: 0 }), &mut state);
@@ -1178,7 +1182,7 @@ fn dungeon_exploration_flow() {
 
     // Light a torch
     let resp = handle_request(&req("3", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert!(resp.success);
@@ -1191,7 +1195,7 @@ fn dungeon_exploration_flow() {
     // Build out the dungeon
     handle_request(&req("5a", GMCommand::AddRoom { id: 1, name: "Guard Room".to_string() }), &mut state);
     handle_request(&req("5b", GMCommand::AddDoor {
-        id: 0, room_a: 0, room_b: 1, state: "closed".to_string(),
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Closed,
     }), &mut state);
 
     // Search the room
@@ -1231,14 +1235,14 @@ fn wilderness_multi_day_travel() {
 
     // Enter wilderness
     let resp = handle_request(&req("1", GMCommand::EnterWilderness {
-        terrain: "clear".to_string(),
+        terrain: Terrain::Clear,
     }), &mut state);
     assert!(resp.success);
 
     // Build a hex path
-    handle_request(&req("2a", GMCommand::AddHex { x: 1, y: 0, terrain: "clear".to_string() }), &mut state);
-    handle_request(&req("2b", GMCommand::AddHex { x: 1, y: 1, terrain: "forest".to_string() }), &mut state);
-    handle_request(&req("2c", GMCommand::AddHex { x: 0, y: 1, terrain: "mountains".to_string() }), &mut state);
+    handle_request(&req("2a", GMCommand::AddHex { x: 1, y: 0, terrain: Terrain::Clear }), &mut state);
+    handle_request(&req("2b", GMCommand::AddHex { x: 1, y: 1, terrain: Terrain::Forest }), &mut state);
+    handle_request(&req("2c", GMCommand::AddHex { x: 0, y: 1, terrain: Terrain::Mountains }), &mut state);
 
     // Day 1: travel to (1,0) — clear terrain
     let resp = handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
@@ -1292,12 +1296,12 @@ fn session_a_dungeon_crawl() {
 
     // Light two sources — torch and lantern
     let resp = handle_request(&req("a2", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Aldric the Bold".to_string(),
     }), &mut state);
     assert!(resp.success);
     let resp = handle_request(&req("a3", GMCommand::Light {
-        source: "lantern".to_string(),
+        source: LightSourceKind::Lantern,
         carrier: "Sister Mira".to_string(),
     }), &mut state);
     assert!(resp.success);
@@ -1321,11 +1325,11 @@ fn session_a_dungeon_crawl() {
 
     // Connect rooms with doors (open so party can pass through)
     let resp = handle_request(&req("a7", GMCommand::AddDoor {
-        id: 0, room_a: 0, room_b: 1, state: "open".to_string(),
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Open,
     }), &mut state);
     assert!(resp.success);
     let resp = handle_request(&req("a8", GMCommand::AddDoor {
-        id: 1, room_a: 1, room_b: 2, state: "open".to_string(),
+        id: 1, room_a: 1, room_b: 2, state: DoorState::Open,
     }), &mut state);
     assert!(resp.success);
 
@@ -1537,7 +1541,7 @@ fn session_b_wilderness_travel() {
 
     // === Enter wilderness ===
     let resp = handle_request(&req("b1", GMCommand::EnterWilderness {
-        terrain: "clear".to_string(),
+        terrain: Terrain::Clear,
     }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Wilderness);
@@ -1550,15 +1554,15 @@ fn session_b_wilderness_travel() {
 
     // === Add multiple hexes for multi-hex travel ===
     let hexes = [
-        (1, 0, "forest"),
-        (1, 1, "hills"),
-        (0, 1, "swamp"),
-        (1, -1, "clear"),
-        (2, 0, "mountains"),
+        (1, 0, Terrain::Forest),
+        (1, 1, Terrain::Hills),
+        (0, 1, Terrain::Swamp),
+        (1, -1, Terrain::Clear),
+        (2, 0, Terrain::Mountains),
     ];
     for (x, y, terrain) in &hexes {
         let resp = handle_request(&req("b2", GMCommand::AddHex {
-            x: *x, y: *y, terrain: terrain.to_string(),
+            x: *x, y: *y, terrain: *terrain,
         }), &mut state);
         assert!(resp.success, "add hex ({},{}) failed: {}", x, y, resp.message);
     }
@@ -1662,7 +1666,7 @@ fn session_c_retainers() {
     let resp = handle_request(&req("c1", GMCommand::HireRetainer {
         employer: "Captain Kael".to_string(),
         retainer_name: "Tormund".to_string(),
-        retainer_class: "Fighter".to_string(),
+        retainer_class: Class::Fighter,
         retainer_level: 1,
     }), &mut state);
     assert!(resp.success, "hire retainer failed: {}", resp.message);
@@ -1676,7 +1680,7 @@ fn session_c_retainers() {
     let resp = handle_request(&req("c2", GMCommand::HireRetainer {
         employer: "Captain Kael".to_string(),
         retainer_name: "Greta".to_string(),
-        retainer_class: "Thief".to_string(),
+        retainer_class: Class::Thief,
         retainer_level: 2,
     }), &mut state);
     assert!(resp.success);
@@ -1691,7 +1695,7 @@ fn session_c_retainers() {
     assert!(resp.success);
 
     let resp = handle_request(&req("c4", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Captain Kael".to_string(),
     }), &mut state);
     assert!(resp.success);
@@ -1816,11 +1820,11 @@ fn save_load_complex_state() {
 
     // Light multiple sources
     handle_request(&req("s2", GMCommand::Light {
-        source: "torch".to_string(),
+        source: LightSourceKind::Torch,
         carrier: "Grom".to_string(),
     }), &mut state);
     handle_request(&req("s3", GMCommand::Light {
-        source: "lantern".to_string(),
+        source: LightSourceKind::Lantern,
         carrier: "Father Odo".to_string(),
     }), &mut state);
 
@@ -1832,7 +1836,7 @@ fn save_load_complex_state() {
     // Add rooms and a door
     handle_request(&req("s5", GMCommand::AddRoom { id: 1, name: "Bone Room".to_string() }), &mut state);
     handle_request(&req("s6", GMCommand::AddDoor {
-        id: 0, room_a: 0, room_b: 1, state: "secret".to_string(),
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Secret,
     }), &mut state);
 
     // Add rulings
@@ -1939,13 +1943,13 @@ fn save_load_complex_state() {
     ws_state.party.add_member(make_fighter("Wanderer"));
 
     let resp = handle_request(&req("w1", GMCommand::EnterWilderness {
-        terrain: "forest".to_string(),
+        terrain: Terrain::Forest,
     }), &mut ws_state);
     assert!(resp.success);
 
     // Add hexes and travel
     handle_request(&req("w2", GMCommand::AddHex {
-        x: 1, y: 0, terrain: "swamp".to_string(),
+        x: 1, y: 0, terrain: Terrain::Swamp,
     }), &mut ws_state);
     handle_request(&req("w3", GMCommand::Travel { x: 1, y: 0 }), &mut ws_state);
 

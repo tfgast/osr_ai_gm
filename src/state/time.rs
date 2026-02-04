@@ -1,10 +1,25 @@
+use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 /// Light source types with their duration in dungeon turns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LightSourceKind {
+    #[serde(alias = "torch")]
     Torch,   // 6 turns
+    #[serde(alias = "lantern")]
     Lantern, // 24 turns
+}
+
+impl FromStr for LightSourceKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "torch" => Ok(LightSourceKind::Torch),
+            "lantern" => Ok(LightSourceKind::Lantern),
+            _ => Err(format!("invalid light source '{}': must be torch or lantern", s)),
+        }
+    }
 }
 
 impl LightSourceKind {

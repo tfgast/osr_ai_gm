@@ -4,6 +4,8 @@ use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::model::{CombatState, Monster};
 use crate::persist::{self, GameState};
 use crate::rules::{ability, class, encumbrance, equipment, monster, spell_data, thief};
+use crate::rules::alignment::Alignment;
+use crate::rules::attack::HitDice;
 use crate::rules::class::Class;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
 use crate::state::game::GameMode;
@@ -27,12 +29,12 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 
         // -- Character management --
         GMCommand::CreateCharacter { name, class, alignment } => {
-            create_character(id, state, name, class, alignment)
+            create_character(id, state, name, *class, *alignment)
         }
 
         // -- Combat --
         GMCommand::SpawnEncounter { name, count, hit_dice, ac, hp, damage, morale, distance, xp_value } => {
-            spawn_encounter(id, state, name, *count, hit_dice, *ac, *hp, damage, *morale, *distance, *xp_value)
+            spawn_encounter(id, state, name, *count, hit_dice.clone(), *ac, *hp, damage, *morale, *distance, *xp_value)
         }
         GMCommand::RollInitiative => roll_initiative(id, state),
         GMCommand::Attack { character, monster_idx, weapon } => {
@@ -54,15 +56,15 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::AdvanceTurn => advance_turn(id, state),
         GMCommand::AddRoom { id: room_id, name } => add_room(id, state, *room_id, name),
         GMCommand::AddDoor { id: door_id, room_a, room_b, state: door_state } => {
-            add_door(id, state, *door_id, *room_a, *room_b, door_state)
+            add_door(id, state, *door_id, *room_a, *room_b, *door_state)
         }
         GMCommand::MoveRoom { door_id } => move_room(id, state, *door_id),
         GMCommand::Search { is_elf } => search(id, state, *is_elf),
-        GMCommand::Light { source, carrier } => light(id, state, source, carrier),
+        GMCommand::Light { source, carrier } => light(id, state, *source, carrier),
 
         // -- Wilderness --
-        GMCommand::EnterWilderness { terrain } => enter_wilderness(id, state, terrain),
-        GMCommand::AddHex { x, y, terrain } => add_hex(id, state, *x, *y, terrain),
+        GMCommand::EnterWilderness { terrain } => enter_wilderness(id, state, *terrain),
+        GMCommand::AddHex { x, y, terrain } => add_hex(id, state, *x, *y, *terrain),
         GMCommand::Travel { x, y } => travel(id, state, *x, *y),
 
         // -- Encounter resolution --
@@ -86,7 +88,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         }
         GMCommand::LookupSpell { name, list } => lookup_spell(id, state, name, list),
         GMCommand::HireRetainer { employer, retainer_name, retainer_class, retainer_level } => {
-            hire_retainer(id, state, employer, retainer_name, retainer_class, *retainer_level)
+            hire_retainer(id, state, employer, retainer_name, *retainer_class, *retainer_level)
         }
         GMCommand::LoyaltyCheck { retainer_name, loyalty } => {
             loyalty_check(id, state, retainer_name, *loyalty)
@@ -138,7 +140,7 @@ fn query_party(id: &str, state: &GameState) -> GMResponse {
             "thac0": c.thac0,
             "xp": c.xp,
             "alive": c.is_alive(),
-            "alignment": c.alignment,
+            "alignment": c.alignment.name(),
             "movement_rate": c.movement_rate,
         })
     }).collect();
@@ -224,18 +226,7 @@ fn query_wilderness(id: &str, state: &GameState) -> GMResponse {
 // Character management
 // =============================================================================
 
-fn create_character(id: &str, state: &mut GameState, name: &str, class_name: &str, alignment: &str) -> GMResponse {
-    let class = match Class::parse(class_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("unknown class '{}'.", class_name), state.mode.clone()),
-    };
-    let alignment = match alignment.to_lowercase().as_str() {
-        "lawful" | "l" => "Lawful",
-        "neutral" | "n" => "Neutral",
-        "chaotic" | "c" => "Chaotic",
-        _ => return GMResponse::err(id, "alignment must be Lawful, Neutral, or Chaotic.", state.mode.clone()),
-    };
-
+fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, alignment: Alignment) -> GMResponse {
     let mut abilities = chargen::roll_abilities();
     let def = class::class_def(class);
     if !def.racial_modifiers.is_empty() {
@@ -267,7 +258,7 @@ fn create_character(id: &str, state: &mut GameState, name: &str, class_name: &st
 
 fn spawn_encounter(
     id: &str, state: &mut GameState,
-    name: &str, count: u32, hit_dice: &str, ac: i32, hp: i32,
+    name: &str, count: u32, hit_dice: HitDice, ac: i32, hp: i32,
     damage: &str, morale: u32, distance: u32, xp_value: Option<u64>,
 ) -> GMResponse {
     if state.combat.is_some() {
@@ -289,7 +280,8 @@ fn spawn_encounter(
         } else {
             name.to_string()
         };
-        let mut m = Monster::new(&monster_name, hit_dice);
+        let hd_str = hit_dice.to_string();
+        let mut m = Monster::new(&monster_name, &hd_str);
         m.hp = hp;
         m.max_hp = hp;
         m.ac = ac;
@@ -506,15 +498,7 @@ fn add_room(id: &str, state: &mut GameState, room_id: u32, name: &str) -> GMResp
     GMResponse::ok(id, format!("added room {}: {}.", room_id, name), state.mode.clone())
 }
 
-fn add_door(id: &str, state: &mut GameState, door_id: u32, room_a: u32, room_b: u32, door_state_str: &str) -> GMResponse {
-    let door_state = match door_state_str.to_lowercase().as_str() {
-        "open" => DoorState::Open,
-        "closed" => DoorState::Closed,
-        "stuck" => DoorState::Stuck,
-        "locked" => DoorState::Locked,
-        "secret" => DoorState::Secret,
-        _ => return GMResponse::err(id, "door state must be open, closed, stuck, locked, or secret.", state.mode.clone()),
-    };
+fn add_door(id: &str, state: &mut GameState, door_id: u32, room_a: u32, room_b: u32, door_state: DoorState) -> GMResponse {
     let dungeon = match state.dungeon.as_mut() {
         Some(d) => d,
         None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
@@ -528,7 +512,7 @@ fn add_door(id: &str, state: &mut GameState, door_id: u32, room_a: u32, room_b: 
     }
     GMResponse::ok(
         id,
-        format!("added door {} between rooms {} and {} ({:?}).", door_id, room_a, room_b, door_state),
+        format!("added door {} between rooms {} and {} ({}).", door_id, room_a, room_b, door_state),
         state.mode.clone(),
     )
 }
@@ -563,46 +547,20 @@ fn search(id: &str, state: &mut GameState, is_elf: bool) -> GMResponse {
     GMResponse::ok(id, format!("{}", result), state.mode.clone())
 }
 
-fn light(id: &str, state: &mut GameState, source: &str, carrier: &str) -> GMResponse {
-    let kind = match source.to_lowercase().as_str() {
-        "torch" => LightSourceKind::Torch,
-        "lantern" => LightSourceKind::Lantern,
-        _ => return GMResponse::err(id, "light source must be 'torch' or 'lantern'.", state.mode.clone()),
-    };
+fn light(id: &str, state: &mut GameState, source: LightSourceKind, carrier: &str) -> GMResponse {
     let time = match state.time.as_mut() {
         Some(t) => t,
         None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
     };
-    time.light(kind, carrier);
-    GMResponse::ok(id, format!("{} lights a {}.", carrier, source), state.mode.clone())
+    time.light(source, carrier);
+    GMResponse::ok(id, format!("{} lights a {}.", carrier, source.name()), state.mode.clone())
 }
 
 // =============================================================================
 // Wilderness
 // =============================================================================
 
-fn parse_terrain(name: &str) -> Option<Terrain> {
-    match name.to_lowercase().as_str() {
-        "clear" => Some(Terrain::Clear),
-        "forest" => Some(Terrain::Forest),
-        "hills" => Some(Terrain::Hills),
-        "mountains" => Some(Terrain::Mountains),
-        "desert" => Some(Terrain::Desert),
-        "swamp" => Some(Terrain::Swamp),
-        "jungle" => Some(Terrain::Jungle),
-        "ocean" => Some(Terrain::Ocean),
-        "river" => Some(Terrain::River),
-        "barren" => Some(Terrain::Barren),
-        "city" => Some(Terrain::City),
-        _ => None,
-    }
-}
-
-fn enter_wilderness(id: &str, state: &mut GameState, terrain_name: &str) -> GMResponse {
-    let terrain = match parse_terrain(terrain_name) {
-        Some(t) => t,
-        None => return GMResponse::err(id, "invalid terrain type.", state.mode.clone()),
-    };
+fn enter_wilderness(id: &str, state: &mut GameState, terrain: Terrain) -> GMResponse {
     let mut ws = WildernessState::new();
     ws.add_hex(HexCell::new(0, 0, terrain)).unwrap();
     state.wilderness = Some(ws);
@@ -614,11 +572,7 @@ fn enter_wilderness(id: &str, state: &mut GameState, terrain_name: &str) -> GMRe
     )
 }
 
-fn add_hex(id: &str, state: &mut GameState, x: i32, y: i32, terrain_name: &str) -> GMResponse {
-    let terrain = match parse_terrain(terrain_name) {
-        Some(t) => t,
-        None => return GMResponse::err(id, "invalid terrain type.", state.mode.clone()),
-    };
+fn add_hex(id: &str, state: &mut GameState, x: i32, y: i32, terrain: Terrain) -> GMResponse {
     let ws = match state.wilderness.as_mut() {
         Some(w) => w,
         None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
@@ -998,7 +952,7 @@ fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &str) -> GMR
     }
 }
 
-fn hire_retainer(id: &str, state: &GameState, employer_name: &str, ret_name: &str, ret_class: &str, ret_level: u32) -> GMResponse {
+fn hire_retainer(id: &str, state: &GameState, employer_name: &str, ret_name: &str, ret_class: Class, ret_level: u32) -> GMResponse {
     let employer = match state.party.find_member(employer_name) {
         Some(c) => c,
         None => return GMResponse::err(id, format!("no party member named '{}'.", employer_name), state.mode.clone()),
@@ -1016,14 +970,14 @@ fn hire_retainer(id: &str, state: &GameState, employer_name: &str, ret_name: &st
     GMResponse::ok_with_data(
         id,
         format!("{} attempts to hire {} ({} L{}, {}gp/month). CHA {} (max {} retainers, loyalty {}). Reaction: {} — {}.",
-            employer.name, ret_name, ret_class, ret_level, wage,
+            employer.name, ret_name, ret_class.name(), ret_level, wage,
             cha, max, base_loyalty, reaction.name(),
             if hired { "HIRED" } else { "NOT HIRED" }),
         state.mode.clone(),
         serde_json::json!({
             "employer": employer.name,
             "retainer": ret_name,
-            "class": ret_class,
+            "class": ret_class.name(),
             "level": ret_level,
             "reaction": reaction.name(),
             "hired": hired,
@@ -1184,8 +1138,8 @@ mod tests {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
-            class: "Fighter".to_string(),
-            alignment: "Lawful".to_string(),
+            class: Class::Fighter,
+            alignment: Alignment::Lawful,
         }), &mut state);
         // Character creation might fail due to random ability rolls not meeting requirements.
         // So we just verify the response is well-formed.
@@ -1207,7 +1161,7 @@ mod tests {
         let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
             name: "goblin".to_string(),
             count: 3,
-            hit_dice: "1".to_string(),
+            hit_dice: "1".parse().unwrap(),
             ac: 6,
             hp: 3,
             damage: "1d6".to_string(),
@@ -1230,7 +1184,7 @@ mod tests {
         let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
             name: "goblin".to_string(),
             count: 1,
-            hit_dice: "1".to_string(),
+            hit_dice: "1".parse().unwrap(),
             ac: 6,
             hp: 3,
             damage: "1d6".to_string(),
@@ -1248,7 +1202,7 @@ mod tests {
         let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
             name: "orc".to_string(),
             count: 1,
-            hit_dice: "1".to_string(),
+            hit_dice: "1".parse().unwrap(),
             ac: 6,
             hp: 4,
             damage: "1d6".to_string(),
@@ -1302,7 +1256,7 @@ mod tests {
     fn enter_wilderness_and_add_hex() {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::EnterWilderness {
-            terrain: "forest".to_string(),
+            terrain: Terrain::Forest,
         }), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Wilderness);
@@ -1310,18 +1264,17 @@ mod tests {
         let resp2 = handle_request(&make_req("2", GMCommand::AddHex {
             x: 1,
             y: 0,
-            terrain: "hills".to_string(),
+            terrain: Terrain::Hills,
         }), &mut state);
         assert!(resp2.success);
     }
 
     #[test]
     fn enter_wilderness_invalid_terrain() {
-        let mut state = GameState::new();
-        let resp = handle_request(&make_req("1", GMCommand::EnterWilderness {
-            terrain: "lava".to_string(),
-        }), &mut state);
-        assert!(!resp.success);
+        // Invalid terrain is now caught at JSON deserialization.
+        let json = r#"{"id":"1","command":{"type":"EnterWilderness","params":{"terrain":"lava"}}}"#;
+        let result = crate::gmapi::protocol::parse_request(json);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1412,7 +1365,7 @@ mod tests {
     fn light_not_exploring() {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::Light {
-            source: "torch".to_string(),
+            source: LightSourceKind::Torch,
             carrier: "Aldric".to_string(),
         }), &mut state);
         assert!(!resp.success);
@@ -1420,13 +1373,10 @@ mod tests {
 
     #[test]
     fn light_invalid_source() {
-        let mut state = GameState::new();
-        state.time = Some(TimeTracker::new());
-        let resp = handle_request(&make_req("1", GMCommand::Light {
-            source: "candle".to_string(),
-            carrier: "Aldric".to_string(),
-        }), &mut state);
-        assert!(!resp.success);
+        // Invalid light source is now caught at JSON deserialization.
+        let json = r#"{"id":"1","command":{"type":"Light","params":{"source":"candle","carrier":"Aldric"}}}"#;
+        let result = crate::gmapi::protocol::parse_request(json);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1444,7 +1394,7 @@ mod tests {
         let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
             name: "goblin".to_string(),
             count: 1,
-            hit_dice: "1".to_string(),
+            hit_dice: "1".parse().unwrap(),
             ac: 6,
             hp: 3,
             damage: "1d6".to_string(),

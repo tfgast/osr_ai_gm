@@ -1,20 +1,69 @@
+use std::fmt;
+use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// Terrain types for wilderness hexes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Terrain {
+    #[serde(alias = "clear")]
     Clear,
+    #[serde(alias = "forest")]
     Forest,
+    #[serde(alias = "hills")]
     Hills,
+    #[serde(alias = "mountains")]
     Mountains,
+    #[serde(alias = "desert")]
     Desert,
+    #[serde(alias = "swamp")]
     Swamp,
+    #[serde(alias = "jungle")]
     Jungle,
+    #[serde(alias = "ocean")]
     Ocean,
+    #[serde(alias = "river")]
     River,
+    #[serde(alias = "barren")]
     Barren,
+    #[serde(alias = "city")]
     City,
+}
+
+impl Default for Terrain {
+    fn default() -> Self {
+        Terrain::Clear
+    }
+}
+
+impl fmt::Display for Terrain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+impl FromStr for Terrain {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "clear" => Ok(Terrain::Clear),
+            "forest" => Ok(Terrain::Forest),
+            "hills" => Ok(Terrain::Hills),
+            "mountains" => Ok(Terrain::Mountains),
+            "desert" => Ok(Terrain::Desert),
+            "swamp" => Ok(Terrain::Swamp),
+            "jungle" => Ok(Terrain::Jungle),
+            "ocean" => Ok(Terrain::Ocean),
+            "river" => Ok(Terrain::River),
+            "barren" => Ok(Terrain::Barren),
+            "city" => Ok(Terrain::City),
+            _ => Err(format!(
+                "invalid terrain '{}': must be clear, forest, hills, mountains, desert, swamp, jungle, ocean, river, barren, or city",
+                s
+            )),
+        }
+    }
 }
 
 impl Terrain {

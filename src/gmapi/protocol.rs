@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
+use crate::rules::alignment::Alignment;
+use crate::rules::attack::HitDice;
+use crate::rules::class::Class;
+use crate::state::dungeon::DoorState;
 use crate::state::game::GameMode;
+use crate::state::time::LightSourceKind;
+use crate::state::wilderness::Terrain;
 
 // =============================================================================
 // GM Request — what the LLM sends to the game engine
@@ -36,9 +42,10 @@ pub enum GMCommand {
     /// Create a character.
     CreateCharacter {
         name: String,
-        class: String,
-        #[serde(default = "default_alignment")]
-        alignment: String,
+        #[serde(deserialize_with = "deserialize_class")]
+        class: Class,
+        #[serde(default)]
+        alignment: Alignment,
     },
 
     // -- GM-only: encounter & combat --
@@ -46,7 +53,7 @@ pub enum GMCommand {
     SpawnEncounter {
         name: String,
         count: u32,
-        hit_dice: String,
+        hit_dice: HitDice,
         ac: i32,
         hp: i32,
         damage: String,
@@ -96,8 +103,8 @@ pub enum GMCommand {
         id: u32,
         room_a: u32,
         room_b: u32,
-        #[serde(default = "default_door_state")]
-        state: String,
+        #[serde(default)]
+        state: DoorState,
     },
     /// Move through a door.
     MoveRoom { door_id: u32 },
@@ -108,21 +115,21 @@ pub enum GMCommand {
     },
     /// Light a torch or lantern.
     Light {
-        source: String,
+        source: LightSourceKind,
         carrier: String,
     },
 
     // -- GM-only: wilderness --
     /// Enter wilderness travel mode.
     EnterWilderness {
-        #[serde(default = "default_terrain")]
-        terrain: String,
+        #[serde(default)]
+        terrain: Terrain,
     },
     /// Add a hex to the wilderness map.
     AddHex {
         x: i32,
         y: i32,
-        terrain: String,
+        terrain: Terrain,
     },
     /// Travel to a hex.
     Travel { x: i32, y: i32 },
@@ -176,7 +183,8 @@ pub enum GMCommand {
     HireRetainer {
         employer: String,
         retainer_name: String,
-        retainer_class: String,
+        #[serde(deserialize_with = "deserialize_class")]
+        retainer_class: Class,
         retainer_level: u32,
     },
     /// Check retainer loyalty.
@@ -206,13 +214,16 @@ pub enum GMCommand {
     Quit,
 }
 
-fn default_alignment() -> String { "Neutral".to_string() }
 fn default_weapon() -> String { "sword".to_string() }
 fn default_room_name() -> String { "Entrance".to_string() }
-fn default_door_state() -> String { "closed".to_string() }
-fn default_terrain() -> String { "clear".to_string() }
 fn default_save_path() -> String { "save.json".to_string() }
 fn default_distance() -> u32 { 60 }
+
+/// Deserialize a `Class` from a string, using `Class::parse` for flexible matching.
+fn deserialize_class<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Class, D::Error> {
+    let s = String::deserialize(deserializer)?;
+    Class::parse(&s).ok_or_else(|| serde::de::Error::custom(format!("unknown class '{}'", s)))
+}
 
 // =============================================================================
 // GM Response — what the game engine sends back
@@ -338,8 +349,8 @@ mod tests {
         match &req.command {
             GMCommand::CreateCharacter { name, class, alignment } => {
                 assert_eq!(name, "Aldric");
-                assert_eq!(class, "Fighter");
-                assert_eq!(alignment, "Neutral"); // default
+                assert_eq!(*class, Class::Fighter);
+                assert_eq!(*alignment, Alignment::default()); // default
             }
             _ => panic!("expected CreateCharacter"),
         }

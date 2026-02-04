@@ -6,6 +6,7 @@ use rand::Rng;
 use crate::dice;
 use crate::model::{AbilityScores, Character};
 use crate::rules::ability;
+use crate::rules::alignment::Alignment;
 use crate::rules::class::{self, Class, CombatAptitude, class_def};
 use crate::rules::save;
 use crate::rules::equipment;
@@ -86,7 +87,7 @@ pub fn create_character(
     name: &str,
     class: Class,
     abilities: [i32; 6],
-    alignment: &str,
+    alignment: Alignment,
 ) -> Character {
     create_character_with(name, class, abilities, alignment, &mut rand::thread_rng())
 }
@@ -96,7 +97,7 @@ pub fn create_character_with<R: Rng>(
     name: &str,
     class: Class,
     abilities: [i32; 6],
-    alignment: &str,
+    alignment: Alignment,
     rng: &mut R,
 ) -> Character {
     let def = class_def(class);
@@ -122,7 +123,7 @@ pub fn create_character_with<R: Rng>(
         xp: 0,
         inventory: Vec::new(),
         spells: Vec::new(),
-        alignment: alignment.to_string(),
+        alignment,
         gold_gp: gold,
         saving_throws: Some(saves),
         thac0: thac0_val,
@@ -248,12 +249,12 @@ mod tests {
     fn create_fighter() {
         let abilities = [14, 10, 10, 12, 13, 10];
         let c = create_character_with(
-            "Grond", Class::Fighter, abilities, "Neutral", &mut test_rng(),
+            "Grond", Class::Fighter, abilities, Alignment::Neutral, &mut test_rng(),
         );
         assert_eq!(c.name, "Grond");
         assert_eq!(c.class, Class::Fighter);
         assert_eq!(c.level, 1);
-        assert_eq!(c.alignment, "Neutral");
+        assert_eq!(c.alignment, Alignment::Neutral);
         assert_eq!(c.thac0, 19);
         assert_eq!(c.movement_rate, 120);
         assert!(c.hp >= 1);
@@ -266,7 +267,7 @@ mod tests {
     fn create_magic_user() {
         let abilities = [8, 16, 10, 12, 10, 11];
         let c = create_character_with(
-            "Elara", Class::MagicUser, abilities, "Chaotic", &mut test_rng(),
+            "Elara", Class::MagicUser, abilities, Alignment::Chaotic, &mut test_rng(),
         );
         assert_eq!(c.class, Class::MagicUser);
         assert!(c.hp >= 1 && c.hp <= 4);
@@ -282,7 +283,7 @@ mod tests {
         assert_eq!(abilities[class::CON], 15); // +1
         assert_eq!(abilities[class::CHA], 9);  // -1
         let c = create_character_with(
-            "Thorin", Class::Dwarf, abilities, "Lawful", &mut test_rng(),
+            "Thorin", Class::Dwarf, abilities, Alignment::Lawful, &mut test_rng(),
         );
         assert_eq!(c.class, Class::Dwarf);
         assert_eq!(c.abilities.constitution, 15);
@@ -296,7 +297,7 @@ mod tests {
         // DEX 16 gives AC mod of -2 (improves AC by 2)
         let abilities = [10, 10, 10, 16, 10, 10];
         let c = create_character_with(
-            "Shadow", Class::Thief, abilities, "Neutral", &mut test_rng(),
+            "Shadow", Class::Thief, abilities, Alignment::Neutral, &mut test_rng(),
         );
         assert_eq!(c.ac, 7); // 9 (unarmoured) - 2 (DEX mod)
     }
@@ -305,7 +306,7 @@ mod tests {
     fn character_sheet_contains_key_info() {
         let abilities = [14, 10, 10, 12, 13, 10];
         let c = create_character_with(
-            "Grond", Class::Fighter, abilities, "Neutral", &mut test_rng(),
+            "Grond", Class::Fighter, abilities, Alignment::Neutral, &mut test_rng(),
         );
         let sheet = character_sheet(&c);
         assert!(sheet.contains("Grond"));
@@ -339,7 +340,7 @@ mod tests {
         );
 
         let c = create_character_with(
-            "TestChar", chosen, final_abilities, "Neutral", &mut rng,
+            "TestChar", chosen, final_abilities, Alignment::Neutral, &mut rng,
         );
         assert_eq!(c.level, 1);
         assert!(c.hp >= 1);
@@ -351,7 +352,7 @@ mod tests {
     fn serialization_with_new_fields() {
         let abilities = [10, 10, 10, 10, 10, 10];
         let c = create_character_with(
-            "SerTest", Class::Fighter, abilities, "Lawful", &mut test_rng(),
+            "SerTest", Class::Fighter, abilities, Alignment::Lawful, &mut test_rng(),
         );
         let json = serde_json::to_string(&c).unwrap();
         let c2: Character = serde_json::from_str(&json).unwrap();
@@ -375,7 +376,7 @@ mod tests {
         }"#;
         let c: Character = serde_json::from_str(old_json).unwrap();
         assert_eq!(c.name, "OldChar");
-        assert_eq!(c.alignment, ""); // default
+        assert_eq!(c.alignment, Alignment::Neutral); // default
         assert_eq!(c.gold_gp, 0);   // default
         assert_eq!(c.thac0, 0);     // default
         assert!(c.saving_throws.is_none());

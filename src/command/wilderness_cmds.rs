@@ -9,24 +9,12 @@ impl Command for EnterWildernessCommand {
     fn name(&self) -> &str { "enter_wilderness" }
     fn help(&self) -> &str { "Enter wilderness travel mode (enter_wilderness <terrain>)" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        let terrain = if args.is_empty() {
-            Terrain::Clear
+        let terrain: Terrain = if args.is_empty() {
+            Terrain::default()
         } else {
-            match args[0].to_lowercase().as_str() {
-                "clear" => Terrain::Clear,
-                "forest" => Terrain::Forest,
-                "hills" => Terrain::Hills,
-                "mountains" => Terrain::Mountains,
-                "desert" => Terrain::Desert,
-                "swamp" => Terrain::Swamp,
-                "jungle" => Terrain::Jungle,
-                "ocean" => Terrain::Ocean,
-                "river" => Terrain::River,
-                "barren" => Terrain::Barren,
-                "city" => Terrain::City,
-                _ => return CommandResult::error(
-                    "terrain must be: clear, forest, hills, mountains, desert, swamp, jungle, ocean, river, barren, city"
-                ),
+            match args[0].parse() {
+                Ok(t) => t,
+                Err(e) => return CommandResult::error(e),
             }
         };
         let mut ws = WildernessState::new();
@@ -57,19 +45,9 @@ impl Command for AddHexCommand {
             Ok(n) => n,
             _ => return CommandResult::error("y must be an integer"),
         };
-        let terrain = match args[2].to_lowercase().as_str() {
-            "clear" => Terrain::Clear,
-            "forest" => Terrain::Forest,
-            "hills" => Terrain::Hills,
-            "mountains" => Terrain::Mountains,
-            "desert" => Terrain::Desert,
-            "swamp" => Terrain::Swamp,
-            "jungle" => Terrain::Jungle,
-            "ocean" => Terrain::Ocean,
-            "river" => Terrain::River,
-            "barren" => Terrain::Barren,
-            "city" => Terrain::City,
-            _ => return CommandResult::error("invalid terrain type"),
+        let terrain: Terrain = match args[2].parse() {
+            Ok(t) => t,
+            Err(e) => return CommandResult::error(e),
         };
         let ws = match state.wilderness.as_mut() {
             Some(w) => w,

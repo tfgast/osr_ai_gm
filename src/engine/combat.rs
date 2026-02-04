@@ -410,7 +410,7 @@ pub fn monster_attack_with<R: Rng>(
     );
     let monster = &combat.monsters[monster_idx];
     let attacker_name = monster.name.clone();
-    let hd = attack::parse_monster_hd(&monster.hit_dice);
+    let hd = monster.hit_dice.combat_hd();
     let thac0 = attack::monster_thac0(hd);
     let target_ac = character.ac;
     let damage_dice = if monster.damage.is_empty() { "1d6" } else { &monster.damage };
@@ -503,7 +503,7 @@ pub fn resolve_turn_undead_with<R: Rng>(
     rng: &mut R,
 ) -> TurnUndeadResult {
     let monster = &combat.monsters[target_monster_idx];
-    let hd = attack::parse_monster_hd(&monster.hit_dice);
+    let hd = monster.hit_dice.combat_hd();
     let rank = turn::undead_rank_from_hd(hd);
     let undead_type = monster.name.clone();
 
@@ -547,7 +547,7 @@ pub fn resolve_turn_undead_with<R: Rng>(
             if !m.is_alive() || m.turned {
                 continue;
             }
-            let m_hd = attack::parse_monster_hd(&m.hit_dice).max(1) as u32;
+            let m_hd = m.hit_dice.combat_hd().max(1) as u32;
             if m_hd <= remaining_hd {
                 remaining_hd -= m_hd;
                 if destroyed {
@@ -677,6 +677,7 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
 mod tests {
     use super::*;
     use crate::model::{AbilityScores, Monster};
+    use crate::rules::alignment::Alignment;
     use crate::rules::class::Class;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
@@ -696,7 +697,7 @@ mod tests {
             },
             hp: 8, max_hp: 8, ac: 3, xp: 0,
             inventory: vec![], spells: vec![],
-            alignment: "Neutral".to_string(), gold_gp: 100,
+            alignment: Alignment::Neutral, gold_gp: 100,
             saving_throws: None, thac0: 19, movement_rate: 120,
         }
     }
@@ -712,7 +713,7 @@ mod tests {
             },
             hp: 14, max_hp: 14, ac: 4, xp: 0,
             inventory: vec![], spells: vec![],
-            alignment: "Lawful".to_string(), gold_gp: 50,
+            alignment: Alignment::Lawful, gold_gp: 50,
             saving_throws: None, thac0: 19, movement_rate: 120,
         }
     }
@@ -728,7 +729,7 @@ mod tests {
             },
             hp: 3, max_hp: 3, ac: 7, xp: 0,
             inventory: vec![], spells: vec![],
-            alignment: "Neutral".to_string(), gold_gp: 40,
+            alignment: Alignment::Neutral, gold_gp: 40,
             saving_throws: None, thac0: 19, movement_rate: 120,
         }
     }
@@ -736,7 +737,7 @@ mod tests {
     fn test_goblin() -> Monster {
         Monster {
             name: "Goblin".to_string(),
-            hit_dice: "1-1".to_string(),
+            hit_dice: "1-1".parse().unwrap(),
             hp: 3, max_hp: 3, ac: 6,
             attacks: vec!["weapon".to_string()],
             damage: "1d6".to_string(),
@@ -748,7 +749,7 @@ mod tests {
     fn test_skeleton() -> Monster {
         Monster {
             name: "Skeleton".to_string(),
-            hit_dice: "1".to_string(),
+            hit_dice: "1".parse().unwrap(),
             hp: 4, max_hp: 4, ac: 7,
             attacks: vec!["weapon".to_string()],
             damage: "1d6".to_string(),
@@ -760,7 +761,7 @@ mod tests {
     fn test_ogre() -> Monster {
         Monster {
             name: "Ogre".to_string(),
-            hit_dice: "4+1".to_string(),
+            hit_dice: "4+1".parse().unwrap(),
             hp: 19, max_hp: 19, ac: 5,
             attacks: vec!["club".to_string()],
             damage: "1d10".to_string(),
@@ -1008,7 +1009,7 @@ mod tests {
     fn turn_undead_impossible() {
         let mut vampire = test_skeleton();
         vampire.name = "Vampire".to_string();
-        vampire.hit_dice = "8".to_string();
+        vampire.hit_dice = "8".parse().unwrap();
         let mut combat = CombatState::new(vec![vampire], 10);
         let cleric = test_cleric();
         // Level 3 vs rank 8: diff = -5, impossible
@@ -1356,7 +1357,7 @@ mod tests {
         // Mix of skeletons (rank 1) and a zombie (rank 2)
         let mut zombie = test_skeleton();
         zombie.name = "Zombie".to_string();
-        zombie.hit_dice = "2".to_string();
+        zombie.hit_dice = "2".parse().unwrap();
         zombie.hp = 9;
         zombie.max_hp = 9;
         let mut combat = CombatState::new(
@@ -1380,7 +1381,7 @@ mod tests {
         // Create high-HD undead: a single 6 HD mummy
         let mummy = Monster {
             name: "Mummy".to_string(),
-            hit_dice: "5+1".to_string(),
+            hit_dice: "5+1".parse().unwrap(),
             hp: 24, max_hp: 24, ac: 3,
             attacks: vec!["touch".to_string()],
             damage: "1d12".to_string(),

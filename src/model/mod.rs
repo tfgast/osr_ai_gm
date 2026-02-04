@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use crate::rules::alignment::Alignment;
+use crate::rules::attack::HitDice;
 use crate::rules::class::Class;
 use crate::rules::save::SavingThrows;
 
@@ -43,7 +45,7 @@ pub struct Character {
     pub inventory: Vec<Item>,
     pub spells: Vec<Spell>,
     #[serde(default)]
-    pub alignment: String,
+    pub alignment: Alignment,
     #[serde(default)]
     pub gold_gp: u32,
     #[serde(default)]
@@ -67,7 +69,7 @@ impl Character {
             xp: 0,
             inventory: Vec::new(),
             spells: Vec::new(),
-            alignment: String::new(),
+            alignment: Alignment::default(),
             gold_gp: 0,
             saving_throws: None,
             thac0: 19,
@@ -84,7 +86,7 @@ impl Character {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Monster {
     pub name: String,
-    pub hit_dice: String,
+    pub hit_dice: HitDice,
     pub hp: i32,
     pub max_hp: i32,
     pub ac: i32,
@@ -101,7 +103,9 @@ impl Monster {
     pub fn new(name: &str, hit_dice: &str) -> Self {
         Monster {
             name: name.to_string(),
-            hit_dice: hit_dice.to_string(),
+            hit_dice: hit_dice.parse().unwrap_or(HitDice {
+                base: 1, modifier: 0, specials: 0, fractional: false, range_end: None,
+            }),
             hp: 1,
             max_hp: 1,
             ac: 9,
