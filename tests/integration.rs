@@ -64,6 +64,23 @@ fn make_cleric(name: &str) -> Character {
     c
 }
 
+/// Helper: create a magic-user with known ability scores.
+fn make_magic_user(name: &str) -> Character {
+    let mut c = Character::new(name, Class::MagicUser);
+    c.abilities = AbilityScores {
+        strength: 8, intelligence: 16, wisdom: 12,
+        dexterity: 12, constitution: 10, charisma: 10,
+    };
+    c.hp = 3;
+    c.max_hp = 3;
+    c.ac = 9;  // no armour
+    c.thac0 = 19;
+    c.alignment = "Neutral".to_string();
+    c.gold_gp = 60;
+    c.movement_rate = 120;
+    c
+}
+
 // ===========================================================================
 // INTEGRATION TEST: Full dungeon session
 // ===========================================================================
@@ -1247,4 +1264,947 @@ fn wilderness_multi_day_travel() {
     let data = resp.data.unwrap();
     // Position might be different if party got lost, but travel_day should still advance
     assert_eq!(data["travel_day"], 4);
+}
+
+// ===========================================================================
+// SESSION A: Full dungeon crawl — 4-character party, 3 rooms, combat, loot,
+// XP, level-up, save/load roundtrip
+// ===========================================================================
+
+#[test]
+fn session_a_dungeon_crawl() {
+    let mut state = GameState::new();
+
+    // === STEP 1: Create 4-character party ===
+    state.party.add_member(make_fighter("Aldric the Bold"));
+    state.party.add_member(make_thief("Vex"));
+    state.party.add_member(make_cleric("Sister Mira"));
+    state.party.add_member(make_magic_user("Zanthus"));
+    assert_eq!(state.party.members.len(), 4);
+
+    // === STEP 2: Enter dungeon ===
+    let resp = handle_request(&req("a1", GMCommand::EnterDungeon {
+        level: 1,
+        room_name: "Crumbling Antechamber".to_string(),
+    }), &mut state);
+    assert!(resp.success, "enter dungeon failed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    // Light two sources — torch and lantern
+    let resp = handle_request(&req("a2", GMCommand::Light {
+        source: "torch".to_string(),
+        carrier: "Aldric the Bold".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let resp = handle_request(&req("a3", GMCommand::Light {
+        source: "lantern".to_string(),
+        carrier: "Sister Mira".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.time.as_ref().unwrap().lights.len(), 2);
+
+    // Advance a turn
+    let resp = handle_request(&req("a4", GMCommand::AdvanceTurn), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.turn(), 1);
+
+    // === STEP 3: Build 3 rooms and explore ===
+    // Room 1 already exists (id=0). Add rooms 1 and 2.
+    let resp = handle_request(&req("a5", GMCommand::AddRoom {
+        id: 1, name: "Goblin Guardpost".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let resp = handle_request(&req("a6", GMCommand::AddRoom {
+        id: 2, name: "Treasure Vault".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Connect rooms with doors (open so party can pass through)
+    let resp = handle_request(&req("a7", GMCommand::AddDoor {
+        id: 0, room_a: 0, room_b: 1, state: "open".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let resp = handle_request(&req("a8", GMCommand::AddDoor {
+        id: 1, room_a: 1, room_b: 2, state: "open".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Search room 0
+    let resp = handle_request(&req("a9", GMCommand::Search { is_elf: false }), &mut state);
+    assert!(resp.success);
+
+    // Move to room 1 through door 0
+    let resp = handle_request(&req("a10", GMCommand::MoveRoom { door_id: 0 }), &mut state);
+    assert!(resp.success);
+    let dungeon = state.dungeon.as_ref().unwrap();
+    assert_eq!(dungeon.current_room, Some(1));
+
+    // Advance another turn
+    let resp = handle_request(&req("a11", GMCommand::AdvanceTurn), &mut state);
+    assert!(resp.success);
+    assert!(state.turn() >= 2, "should have advanced multiple turns");
+
+    // === STEP 4: Encounter in room 1 ===
+    let resp = handle_request(&req("a20", GMCommand::SpawnMonster {
+        name: "Goblin".to_string(),
+        count: 5,
+        distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Combat);
+    assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 5);
+
+    // Roll surprise
+    let resp = handle_request(&req("a21", GMCommand::RollSurprise), &mut state);
+    assert!(resp.success);
+
+    // Roll initiative
+    let resp = handle_request(&req("a22", GMCommand::RollInitiative), &mut state);
+    assert!(resp.success);
+    let combat = state.combat.as_ref().unwrap();
+    assert!(combat.party_initiative > 0);
+    assert!(combat.monster_initiative > 0);
+    assert_eq!(combat.round, 1);
+
+    // Fighter attacks goblin 0
+    let resp = handle_request(&req("a23", GMCommand::Attack {
+        character: "Aldric the Bold".to_string(),
+        monster_idx: 0,
+        weapon: "sword".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Thief backstabs goblin 1
+    let resp = handle_request(&req("a24", GMCommand::Backstab {
+        character: "Vex".to_string(),
+        monster_idx: 1,
+        weapon: "dagger".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    if data["hit"].as_bool().unwrap_or(false) {
+        assert_eq!(data["multiplier"], 2); // level 1 backstab = x2
+    }
+
+    // Cleric attacks goblin 2
+    let resp = handle_request(&req("a25", GMCommand::Attack {
+        character: "Sister Mira".to_string(),
+        monster_idx: 2,
+        weapon: "mace".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Magic-User attacks goblin 3 with dagger (can't use swords)
+    let resp = handle_request(&req("a26", GMCommand::Attack {
+        character: "Zanthus".to_string(),
+        monster_idx: 3,
+        weapon: "dagger".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Monster attacks back
+    let resp = handle_request(&req("a27", GMCommand::MonsterAttack {
+        monster_idx: 4,
+        character: "Aldric the Bold".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Check morale
+    let resp = handle_request(&req("a28", GMCommand::CheckMorale), &mut state);
+    assert!(resp.success);
+
+    // End combat
+    let resp = handle_request(&req("a29", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Idle);
+    let combat_data = resp.data.unwrap();
+    let monster_xp = combat_data["total_xp"].as_u64().unwrap();
+    // monster_xp may be 0 if no goblins were killed (attack rolls are random)
+
+    // === STEP 5: Loot treasure and award XP ===
+    let treasure_gp = 2000u64; // big haul to trigger level-up
+    let share = treasure_gp / 4;
+    let monster_share = monster_xp / 4;
+
+    // Track pre-XP state
+    let pre_fighter_xp = state.party.find_member("Aldric the Bold").unwrap().xp;
+    assert_eq!(pre_fighter_xp, 0);
+
+    for name in &["Aldric the Bold", "Vex", "Sister Mira", "Zanthus"] {
+        let resp = handle_request(&req("a30", GMCommand::AwardTreasureXp {
+            character: name.to_string(),
+            treasure_gp: share,
+            monster_xp: monster_share,
+        }), &mut state);
+        assert!(resp.success, "award xp to {} failed: {}", name, resp.message);
+    }
+
+    // === STEP 6: Verify level-up triggers ===
+    // Fighter needs 2000 XP for L2. 500gp treasure + monster share + 10% bonus
+    // should push past 2000.
+    let fighter = state.party.find_member("Aldric the Bold").unwrap();
+    assert!(fighter.xp > 0);
+    // With STR 16 = +10% modifier, 500+monster_share base -> 550+ adjusted
+    // plus treasure 500gp -> should be around 550+ total.
+    // If treasure_gp=2000, share=500, adjusted = (500+monster_share)*1.10
+    // Fighter needs 2000 for L2. 500*1.10 = 550 base. Not enough for L2 with just share.
+
+    // Thief needs 1200 for L2. DEX 16 = +10%. share=500+monster_share, adjusted ~550+
+    // Also not enough from share alone. Let's add more XP to trigger level-ups.
+    // Award a big direct XP to trigger level-up for the thief
+    let resp = handle_request(&req("a31", GMCommand::AwardTreasureXp {
+        character: "Vex".to_string(),
+        treasure_gp: 1000,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["leveled_up"].as_bool().unwrap(), "thief should level up to 2");
+    assert_eq!(data["new_level"], 2);
+    assert!(data["hp_gained"].as_i64().unwrap() >= 1);
+
+    let vex = state.party.find_member("Vex").unwrap();
+    assert_eq!(vex.level, 2);
+    assert!(vex.max_hp > 4, "thief should have gained HP");
+
+    // Award big XP to fighter too
+    let resp = handle_request(&req("a32", GMCommand::AwardTreasureXp {
+        character: "Aldric the Bold".to_string(),
+        treasure_gp: 2000,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["leveled_up"].as_bool().unwrap(), "fighter should level up");
+    let fighter = state.party.find_member("Aldric the Bold").unwrap();
+    assert_eq!(fighter.level, 2);
+    assert!(fighter.max_hp > 8);
+    assert!(fighter.saving_throws.is_some());
+
+    // === STEP 7: Save state ===
+    let save_path = "/tmp/osr_session_a_test.json";
+    let resp = handle_request(&req("a40", GMCommand::Save {
+        path: save_path.to_string(),
+    }), &mut state);
+    assert!(resp.success, "save failed: {}", resp.message);
+
+    // Record key state for comparison
+    let saved_party_count = state.party.members.len();
+    let saved_fighter_level = state.party.find_member("Aldric the Bold").unwrap().level;
+    let saved_fighter_xp = state.party.find_member("Aldric the Bold").unwrap().xp;
+    let saved_fighter_hp = state.party.find_member("Aldric the Bold").unwrap().max_hp;
+    let saved_thief_level = state.party.find_member("Vex").unwrap().level;
+    let saved_notes_count = state.notes.len();
+
+    // === STEP 8: Load into fresh state and verify ===
+    let mut loaded_state = GameState::new();
+    let resp = handle_request(&req("a41", GMCommand::Load {
+        path: save_path.to_string(),
+    }), &mut loaded_state);
+    assert!(resp.success, "load failed: {}", resp.message);
+
+    assert_eq!(loaded_state.party.members.len(), saved_party_count);
+    let loaded_fighter = loaded_state.party.find_member("Aldric the Bold").unwrap();
+    assert_eq!(loaded_fighter.level, saved_fighter_level);
+    assert_eq!(loaded_fighter.xp, saved_fighter_xp);
+    assert_eq!(loaded_fighter.max_hp, saved_fighter_hp);
+    let loaded_thief = loaded_state.party.find_member("Vex").unwrap();
+    assert_eq!(loaded_thief.level, saved_thief_level);
+    assert_eq!(loaded_state.notes.len(), saved_notes_count);
+
+    // Verify all 4 members survived the roundtrip
+    assert!(loaded_state.party.find_member("Aldric the Bold").is_some());
+    assert!(loaded_state.party.find_member("Vex").is_some());
+    assert!(loaded_state.party.find_member("Sister Mira").is_some());
+    assert!(loaded_state.party.find_member("Zanthus").is_some());
+
+    // Clean up
+    let _ = std::fs::remove_file(save_path);
+}
+
+// ===========================================================================
+// SESSION B: Wilderness travel — multi-hex travel, encounters, foraging
+// ===========================================================================
+
+#[test]
+fn session_b_wilderness_travel() {
+    let mut state = GameState::new();
+
+    // Create a party
+    state.party.add_member(make_fighter("Rowan"));
+    state.party.add_member(make_cleric("Prior Anselm"));
+    assert_eq!(state.party.members.len(), 2);
+
+    // === Enter wilderness ===
+    let resp = handle_request(&req("b1", GMCommand::EnterWilderness {
+        terrain: "clear".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    // Verify starting position
+    let ws = state.wilderness.as_ref().unwrap();
+    assert_eq!(ws.current_x, 0);
+    assert_eq!(ws.current_y, 0);
+    assert_eq!(ws.travel_day, 1);
+
+    // === Add multiple hexes for multi-hex travel ===
+    let hexes = [
+        (1, 0, "forest"),
+        (1, 1, "hills"),
+        (0, 1, "swamp"),
+        (1, -1, "clear"),
+        (2, 0, "mountains"),
+    ];
+    for (x, y, terrain) in &hexes {
+        let resp = handle_request(&req("b2", GMCommand::AddHex {
+            x: *x, y: *y, terrain: terrain.to_string(),
+        }), &mut state);
+        assert!(resp.success, "add hex ({},{}) failed: {}", x, y, resp.message);
+    }
+
+    // === Travel hex 1: (0,0) -> (1,0) forest ===
+    let resp = handle_request(&req("b3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    // Travel response should include encounter/lost info
+    assert!(data.get("lost").is_some());
+    assert!(data.get("has_encounter").is_some());
+
+    // Party may or may not arrive at destination (could get lost in forest, 2-in-6)
+    let ws = state.wilderness.as_ref().unwrap();
+    let _after_travel1 = (ws.current_x, ws.current_y);
+    // Travel day should have incremented
+    assert!(ws.travel_day >= 2);
+
+    // === Travel multiple days to cover ground ===
+    // Travel toward (1,0) until we arrive (handling lost possibility)
+    for _ in 0..5 {
+        let ws = state.wilderness.as_ref().unwrap();
+        if ws.current_x == 1 && ws.current_y == 0 { break; }
+        // Travel back toward (1,0) from wherever we are
+        handle_request(&req("b3r", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    }
+
+    // Now try to travel to (1,1) hills
+    // First make sure hex (1,1) is adjacent to current position
+    let ws = state.wilderness.as_ref().unwrap();
+    let can_reach_11 = (ws.current_x - 1).abs() <= 1 && (ws.current_y - 1).abs() <= 1;
+    if can_reach_11 {
+        let resp = handle_request(&req("b4", GMCommand::Travel { x: 1, y: 1 }), &mut state);
+        assert!(resp.success);
+    }
+
+    // Travel toward swamp (0,1)
+    let ws = state.wilderness.as_ref().unwrap();
+    let can_reach_01 = (ws.current_x - 0).abs() <= 1 && (ws.current_y - 1).abs() <= 1;
+    if can_reach_01 {
+        let resp = handle_request(&req("b5", GMCommand::Travel { x: 0, y: 1 }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        // Swamp has higher lost chance (2-in-6)
+        assert!(data.get("lost").is_some());
+    }
+
+    // === Query wilderness state ===
+    let resp = handle_request(&req("b6", GMCommand::QueryWilderness), &mut state);
+    assert!(resp.success);
+
+    // Verify explored hexes accumulated (at least the starting hex + some travel)
+    let ws = state.wilderness.as_ref().unwrap();
+    assert!(ws.explored.len() >= 1, "should have explored at least 1 hex");
+
+    // === Verify travel day counter incremented across all travel ===
+    let ws = state.wilderness.as_ref().unwrap();
+    assert!(ws.travel_day >= 2, "travel days should have incremented");
+
+    // === Spawn encounter in wilderness ===
+    let resp = handle_request(&req("b8", GMCommand::SpawnMonster {
+        name: "Orc".to_string(),
+        count: 3,
+        distance: 60,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    // Roll reaction to try to evade/negotiate
+    let resp = handle_request(&req("b9", GMCommand::RollReaction {
+        character: "Prior Anselm".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["character"], "Prior Anselm");
+    assert!(data["charisma"].as_i64().unwrap() > 0);
+    let reaction = data["reaction"].as_str().unwrap();
+    assert!(!reaction.is_empty());
+
+    // End combat (simulate evasion by ending)
+    let resp = handle_request(&req("b10", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Idle);
+}
+
+// ===========================================================================
+// SESSION C: Retainer — hire, dungeon crawl, morale, combat, XP split
+// ===========================================================================
+
+#[test]
+fn session_c_retainers() {
+    let mut state = GameState::new();
+
+    // Create party with high-CHA leader
+    let mut leader = make_fighter("Captain Kael");
+    leader.abilities.charisma = 16; // CHA 16 = max 6 retainers
+    state.party.add_member(leader);
+    state.party.add_member(make_cleric("Deacon Brin"));
+
+    // === Hire a retainer ===
+    let resp = handle_request(&req("c1", GMCommand::HireRetainer {
+        employer: "Captain Kael".to_string(),
+        retainer_name: "Tormund".to_string(),
+        retainer_class: "Fighter".to_string(),
+        retainer_level: 1,
+    }), &mut state);
+    assert!(resp.success, "hire retainer failed: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert_eq!(data["retainer"], "Tormund");
+    assert_eq!(data["level"], 1);
+    assert_eq!(data["wage_gp"], 25); // level 1 wage
+    assert_eq!(data["max_retainers"], 6); // CHA 16
+
+    // Hire a second retainer
+    let resp = handle_request(&req("c2", GMCommand::HireRetainer {
+        employer: "Captain Kael".to_string(),
+        retainer_name: "Greta".to_string(),
+        retainer_class: "Thief".to_string(),
+        retainer_level: 2,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["wage_gp"], 50); // level 2 wage
+
+    // === Enter dungeon with retainers ===
+    let resp = handle_request(&req("c3", GMCommand::EnterDungeon {
+        level: 1,
+        room_name: "Collapsed Entrance".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("c4", GMCommand::Light {
+        source: "torch".to_string(),
+        carrier: "Captain Kael".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // === Retainer loyalty check ===
+    // Tormund loyalty check (base loyalty for CHA 16 employer = 9)
+    let resp = handle_request(&req("c5", GMCommand::LoyaltyCheck {
+        retainer_name: "Tormund".to_string(),
+        loyalty: 9,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["retainer"], "Tormund");
+    assert_eq!(data["loyalty"], 9);
+    let result = data["result"].as_str().unwrap();
+    assert!(["Loyal", "Wavering", "Disloyal"].contains(&result));
+
+    // === Combat with retainer in party ===
+    let resp = handle_request(&req("c6", GMCommand::SpawnMonster {
+        name: "Hobgoblin".to_string(),
+        count: 3,
+        distance: 5,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    let resp = handle_request(&req("c7", GMCommand::RollInitiative), &mut state);
+    assert!(resp.success);
+
+    // Party members attack
+    let resp = handle_request(&req("c8", GMCommand::Attack {
+        character: "Captain Kael".to_string(),
+        monster_idx: 0,
+        weapon: "sword".to_string(),
+    }), &mut state);
+    assert!(resp.success, "attack failed: {}", resp.message);
+
+    let resp = handle_request(&req("c9", GMCommand::Attack {
+        character: "Deacon Brin".to_string(),
+        monster_idx: 1,
+        weapon: "mace".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Monster attacks back
+    let resp = handle_request(&req("c10", GMCommand::MonsterAttack {
+        monster_idx: 2,
+        character: "Captain Kael".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Check morale
+    let resp = handle_request(&req("c11", GMCommand::CheckMorale), &mut state);
+    assert!(resp.success);
+
+    // End combat
+    let resp = handle_request(&req("c12", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    let combat_data = resp.data.unwrap();
+    let total_monster_xp = combat_data["total_xp"].as_u64().unwrap();
+
+    // === XP split with retainer (retainer gets half share) ===
+    // 2 PCs + 1 retainer at half = 2.5 shares
+    // PC share = total / 2.5 = total * 2 / 5
+    // Retainer share = total / 5
+    let treasure_gp = 500u64;
+    // Simple split: each PC gets full share, retainer would get half
+    let pc_share_treasure = treasure_gp / 2;
+    let pc_share_monster = total_monster_xp / 2;
+
+    let resp = handle_request(&req("c13", GMCommand::AwardTreasureXp {
+        character: "Captain Kael".to_string(),
+        treasure_gp: pc_share_treasure,
+        monster_xp: pc_share_monster,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    // CHA 16, STR prime req for Fighter (+10%)
+    assert!(data["adjusted_xp"].as_u64().unwrap() > 0);
+
+    let resp = handle_request(&req("c14", GMCommand::AwardTreasureXp {
+        character: "Deacon Brin".to_string(),
+        treasure_gp: pc_share_treasure,
+        monster_xp: pc_share_monster,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Verify both PCs got XP
+    let kael = state.party.find_member("Captain Kael").unwrap();
+    assert!(kael.xp > 0, "Captain Kael should have XP");
+    let brin = state.party.find_member("Deacon Brin").unwrap();
+    assert!(brin.xp > 0, "Deacon Brin should have XP");
+
+    // Retainer loyalty check after combat (morale situation)
+    let resp = handle_request(&req("c15", GMCommand::LoyaltyCheck {
+        retainer_name: "Greta".to_string(),
+        loyalty: 8,
+    }), &mut state);
+    assert!(resp.success);
+}
+
+// ===========================================================================
+// SAVE/LOAD ROUNDTRIP: Complex state — mid-combat, lights, wilderness+lost
+// ===========================================================================
+
+#[test]
+fn save_load_complex_state() {
+    let save_path = "/tmp/osr_complex_roundtrip_test.json";
+
+    // === Build complex state: mid-combat with lights ===
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Grom"));
+    state.party.add_member(make_thief("Silke"));
+    state.party.add_member(make_cleric("Father Odo"));
+
+    // Enter dungeon and set up time/lights
+    let resp = handle_request(&req("s1", GMCommand::EnterDungeon {
+        level: 2,
+        room_name: "Deep Crypt".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Light multiple sources
+    handle_request(&req("s2", GMCommand::Light {
+        source: "torch".to_string(),
+        carrier: "Grom".to_string(),
+    }), &mut state);
+    handle_request(&req("s3", GMCommand::Light {
+        source: "lantern".to_string(),
+        carrier: "Father Odo".to_string(),
+    }), &mut state);
+
+    // Advance a few turns to change light state
+    for _ in 0..3 {
+        handle_request(&req("s4", GMCommand::AdvanceTurn), &mut state);
+    }
+
+    // Add rooms and a door
+    handle_request(&req("s5", GMCommand::AddRoom { id: 1, name: "Bone Room".to_string() }), &mut state);
+    handle_request(&req("s6", GMCommand::AddDoor {
+        id: 0, room_a: 0, room_b: 1, state: "secret".to_string(),
+    }), &mut state);
+
+    // Add rulings
+    handle_request(&req("s7", GMCommand::Ruling {
+        text: "The crypt is unnaturally cold.".to_string(),
+    }), &mut state);
+    handle_request(&req("s8", GMCommand::Ruling {
+        text: "Strange runes glow on the walls.".to_string(),
+    }), &mut state);
+
+    // Spawn combat (puts us mid-combat)
+    let resp = handle_request(&req("s9", GMCommand::SpawnMonster {
+        name: "Orc".to_string(),
+        count: 4,
+        distance: 30,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    // Roll initiative to populate combat state
+    handle_request(&req("s10", GMCommand::RollInitiative), &mut state);
+
+    // Attack to change combat state
+    handle_request(&req("s11", GMCommand::Attack {
+        character: "Grom".to_string(),
+        monster_idx: 0,
+        weapon: "sword".to_string(),
+    }), &mut state);
+
+    // Record all state before save
+    let pre_turn = state.turn();
+    let pre_dungeon_level = state.dungeon_level;
+    let pre_mode = state.mode.clone();
+    let pre_party_count = state.party.members.len();
+    let pre_notes_count = state.notes.len();
+    let pre_combat_round = state.combat.as_ref().unwrap().round;
+    let pre_combat_monster_count = state.combat.as_ref().unwrap().monsters.len();
+    let pre_combat_distance = state.combat.as_ref().unwrap().distance;
+    let pre_light_count = state.time.as_ref().unwrap().lights.len();
+    let pre_room_count = state.dungeon.as_ref().unwrap().rooms.len();
+    let pre_door_count = state.dungeon.as_ref().unwrap().doors.len();
+    let pre_grom_hp = state.party.find_member("Grom").unwrap().hp;
+    let pre_monster0_hp = state.combat.as_ref().unwrap().monsters[0].hp;
+
+    // === Save ===
+    let resp = handle_request(&req("s20", GMCommand::Save {
+        path: save_path.to_string(),
+    }), &mut state);
+    assert!(resp.success, "save failed: {}", resp.message);
+
+    // === Load into completely fresh state ===
+    let mut loaded = GameState::new();
+    let resp = handle_request(&req("s21", GMCommand::Load {
+        path: save_path.to_string(),
+    }), &mut loaded);
+    assert!(resp.success, "load failed: {}", resp.message);
+
+    // === Verify EVERY field ===
+    assert_eq!(loaded.turn(), pre_turn, "turn mismatch");
+    assert_eq!(loaded.dungeon_level, pre_dungeon_level, "dungeon_level mismatch");
+    assert_eq!(loaded.mode, pre_mode, "mode mismatch");
+    assert_eq!(loaded.party.members.len(), pre_party_count, "party count mismatch");
+    assert_eq!(loaded.notes.len(), pre_notes_count, "notes count mismatch");
+
+    // Combat state
+    let combat = loaded.combat.as_ref().expect("combat should exist after load");
+    assert_eq!(combat.round, pre_combat_round, "combat round mismatch");
+    assert_eq!(combat.monsters.len(), pre_combat_monster_count, "monster count mismatch");
+    assert_eq!(combat.distance, pre_combat_distance, "combat distance mismatch");
+    assert_eq!(combat.monsters[0].hp, pre_monster0_hp, "monster hp mismatch");
+
+    // Time/light state
+    let time = loaded.time.as_ref().expect("time should exist after load");
+    assert_eq!(time.lights.len(), pre_light_count, "light count mismatch");
+    // Torch should have 3 turns remaining (started at 6, advanced 3)
+    let torch = time.lights.iter().find(|l| l.carrier == "Grom");
+    assert!(torch.is_some(), "Grom's torch should persist");
+    assert_eq!(torch.unwrap().remaining_turns, 3, "torch remaining turns mismatch");
+    // Lantern should have 21 turns remaining (started at 24, advanced 3)
+    let lantern = time.lights.iter().find(|l| l.carrier == "Father Odo");
+    assert!(lantern.is_some(), "Father Odo's lantern should persist");
+    assert_eq!(lantern.unwrap().remaining_turns, 21, "lantern remaining turns mismatch");
+
+    // Dungeon state
+    let dungeon = loaded.dungeon.as_ref().expect("dungeon should exist after load");
+    assert_eq!(dungeon.rooms.len(), pre_room_count, "room count mismatch");
+    assert_eq!(dungeon.doors.len(), pre_door_count, "door count mismatch");
+    assert_eq!(dungeon.level, 2, "dungeon level mismatch");
+
+    // Character state preserved
+    let grom = loaded.party.find_member("Grom").unwrap();
+    assert_eq!(grom.hp, pre_grom_hp, "Grom HP mismatch");
+    assert_eq!(grom.class, Class::Fighter);
+
+    // Notes preserved
+    assert!(loaded.notes.iter().any(|n| n.contains("unnaturally cold")));
+    assert!(loaded.notes.iter().any(|n| n.contains("runes glow")));
+
+    // Clean up
+    let _ = std::fs::remove_file(save_path);
+
+    // === Part 2: Wilderness state with lost flag ===
+    let mut ws_state = GameState::new();
+    ws_state.party.add_member(make_fighter("Wanderer"));
+
+    let resp = handle_request(&req("w1", GMCommand::EnterWilderness {
+        terrain: "forest".to_string(),
+    }), &mut ws_state);
+    assert!(resp.success);
+
+    // Add hexes and travel
+    handle_request(&req("w2", GMCommand::AddHex {
+        x: 1, y: 0, terrain: "swamp".to_string(),
+    }), &mut ws_state);
+    handle_request(&req("w3", GMCommand::Travel { x: 1, y: 0 }), &mut ws_state);
+
+    // Manually set lost flag for testing
+    ws_state.wilderness.as_mut().unwrap().lost = true;
+
+    let pre_ws_x = ws_state.wilderness.as_ref().unwrap().current_x;
+    let pre_ws_y = ws_state.wilderness.as_ref().unwrap().current_y;
+    let pre_ws_lost = ws_state.wilderness.as_ref().unwrap().lost;
+    let pre_ws_day = ws_state.wilderness.as_ref().unwrap().travel_day;
+
+    let ws_save_path = "/tmp/osr_wilderness_roundtrip_test.json";
+    let resp = handle_request(&req("w4", GMCommand::Save {
+        path: ws_save_path.to_string(),
+    }), &mut ws_state);
+    assert!(resp.success);
+
+    let mut ws_loaded = GameState::new();
+    let resp = handle_request(&req("w5", GMCommand::Load {
+        path: ws_save_path.to_string(),
+    }), &mut ws_loaded);
+    assert!(resp.success);
+
+    let ws = ws_loaded.wilderness.as_ref().expect("wilderness should exist after load");
+    assert_eq!(ws.current_x, pre_ws_x, "wilderness x mismatch");
+    assert_eq!(ws.current_y, pre_ws_y, "wilderness y mismatch");
+    assert_eq!(ws.lost, pre_ws_lost, "wilderness lost flag mismatch");
+    assert_eq!(ws.travel_day, pre_ws_day, "wilderness travel_day mismatch");
+    assert_eq!(ws_loaded.mode, GameMode::Wilderness, "mode should be Wilderness");
+
+    let _ = std::fs::remove_file(ws_save_path);
+}
+
+// ===========================================================================
+// CHARACTER PROGRESSION: Multi-level XP accumulation across combats/treasure
+// ===========================================================================
+
+#[test]
+fn character_progression_multi_level() {
+    let mut state = GameState::new();
+
+    // Create all 4 class types at level 1
+    let mut fighter = make_fighter("Bjorn");
+    fighter.xp = 0;
+    state.party.add_member(fighter);
+
+    let mut thief = make_thief("Nyx");
+    thief.xp = 0;
+    state.party.add_member(thief);
+
+    let mut cleric = make_cleric("Amara");
+    cleric.xp = 0;
+    state.party.add_member(cleric);
+
+    let mut mage = make_magic_user("Elara");
+    mage.xp = 0;
+    state.party.add_member(mage);
+
+    // Record baseline stats
+    let fighter_base_hp = state.party.find_member("Bjorn").unwrap().max_hp;
+    let thief_base_hp = state.party.find_member("Nyx").unwrap().max_hp;
+    let cleric_base_hp = state.party.find_member("Amara").unwrap().max_hp;
+    let mage_base_hp = state.party.find_member("Elara").unwrap().max_hp;
+
+    assert_eq!(state.party.find_member("Bjorn").unwrap().thac0, 19);
+    assert_eq!(state.party.find_member("Nyx").unwrap().thac0, 19);
+
+    // === Combat 1: Small encounter ===
+    let resp = handle_request(&req("p1", GMCommand::SpawnMonster {
+        name: "Kobold".to_string(),
+        count: 6,
+        distance: 20,
+    }), &mut state);
+    assert!(resp.success);
+
+    handle_request(&req("p2", GMCommand::RollInitiative), &mut state);
+    handle_request(&req("p3", GMCommand::Attack {
+        character: "Bjorn".to_string(), monster_idx: 0, weapon: "sword".to_string(),
+    }), &mut state);
+    handle_request(&req("p4", GMCommand::Attack {
+        character: "Amara".to_string(), monster_idx: 1, weapon: "mace".to_string(),
+    }), &mut state);
+
+    let resp = handle_request(&req("p5", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    let combat1_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
+
+    // Award combat 1 XP + small treasure
+    for name in &["Bjorn", "Nyx", "Amara", "Elara"] {
+        let resp = handle_request(&req("p6", GMCommand::AwardTreasureXp {
+            character: name.to_string(),
+            treasure_gp: 50,
+            monster_xp: combat1_xp / 4,
+        }), &mut state);
+        assert!(resp.success);
+    }
+
+    // === Combat 2: Medium encounter ===
+    let resp = handle_request(&req("p10", GMCommand::SpawnMonster {
+        name: "Orc".to_string(),
+        count: 4,
+        distance: 40,
+    }), &mut state);
+    assert!(resp.success);
+
+    handle_request(&req("p11", GMCommand::RollInitiative), &mut state);
+    handle_request(&req("p12", GMCommand::Attack {
+        character: "Bjorn".to_string(), monster_idx: 0, weapon: "sword".to_string(),
+    }), &mut state);
+
+    let resp = handle_request(&req("p13", GMCommand::EndCombat), &mut state);
+    let combat2_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
+
+    // Award combat 2 XP + bigger treasure
+    for name in &["Bjorn", "Nyx", "Amara", "Elara"] {
+        handle_request(&req("p14", GMCommand::AwardTreasureXp {
+            character: name.to_string(),
+            treasure_gp: 200,
+            monster_xp: combat2_xp / 4,
+        }), &mut state);
+    }
+
+    // All characters should have accumulated XP
+    for name in &["Bjorn", "Nyx", "Amara", "Elara"] {
+        let c = state.party.find_member(name).unwrap();
+        assert!(c.xp > 0, "{} should have XP", name);
+    }
+
+    // === Award large treasure haul to trigger level-ups ===
+    // Thief needs 1200 XP for L2 (DEX 16 = +10% bonus)
+    // Award enough to level up thief first (lowest threshold)
+    let resp = handle_request(&req("p20", GMCommand::AwardTreasureXp {
+        character: "Nyx".to_string(),
+        treasure_gp: 1000,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["leveled_up"].as_bool().unwrap(), "thief should level up to 2");
+    assert_eq!(data["new_level"], 2);
+
+    let nyx = state.party.find_member("Nyx").unwrap();
+    assert_eq!(nyx.level, 2);
+    assert!(nyx.max_hp > thief_base_hp, "thief HP should increase");
+    // Thief at L2 should have Open Locks target of 20 (vs 15 at L1)
+    let resp = handle_request(&req("p21", GMCommand::ThiefSkillCheck {
+        character: "Nyx".to_string(),
+        skill: "open locks".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["target"], 20, "L2 thief open locks should be 20%");
+
+    // Cleric needs 1500 for L2 (WIS 16 = +10%)
+    let resp = handle_request(&req("p22", GMCommand::AwardTreasureXp {
+        character: "Amara".to_string(),
+        treasure_gp: 1500,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["leveled_up"].as_bool().unwrap(), "cleric should level up");
+    let amara = state.party.find_member("Amara").unwrap();
+    assert_eq!(amara.level, 2);
+    assert!(amara.max_hp > cleric_base_hp, "cleric HP should increase");
+    // Cleric saving throws should be set
+    assert!(amara.saving_throws.is_some(), "cleric should have saving throws after level up");
+
+    // Fighter needs 2000 for L2 (STR 16 = +10%)
+    let resp = handle_request(&req("p23", GMCommand::AwardTreasureXp {
+        character: "Bjorn".to_string(),
+        treasure_gp: 2000,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["leveled_up"].as_bool().unwrap(), "fighter should level up");
+    let bjorn = state.party.find_member("Bjorn").unwrap();
+    assert_eq!(bjorn.level, 2);
+    assert!(bjorn.max_hp > fighter_base_hp, "fighter HP should increase");
+    assert!(bjorn.saving_throws.is_some(), "fighter should have saving throws");
+    // Fighter THAC0 stays 19 at L2 (changes at L4 for martial)
+    assert_eq!(bjorn.thac0, 19, "fighter THAC0 should still be 19 at L2");
+
+    // Magic-User needs 2500 for L2 (INT 16 = +10%)
+    let resp = handle_request(&req("p24", GMCommand::AwardTreasureXp {
+        character: "Elara".to_string(),
+        treasure_gp: 2500,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["leveled_up"].as_bool().unwrap(), "magic-user should level up");
+    let elara = state.party.find_member("Elara").unwrap();
+    assert_eq!(elara.level, 2);
+    assert!(elara.max_hp > mage_base_hp, "magic-user HP should increase");
+
+    // === Push fighter to level 3 (needs 4000 XP total) ===
+    let resp = handle_request(&req("p30", GMCommand::AwardTreasureXp {
+        character: "Bjorn".to_string(),
+        treasure_gp: 2000,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["leveled_up"].as_bool().unwrap(), "fighter should reach L3");
+    assert_eq!(data["new_level"], 3);
+    let bjorn = state.party.find_member("Bjorn").unwrap();
+    assert_eq!(bjorn.level, 3);
+    // THAC0 still 19 at L3 for martial (changes at L4)
+    assert_eq!(bjorn.thac0, 19);
+
+    // === Push fighter to level 4 (needs 8000 XP total) — THAC0 should improve ===
+    let resp = handle_request(&req("p31", GMCommand::AwardTreasureXp {
+        character: "Bjorn".to_string(),
+        treasure_gp: 5000,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["leveled_up"].as_bool().unwrap(), "fighter should reach L4");
+    let bjorn = state.party.find_member("Bjorn").unwrap();
+    assert_eq!(bjorn.level, 4);
+    // Martial L4-6 THAC0 = 17
+    assert_eq!(bjorn.thac0, 17, "fighter THAC0 should improve to 17 at L4");
+
+    // === Push thief further — verify skill improvement ===
+    // Thief L3 needs 2400 total, L4 needs 4800
+    let resp = handle_request(&req("p32", GMCommand::AwardTreasureXp {
+        character: "Nyx".to_string(),
+        treasure_gp: 4000,
+        monster_xp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let nyx = state.party.find_member("Nyx").unwrap();
+    assert!(nyx.level >= 3, "thief should be at least L3");
+
+    // Check thief skill at new level
+    let resp = handle_request(&req("p33", GMCommand::ThiefSkillCheck {
+        character: "Nyx".to_string(),
+        skill: "find traps".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let target = data["target"].as_u64().unwrap();
+    // L3 find traps = 20%, L4 = 25%
+    assert!(target >= 20, "higher level thief should have better find traps");
+
+    // === Verify saving throw improvement ===
+    // Fighter L4 saving throws should be different from L1-3
+    let bjorn = state.party.find_member("Bjorn").unwrap();
+    let saves = bjorn.saving_throws.as_ref().unwrap();
+    // Fighter L4-6 saves: D10 W11 P12 B13 S14
+    assert_eq!(saves.death, 10, "fighter L4 death save should be 10");
+    assert_eq!(saves.wands, 11, "fighter L4 wands save should be 11");
+
+    // === Verify all characters accumulated HP ===
+    let bjorn = state.party.find_member("Bjorn").unwrap();
+    assert!(bjorn.max_hp > fighter_base_hp + 2, "fighter should have gained HP from multiple levels");
+    let nyx = state.party.find_member("Nyx").unwrap();
+    assert!(nyx.max_hp > thief_base_hp, "thief should have gained HP from leveling");
 }
