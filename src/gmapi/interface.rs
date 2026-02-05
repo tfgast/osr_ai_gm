@@ -97,6 +97,19 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::LevelUp { character } => level_up(id, state, character),
         GMCommand::Ruling { text } => ruling(id, state, text),
 
+        // -- Fiat commands --
+        GMCommand::Heal { character, amount } => heal(id, state, character, *amount),
+        GMCommand::Damage { character, amount } => damage(id, state, character, *amount),
+        GMCommand::SetHp { character, hp } => set_hp(id, state, character, *hp),
+        GMCommand::SetHelpless { monster_idx, helpless } => {
+            combat_handlers::set_helpless(id, state, *monster_idx, *helpless)
+        }
+        GMCommand::Kill { character, monster_idx } => {
+            combat_handlers::kill(id, state, character, *monster_idx)
+        }
+        GMCommand::SetRations { amount } => set_rations(id, state, *amount),
+        GMCommand::AddRations { amount } => add_rations(id, state, *amount),
+
         // -- System --
         GMCommand::Save { path } => save_game(id, state, path),
         GMCommand::Load { path } => load_game(id, state, path),
@@ -362,6 +375,109 @@ fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
             }
         }
     }
+}
+
+fn heal(id: &str, state: &mut GameState, char_name: &str, amount: i32) -> GMResponse {
+    if amount < 1 {
+        return GMResponse::err(id, "amount must be a positive integer.", state.mode.clone());
+    }
+    let character = match state.party.find_member_mut(char_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let old_hp = character.hp;
+    character.hp = (character.hp + amount).min(character.max_hp);
+    let healed = character.hp - old_hp;
+    GMResponse::ok_with_data(
+        id,
+        format!("{} healed {} HP ({} -> {}/{}).", character.name, healed, old_hp, character.hp, character.max_hp),
+        state.mode.clone(),
+        serde_json::json!({
+            "character": character.name,
+            "healed": healed,
+            "old_hp": old_hp,
+            "hp": character.hp,
+            "max_hp": character.max_hp,
+        }),
+    )
+}
+
+fn damage(id: &str, state: &mut GameState, char_name: &str, amount: i32) -> GMResponse {
+    if amount < 1 {
+        return GMResponse::err(id, "amount must be a positive integer.", state.mode.clone());
+    }
+    let character = match state.party.find_member_mut(char_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let old_hp = character.hp;
+    character.hp -= amount;
+    let status = if character.is_alive() { "wounded" } else { "DEAD" };
+    GMResponse::ok_with_data(
+        id,
+        format!("{} takes {} damage ({} -> {}/{}). Status: {}.", character.name, amount, old_hp, character.hp, character.max_hp, status),
+        state.mode.clone(),
+        serde_json::json!({
+            "character": character.name,
+            "damage": amount,
+            "old_hp": old_hp,
+            "hp": character.hp,
+            "max_hp": character.max_hp,
+            "alive": character.is_alive(),
+        }),
+    )
+}
+
+fn set_hp(id: &str, state: &mut GameState, char_name: &str, hp: i32) -> GMResponse {
+    let character = match state.party.find_member_mut(char_name) {
+        Some(c) => c,
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let old_hp = character.hp;
+    character.hp = hp;
+    let status = if character.is_alive() { "alive" } else { "DEAD" };
+    GMResponse::ok_with_data(
+        id,
+        format!("{} HP set to {} (was {}). Max HP: {}. Status: {}.", character.name, character.hp, old_hp, character.max_hp, status),
+        state.mode.clone(),
+        serde_json::json!({
+            "character": character.name,
+            "old_hp": old_hp,
+            "hp": character.hp,
+            "max_hp": character.max_hp,
+            "alive": character.is_alive(),
+        }),
+    )
+}
+
+fn set_rations(id: &str, state: &mut GameState, amount: u32) -> GMResponse {
+    let old = state.party.rations;
+    state.party.rations = amount;
+    GMResponse::ok_with_data(
+        id,
+        format!("rations set to {} person-days (was {}).", amount, old),
+        state.mode.clone(),
+        serde_json::json!({
+            "old_rations": old,
+            "rations": amount,
+        }),
+    )
+}
+
+fn add_rations(id: &str, state: &mut GameState, amount: u32) -> GMResponse {
+    if amount < 1 {
+        return GMResponse::err(id, "amount must be a positive integer.", state.mode.clone());
+    }
+    state.party.rations += amount;
+    GMResponse::ok_with_data(
+        id,
+        format!("added {} rations. Total: {} person-days.", amount, state.party.rations),
+        state.mode.clone(),
+        serde_json::json!({
+            "added": amount,
+            "rations": state.party.rations,
+        }),
+    )
 }
 
 fn ruling(id: &str, state: &mut GameState, text: &str) -> GMResponse {

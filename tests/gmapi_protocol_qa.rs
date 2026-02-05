@@ -2694,3 +2694,353 @@ fn mode_transitions() {
     }), &mut state);
     assert_eq!(resp.mode, GameMode::Wilderness);
 }
+
+// ===========================================================================
+// GM Fiat: Heal
+// ===========================================================================
+
+#[test]
+fn heal_happy_path() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.hp = 3;
+    c.max_hp = 8;
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("h1", GMCommand::Heal {
+        character: "Aldric".to_string(), amount: 4,
+    }), &mut state);
+    assert_response_format(&resp, "h1");
+    assert!(resp.success);
+
+    let data = resp.data.expect("Heal should have data");
+    assert_eq!(data["character"], "Aldric");
+    assert_eq!(data["healed"], 4);
+    assert_eq!(data["old_hp"], 3);
+    assert_eq!(data["hp"], 7);
+    assert_eq!(data["max_hp"], 8);
+    assert_eq!(state.party.find_member("Aldric").unwrap().hp, 7);
+}
+
+#[test]
+fn heal_capped_at_max() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.hp = 6;
+    c.max_hp = 8;
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("h2", GMCommand::Heal {
+        character: "Aldric".to_string(), amount: 20,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["healed"], 2);
+    assert_eq!(data["hp"], 8);
+    assert_eq!(state.party.find_member("Aldric").unwrap().hp, 8);
+}
+
+#[test]
+fn heal_no_character() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("h3", GMCommand::Heal {
+        character: "Nobody".to_string(), amount: 5,
+    }), &mut state);
+    assert_response_format(&resp, "h3");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no party member"));
+}
+
+#[test]
+fn heal_invalid_amount() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    let resp = handle_request(&req("h4", GMCommand::Heal {
+        character: "Aldric".to_string(), amount: 0,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("positive integer"));
+}
+
+// ===========================================================================
+// GM Fiat: Damage
+// ===========================================================================
+
+#[test]
+fn damage_happy_path() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("d1", GMCommand::Damage {
+        character: "Aldric".to_string(), amount: 3,
+    }), &mut state);
+    assert_response_format(&resp, "d1");
+    assert!(resp.success);
+
+    let data = resp.data.expect("Damage should have data");
+    assert_eq!(data["character"], "Aldric");
+    assert_eq!(data["damage"], 3);
+    assert_eq!(data["old_hp"], 8);
+    assert_eq!(data["hp"], 5);
+    assert_eq!(data["alive"], true);
+    assert_eq!(state.party.find_member("Aldric").unwrap().hp, 5);
+}
+
+#[test]
+fn damage_kills_character() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.hp = 3;
+    c.max_hp = 8;
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("d2", GMCommand::Damage {
+        character: "Aldric".to_string(), amount: 5,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["hp"], -2);
+    assert_eq!(data["alive"], false);
+    assert!(resp.message.contains("DEAD"));
+}
+
+#[test]
+fn damage_no_character() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("d3", GMCommand::Damage {
+        character: "Nobody".to_string(), amount: 5,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no party member"));
+}
+
+#[test]
+fn damage_invalid_amount() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    let resp = handle_request(&req("d4", GMCommand::Damage {
+        character: "Aldric".to_string(), amount: 0,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("positive integer"));
+}
+
+// ===========================================================================
+// GM Fiat: SetHp
+// ===========================================================================
+
+#[test]
+fn set_hp_happy_path() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("shp1", GMCommand::SetHp {
+        character: "Aldric".to_string(), hp: 5,
+    }), &mut state);
+    assert_response_format(&resp, "shp1");
+    assert!(resp.success);
+
+    let data = resp.data.expect("SetHp should have data");
+    assert_eq!(data["character"], "Aldric");
+    assert_eq!(data["old_hp"], 8);
+    assert_eq!(data["hp"], 5);
+    assert_eq!(data["alive"], true);
+    assert_eq!(state.party.find_member("Aldric").unwrap().hp, 5);
+}
+
+#[test]
+fn set_hp_to_zero_kills() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("shp2", GMCommand::SetHp {
+        character: "Aldric".to_string(), hp: 0,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["alive"], false);
+    assert!(resp.message.contains("DEAD"));
+    assert_eq!(state.party.find_member("Aldric").unwrap().hp, 0);
+}
+
+#[test]
+fn set_hp_no_character() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("shp3", GMCommand::SetHp {
+        character: "Nobody".to_string(), hp: 5,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no party member"));
+}
+
+// ===========================================================================
+// GM Fiat: SetHelpless
+// ===========================================================================
+
+#[test]
+fn set_helpless_happy_path() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    let resp = handle_request(&req("sh1", GMCommand::SetHelpless {
+        monster_idx: 0, helpless: true,
+    }), &mut state);
+    assert_response_format(&resp, "sh1");
+    assert!(resp.success);
+    assert!(resp.message.contains("helpless"));
+
+    let data = resp.data.expect("SetHelpless should have data");
+    assert_eq!(data["monster_idx"], 0);
+    assert_eq!(data["helpless"], true);
+    assert!(state.combat.as_ref().unwrap().monsters[0].helpless);
+}
+
+#[test]
+fn set_helpless_remove() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+    state.combat.as_mut().unwrap().monsters[0].helpless = true;
+
+    let resp = handle_request(&req("sh2", GMCommand::SetHelpless {
+        monster_idx: 0, helpless: false,
+    }), &mut state);
+    assert!(resp.success);
+    assert!(resp.message.contains("no longer helpless"));
+    assert!(!state.combat.as_ref().unwrap().monsters[0].helpless);
+}
+
+#[test]
+fn set_helpless_no_combat() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("sh3", GMCommand::SetHelpless {
+        monster_idx: 0, helpless: true,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no active combat"));
+}
+
+#[test]
+fn set_helpless_out_of_range() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    let resp = handle_request(&req("sh4", GMCommand::SetHelpless {
+        monster_idx: 99, helpless: true,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("out of range"));
+}
+
+// ===========================================================================
+// GM Fiat: Kill
+// ===========================================================================
+
+#[test]
+fn kill_happy_path() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+    state.combat.as_mut().unwrap().monsters[0].helpless = true;
+
+    let resp = handle_request(&req("k1", GMCommand::Kill {
+        character: "Aldric".to_string(), monster_idx: 0,
+    }), &mut state);
+    assert_response_format(&resp, "k1");
+    assert!(resp.success);
+    assert!(resp.message.contains("KILLED"));
+
+    let data = resp.data.expect("Kill should have data");
+    assert_eq!(data["attacker"], "Aldric");
+    assert!(!state.combat.as_ref().unwrap().monsters[0].is_alive());
+}
+
+#[test]
+fn kill_not_helpless() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    let resp = handle_request(&req("k2", GMCommand::Kill {
+        character: "Aldric".to_string(), monster_idx: 0,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not helpless"));
+}
+
+#[test]
+fn kill_no_combat() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    let resp = handle_request(&req("k3", GMCommand::Kill {
+        character: "Aldric".to_string(), monster_idx: 0,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no active combat"));
+}
+
+#[test]
+fn kill_no_character() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+    state.combat.as_mut().unwrap().monsters[0].helpless = true;
+
+    let resp = handle_request(&req("k4", GMCommand::Kill {
+        character: "Nobody".to_string(), monster_idx: 0,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no party member"));
+}
+
+// ===========================================================================
+// GM Fiat: SetRations
+// ===========================================================================
+
+#[test]
+fn set_rations_happy_path() {
+    let mut state = GameState::new();
+    state.party.rations = 5;
+
+    let resp = handle_request(&req("sr1", GMCommand::SetRations { amount: 20 }), &mut state);
+    assert_response_format(&resp, "sr1");
+    assert!(resp.success);
+
+    let data = resp.data.expect("SetRations should have data");
+    assert_eq!(data["old_rations"], 5);
+    assert_eq!(data["rations"], 20);
+    assert_eq!(state.party.rations, 20);
+}
+
+#[test]
+fn set_rations_to_zero() {
+    let mut state = GameState::new();
+    state.party.rations = 10;
+
+    let resp = handle_request(&req("sr2", GMCommand::SetRations { amount: 0 }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.party.rations, 0);
+}
+
+// ===========================================================================
+// GM Fiat: AddRations
+// ===========================================================================
+
+#[test]
+fn add_rations_happy_path() {
+    let mut state = GameState::new();
+    state.party.rations = 5;
+
+    let resp = handle_request(&req("ar1", GMCommand::AddRations { amount: 10 }), &mut state);
+    assert_response_format(&resp, "ar1");
+    assert!(resp.success);
+
+    let data = resp.data.expect("AddRations should have data");
+    assert_eq!(data["added"], 10);
+    assert_eq!(data["rations"], 15);
+    assert_eq!(state.party.rations, 15);
+}
+
+#[test]
+fn add_rations_invalid_amount() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ar2", GMCommand::AddRations { amount: 0 }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("positive integer"));
+}

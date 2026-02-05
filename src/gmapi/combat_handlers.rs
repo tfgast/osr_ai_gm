@@ -489,6 +489,44 @@ pub(super) fn roll_surprise(id: &str, state: &GameState) -> GMResponse {
     )
 }
 
+pub(super) fn set_helpless(id: &str, state: &mut GameState, monster_idx: usize, helpless: bool) -> GMResponse {
+    let combat_state = match state.combat.as_mut() {
+        Some(c) => c,
+        None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
+    };
+    match combat::set_monster_helpless(combat_state, monster_idx, helpless) {
+        Ok(msg) => GMResponse::ok_with_data(
+            id, msg, state.mode.clone(),
+            serde_json::json!({
+                "monster_idx": monster_idx,
+                "helpless": helpless,
+            }),
+        ),
+        Err(e) => GMResponse::err(id, e, state.mode.clone()),
+    }
+}
+
+pub(super) fn kill(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize) -> GMResponse {
+    let character = match state.party.find_member(char_name) {
+        Some(c) => c.clone(),
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let combat_state = match state.combat.as_mut() {
+        Some(c) => c,
+        None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
+    };
+    match combat::coup_de_grace(combat_state, &character, monster_idx) {
+        Ok(result) => GMResponse::ok_with_data(
+            id, result.to_string(), state.mode.clone(),
+            serde_json::json!({
+                "attacker": result.attacker,
+                "target": result.target,
+            }),
+        ),
+        Err(e) => GMResponse::err(id, e, state.mode.clone()),
+    }
+}
+
 pub(super) fn roll_reaction(id: &str, state: &GameState, char_name: &str) -> GMResponse {
     let character = match state.party.find_member(char_name) {
         Some(c) => c,

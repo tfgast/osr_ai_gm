@@ -229,6 +229,22 @@ pub enum GMCommand {
     /// Issue a GM ruling (free-text note recorded in the session log).
     Ruling { text: String },
 
+    // -- GM-only: fiat commands (direct state manipulation) --
+    /// Heal a character (capped at max HP).
+    Heal { character: String, amount: i32 },
+    /// Damage a character (can kill).
+    Damage { character: String, amount: i32 },
+    /// Set a character's HP directly.
+    SetHp { character: String, hp: i32 },
+    /// Mark a monster as helpless (sleeping, paralyzed, held, etc.).
+    SetHelpless { monster_idx: usize, #[serde(default = "default_helpless")] helpless: bool },
+    /// Auto-kill a helpless monster.
+    Kill { character: String, monster_idx: usize },
+    /// Set party rations to a fixed amount.
+    SetRations { amount: u32 },
+    /// Add rations to the party supply.
+    AddRations { amount: u32 },
+
     // -- System --
     /// Save game state.
     Save {
@@ -246,6 +262,7 @@ pub enum GMCommand {
     Quit,
 }
 
+fn default_helpless() -> bool { true }
 fn default_weapon() -> String { "sword".to_string() }
 fn default_room_name() -> String { "Entrance".to_string() }
 fn default_save_path() -> String { "save.json".to_string() }
@@ -452,6 +469,108 @@ mod tests {
                 assert_eq!(notation, "2d6+3");
             }
             _ => panic!("expected Roll"),
+        }
+    }
+
+    #[test]
+    fn parse_heal() {
+        let json = r#"{"id":"h1","command":{"type":"Heal","params":{"character":"Aldric","amount":5}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Heal { character, amount } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(*amount, 5);
+            }
+            _ => panic!("expected Heal"),
+        }
+    }
+
+    #[test]
+    fn parse_damage() {
+        let json = r#"{"id":"d1","command":{"type":"Damage","params":{"character":"Aldric","amount":3}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Damage { character, amount } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(*amount, 3);
+            }
+            _ => panic!("expected Damage"),
+        }
+    }
+
+    #[test]
+    fn parse_set_hp() {
+        let json = r#"{"id":"s1","command":{"type":"SetHp","params":{"character":"Aldric","hp":5}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::SetHp { character, hp } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(*hp, 5);
+            }
+            _ => panic!("expected SetHp"),
+        }
+    }
+
+    #[test]
+    fn parse_set_helpless() {
+        let json = r#"{"id":"sh1","command":{"type":"SetHelpless","params":{"monster_idx":0,"helpless":true}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::SetHelpless { monster_idx, helpless } => {
+                assert_eq!(*monster_idx, 0);
+                assert!(*helpless);
+            }
+            _ => panic!("expected SetHelpless"),
+        }
+    }
+
+    #[test]
+    fn parse_set_helpless_default() {
+        let json = r#"{"id":"sh2","command":{"type":"SetHelpless","params":{"monster_idx":1}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::SetHelpless { monster_idx, helpless } => {
+                assert_eq!(*monster_idx, 1);
+                assert!(*helpless); // default is true
+            }
+            _ => panic!("expected SetHelpless"),
+        }
+    }
+
+    #[test]
+    fn parse_kill() {
+        let json = r#"{"id":"k1","command":{"type":"Kill","params":{"character":"Aldric","monster_idx":0}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Kill { character, monster_idx } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(*monster_idx, 0);
+            }
+            _ => panic!("expected Kill"),
+        }
+    }
+
+    #[test]
+    fn parse_set_rations() {
+        let json = r#"{"id":"sr1","command":{"type":"SetRations","params":{"amount":20}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::SetRations { amount } => {
+                assert_eq!(*amount, 20);
+            }
+            _ => panic!("expected SetRations"),
+        }
+    }
+
+    #[test]
+    fn parse_add_rations() {
+        let json = r#"{"id":"ar1","command":{"type":"AddRations","params":{"amount":10}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::AddRations { amount } => {
+                assert_eq!(*amount, 10);
+            }
+            _ => panic!("expected AddRations"),
         }
     }
 
