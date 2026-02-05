@@ -165,6 +165,7 @@ impl MonsterDef {
 
 /// Container for loaded monster data.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MonsterFile {
     #[serde(default)]
     source: Option<String>,

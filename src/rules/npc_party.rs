@@ -3,6 +3,8 @@
 //! Provides random generation of NPC adventuring parties for encounters,
 //! including class/level determination, alignment, and stronghold reactions.
 
+#![allow(dead_code)]
+
 use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;

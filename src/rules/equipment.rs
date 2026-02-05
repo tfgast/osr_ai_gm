@@ -308,6 +308,7 @@ struct EquipmentCategories {
 
 /// JSON file format for equipment data.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct EquipmentFile {
     #[serde(default)]
     source: Option<String>,

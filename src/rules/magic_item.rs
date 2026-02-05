@@ -63,6 +63,7 @@ pub struct MagicItemDef {
 
 /// JSON file format for magic item data.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MagicItemFile {
     #[serde(default)]
     source: Option<String>,

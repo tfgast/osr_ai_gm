@@ -47,6 +47,7 @@ pub struct SpellDef {
 
 /// JSON file format for spell data.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SpellFile {
     #[serde(default)]
     source: Option<String>,

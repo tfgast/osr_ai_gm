@@ -109,6 +109,7 @@ pub struct TreasureTypeDef {
 
 /// JSON file format for treasure data.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct TreasureFile {
     #[serde(default)]
     source: Option<String>,
