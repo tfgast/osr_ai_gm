@@ -122,7 +122,10 @@ pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
             .unwrap_or("save")
     ));
     fs::write(&tmp_path, &json)?;
-    fs::rename(&tmp_path, path)?;
+    if let Err(e) = fs::rename(&tmp_path, path) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(e);
+    }
     Ok(())
 }
 
@@ -218,5 +221,24 @@ mod tests {
     fn safe_save_path_rejects_whitespace_only() {
         let result = safe_save_path("   ");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn save_cleans_up_temp_on_rename_failure() {
+        let dir = std::env::temp_dir().join("osr_persist_test_rename_fail");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        // Create a directory at the target path so rename(file -> dir) fails.
+        let target = dir.join("save.json");
+        fs::create_dir(&target).unwrap();
+        let tmp_path = dir.join(".save.json.tmp");
+
+        let state = GameState::new();
+        let result = save(&state, &target);
+        assert!(result.is_err(), "rename of file over directory should fail");
+        assert!(!tmp_path.exists(), "temp file should be cleaned up after rename failure");
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }
