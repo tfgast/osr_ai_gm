@@ -431,6 +431,19 @@ mod tests {
     }
 
     #[test]
+    fn spawn_encounter_count_zero() {
+        let mut state = GameState::new();
+        let cmd = SpawnEncounterCommand;
+        let result = cmd.execute(
+            &["goblin", "0", "1", "6", "3", "1d6", "7", "60"],
+            &mut state,
+        );
+        assert!(result.output.contains("Error"));
+        assert!(result.output.contains("count must be a positive integer"));
+        assert!(state.combat.is_none());
+    }
+
+    #[test]
     fn spawn_encounter_too_few_args() {
         let mut state = GameState::new();
         let cmd = SpawnEncounterCommand;
