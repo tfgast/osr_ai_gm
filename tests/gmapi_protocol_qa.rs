@@ -2492,6 +2492,185 @@ fn double_query_state() {
 }
 
 // ===========================================================================
+// OpenDoor
+// ===========================================================================
+
+#[test]
+fn open_door_happy_path() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+    handle_request(&req("s", GMCommand::Light {
+        source: LightSourceKind::Torch,
+        carrier: "Aldric".to_string(),
+    }), &mut state);
+    handle_request(&req("s", GMCommand::AddRoom { id: 1, name: "Hall".to_string() }), &mut state);
+    handle_request(&req("s", GMCommand::AddDoor {
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Open,
+    }), &mut state);
+
+    let resp = handle_request(&req("od1", GMCommand::OpenDoor { door_id: 0 }), &mut state);
+    assert_response_format(&resp, "od1");
+    assert!(resp.success, "open door failed: {}", resp.message);
+    assert_eq!(state.dungeon.as_ref().unwrap().current_room, Some(1));
+}
+
+#[test]
+fn open_door_locked_rejected() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+    handle_request(&req("s", GMCommand::AddRoom { id: 1, name: "Vault".to_string() }), &mut state);
+    handle_request(&req("s", GMCommand::AddDoor {
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Locked,
+    }), &mut state);
+
+    let resp = handle_request(&req("od2", GMCommand::OpenDoor { door_id: 0 }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("locked"));
+}
+
+#[test]
+fn open_door_not_exploring() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("od3", GMCommand::OpenDoor { door_id: 0 }), &mut state);
+    assert!(!resp.success);
+}
+
+#[test]
+fn open_door_closed_attempts_force() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+    handle_request(&req("s", GMCommand::Light {
+        source: LightSourceKind::Torch,
+        carrier: "Aldric".to_string(),
+    }), &mut state);
+    handle_request(&req("s", GMCommand::AddRoom { id: 1, name: "Hall".to_string() }), &mut state);
+    handle_request(&req("s", GMCommand::AddDoor {
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Closed,
+    }), &mut state);
+
+    let resp = handle_request(&req("od4", GMCommand::OpenDoor { door_id: 0 }), &mut state);
+    assert_response_format(&resp, "od4");
+    assert!(resp.success);
+    // Should mention Aldric (the forcer) in output
+    assert!(resp.message.contains("Aldric"));
+}
+
+#[test]
+fn open_door_nonexistent() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    let resp = handle_request(&req("od5", GMCommand::OpenDoor { door_id: 99 }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not found"));
+}
+
+// ===========================================================================
+// ForceDoor
+// ===========================================================================
+
+#[test]
+fn force_door_happy_path() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+    handle_request(&req("s", GMCommand::AddRoom { id: 1, name: "Hall".to_string() }), &mut state);
+    handle_request(&req("s", GMCommand::AddDoor {
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Stuck,
+    }), &mut state);
+
+    let resp = handle_request(&req("fd1", GMCommand::ForceDoor {
+        door_id: 0,
+        character: "Aldric".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "fd1");
+    assert!(resp.success);
+    assert!(resp.message.contains("Aldric"));
+}
+
+#[test]
+fn force_door_no_character() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+    handle_request(&req("s", GMCommand::AddRoom { id: 1, name: "Hall".to_string() }), &mut state);
+    handle_request(&req("s", GMCommand::AddDoor {
+        id: 0, room_a: 0, room_b: 1, state: DoorState::Stuck,
+    }), &mut state);
+
+    let resp = handle_request(&req("fd2", GMCommand::ForceDoor {
+        door_id: 0,
+        character: "Nobody".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no party member"));
+}
+
+#[test]
+fn force_door_no_dungeon() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    let resp = handle_request(&req("fd3", GMCommand::ForceDoor {
+        door_id: 0,
+        character: "Aldric".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no dungeon"));
+}
+
+// ===========================================================================
+// Listen
+// ===========================================================================
+
+#[test]
+fn listen_happy_path() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    let resp = handle_request(&req("li1", GMCommand::Listen { is_demihuman: false }), &mut state);
+    assert_response_format(&resp, "li1");
+    assert!(resp.success);
+    assert!(!resp.message.is_empty());
+}
+
+#[test]
+fn listen_as_demihuman() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    let resp = handle_request(&req("li2", GMCommand::Listen { is_demihuman: true }), &mut state);
+    assert_response_format(&resp, "li2");
+    assert!(resp.success);
+}
+
+#[test]
+fn listen_not_exploring() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("li3", GMCommand::Listen { is_demihuman: false }), &mut state);
+    assert!(!resp.success);
+}
+
+// ===========================================================================
+// Rest
+// ===========================================================================
+
+#[test]
+fn rest_happy_path() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    let resp = handle_request(&req("r1", GMCommand::Rest), &mut state);
+    assert_response_format(&resp, "r1");
+    assert!(resp.success);
+    assert!(resp.message.contains("rest"));
+}
+
+#[test]
+fn rest_not_exploring() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("r2", GMCommand::Rest), &mut state);
+    assert!(!resp.success);
+}
+
+// ===========================================================================
 // Cross-cutting: Rapid command sequences and state consistency
 // ===========================================================================
 

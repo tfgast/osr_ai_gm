@@ -154,6 +154,109 @@ pub(super) fn load_module(id: &str, state: &mut GameState, path: &str) -> GMResp
     )
 }
 
+pub(super) fn open_door(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
+    let dungeon = match state.dungeon.as_ref() {
+        Some(d) => d,
+        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
+    };
+    let door = match dungeon.doors.iter().find(|d| d.id == door_id) {
+        Some(d) => d.clone(),
+        None => return GMResponse::err(id, format!("door {} not found.", door_id), state.mode.clone()),
+    };
+
+    if door.state == DoorState::Locked {
+        return GMResponse::err(
+            id,
+            format!("door {} is locked. it must be unlocked before it can be opened.", door_id),
+            state.mode.clone(),
+        );
+    }
+
+    let mut output = Vec::new();
+
+    // If not passable (closed/stuck), force with the strongest party member
+    if !door.is_passable() {
+        let strongest = state.party.members
+            .iter()
+            .filter(|c| c.hp > 0)
+            .max_by_key(|c| c.abilities.strength)
+            .cloned();
+        let character = match strongest {
+            Some(c) => c,
+            None => return GMResponse::err(id, "no living party members to force the door.", state.mode.clone()),
+        };
+        let force_result = exploration::force_door(
+            state.dungeon.as_mut().unwrap(), door_id, &character,
+        );
+        output.push(force_result);
+
+        // Check if forcing succeeded
+        let door_after = state.dungeon.as_ref().unwrap()
+            .doors.iter().find(|d| d.id == door_id).unwrap();
+        if !door_after.is_passable() {
+            return GMResponse::ok(id, output.join("\n"), state.mode.clone());
+        }
+    }
+
+    // Door is now open — move through it
+    let level = state.dungeon_level;
+    let time = match state.time.as_mut() {
+        Some(t) => t,
+        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
+    };
+    let dungeon = state.dungeon.as_mut().unwrap();
+    match exploration::move_through_door(time, dungeon, level, door_id) {
+        Ok(result) => {
+            output.push(result.to_string());
+            GMResponse::ok(id, output.join("\n"), state.mode.clone())
+        }
+        Err(e) => {
+            if output.is_empty() {
+                GMResponse::err(id, e, state.mode.clone())
+            } else {
+                output.push(format!("error: {}", e));
+                GMResponse::ok(id, output.join("\n"), state.mode.clone())
+            }
+        }
+    }
+}
+
+pub(super) fn force_door(id: &str, state: &mut GameState, door_id: u32, char_name: &str) -> GMResponse {
+    let character = match state.party.find_member(char_name) {
+        Some(c) => c.clone(),
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+    };
+    let dungeon = match state.dungeon.as_mut() {
+        Some(d) => d,
+        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
+    };
+    let result = exploration::force_door(dungeon, door_id, &character);
+    GMResponse::ok(id, result, state.mode.clone())
+}
+
+pub(super) fn listen(id: &str, state: &mut GameState, is_demihuman: bool) -> GMResponse {
+    let dungeon_level = state.dungeon_level;
+    let time = match state.time.as_mut() {
+        Some(t) => t,
+        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
+    };
+    let dungeon = match state.dungeon.as_ref() {
+        Some(d) => d,
+        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
+    };
+    let result = exploration::listen_at_door(time, dungeon, dungeon_level, is_demihuman);
+    GMResponse::ok(id, result.to_string(), state.mode.clone())
+}
+
+pub(super) fn rest(id: &str, state: &mut GameState) -> GMResponse {
+    let time = match state.time.as_mut() {
+        Some(t) => t,
+        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
+    };
+    time.rest();
+    GMResponse::ok(id, "party rests for one turn. activity counter reset.", state.mode.clone())
+}
+
 pub(super) fn enter_wilderness(id: &str, state: &mut GameState, terrain: Terrain) -> GMResponse {
     let mut ws = WildernessState::new();
     ws.add_hex(HexCell::new(0, 0, terrain)).unwrap();

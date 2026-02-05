@@ -149,6 +149,17 @@ pub enum GMCommand {
     },
     /// Load a prewritten adventure module from a JSON file.
     LoadModule { path: String },
+    /// Open a door (force if stuck/closed) and move through it.
+    OpenDoor { door_id: u32 },
+    /// Force open a stuck or closed door using a party member.
+    ForceDoor { door_id: u32, character: String },
+    /// Listen at a door (1-in-6, demihumans 2-in-6). Takes one turn.
+    Listen {
+        #[serde(default)]
+        is_demihuman: bool,
+    },
+    /// Rest for one turn (resets activity counter).
+    Rest,
 
     // -- GM-only: wilderness --
     /// Enter wilderness travel mode.
@@ -821,6 +832,57 @@ mod tests {
             }
             _ => panic!("expected LoadModule"),
         }
+    }
+
+    #[test]
+    fn parse_open_door() {
+        let json = r#"{"id":"o1","command":{"type":"OpenDoor","params":{"door_id":3}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "o1");
+        match &req.command {
+            GMCommand::OpenDoor { door_id } => assert_eq!(*door_id, 3),
+            _ => panic!("expected OpenDoor"),
+        }
+    }
+
+    #[test]
+    fn parse_force_door() {
+        let json = r#"{"id":"f1","command":{"type":"ForceDoor","params":{"door_id":0,"character":"Aldric"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::ForceDoor { door_id, character } => {
+                assert_eq!(*door_id, 0);
+                assert_eq!(character, "Aldric");
+            }
+            _ => panic!("expected ForceDoor"),
+        }
+    }
+
+    #[test]
+    fn parse_listen() {
+        let json = r#"{"id":"l1","command":{"type":"Listen","params":{"is_demihuman":true}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Listen { is_demihuman } => assert!(*is_demihuman),
+            _ => panic!("expected Listen"),
+        }
+    }
+
+    #[test]
+    fn parse_listen_default() {
+        let json = r#"{"id":"l2","command":{"type":"Listen","params":{"is_demihuman":false}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Listen { is_demihuman } => assert!(!*is_demihuman),
+            _ => panic!("expected Listen"),
+        }
+    }
+
+    #[test]
+    fn parse_rest() {
+        let json = r#"{"id":"r1","command":{"type":"Rest"}}"#;
+        let req = parse_request(json).unwrap();
+        assert!(matches!(req.command, GMCommand::Rest));
     }
 
     #[test]

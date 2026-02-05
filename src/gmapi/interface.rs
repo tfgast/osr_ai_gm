@@ -62,6 +62,10 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::Search { is_elf } => exploration_handlers::search(id, state, *is_elf),
         GMCommand::Light { source, carrier } => exploration_handlers::light(id, state, *source, carrier),
         GMCommand::LoadModule { path } => exploration_handlers::load_module(id, state, path),
+        GMCommand::OpenDoor { door_id } => exploration_handlers::open_door(id, state, *door_id),
+        GMCommand::ForceDoor { door_id, character } => exploration_handlers::force_door(id, state, *door_id, character),
+        GMCommand::Listen { is_demihuman } => exploration_handlers::listen(id, state, *is_demihuman),
+        GMCommand::Rest => exploration_handlers::rest(id, state),
 
         // -- Wilderness --
         GMCommand::EnterWilderness { terrain } => exploration_handlers::enter_wilderness(id, state, *terrain),
