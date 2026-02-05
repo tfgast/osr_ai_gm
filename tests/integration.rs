@@ -15,11 +15,15 @@ use osr_ai_gm::state::wilderness::Terrain;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-fn unique_tmp_path(prefix: &str) -> String {
+fn unique_save_name(prefix: &str) -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
-    format!("{}/osr_test_{}_{pid}_{n}.json", std::env::temp_dir().display(), prefix)
+    format!("osr_test_{prefix}_{pid}_{n}")
+}
+
+fn resolve_save(name: &str) -> std::path::PathBuf {
+    osr_ai_gm::persist::safe_save_path(name).unwrap()
 }
 
 fn req(id: &str, command: GMCommand) -> GMRequest {
@@ -502,16 +506,16 @@ fn save_load_roundtrip() {
     state.notes.push("[RULING] The door is trapped.".to_string());
 
     // Save
-    let path = unique_tmp_path("save");
+    let name = unique_save_name("save");
     let resp = handle_request(&req("1", GMCommand::Save {
-        path: path.to_string(),
+        path: name.clone(),
     }), &mut state);
     assert!(resp.success, "save failed: {}", resp.message);
 
     // Load into a fresh state
     let mut new_state = GameState::new();
     let resp = handle_request(&req("2", GMCommand::Load {
-        path: path.to_string(),
+        path: name.clone(),
     }), &mut new_state);
     assert!(resp.success, "load failed: {}", resp.message);
 
@@ -523,7 +527,7 @@ fn save_load_roundtrip() {
     assert_eq!(new_state.notes.len(), 1);
 
     // Clean up
-    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(resolve_save(&name));
 }
 
 // ===========================================================================
@@ -1522,9 +1526,9 @@ fn session_a_dungeon_crawl() {
     assert!(fighter.saving_throws.is_some());
 
     // === STEP 7: Save state ===
-    let save_path = unique_tmp_path("session_a");
+    let save_name = unique_save_name("session_a");
     let resp = handle_request(&req("a40", GMCommand::Save {
-        path: save_path.to_string(),
+        path: save_name.clone(),
     }), &mut state);
     assert!(resp.success, "save failed: {}", resp.message);
 
@@ -1539,7 +1543,7 @@ fn session_a_dungeon_crawl() {
     // === STEP 8: Load into fresh state and verify ===
     let mut loaded_state = GameState::new();
     let resp = handle_request(&req("a41", GMCommand::Load {
-        path: save_path.to_string(),
+        path: save_name.clone(),
     }), &mut loaded_state);
     assert!(resp.success, "load failed: {}", resp.message);
 
@@ -1559,7 +1563,7 @@ fn session_a_dungeon_crawl() {
     assert!(loaded_state.party.find_member("Zanthus").is_some());
 
     // Clean up
-    let _ = std::fs::remove_file(save_path);
+    let _ = std::fs::remove_file(resolve_save(&save_name));
 }
 
 // ===========================================================================
@@ -1839,7 +1843,7 @@ fn session_c_retainers() {
 
 #[test]
 fn save_load_complex_state() {
-    let save_path = unique_tmp_path("complex_roundtrip");
+    let save_name = unique_save_name("complex_roundtrip");
 
     // === Build complex state: mid-combat with lights ===
     let mut state = GameState::new();
@@ -1919,14 +1923,14 @@ fn save_load_complex_state() {
 
     // === Save ===
     let resp = handle_request(&req("s20", GMCommand::Save {
-        path: save_path.to_string(),
+        path: save_name.clone(),
     }), &mut state);
     assert!(resp.success, "save failed: {}", resp.message);
 
     // === Load into completely fresh state ===
     let mut loaded = GameState::new();
     let resp = handle_request(&req("s21", GMCommand::Load {
-        path: save_path.to_string(),
+        path: save_name.clone(),
     }), &mut loaded);
     assert!(resp.success, "load failed: {}", resp.message);
 
@@ -1972,7 +1976,7 @@ fn save_load_complex_state() {
     assert!(loaded.notes.iter().any(|n| n.contains("runes glow")));
 
     // Clean up
-    let _ = std::fs::remove_file(save_path);
+    let _ = std::fs::remove_file(resolve_save(&save_name));
 
     // === Part 2: Wilderness state with lost flag ===
     let mut ws_state = GameState::new();
@@ -1997,15 +2001,15 @@ fn save_load_complex_state() {
     let pre_ws_lost = ws_state.wilderness.as_ref().unwrap().lost;
     let pre_ws_day = ws_state.wilderness.as_ref().unwrap().travel_day;
 
-    let ws_save_path = unique_tmp_path("wilderness_roundtrip");
+    let ws_save_name = unique_save_name("wilderness_roundtrip");
     let resp = handle_request(&req("w4", GMCommand::Save {
-        path: ws_save_path.to_string(),
+        path: ws_save_name.clone(),
     }), &mut ws_state);
     assert!(resp.success);
 
     let mut ws_loaded = GameState::new();
     let resp = handle_request(&req("w5", GMCommand::Load {
-        path: ws_save_path.to_string(),
+        path: ws_save_name.clone(),
     }), &mut ws_loaded);
     assert!(resp.success);
 
@@ -2016,7 +2020,7 @@ fn save_load_complex_state() {
     assert_eq!(ws.travel_day, pre_ws_day, "wilderness travel_day mismatch");
     assert_eq!(ws_loaded.mode, GameMode::Wilderness, "mode should be Wilderness");
 
-    let _ = std::fs::remove_file(ws_save_path);
+    let _ = std::fs::remove_file(resolve_save(&ws_save_name));
 }
 
 // ===========================================================================

@@ -20,11 +20,11 @@ use osr_ai_gm::state::wilderness::Terrain;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-fn unique_tmp_path(prefix: &str) -> String {
+fn unique_save_name(prefix: &str) -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
-    format!("{}/osr_test_{}_{pid}_{n}.json", std::env::temp_dir().display(), prefix)
+    format!("osr_test_{prefix}_{pid}_{n}")
 }
 
 // ===========================================================================
@@ -2211,15 +2211,15 @@ fn save_happy_path() {
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
 
-    let path = unique_tmp_path("qa_save");
+    let name = unique_save_name("qa_save");
     let resp = handle_request(&req("sv1", GMCommand::Save {
-        path: path.to_string(),
+        path: name.clone(),
     }), &mut state);
     assert_response_format(&resp, "sv1");
     assert!(resp.success);
     assert!(resp.message.contains("saved"));
 
-    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(osr_ai_gm::persist::safe_save_path(&name).unwrap());
 }
 
 #[test]
@@ -2241,32 +2241,52 @@ fn load_happy_path() {
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
 
-    let path = unique_tmp_path("qa_load");
+    let name = unique_save_name("qa_load");
     let resp = handle_request(&req("1", GMCommand::Save {
-        path: path.to_string(),
+        path: name.clone(),
     }), &mut state);
     assert!(resp.success);
 
     let mut new_state = GameState::new();
     let resp = handle_request(&req("ld1", GMCommand::Load {
-        path: path.to_string(),
+        path: name.clone(),
     }), &mut new_state);
     assert_response_format(&resp, "ld1");
     assert!(resp.success);
     assert_eq!(new_state.party.members.len(), 1);
     assert_eq!(new_state.party.members[0].name, "Aldric");
 
-    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(osr_ai_gm::persist::safe_save_path(&name).unwrap());
 }
 
 #[test]
 fn load_invalid_path() {
     let mut state = GameState::new();
     let resp = handle_request(&req("ld2", GMCommand::Load {
-        path: "/nonexistent/save.json".to_string(),
+        path: "nonexistent_save".to_string(),
     }), &mut state);
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("load failed"));
+}
+
+#[test]
+fn save_path_traversal_rejected() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("sv3", GMCommand::Save {
+        path: "../../etc/cron.d/malicious".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("simple name"));
+}
+
+#[test]
+fn load_path_traversal_rejected() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ld3", GMCommand::Load {
+        path: "/etc/shadow".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("simple name"));
 }
 
 // ===========================================================================
@@ -2392,17 +2412,17 @@ fn double_save() {
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
 
-    let path = unique_tmp_path("qa_double_save");
+    let name = unique_save_name("qa_double_save");
     let resp1 = handle_request(&req("ds1", GMCommand::Save {
-        path: path.to_string(),
+        path: name.clone(),
     }), &mut state);
     let resp2 = handle_request(&req("ds2", GMCommand::Save {
-        path: path.to_string(),
+        path: name.clone(),
     }), &mut state);
     assert!(resp1.success);
     assert!(resp2.success);
 
-    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(osr_ai_gm::persist::safe_save_path(&name).unwrap());
 }
 
 #[test]

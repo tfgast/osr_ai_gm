@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::engine::retainer::Retainer;
 use crate::model::{Party, CombatState};
@@ -71,6 +71,39 @@ impl Default for GameState {
     }
 }
 
+/// Return the saves directory (`~/.osr_data/saves/`).
+pub fn saves_dir() -> io::Result<PathBuf> {
+    let home = std::env::var("HOME")
+        .map_err(|_| io::Error::new(io::ErrorKind::NotFound, "HOME not set"))?;
+    Ok(PathBuf::from(home).join(".osr_data").join("saves"))
+}
+
+/// Resolve a user-provided filename to a safe path inside the saves directory.
+///
+/// Rejects path separators and `..` components to prevent path traversal.
+/// Appends `.json` if the filename has no extension.
+pub fn safe_save_path(filename: &str) -> io::Result<PathBuf> {
+    let filename = filename.trim();
+    if filename.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "filename must not be empty",
+        ));
+    }
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "filename must be a simple name, not a path",
+        ));
+    }
+    let mut name = filename.to_string();
+    if !name.ends_with(".json") {
+        name.push_str(".json");
+    }
+    let dir = saves_dir()?;
+    Ok(dir.join(name))
+}
+
 /// Save game state to a JSON file.
 /// Uses atomic write (write-to-temp-then-rename) to prevent corruption.
 pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
@@ -81,6 +114,7 @@ pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
     // This ensures the save is atomic — either the old file remains or
     // the new one replaces it; a crash mid-write won't corrupt data.
     let parent = path.parent().unwrap_or(Path::new("."));
+    fs::create_dir_all(parent)?;
     let tmp_path = parent.join(format!(
         ".{}.tmp",
         path.file_name()
@@ -137,6 +171,52 @@ mod tests {
     #[test]
     fn load_missing_file() {
         let result = load(&PathBuf::from("/nonexistent/save.json"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_save_path_simple_name() {
+        let path = safe_save_path("mycamp").unwrap();
+        assert!(path.ends_with("mycamp.json"));
+        assert!(path.to_str().unwrap().contains(".osr_data/saves/"));
+    }
+
+    #[test]
+    fn safe_save_path_already_has_json() {
+        let path = safe_save_path("mycamp.json").unwrap();
+        assert!(path.ends_with("mycamp.json"));
+        // Should not double-append .json
+        assert!(!path.to_str().unwrap().ends_with(".json.json"));
+    }
+
+    #[test]
+    fn safe_save_path_rejects_slash() {
+        let result = safe_save_path("/etc/shadow");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("simple name"));
+    }
+
+    #[test]
+    fn safe_save_path_rejects_dotdot() {
+        let result = safe_save_path("../../etc/passwd");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_save_path_rejects_backslash() {
+        let result = safe_save_path("..\\windows\\system32");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_save_path_rejects_empty() {
+        let result = safe_save_path("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_save_path_rejects_whitespace_only() {
+        let result = safe_save_path("   ");
         assert!(result.is_err());
     }
 }

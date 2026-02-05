@@ -1264,14 +1264,22 @@ fn ruling(id: &str, state: &mut GameState, text: &str) -> GMResponse {
 // =============================================================================
 
 fn save_game(id: &str, state: &GameState, path: &str) -> GMResponse {
-    match persist::save(state, std::path::Path::new(path)) {
-        Ok(()) => GMResponse::ok(id, format!("game saved to {}.", path), state.mode.clone()),
+    let safe_path = match persist::safe_save_path(path) {
+        Ok(p) => p,
+        Err(e) => return GMResponse::err(id, format!("save failed: {}.", e), state.mode.clone()),
+    };
+    match persist::save(state, &safe_path) {
+        Ok(()) => GMResponse::ok(id, format!("game saved to {}.", safe_path.display()), state.mode.clone()),
         Err(e) => GMResponse::err(id, format!("save failed: {}.", e), state.mode.clone()),
     }
 }
 
 fn load_game(id: &str, state: &mut GameState, path: &str) -> GMResponse {
-    match persist::load(std::path::Path::new(path)) {
+    let safe_path = match persist::safe_save_path(path) {
+        Ok(p) => p,
+        Err(e) => return GMResponse::err(id, format!("load failed: {}.", e), state.mode.clone()),
+    };
+    match persist::load(&safe_path) {
         Ok(loaded) => {
             let msg = format!(
                 "loaded: turn {}, dungeon level {}, {} party members.",

@@ -21,11 +21,15 @@ impl Command for RollCommand {
 pub struct SaveCommand;
 impl Command for SaveCommand {
     fn name(&self) -> &str { "save" }
-    fn help(&self) -> &str { "Save game state (e.g., save game.json)" }
+    fn help(&self) -> &str { "Save game state (e.g., save mycamp)" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        let path = args.first().copied().unwrap_or("save.json");
-        match persist::save(state, std::path::Path::new(path)) {
-            Ok(()) => CommandResult::ok(format!("Game saved to {}", path)),
+        let filename = args.first().copied().unwrap_or("save");
+        let path = match persist::safe_save_path(filename) {
+            Ok(p) => p,
+            Err(e) => return CommandResult::error(format!("save failed: {}", e)),
+        };
+        match persist::save(state, &path) {
+            Ok(()) => CommandResult::ok(format!("Game saved to {}", path.display())),
             Err(e) => CommandResult::error(format!("save failed: {}", e)),
         }
     }
@@ -34,10 +38,14 @@ impl Command for SaveCommand {
 pub struct LoadCommand;
 impl Command for LoadCommand {
     fn name(&self) -> &str { "load" }
-    fn help(&self) -> &str { "Load game state (e.g., load game.json)" }
+    fn help(&self) -> &str { "Load game state (e.g., load mycamp)" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        let path = args.first().copied().unwrap_or("save.json");
-        match persist::load(std::path::Path::new(path)) {
+        let filename = args.first().copied().unwrap_or("save");
+        let path = match persist::safe_save_path(filename) {
+            Ok(p) => p,
+            Err(e) => return CommandResult::error(format!("load failed: {}", e)),
+        };
+        match persist::load(&path) {
             Ok(loaded) => {
                 let msg = format!(
                     "Loaded: turn {}, dungeon level {}, {} party members{}",
