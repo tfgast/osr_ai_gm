@@ -9,7 +9,7 @@
 /// - Heavily encumbered (601-800 cn): 60'
 /// - Severely encumbered (801-1600 cn): 30'
 /// - Over maximum (>1600 cn): 0' (cannot move)
-
+///
 /// Encumbrance category.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncumbranceLevel {

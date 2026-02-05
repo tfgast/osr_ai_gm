@@ -11,8 +11,7 @@ use rand::Rng;
 fn parse_quantity_with_multiplier(quantity: &str) -> Result<i32, String> {
     // Normalize the multiplication sign (× or x or *)
     let normalized = quantity
-        .replace('×', "*")
-        .replace('x', "*")
+        .replace(['×', 'x'], "*")
         .replace(" ", "");
 
     if let Some(pos) = normalized.find('*') {
@@ -228,7 +227,7 @@ fn format_treasure_haul(
             if let Some(note) = &r.note {
                 out.push_str(&format!(" ({})", note));
             }
-            out.push_str("\n");
+            out.push('\n');
         }
         out.push_str("  (Use 'magic_item' command to generate specific items)\n");
     }

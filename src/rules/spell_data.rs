@@ -101,7 +101,7 @@ impl SpellRegistry {
 
         for &idx in indices {
             let spell = &self.spells[idx];
-            if list.map_or(true, |l| spell.list == l) {
+            if list.is_none_or(|l| spell.list == l) {
                 return Some(spell);
             }
         }

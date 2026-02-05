@@ -361,7 +361,7 @@ fn attack(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize, 
         None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
     };
 
-    match combat::resolve_character_attack(combat_state, &character, monster_idx, &weapon, rest_penalty) {
+    match combat::resolve_character_attack(combat_state, &character, monster_idx, weapon, rest_penalty) {
         Ok(result) => GMResponse::ok(id, format!("{}", result), state.mode.clone()),
         Err(e) => GMResponse::err(id, e, state.mode.clone()),
     }

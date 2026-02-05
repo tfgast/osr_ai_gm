@@ -1,7 +1,7 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::rules::module::{load_module, ModuleDef, PlacedTreasure};
-use crate::state::dungeon::{Door, DoorState, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room};
+use crate::state::dungeon::{Door, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room};
 use crate::state::game::GameMode;
 use crate::state::time::TimeTracker;
 use std::collections::HashMap;
@@ -144,6 +144,7 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::dungeon::DoorState;
 
     fn sample_module() -> ModuleDef {
         let json = r#"{

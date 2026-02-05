@@ -171,7 +171,7 @@ impl Command for AttackCommand {
 
         let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
 
-        match combat::resolve_character_attack(combat, &character, monster_idx, &weapon, rest_penalty) {
+        match combat::resolve_character_attack(combat, &character, monster_idx, weapon, rest_penalty) {
             Ok(result) => CommandResult::ok(format!("{}", result)),
             Err(e) => CommandResult::error(e),
         }

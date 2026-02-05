@@ -660,7 +660,7 @@ pub fn resolve_turn_undead_with<R: Rng>(
             if !m.is_alive() || m.turned {
                 continue;
             }
-            let m_hd = m.hit_dice.combat_hd().max(1) as u32;
+            let m_hd = m.hit_dice.combat_hd().max(1);
             if m_hd <= remaining_hd {
                 remaining_hd -= m_hd;
                 if destroyed {

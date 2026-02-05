@@ -75,7 +75,7 @@ impl Default for GameState {
 /// Uses atomic write (write-to-temp-then-rename) to prevent corruption.
 pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
     let json = serde_json::to_string_pretty(state)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        .map_err(io::Error::other)?;
 
     // Write to a temporary file in the same directory, then rename.
     // This ensures the save is atomic — either the old file remains or
