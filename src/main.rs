@@ -113,6 +113,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(AddRoomCommand));
     registry.register(Box::new(AddDoorCommand));
     registry.register(Box::new(MoveRoomCommand));
+    registry.register(Box::new(OpenCommand));
     registry.register(Box::new(RestCommand));
     registry.register(Box::new(ExplorationStatusCommand));
     registry.register(Box::new(LoadModuleCommand));

@@ -248,6 +248,84 @@ impl Command for MoveRoomCommand {
     }
 }
 
+pub struct OpenCommand;
+impl Command for OpenCommand {
+    fn name(&self) -> &str { "open" }
+    fn help(&self) -> &str { "Open/force a door and move through (open <door_id>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error("usage: open <door_id>");
+        }
+        let door_id: u32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("door_id must be a number"),
+        };
+
+        let dungeon = match state.dungeon.as_ref() {
+            Some(d) => d,
+            None => return CommandResult::error("no dungeon state."),
+        };
+        let door = match dungeon.doors.iter().find(|d| d.id == door_id) {
+            Some(d) => d.clone(),
+            None => return CommandResult::error(format!("Door {} not found.", door_id)),
+        };
+
+        if door.state == DoorState::Locked {
+            return CommandResult::error(format!(
+                "Door {} is locked. It must be unlocked before it can be opened.", door_id
+            ));
+        }
+
+        let mut output = Vec::new();
+
+        // If not passable (closed/stuck), force it with the strongest party member
+        if !door.is_passable() {
+            let strongest = state.party.members
+                .iter()
+                .filter(|c| c.hp > 0)
+                .max_by_key(|c| c.abilities.strength)
+                .cloned();
+            let character = match strongest {
+                Some(c) => c,
+                None => return CommandResult::error("no living party members to force the door."),
+            };
+            let force_result = exploration::force_door(
+                state.dungeon.as_mut().unwrap(), door_id, &character,
+            );
+            output.push(force_result);
+
+            // Check if forcing succeeded
+            let door_after = state.dungeon.as_ref().unwrap()
+                .doors.iter().find(|d| d.id == door_id).unwrap();
+            if !door_after.is_passable() {
+                return CommandResult::ok(output.join("\n"));
+            }
+        }
+
+        // Door is now open — move through it
+        let level = state.dungeon_level;
+        let time = match state.time.as_mut() {
+            Some(t) => t,
+            None => return CommandResult::error("not in exploration mode."),
+        };
+        let dungeon = state.dungeon.as_mut().unwrap();
+        match exploration::move_through_door(time, dungeon, level, door_id) {
+            Ok(result) => {
+                output.push(format!("{}", result));
+                CommandResult::ok(output.join("\n"))
+            }
+            Err(e) => {
+                if output.is_empty() {
+                    CommandResult::error(e)
+                } else {
+                    output.push(format!("Error: {}", e));
+                    CommandResult::ok(output.join("\n"))
+                }
+            }
+        }
+    }
+}
+
 pub struct RestCommand;
 impl Command for RestCommand {
     fn name(&self) -> &str { "rest" }
@@ -277,5 +355,76 @@ impl Command for ExplorationStatusCommand {
         };
         let status = exploration::exploration_status(time, dungeon);
         CommandResult::ok(status)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Character;
+    use crate::rules::class::Class;
+    use crate::state::dungeon::{Door, Room, DungeonState};
+    use crate::state::time::TimeTracker;
+
+    fn dungeon_state_with_doors() -> GameState {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.abilities.strength = 14;
+        state.party.add_member(c);
+
+        let mut dungeon = DungeonState::new(1);
+        dungeon.add_room(Room::new(0, "Start")).unwrap();
+        dungeon.add_room(Room::new(1, "Next")).unwrap();
+        dungeon.add_room(Room::new(2, "Locked Room")).unwrap();
+        dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+        dungeon.add_door(Door::new(1, 0, 2, DoorState::Locked).unwrap()).unwrap();
+        dungeon.current_room = Some(0);
+        dungeon.explored.insert(0);
+        state.dungeon = Some(dungeon);
+        state.time = Some(TimeTracker::new());
+        state.time.as_mut().unwrap().light(
+            crate::state::time::LightSourceKind::Torch, "Aldric",
+        );
+        state.mode = GameMode::Exploration;
+        state.dungeon_level = 1;
+        state
+    }
+
+    #[test]
+    fn open_moves_through_open_door() {
+        let cmd = OpenCommand;
+        let mut state = dungeon_state_with_doors();
+        let result = cmd.execute(&["0"], &mut state);
+        assert!(!result.output.starts_with("Error:"));
+        assert!(result.output.contains("Moved to Next"));
+    }
+
+    #[test]
+    fn open_locked_door_rejected() {
+        let cmd = OpenCommand;
+        let mut state = dungeon_state_with_doors();
+        let result = cmd.execute(&["1"], &mut state);
+        assert!(result.output.contains("Error:"));
+        assert!(result.output.contains("locked"));
+    }
+
+    #[test]
+    fn open_no_args() {
+        let cmd = OpenCommand;
+        let mut state = dungeon_state_with_doors();
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.output.contains("Error:"));
+        assert!(result.output.contains("usage"));
+    }
+
+    #[test]
+    fn open_closed_door_attempts_force() {
+        let cmd = OpenCommand;
+        let mut state = dungeon_state_with_doors();
+        // Change door 0 to closed
+        state.dungeon.as_mut().unwrap().find_door_mut(0).unwrap().state = DoorState::Closed;
+        let result = cmd.execute(&["0"], &mut state);
+        // Should attempt to force — output mentions Aldric (the forcer)
+        assert!(result.output.contains("Aldric"));
     }
 }
