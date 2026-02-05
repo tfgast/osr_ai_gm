@@ -32,8 +32,11 @@ impl Command for EncounterCommand {
                         "dungeon level not set. Use 'enter_dungeon <level>' first.",
                     );
                 }
-                let entry = encounter_tables::dungeon_encounter(level, table_roll);
-                let num_appearing = match roll_number_appearing(entry.number) {
+                let entry = match encounter_tables::dungeon_encounter_d40(level, table_roll) {
+                    Some(e) => e,
+                    None => return CommandResult::error("no encounter found for this roll"),
+                };
+                let num_appearing = match roll_number_appearing(&entry.number) {
                     Ok(n) => n,
                     Err(e) => return CommandResult::error(e),
                 };
@@ -65,8 +68,11 @@ impl Command for EncounterCommand {
                     None => return CommandResult::error("no current hex."),
                 };
                 let terrain = hex.terrain;
-                let entry = encounter_tables::wilderness_encounter(terrain, table_roll);
-                let num_appearing = match roll_number_appearing(entry.number) {
+                let entry = match encounter_tables::wilderness_encounter_simple(terrain, table_roll) {
+                    Some(e) => e,
+                    None => return CommandResult::error("no encounter found for this terrain"),
+                };
+                let num_appearing = match roll_number_appearing(&entry.number) {
                     Ok(n) => n,
                     Err(e) => return CommandResult::error(e),
                 };

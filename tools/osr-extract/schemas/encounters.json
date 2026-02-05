@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OSE Encounter Tables",
+  "description": "Random encounter tables for Old-School Essentials dungeons and wilderness",
+  "type": "object",
+  "required": ["source", "counts", "dungeon", "wilderness"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "description": "Source file name"
+    },
+    "counts": {
+      "type": "object",
+      "description": "Counts of entries",
+      "properties": {
+        "dungeon_levels": { "type": "integer" },
+        "dungeon_entries": { "type": "integer" },
+        "terrain_types": { "type": "integer" },
+        "sub_tables": { "type": "integer" }
+      }
+    },
+    "dungeon": {
+      "type": "object",
+      "description": "Dungeon encounter tables by level",
+      "additionalProperties": {
+        "$ref": "#/definitions/dungeon_level_table"
+      }
+    },
+    "wilderness": {
+      "type": "object",
+      "required": ["terrain_table", "sub_tables"],
+      "properties": {
+        "terrain_table": {
+          "type": "object",
+          "description": "d8 terrain lookup -> sub-table codes",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "sub_tables": {
+          "type": "object",
+          "description": "Sub-tables by ID (1, 2, B, C, D, F, G, J, L, O, S)",
+          "additionalProperties": {
+            "$ref": "#/definitions/sub_table"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "dungeon_level_table": {
+      "type": "object",
+      "description": "Encounter table for a dungeon level range",
+      "additionalProperties": {
+        "$ref": "#/definitions/monster_entry"
+      }
+    },
+    "monster_entry": {
+      "type": "object",
+      "required": ["monster", "number"],
+      "properties": {
+        "monster": {
+          "type": "string",
+          "description": "Monster name"
+        },
+        "number": {
+          "type": "string",
+          "description": "Number appearing (dice expression or fixed)"
+        },
+        "hd": {
+          "type": "string",
+          "description": "Hit dice variant (for monsters with multiple HD versions)"
+        }
+      }
+    },
+    "sub_table": {
+      "type": "object",
+      "description": "Wilderness sub-table by category",
+      "additionalProperties": {
+        "type": "object",
+        "description": "d20 roll -> monster name",
+        "additionalProperties": { "type": "string" }
+      }
+    }
+  }
+}

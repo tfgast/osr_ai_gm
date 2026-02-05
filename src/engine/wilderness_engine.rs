@@ -239,12 +239,13 @@ pub fn travel_day_with<R: Rng>(
         let encounter_roll: u32 = rng.gen_range(1..=6);
         if encounter_roll <= encounter_chance {
             let table_roll: u32 = rng.gen_range(1..=20);
-            let entry = encounter::wilderness_encounter(current_terrain, table_roll);
-            result.msg(format!(
-                "{} encounter! {} ({} appearing).",
-                period, entry.name, entry.number
-            ));
-            result.encounters.push(entry.clone());
+            if let Some(entry) = encounter::wilderness_encounter_simple(current_terrain, table_roll) {
+                result.msg(format!(
+                    "{} encounter! {} ({} appearing).",
+                    period, entry.name, entry.number
+                ));
+                result.encounters.push(entry);
+            }
         }
     }
 

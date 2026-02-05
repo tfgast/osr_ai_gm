@@ -1,0 +1,2002 @@
+{
+  "source": "Advanced_Fantasy_Referees_Tome_v1-3.md",
+  "counts": {
+    "dungeon_levels": 6,
+    "dungeon_entries": 240,
+    "terrain_types": 10,
+    "sub_tables": 11
+  },
+  "dungeon": {
+    "1": {
+      "1/0": {
+        "monster": "Acolyte",
+        "number": "1d8"
+      },
+      "1/1": {
+        "monster": "Bandit",
+        "number": "1d8"
+      },
+      "1/2": {
+        "monster": "Beetle, Fire",
+        "number": "1d8"
+      },
+      "1/3": {
+        "monster": "Beetle, Oil",
+        "number": "1d3"
+      },
+      "1/4": {
+        "monster": "Berserker",
+        "number": "1d4"
+      },
+      "1/5": {
+        "monster": "Brown Mould",
+        "number": "1d3"
+      },
+      "1/6": {
+        "monster": "Brownie",
+        "number": "3d6"
+      },
+      "1/7": {
+        "monster": "Dark Creeper",
+        "number": "1"
+      },
+      "1/8": {
+        "monster": "Dog, Wild",
+        "number": "2d6"
+      },
+      "1/9": {
+        "monster": "Dwarf",
+        "number": "1d6"
+      },
+      "2/0": {
+        "monster": "Frog, Mutant",
+        "number": "3d6"
+      },
+      "2/1": {
+        "monster": "Gas Spore",
+        "number": "1d3"
+      },
+      "2/2": {
+        "monster": "Gnome",
+        "number": "1d6"
+      },
+      "2/3": {
+        "monster": "Goblin",
+        "number": "2d4"
+      },
+      "2/4": {
+        "monster": "Green Slime",
+        "number": "1d4"
+      },
+      "2/5": {
+        "monster": "Gullygug",
+        "number": "2d6"
+      },
+      "2/6": {
+        "monster": "Halfling",
+        "number": "3d6"
+      },
+      "2/7": {
+        "monster": "Homunculus",
+        "number": "1"
+      },
+      "2/8": {
+        "monster": "Killer Bee",
+        "number": "1d10"
+      },
+      "2/9": {
+        "monster": "Kobold",
+        "number": "4d4"
+      },
+      "3/0": {
+        "monster": "Leprechaun",
+        "number": "1"
+      },
+      "3/1": {
+        "monster": "Lizard, Gecko",
+        "number": "1d3"
+      },
+      "3/2": {
+        "monster": "Mutoid",
+        "number": "1d8"
+      },
+      "3/3": {
+        "monster": "Necrophidius",
+        "number": "1"
+      },
+      "3/4": {
+        "monster": "Orc",
+        "number": "2d4"
+      },
+      "3/5": {
+        "monster": "Piercer",
+        "hd": "1",
+        "number": "3d6"
+      },
+      "3/6": {
+        "monster": "Poltergeist",
+        "number": "1d3"
+      },
+      "3/7": {
+        "monster": "Robber Fly",
+        "number": "1d3"
+      },
+      "3/8": {
+        "monster": "Rot Grub",
+        "number": "5d4"
+      },
+      "3/9": {
+        "monster": "Shrew, Giant",
+        "number": "1d10"
+      },
+      "4/0": {
+        "monster": "Skeleton",
+        "number": "3d4"
+      },
+      "4/1": {
+        "monster": "Snake, Cobra",
+        "number": "1d6"
+      },
+      "4/2": {
+        "monster": "Spider, Crab",
+        "number": "1d4"
+      },
+      "4/3": {
+        "monster": "Sprite",
+        "number": "3d6"
+      },
+      "4/4": {
+        "monster": "Stirge",
+        "number": "1d10"
+      },
+      "4/5": {
+        "monster": "Toad, Poisonous",
+        "number": "1d4"
+      },
+      "4/6": {
+        "monster": "Trader",
+        "number": "1d8"
+      },
+      "4/7": {
+        "monster": "Troglodyte",
+        "number": "1d4"
+      },
+      "4/8": {
+        "monster": "Wolf",
+        "number": "2d6"
+      },
+      "4/9": {
+        "monster": "Zombie",
+        "number": "1d4"
+      }
+    },
+    "2": {
+      "1/0": {
+        "monster": "Ankheg",
+        "hd": "3",
+        "number": "1d2"
+      },
+      "1/1": {
+        "monster": "Beetle, Oil",
+        "number": "1d8"
+      },
+      "1/2": {
+        "monster": "Berserker",
+        "number": "1d6"
+      },
+      "1/3": {
+        "monster": "Brown Mould",
+        "number": "1d8"
+      },
+      "1/4": {
+        "monster": "Cat, Mntn. Lion",
+        "number": "1d4"
+      },
+      "1/5": {
+        "monster": "Coffer Corpse",
+        "number": "1"
+      },
+      "1/6": {
+        "monster": "Dark Creeper",
+        "number": "1"
+      },
+      "1/7": {
+        "monster": "Dog, Wild",
+        "number": "2d6"
+      },
+      "1/8": {
+        "monster": "Elf",
+        "number": "1d4"
+      },
+      "1/9": {
+        "monster": "Frog, Poisonous",
+        "number": "1d6"
+      },
+      "2/0": {
+        "monster": "Gas Spore",
+        "number": "1d3"
+      },
+      "2/1": {
+        "monster": "Ghoul",
+        "number": "1d6"
+      },
+      "2/2": {
+        "monster": "Gnoll",
+        "number": "1d6"
+      },
+      "2/3": {
+        "monster": "Grey Ooze",
+        "number": "1"
+      },
+      "2/4": {
+        "monster": "Gullygug",
+        "number": "2d6"
+      },
+      "2/5": {
+        "monster": "Hobgoblin",
+        "number": "1d6"
+      },
+      "2/6": {
+        "monster": "Homunculus",
+        "number": "1"
+      },
+      "2/7": {
+        "monster": "Lizard Man",
+        "number": "2d4"
+      },
+      "2/8": {
+        "monster": "Lizard, Draco",
+        "number": "1d4"
+      },
+      "2/9": {
+        "monster": "Lycan., Wererat",
+        "number": "1d4"
+      },
+      "3/0": {
+        "monster": "Mutoid",
+        "number": "2d6"
+      },
+      "3/1": {
+        "monster": "Mycelian",
+        "number": "1d12"
+      },
+      "3/2": {
+        "monster": "Neanderthal",
+        "number": "1d10"
+      },
+      "3/3": {
+        "monster": "Necrophidius",
+        "number": "1"
+      },
+      "3/4": {
+        "monster": "Noble",
+        "number": "2d6"
+      },
+      "3/5": {
+        "monster": "Piercer",
+        "hd": "2",
+        "number": "3d8"
+      },
+      "3/6": {
+        "monster": "Pixie",
+        "number": "2d4"
+      },
+      "3/7": {
+        "monster": "Poltergeist",
+        "number": "1d8"
+      },
+      "3/8": {
+        "monster": "Pseudo-Dragon",
+        "number": "1"
+      },
+      "3/9": {
+        "monster": "Robber Fly",
+        "number": "1d6"
+      },
+      "4/0": {
+        "monster": "Rock Baboon",
+        "number": "2d6"
+      },
+      "4/1": {
+        "monster": "Rot Grub",
+        "number": "5d6"
+      },
+      "4/2": {
+        "monster": "Snake, Pit Viper",
+        "number": "1d8"
+      },
+      "4/3": {
+        "monster": "Spider, Bl. Widow",
+        "number": "1d3"
+      },
+      "4/4": {
+        "monster": "Toad, Poisonous",
+        "number": "1d8"
+      },
+      "4/5": {
+        "monster": "Troglodyte",
+        "number": "1d8"
+      },
+      "4/6": {
+        "monster": "Veteran",
+        "number": "2d4"
+      },
+      "4/7": {
+        "monster": "Violet Fungus",
+        "number": "1d2"
+      },
+      "4/8": {
+        "monster": "Water Fiend",
+        "number": "1"
+      },
+      "4/9": {
+        "monster": "Zombie",
+        "number": "2d4"
+      }
+    },
+    "3": {
+      "1/0": {
+        "monster": "Ankheg",
+        "hd": "3",
+        "number": "1d6"
+      },
+      "1/1": {
+        "monster": "Ape, White",
+        "number": "1d6"
+      },
+      "1/2": {
+        "monster": "Basic Adv.",
+        "number": "1d4+4"
+      },
+      "1/3": {
+        "monster": "Beetle, Tiger",
+        "number": "1d6"
+      },
+      "1/4": {
+        "monster": "Brown Mould",
+        "number": "1d10"
+      },
+      "1/5": {
+        "monster": "Bugbear",
+        "number": "2d4"
+      },
+      "1/6": {
+        "monster": "Carcass Crawler",
+        "number": "1d3"
+      },
+      "1/7": {
+        "monster": "Coffer Corpse",
+        "number": "1d3"
+      },
+      "1/8": {
+        "monster": "Dark Creeper",
+        "number": "1d4"
+      },
+      "1/9": {
+        "monster": "Deep One",
+        "number": "2d12"
+      },
+      "2/0": {
+        "monster": "Doppelg\u00e4nger",
+        "number": "1d6"
+      },
+      "2/1": {
+        "monster": "Driver Ant",
+        "number": "2d4"
+      },
+      "2/2": {
+        "monster": "Drow",
+        "number": "2d4"
+      },
+      "2/3": {
+        "monster": "Duergar",
+        "number": "2d6"
+      },
+      "2/4": {
+        "monster": "Flail Snail",
+        "number": "1"
+      },
+      "2/5": {
+        "monster": "Gargoyle",
+        "number": "1d6"
+      },
+      "2/6": {
+        "monster": "Gas Spore",
+        "number": "1d3"
+      },
+      "2/7": {
+        "monster": "Gelatinous Cube",
+        "number": "1"
+      },
+      "2/8": {
+        "monster": "Ghast",
+        "number": "1"
+      },
+      "2/9": {
+        "monster": "Harpy",
+        "number": "1d6"
+      },
+      "3/0": {
+        "monster": "Lvng. Stat., Crystal",
+        "number": "1d6"
+      },
+      "3/1": {
+        "monster": "Lycan., Wererat",
+        "number": "1d8"
+      },
+      "3/2": {
+        "monster": "Medium",
+        "number": "1d4"
+      },
+      "3/3": {
+        "monster": "Medusa",
+        "number": "1d3"
+      },
+      "3/4": {
+        "monster": "Mutoid",
+        "number": "2d8"
+      },
+      "3/5": {
+        "monster": "Mycelian",
+        "number": "2d8"
+      },
+      "3/6": {
+        "monster": "Necrophidius",
+        "number": "1d3"
+      },
+      "3/7": {
+        "monster": "Ochre Jelly",
+        "number": "1"
+      },
+      "3/8": {
+        "monster": "Ogre",
+        "number": "1d6"
+      },
+      "3/9": {
+        "monster": "Piercer",
+        "hd": "3",
+        "number": "4d6"
+      },
+      "4/0": {
+        "monster": "Poltergeist",
+        "number": "2d6"
+      },
+      "4/1": {
+        "monster": "Rot Grub",
+        "number": "5d6"
+      },
+      "4/2": {
+        "monster": "Shadow",
+        "number": "1d8"
+      },
+      "4/3": {
+        "monster": "Spider, Tarantella",
+        "number": "1d3"
+      },
+      "4/4": {
+        "monster": "Svirfneblin",
+        "number": "2d8"
+      },
+      "4/5": {
+        "monster": "Thoul",
+        "number": "1d6"
+      },
+      "4/6": {
+        "monster": "Toad, Poisonous",
+        "number": "2d6"
+      },
+      "4/7": {
+        "monster": "Violet Fungus",
+        "number": "1d4"
+      },
+      "4/8": {
+        "monster": "Water Fiend",
+        "number": "1d3"
+      },
+      "4/9": {
+        "monster": "Wight",
+        "number": "1d6"
+      }
+    },
+    "4-5": {
+      "1/0": {
+        "monster": "Ankheg",
+        "hd": "5",
+        "number": "1d6"
+      },
+      "1/1": {
+        "monster": "Bear, Cave",
+        "number": "1d2"
+      },
+      "1/2": {
+        "monster": "Blink Dog",
+        "number": "1d6"
+      },
+      "1/3": {
+        "monster": "Caecilia",
+        "number": "1d3"
+      },
+      "1/4": {
+        "monster": "Caryatid Column",
+        "number": "1d12"
+      },
+      "1/5": {
+        "monster": "Cockatrice",
+        "number": "1d4"
+      },
+      "1/6": {
+        "monster": "Deep One",
+        "number": "3d12"
+      },
+      "1/7": {
+        "monster": "Disenchanter",
+        "number": "1d2"
+      },
+      "1/8": {
+        "monster": "Doppelg\u00e4nger",
+        "number": "1d6"
+      },
+      "1/9": {
+        "monster": "Drow",
+        "number": "3d6"
+      },
+      "2/0": {
+        "monster": "Duergar",
+        "number": "3d6"
+      },
+      "2/1": {
+        "monster": "Expert Adv.",
+        "number": "1d6+3"
+      },
+      "2/2": {
+        "monster": "Flail Snail",
+        "number": "1"
+      },
+      "2/3": {
+        "monster": "Ghast",
+        "number": "1d3"
+      },
+      "2/4": {
+        "monster": "Gibbering Mouther",
+        "number": "1"
+      },
+      "2/5": {
+        "monster": "Grey Ooze",
+        "number": "1"
+      },
+      "2/6": {
+        "monster": "Hellhound",
+        "number": "2d4"
+      },
+      "2/7": {
+        "monster": "Hook Beast",
+        "number": "2d6"
+      },
+      "2/8": {
+        "monster": "Krell",
+        "number": "1"
+      },
+      "2/9": {
+        "monster": "Lizard, Tuatara",
+        "number": "1d2"
+      },
+      "3/0": {
+        "monster": "Lycan., Wereboar",
+        "number": "1d4"
+      },
+      "3/1": {
+        "monster": "Lycan., Werewolf",
+        "number": "1d6"
+      },
+      "3/2": {
+        "monster": "Minotaur",
+        "number": "1d6"
+      },
+      "3/3": {
+        "monster": "Ochre Jelly",
+        "number": "1"
+      },
+      "3/4": {
+        "monster": "Otyugh",
+        "hd": "6",
+        "number": "1"
+      },
+      "3/5": {
+        "monster": "Owl Bear",
+        "number": "1d4"
+      },
+      "3/6": {
+        "monster": "Rhagodessa",
+        "number": "1d4"
+      },
+      "3/7": {
+        "monster": "Rust Monster",
+        "number": "1d4"
+      },
+      "3/8": {
+        "monster": "Slithering Tracker",
+        "number": "1"
+      },
+      "3/9": {
+        "monster": "Snake Person",
+        "number": "1d3"
+      },
+      "4/0": {
+        "monster": "Sp. of the Worm",
+        "number": "1d3"
+      },
+      "4/1": {
+        "monster": "Spectre",
+        "number": "1d4"
+      },
+      "4/2": {
+        "monster": "Spider, Phase",
+        "number": "1d4"
+      },
+      "4/3": {
+        "monster": "Toad, Frost",
+        "number": "1d4"
+      },
+      "4/4": {
+        "monster": "Troll",
+        "number": "1d8"
+      },
+      "4/5": {
+        "monster": "Violet Fungus",
+        "number": "2d4"
+      },
+      "4/6": {
+        "monster": "Water Fiend",
+        "number": "1d4"
+      },
+      "4/7": {
+        "monster": "Weasel, Giant",
+        "number": "1d4"
+      },
+      "4/8": {
+        "monster": "Will-o'-the-Wisp",
+        "number": "1"
+      },
+      "4/9": {
+        "monster": "Wraith",
+        "number": "1d4"
+      }
+    },
+    "6-7": {
+      "1/0": {
+        "monster": "Amphisbaena",
+        "number": "1d3"
+      },
+      "1/1": {
+        "monster": "Banshee",
+        "number": "1"
+      },
+      "1/2": {
+        "monster": "Basilisk",
+        "number": "1d6"
+      },
+      "1/3": {
+        "monster": "Bear, Cave",
+        "number": "1d2"
+      },
+      "1/4": {
+        "monster": "Black Pudding",
+        "number": "1"
+      },
+      "1/5": {
+        "monster": "Caecilia",
+        "number": "1d3"
+      },
+      "1/6": {
+        "monster": "Caryatid Column",
+        "number": "3d6"
+      },
+      "1/7": {
+        "monster": "Dragon, White",
+        "number": "1d4"
+      },
+      "1/8": {
+        "monster": "Drider",
+        "number": "1d4"
+      },
+      "1/9": {
+        "monster": "Expert Adv.",
+        "number": "1d6+3"
+      },
+      "2/0": {
+        "monster": "Flail Snail",
+        "number": "1d4"
+      },
+      "2/1": {
+        "monster": "Ghast",
+        "number": "2d4"
+      },
+      "2/2": {
+        "monster": "Gibbering Mouther",
+        "number": "1d3"
+      },
+      "2/3": {
+        "monster": "Gorgon",
+        "number": "1d2"
+      },
+      "2/4": {
+        "monster": "Hellhound",
+        "number": "2d4"
+      },
+      "2/5": {
+        "monster": "Hook Beast",
+        "number": "3d6"
+      },
+      "2/6": {
+        "monster": "Hydra",
+        "hd": "1d4+4",
+        "number": "1"
+      },
+      "2/7": {
+        "monster": "Krell",
+        "number": "1d3"
+      },
+      "2/8": {
+        "monster": "Lizard, Flame",
+        "number": "1d4"
+      },
+      "2/9": {
+        "monster": "Lizard, Subterr.",
+        "number": "1d6"
+      },
+      "3/0": {
+        "monster": "Lycan., Weretiger",
+        "number": "1d4"
+      },
+      "3/1": {
+        "monster": "Mind Lasher",
+        "number": "1d4"
+      },
+      "3/2": {
+        "monster": "Minotaur",
+        "number": "1d6"
+      },
+      "3/3": {
+        "monster": "Mummy",
+        "number": "1d4"
+      },
+      "3/4": {
+        "monster": "Ochre Jelly",
+        "number": "1"
+      },
+      "3/5": {
+        "monster": "Otyugh",
+        "hd": "6",
+        "number": "1d3"
+      },
+      "3/6": {
+        "monster": "Owl Bear",
+        "number": "1d4"
+      },
+      "3/7": {
+        "monster": "Rakshasa",
+        "number": "1d4"
+      },
+      "3/8": {
+        "monster": "Remorhaz",
+        "hd": "7",
+        "number": "1"
+      },
+      "3/9": {
+        "monster": "Revenant",
+        "number": "1"
+      },
+      "4/0": {
+        "monster": "Rust Monster",
+        "number": "1d4"
+      },
+      "4/1": {
+        "monster": "Salam., Flame",
+        "number": "1d4+1"
+      },
+      "4/2": {
+        "monster": "Scorpion, Giant",
+        "number": "1d6"
+      },
+      "4/3": {
+        "monster": "Slithering Tracker",
+        "number": "1"
+      },
+      "4/4": {
+        "monster": "Snake Person",
+        "number": "1d6"
+      },
+      "4/5": {
+        "monster": "Spectre",
+        "number": "1d4"
+      },
+      "4/6": {
+        "monster": "Troll",
+        "number": "1d8"
+      },
+      "4/7": {
+        "monster": "Warp Beast",
+        "number": "1d4"
+      },
+      "4/8": {
+        "monster": "Will-o'-the-Wisp",
+        "number": "1d3"
+      },
+      "4/9": {
+        "monster": "Xorn",
+        "number": "1d4"
+      }
+    },
+    "8+": {
+      "1/0": {
+        "monster": "Black Pudding",
+        "number": "1"
+      },
+      "1/1": {
+        "monster": "Chimera",
+        "number": "1d2"
+      },
+      "1/2": {
+        "monster": "Dragon, Black",
+        "number": "1d4"
+      },
+      "1/3": {
+        "monster": "Dragon, Blue",
+        "number": "1d4"
+      },
+      "1/4": {
+        "monster": "Dragon, Brass",
+        "number": "1d4"
+      },
+      "1/5": {
+        "monster": "Dragon, Bronze",
+        "number": "1d4"
+      },
+      "1/6": {
+        "monster": "Dragon, Copper",
+        "number": "1d4"
+      },
+      "1/7": {
+        "monster": "Dragon, Gold",
+        "number": "1d4"
+      },
+      "1/8": {
+        "monster": "Dragon, Green",
+        "number": "1d4"
+      },
+      "1/9": {
+        "monster": "Dragon, Red",
+        "number": "1d4"
+      },
+      "2/0": {
+        "monster": "Dragon, Silver",
+        "number": "1d4"
+      },
+      "2/1": {
+        "monster": "Dragonne",
+        "number": "1"
+      },
+      "2/2": {
+        "monster": "Expert Adv.",
+        "number": "1d6+3"
+      },
+      "2/3": {
+        "monster": "Eye of Terror",
+        "number": "1"
+      },
+      "2/4": {
+        "monster": "Ghost",
+        "number": "1"
+      },
+      "2/5": {
+        "monster": "Giant, Hill",
+        "number": "1d4"
+      },
+      "2/6": {
+        "monster": "Giant, Stone",
+        "number": "1d2"
+      },
+      "2/7": {
+        "monster": "Golem, Amber",
+        "number": "1"
+      },
+      "2/8": {
+        "monster": "Golem, Bone",
+        "number": "1"
+      },
+      "2/9": {
+        "monster": "Golem, Iron",
+        "number": "1"
+      },
+      "3/0": {
+        "monster": "Golem, Stone",
+        "number": "1"
+      },
+      "3/1": {
+        "monster": "Hag, Black",
+        "number": "1"
+      },
+      "3/2": {
+        "monster": "Hulker",
+        "number": "1d4"
+      },
+      "3/3": {
+        "monster": "Hydra",
+        "hd": "1d4+8",
+        "number": "1"
+      },
+      "3/4": {
+        "monster": "Lamia",
+        "number": "1"
+      },
+      "3/5": {
+        "monster": "Lurker Above",
+        "number": "1"
+      },
+      "3/6": {
+        "monster": "Lycan., Devil Swine",
+        "number": "1d3"
+      },
+      "3/7": {
+        "monster": "Lycan., Werebear",
+        "number": "1d4"
+      },
+      "3/8": {
+        "monster": "Manticore",
+        "number": "1d2"
+      },
+      "3/9": {
+        "monster": "Mimic",
+        "number": "1"
+      },
+      "4/0": {
+        "monster": "Mind Lasher",
+        "number": "1d8"
+      },
+      "4/1": {
+        "monster": "Purple Worm",
+        "number": "1d2"
+      },
+      "4/2": {
+        "monster": "Revenant",
+        "number": "1"
+      },
+      "4/3": {
+        "monster": "Roper",
+        "number": "1d2"
+      },
+      "4/4": {
+        "monster": "Salam., Flame",
+        "number": "1d4+1"
+      },
+      "4/5": {
+        "monster": "Salamander, Frost",
+        "number": "1d3"
+      },
+      "4/6": {
+        "monster": "Shambling Mound",
+        "number": "1d3"
+      },
+      "4/7": {
+        "monster": "Slug, Giant",
+        "number": "1"
+      },
+      "4/8": {
+        "monster": "Trapper",
+        "number": "1"
+      },
+      "4/9": {
+        "monster": "Vampire",
+        "number": "1d4"
+      }
+    }
+  },
+  "wilderness": {
+    "terrain_table": {
+      "Barren, Hills, Mountains": {
+        "1": "B-Animal",
+        "2": "1-Dragon",
+        "3": "1-Dragon",
+        "4": "B-Human",
+        "5": "B-Humanoid",
+        "6": "B-Humanoid",
+        "7": "B-Monster",
+        "8": "2-Unusual"
+      },
+      "City": {
+        "1": "C-Human",
+        "2": "C-Human",
+        "3": "C-Human",
+        "4": "C-Human",
+        "5": "C-Human",
+        "6": "C-Human",
+        "7": "C-Humanoid",
+        "8": "2-Undead"
+      },
+      "Clear, Grasslands": {
+        "1": "G-Animal",
+        "2": "1-Dragon",
+        "3": "1-Flyer",
+        "4": "G-Human",
+        "5": "G-Humanoid",
+        "6": "1-Insect",
+        "7": "G-Monster",
+        "8": "2-Unusual"
+      },
+      "Desert": {
+        "1": "D-Animal",
+        "2": "D-Animal",
+        "3": "1-Dragon",
+        "4": "D-Human",
+        "5": "D-Human",
+        "6": "D-Humanoid",
+        "7": "D-Monster",
+        "8": "2-Undead"
+      },
+      "Forest": {
+        "1": "F-Animal",
+        "2": "1-Dragon",
+        "3": "1-Flyer",
+        "4": "F-Human",
+        "5": "F-Humanoid",
+        "6": "1-Insect",
+        "7": "F-Monster",
+        "8": "2-Unusual"
+      },
+      "Jungle": {
+        "1": "J-Animal",
+        "2": "1-Dragon",
+        "3": "1-Flyer",
+        "4": "J-Human",
+        "5": "J-Humanoid",
+        "6": "1-Insect",
+        "7": "1-Insect",
+        "8": "J-Monster"
+      },
+      "Lake, River": {
+        "1": "L-Animal",
+        "2": "1-Dragon",
+        "3": "1-Flyer",
+        "4": "L-Human",
+        "5": "L-Humanoid",
+        "6": "1-Insect",
+        "7": "L-Swimmer",
+        "8": "L-Swimmer"
+      },
+      "Ocean, Sea": {
+        "1": "1-Dragon*",
+        "2": "1-Flyer",
+        "3": "O-Human",
+        "4": "O-Swimmer",
+        "5": "O-Swimmer",
+        "6": "O-Swimmer",
+        "7": "O-Swimmer",
+        "8": "O-Swimmer"
+      },
+      "Settled": {
+        "1": "C-Animal",
+        "2": "1-Dragon",
+        "3": "1-Flyer",
+        "4": "C-Human",
+        "5": "C-Human",
+        "6": "C-Human",
+        "7": "C-Humanoid",
+        "8": "1-Insect"
+      },
+      "Swamp": {
+        "1": "1-Dragon",
+        "2": "1-Flyer",
+        "3": "S-Human",
+        "4": "S-Humanoid",
+        "5": "1-Insect",
+        "6": "S-Swimmer",
+        "7": "S-Monster",
+        "8": "2-Undead"
+      }
+    },
+    "sub_tables": {
+      "1": {
+        "Dragon": {
+          "1": "Chimera",
+          "2": "Dragon, Black",
+          "3": "Dragon, Blue",
+          "4": "Dragon, Brass",
+          "5": "Dragon, Bronze",
+          "6": "Dragon, Copper",
+          "7": "Dragon, Gold",
+          "8": "Dragon, Green",
+          "9": "Dragon, Red",
+          "10": "Dragon, Silver",
+          "11": "Dragon, White",
+          "12": "Hydra (or Sea Hydra)",
+          "13": "Hydra (or Sea Hydra)",
+          "14": "Pseudo-Dragon",
+          "15": "Wyvern",
+          "16": "Amphisbaena*",
+          "17": "Basilisk*",
+          "18": "Dragonne*",
+          "19": "Lizard, Flame*",
+          "20": "Salamander*"
+        },
+        "Flyer": {
+          "1": "Cockatrice",
+          "2": "Couatl",
+          "3": "Gargoyle",
+          "4": "Griffon",
+          "5": "Hawk, Giant",
+          "6": "Hippogriff",
+          "7": "Killer Bee",
+          "8": "Mantis, Giant",
+          "9": "Nightmare",
+          "10": "Pegasus",
+          "11": "Peryton",
+          "12": "Phoenix",
+          "13": "Pixie",
+          "14": "Pseudo-Dragon",
+          "15": "Robber Fly",
+          "16": "Roc, Small",
+          "17": "Sphinx",
+          "18": "Sprite",
+          "19": "Stirge",
+          "20": "Wasp, Giant"
+        },
+        "Insect": {
+          "1": "Ankheg",
+          "2": "Beetle, Fire",
+          "3": "Beetle, Oil",
+          "4": "Beetle, Tiger",
+          "5": "Centipede, Giant",
+          "6": "Driver Ant",
+          "7": "Driver Ant",
+          "8": "Flail Snail",
+          "9": "Killer Bee",
+          "10": "Mantis, Giant",
+          "11": "Rhagodessa",
+          "12": "Robber Fly",
+          "13": "Rot Grub",
+          "14": "Scorpion, Giant",
+          "15": "Slug, Giant",
+          "16": "Spider, Black Widow",
+          "17": "Spider, Crab",
+          "18": "Spider, Phase",
+          "19": "Spider, Tarantella",
+          "20": "Wasp, Giant"
+        }
+      },
+      "2": {
+        "Prehistoric Animal": {
+          "1": "Bear, Cave",
+          "2": "Bear, Cave",
+          "3": "Cat, Sabre-Toothed",
+          "4": "Cat, Sabre-Toothed",
+          "5": "Crocodile, Giant",
+          "6": "Crocodile, Giant",
+          "7": "Gorilla",
+          "8": "Hippo, Behemoth",
+          "9": "Mastodon",
+          "10": "Pterosaur, Pteranodon",
+          "11": "Pterosaur, Pterodactyl",
+          "12": "Rhino, Woolly",
+          "13": "Rhino, Woolly",
+          "14": "Snake, Pit Viper",
+          "15": "Stegosaurus",
+          "16": "Titanothere",
+          "17": "Triceratops",
+          "18": "Tyrannosaurus Rex",
+          "19": "Wolf, Dire",
+          "20": "Yeti"
+        },
+        "Undead": {
+          "1": "Banshee",
+          "2": "Coffer Corpse",
+          "3": "Coffer Corpse",
+          "4": "Ghast",
+          "5": "Ghost",
+          "6": "Ghost",
+          "7": "Ghoul",
+          "8": "Ghoul",
+          "9": "Mummy",
+          "10": "Necrophidius",
+          "11": "Poltergeist",
+          "12": "Revenant",
+          "13": "Skeleton",
+          "14": "Skeleton",
+          "15": "Spectre",
+          "16": "Vampire",
+          "17": "Wight",
+          "18": "Wraith",
+          "19": "Zombie",
+          "20": "Zombie"
+        },
+        "Unusual": {
+          "1": "Basilisk",
+          "2": "Blink Dog",
+          "3": "Bulette",
+          "4": "Catoblepas",
+          "5": "Centaur",
+          "6": "Gorgon",
+          "7": "Jackalwere",
+          "8": "Lamia",
+          "9": "Leucrocotta",
+          "10": "Lycanthrope, Werebear",
+          "11": "Lycanthrope, Wereboar",
+          "12": "Lycanthrope, Wererat",
+          "13": "Lycanthrope, Weretiger",
+          "14": "Lycanthrope, Werewolf",
+          "15": "Medusa",
+          "16": "Otyugh",
+          "17": "Roper",
+          "18": "Shambling Mound",
+          "19": "Treant",
+          "20": "Warp Beast"
+        }
+      },
+      "B": {
+        "Animal": {
+          "1": "Ape, White",
+          "2": "Ape, White",
+          "3": "Bear, Cave",
+          "4": "Cat, Mntn. Lion",
+          "5": "Dog, Wild",
+          "6": "Dragonne",
+          "7": "Gorilla",
+          "8": "Hawk",
+          "9": "Herd Animal",
+          "10": "Lizard, Flame",
+          "11": "Lizard, Subterr.",
+          "12": "Mule",
+          "13": "Rock Baboon",
+          "14": "Snake, Pit Viper",
+          "15": "Snake, Rattler",
+          "16": "Spider, Phase",
+          "17": "Wasp, Giant",
+          "18": "Wolf",
+          "19": "Wolf, Dire",
+          "20": "Wolf, Winter"
+        },
+        "Human": {
+          "1": "Bandit",
+          "2": "Bandit",
+          "3": "Berserker",
+          "4": "Berserker",
+          "5": "Berserker",
+          "6": "Brigand",
+          "7": "Brigand",
+          "8": "Brigand",
+          "9": "Exp. Adventurers",
+          "10": "Exp. Adventurers",
+          "11": "High-Level Cleric",
+          "12": "High-Level Fighter",
+          "13": "High-Level Fighter",
+          "14": "High-LevelMU",
+          "15": "High-LevelMU",
+          "16": "Merchant",
+          "17": "Merchant",
+          "18": "Neanderthal",
+          "19": "Neanderthal",
+          "20": "Neanderthal"
+        },
+        "Humanoid": {
+          "1": "Dwarf",
+          "2": "Ettin",
+          "3": "Giant, Cloud",
+          "4": "Giant, Frost",
+          "5": "Giant, Hill",
+          "6": "Giant, Stone",
+          "7": "Giant, Storm",
+          "8": "Gnome",
+          "9": "Goblin",
+          "10": "Hag, Black",
+          "11": "Jackalwere",
+          "12": "Kobold",
+          "13": "Mutoid",
+          "14": "Orc",
+          "15": "Scorpionoid",
+          "16": "Svirfneblin",
+          "17": "Titan",
+          "18": "Troglodyte",
+          "19": "Troll",
+          "20": "Yeti"
+        },
+        "Monster": {
+          "1": "Gargoyle",
+          "2": "Griffon",
+          "3": "Harpy",
+          "4": "Hawk",
+          "5": "Hawk, Giant",
+          "6": "Hippogriff",
+          "7": "Lamia",
+          "8": "Leucrocotta",
+          "9": "Manticore",
+          "10": "Manticore",
+          "11": "Nightmare",
+          "12": "Pegasus",
+          "13": "Peryton",
+          "14": "Peryton",
+          "15": "Roc, Giant",
+          "16": "Roc, Large",
+          "17": "Roc, Small",
+          "18": "Sphinx",
+          "19": "Will-o'-the-Wisp",
+          "20": "Xorn"
+        }
+      },
+      "C": {
+        "Animal": {
+          "1": "Boar",
+          "2": "Boar",
+          "3": "Cat, Tiger",
+          "4": "Dog, Hunting",
+          "5": "Dog, Hunting",
+          "6": "Dog, War",
+          "7": "Ferret, Giant",
+          "8": "Hawk",
+          "9": "Hawk",
+          "10": "Herd Animal",
+          "11": "Herd Animal",
+          "12": "Herd Animal",
+          "13": "Rat, Giant",
+          "14": "Rat, Giant",
+          "15": "Shrew, Giant",
+          "16": "Snake, Pit Viper",
+          "17": "Spider, Tarantella",
+          "18": "Weasel, Giant",
+          "19": "Wolf",
+          "20": "Wolf"
+        },
+        "Human, City": {
+          "1": "Acolyte",
+          "2": "Acolyte",
+          "3": "Bandit",
+          "4": "Bandit",
+          "5": "Bandit",
+          "6": "Basic Adventurers",
+          "7": "Basic Adventurers",
+          "8": "Exp. Adventurers",
+          "9": "High-Level Fighter",
+          "10": "High-Level Fighter",
+          "11": "Medium",
+          "12": "Merchant",
+          "13": "Merchant",
+          "14": "Noble",
+          "15": "Noble",
+          "16": "Trader",
+          "17": "Trader",
+          "18": "Trader",
+          "19": "Trader",
+          "20": "Veteran"
+        },
+        "Human, Settled": {
+          "1": "Acolyte",
+          "2": "Acolyte",
+          "3": "Bandit",
+          "4": "Bandit",
+          "5": "Bandit",
+          "6": "Basic Adventurers",
+          "7": "Basic Adventurers",
+          "8": "Exp. Adventurers",
+          "9": "High-Level Cleric",
+          "10": "High-Level Cleric",
+          "11": "High-Level Fighter",
+          "12": "High-LevelMU",
+          "13": "Medium",
+          "14": "Merchant",
+          "15": "Merchant",
+          "16": "Noble",
+          "17": "Noble",
+          "18": "Trader",
+          "19": "Trader",
+          "20": "Veteran"
+        },
+        "Humanoid": {
+          "1": "Brownie",
+          "2": "Dwarf",
+          "3": "Dwarf",
+          "4": "Elf",
+          "5": "Elf",
+          "6": "Giant, Hill",
+          "7": "Gnoll",
+          "8": "Gnome",
+          "9": "Gnome",
+          "10": "Goblin",
+          "11": "Gullygug",
+          "12": "Halfling",
+          "13": "Halfling",
+          "14": "Hobgoblin",
+          "15": "Leprechaun",
+          "16": "Mutoid",
+          "17": "Ogre",
+          "18": "Orc",
+          "19": "Pixie",
+          "20": "Sprite"
+        }
+      },
+      "D": {
+        "Animal": {
+          "1": "Camel",
+          "2": "Camel",
+          "3": "Camel",
+          "4": "Cat, Lion",
+          "5": "Cat, Lion",
+          "6": "Cat, Lion",
+          "7": "Dog, Wild Dog",
+          "8": "Hawk",
+          "9": "Herd Animal",
+          "10": "Herd Animal",
+          "11": "Herd Animal",
+          "12": "Lizard, Gecko",
+          "13": "Lizard, Monitor",
+          "14": "Lizard, Tuatara",
+          "15": "Mantis, Giant",
+          "16": "Snake, Pit Viper",
+          "17": "Snake, Rattler",
+          "18": "Snake, Rattler",
+          "19": "Spider, Tarantella",
+          "20": "Spider, Tarantella"
+        },
+        "Human": {
+          "1": "Dervish",
+          "2": "Dervish",
+          "3": "Dervish",
+          "4": "Exp. Adventurers",
+          "5": "Exp. Adventurers",
+          "6": "High-Level Cleric",
+          "7": "High-Level Cleric",
+          "8": "High-Level Fighter",
+          "9": "High-Level Fighter",
+          "10": "High-Level MU",
+          "11": "Merchant",
+          "12": "Merchant",
+          "13": "Noble",
+          "14": "Noble",
+          "15": "Nomad",
+          "16": "Nomad",
+          "17": "Nomad",
+          "18": "Nomad",
+          "19": "Nomad",
+          "20": "Nomad"
+        },
+        "Humanoid": {
+          "1": "Giant, Fire",
+          "2": "Goblin",
+          "3": "Goblin",
+          "4": "Hobgoblin",
+          "5": "Hobgoblin",
+          "6": "Jackalwere",
+          "7": "Mantid",
+          "8": "Mutoid",
+          "9": "Mutoid",
+          "10": "Ogre",
+          "11": "Ogre",
+          "12": "Ogre",
+          "13": "Orc",
+          "14": "Orc",
+          "15": "Pixie",
+          "16": "Rakshasa",
+          "17": "Scorpionoid",
+          "18": "Snake Person",
+          "19": "Sprite",
+          "20": "Thoul"
+        },
+        "Monster": {
+          "1": "Amphisbaena",
+          "2": "Bulette",
+          "3": "Dragonne",
+          "4": "Gargoyle",
+          "5": "Gargoyle",
+          "6": "Griffon",
+          "7": "Hawk",
+          "8": "Hawk, Giant",
+          "9": "Hawk, Giant",
+          "10": "Lamia",
+          "11": "Leucrocotta",
+          "12": "Manticore",
+          "13": "Manticore",
+          "14": "Manticore",
+          "15": "Roc, Giant",
+          "16": "Roc, Large",
+          "17": "Roc, Small",
+          "18": "Sphinx",
+          "19": "Sphinx",
+          "20": "Wasp, Giant"
+        }
+      },
+      "F": {
+        "Animal": {
+          "1": "Bear, Grizzly",
+          "2": "Boar",
+          "3": "Cat, Panther",
+          "4": "Cat, Tiger",
+          "5": "Dog, Wild Dog",
+          "6": "Frog, Mutant",
+          "7": "Frog, Poisonous",
+          "8": "Hawk",
+          "9": "Herd Animal",
+          "10": "Lizard, Gecko",
+          "11": "Lizard, Tuatara",
+          "12": "Snake, Pit Viper",
+          "13": "Spider, Crab",
+          "14": "Spider, Crab",
+          "15": "Spider, Phase",
+          "16": "Toad, Poisonous",
+          "17": "Unicorn",
+          "18": "Wolf",
+          "19": "Wolf",
+          "20": "Wolf, Dire"
+        },
+        "Human": {
+          "1": "Bandit",
+          "2": "Bandit",
+          "3": "Bandit",
+          "4": "Basic Adventurers",
+          "5": "Basic Adventurers",
+          "6": "Berserker",
+          "7": "Berserker",
+          "8": "Brigand",
+          "9": "Brigand",
+          "10": "Brigand",
+          "11": "Brigand",
+          "12": "Expert Adventurers",
+          "13": "Expert Adventurers",
+          "14": "High-Level Cleric",
+          "15": "High-Level Fighter",
+          "16": "High-LevelMU",
+          "17": "Merchant",
+          "18": "Merchant",
+          "19": "Trader",
+          "20": "Trader"
+        },
+        "Humanoid": {
+          "1": "Brownie",
+          "2": "Bugbear",
+          "3": "Cyclops",
+          "4": "Dryad",
+          "5": "Elf",
+          "6": "Ettin",
+          "7": "Giant, Hill",
+          "8": "Gnoll",
+          "9": "Goblin",
+          "10": "Gullygug",
+          "11": "Hag, Black",
+          "12": "Hobgoblin",
+          "13": "Leprechaun",
+          "14": "Mutoid",
+          "15": "Ogre",
+          "16": "Ogre",
+          "17": "Orc",
+          "18": "Satyr",
+          "19": "Thoul",
+          "20": "Troll"
+        },
+        "Monster": {
+          "1": "Catoblepas",
+          "2": "Centaur",
+          "3": "Cockatrice",
+          "4": "Gas Spore",
+          "5": "Ghost",
+          "6": "Gibbering Mouther",
+          "7": "Manticore",
+          "8": "Otyugh",
+          "9": "Owl Bear",
+          "10": "Peryton",
+          "11": "Poltergeist",
+          "12": "Pseudo-Dragon",
+          "13": "Roper",
+          "14": "Shambling Mound",
+          "15": "Slithering Tracker",
+          "16": "Spider, Aranea",
+          "17": "Treant",
+          "18": "Violet Fungus",
+          "19": "Will-o'-the-Wisp",
+          "20": "Wyvern"
+        }
+      },
+      "G": {
+        "Animal": {
+          "1": "Ankheg",
+          "2": "Boar",
+          "3": "Cat, Lion",
+          "4": "Dog, Wild",
+          "5": "Elephant",
+          "6": "Ferret, Giant",
+          "7": "Hawk, Giant",
+          "8": "Herd Animal",
+          "9": "Herd Animal",
+          "10": "Hippo, Normal",
+          "11": "Horse, Wild",
+          "12": "Lizard, Flame",
+          "13": "Mantis, Giant",
+          "14": "Mule",
+          "15": "Rock Baboon",
+          "16": "Snake, Pit Viper",
+          "17": "Snake, Rattler",
+          "18": "Spider, Phase",
+          "19": "Wasp, Giant",
+          "20": "Weasel, Giant"
+        },
+        "Human": {
+          "1": "Bandit",
+          "2": "Bandit",
+          "3": "Bandit",
+          "4": "Berserker",
+          "5": "Berserker",
+          "6": "Brigand",
+          "7": "Brigand",
+          "8": "Expert Adventurers",
+          "9": "Expert Adventurers",
+          "10": "High-Level Cleric",
+          "11": "High-Level Fighter",
+          "12": "High-LevelMU",
+          "13": "Merchant",
+          "14": "Merchant",
+          "15": "Merchant",
+          "16": "Noble",
+          "17": "Noble",
+          "18": "Nomad",
+          "19": "Nomad",
+          "20": "Trader"
+        },
+        "Humanoid": {
+          "1": "Brownie",
+          "2": "Bugbear",
+          "3": "Elf",
+          "4": "Giant, Hill",
+          "5": "Gnoll",
+          "6": "Goblin",
+          "7": "Halfling",
+          "8": "Hobgoblin",
+          "9": "Jackalwere",
+          "10": "Leprechaun",
+          "11": "Mantid",
+          "12": "Mutoid",
+          "13": "Ogre",
+          "14": "Orc",
+          "15": "Pixie",
+          "16": "Rakshasa",
+          "17": "Snake Person",
+          "18": "Thoul",
+          "19": "Titan",
+          "20": "Troll"
+        },
+        "Monster": {
+          "1": "Amphisbaena",
+          "2": "Amphisbaena",
+          "3": "Blink Dog",
+          "4": "Blink Dog",
+          "5": "Bulette",
+          "6": "Bulette",
+          "7": "Dragonne",
+          "8": "Dragonne",
+          "9": "Gorgon",
+          "10": "Griffon",
+          "11": "Griffon",
+          "12": "Harpy",
+          "13": "Hippogriff",
+          "14": "Leucrocotta",
+          "15": "Manticore",
+          "16": "Minotaur",
+          "17": "Nightmare",
+          "18": "Pegasus",
+          "19": "Warp Beast",
+          "20": "Wyvern"
+        }
+      },
+      "J": {
+        "Animal": {
+          "1": "Boar",
+          "2": "Cat, Panther",
+          "3": "Elephant",
+          "4": "Frog, Poisonous",
+          "5": "Gorilla",
+          "6": "Herd Animal",
+          "7": "Hippo, Behemoth",
+          "8": "Hippo, Normal",
+          "9": "Lizard, Draco",
+          "10": "Lizard, Gecko",
+          "11": "Lizard, Monitor",
+          "12": "Lzd., H. Chameleon",
+          "13": "Rat, Giant",
+          "14": "Shrew, Giant",
+          "15": "Slug, Giant",
+          "16": "Snake, Pit Viper",
+          "17": "Snake, Rock Python",
+          "18": "Snake, Sp. Cobra",
+          "19": "Spider, Crab",
+          "20": "Toad, Poisonous"
+        },
+        "Human": {
+          "1": "Bandit",
+          "2": "Bandit",
+          "3": "Berserker",
+          "4": "Berserker",
+          "5": "Brigand",
+          "6": "Brigand",
+          "7": "Brigand",
+          "8": "Brigand",
+          "9": "Expert Adventurers",
+          "10": "Expert Adventurers",
+          "11": "Expert Adventurers",
+          "12": "High-Level Cleric",
+          "13": "High-Level Fighter",
+          "14": "High-Level Fighter",
+          "15": "High-LevelMU",
+          "16": "High-LevelMU",
+          "17": "Merchant",
+          "18": "Neanderthal",
+          "19": "Neanderthal",
+          "20": "Trader"
+        },
+        "Humanoid": {
+          "1": "Bugbear",
+          "2": "Cyclops",
+          "3": "Elf",
+          "4": "Ettin",
+          "5": "Giant, Fire",
+          "6": "Giant, Hill",
+          "7": "Gnoll",
+          "8": "Goblin",
+          "9": "Gullygug",
+          "10": "Gullygug",
+          "11": "Hag, Black",
+          "12": "Lizard Man",
+          "13": "Mantid",
+          "14": "Mutoid",
+          "15": "Ogre",
+          "16": "Orc",
+          "17": "Rakshasa",
+          "18": "Snake Person",
+          "19": "Troglodyte",
+          "20": "Troll"
+        },
+        "Monster": {
+          "1": "Amphisbaena",
+          "2": "Basilisk",
+          "3": "Caecilia",
+          "4": "Couatl",
+          "5": "Couatl",
+          "6": "Flail Snail",
+          "7": "Ghost",
+          "8": "Gibbering Mouther",
+          "9": "Leech, Giant",
+          "10": "Nightmare",
+          "11": "Otyugh",
+          "12": "Otyugh",
+          "13": "Pseudo-Dragon",
+          "14": "Roper",
+          "15": "Roper",
+          "16": "Sphinx",
+          "17": "Spider, Phase",
+          "18": "Violet Fungus",
+          "19": "Violet Fungus",
+          "20": "Warp Beast"
+        }
+      },
+      "L": {
+        "Animal": {
+          "1": "Boar",
+          "2": "Cat, Panther",
+          "3": "Cat, Tiger",
+          "4": "Crab, Giant",
+          "5": "Crocodile",
+          "6": "Crocodile",
+          "7": "Crocodile, Large",
+          "8": "Fish, Piranha",
+          "9": "Frog, Mutant",
+          "10": "Herd Animal",
+          "11": "Herd Animal",
+          "12": "Hippo, Behemoth",
+          "13": "Hippo, Normal",
+          "14": "Lamprey, Giant",
+          "15": "Leech, Giant",
+          "16": "Leech, Giant",
+          "17": "Rat, Giant",
+          "18": "Shrew, Giant",
+          "19": "Toad, Giant",
+          "20": "Toad, Giant"
+        },
+        "Human": {
+          "1": "Bandit",
+          "2": "Bandit",
+          "3": "Basic Adventurers",
+          "4": "Basic Adventurers",
+          "5": "Brigand",
+          "6": "Buccaneer",
+          "7": "Buccaneer",
+          "8": "Buccaneer",
+          "9": "Buccaneer",
+          "10": "Exp. Adventurers",
+          "11": "Exp. Adventurers",
+          "12": "High-Level Cleric",
+          "13": "High-Level Cleric",
+          "14": "High-Level Fighter",
+          "15": "High-Level Fighter",
+          "16": "High-Level MU",
+          "17": "Merchant",
+          "18": "Merchant",
+          "19": "Merchant",
+          "20": "Trader"
+        },
+        "Humanoid": {
+          "1": "Brownie",
+          "2": "Brownie",
+          "3": "Bugbear",
+          "4": "Elf",
+          "5": "Gnoll",
+          "6": "Gullygug",
+          "7": "Gullygug",
+          "8": "Hobgoblin",
+          "9": "Leprechaun",
+          "10": "Lizard Man",
+          "11": "Lizard Man",
+          "12": "Merrow",
+          "13": "Merrow",
+          "14": "Mutoid",
+          "15": "Nixie",
+          "16": "Ogre",
+          "17": "Orc",
+          "18": "Sprite",
+          "19": "Thoul",
+          "20": "Troll"
+        },
+        "Swimmer": {
+          "1": "Crab, Giant",
+          "2": "Crocodile",
+          "3": "Crocodile, Large",
+          "4": "Fish, Catfish",
+          "5": "Fish, Electric Eel",
+          "6": "Fish, Electric Eel",
+          "7": "Fish, Pike",
+          "8": "Fish, Pike",
+          "9": "Fish, Piranha",
+          "10": "Fish, Sturgeon",
+          "11": "Frog, Mutant",
+          "12": "Frog, Mutant",
+          "13": "Gullygug",
+          "14": "Hippo, Normal",
+          "15": "Leech, Giant",
+          "16": "Lizard Man",
+          "17": "Nixie",
+          "18": "Spider, Aquatic",
+          "19": "Termite, Water",
+          "20": "Turtle, Snapping"
+        }
+      },
+      "O": {
+        "Human": {
+          "1": "Buccaneer",
+          "2": "Buccaneer",
+          "3": "Buccaneer",
+          "4": "Buccaneer",
+          "5": "Ex. Adventurers",
+          "6": "Ex. Adventurers",
+          "7": "Merchant",
+          "8": "Merchant",
+          "9": "Merchant",
+          "10": "Merchant",
+          "11": "Merchant",
+          "12": "Merchant",
+          "13": "Merchant",
+          "14": "Pirate",
+          "15": "Pirate",
+          "16": "Pirate",
+          "17": "Pirate",
+          "18": "Pirate",
+          "19": "Pirate",
+          "20": "Pirate"
+        },
+        "Swimmer": {
+          "1": "Dragon Turtle",
+          "2": "Fish, Swordfish",
+          "3": "Hag, Sea",
+          "4": "Hippocampus",
+          "5": "Hydra, Sea",
+          "6": "Jellyfish, Giant",
+          "7": "Locathah",
+          "8": "Merman",
+          "9": "Merrow",
+          "10": "Octopus, Giant",
+          "11": "Sahuagin",
+          "12": "Sea Dragon",
+          "13": "Sea Serpent",
+          "14": "Shark",
+          "15": "Snake, Sea",
+          "16": "Squid, Giant",
+          "17": "Termite, Water",
+          "18": "Triton",
+          "19": "Turtle, Sea",
+          "20": "Whale"
+        }
+      },
+      "S": {
+        "Human": {
+          "1": "Bandit",
+          "2": "Bandit",
+          "3": "Bandit",
+          "4": "Basic Adventurers",
+          "5": "Berserker",
+          "6": "Berserker",
+          "7": "Brigand",
+          "8": "Brigand",
+          "9": "Expert Adventurers",
+          "10": "Expert Adventurers",
+          "11": "Expert Adventurers",
+          "12": "High-Level Cleric",
+          "13": "High-Level Cleric",
+          "14": "High-Level Fighter",
+          "15": "High-Level Fighter",
+          "16": "High-LevelMU",
+          "17": "High-LevelMU",
+          "18": "Merchant",
+          "19": "Trader",
+          "20": "Trader"
+        },
+        "Humanoid": {
+          "1": "Ettin",
+          "2": "Gnoll",
+          "3": "Goblin",
+          "4": "Gullygug",
+          "5": "Gullygug",
+          "6": "Gullygug",
+          "7": "Hag, Black",
+          "8": "Hobgoblin",
+          "9": "Lizard Man",
+          "10": "Lizard Man",
+          "11": "Lizard Man",
+          "12": "Merrow",
+          "13": "Mutoid",
+          "14": "Nixie",
+          "15": "Ogre",
+          "16": "Orc",
+          "17": "Snake Person",
+          "18": "Troglodyte",
+          "19": "Troll",
+          "20": "Troll"
+        },
+        "Monster": {
+          "1": "Banshee",
+          "2": "Carcass Crawler",
+          "3": "Catoblepas",
+          "4": "Frog, Mutant",
+          "5": "Frog, Poisonous",
+          "6": "Ghost",
+          "7": "Ghoul",
+          "8": "Hydra",
+          "9": "Leucrocotta",
+          "10": "Merrow",
+          "11": "Merrow",
+          "12": "Otyugh",
+          "13": "Rot Grub",
+          "14": "Shambling Mound",
+          "15": "Spawn of theWorm",
+          "16": "Toad, Poisonous",
+          "17": "Water Fiend",
+          "18": "Will-o'-the-Wisp",
+          "19": "Will-o'-the-Wisp",
+          "20": "Wraith"
+        },
+        "Swimmer": {
+          "1": "Crab, Giant",
+          "2": "Crocodile",
+          "3": "Crocodile, Giant",
+          "4": "Crocodile, Large",
+          "5": "Fish, Catfish",
+          "6": "Fish, Electric Eel",
+          "7": "Fish, Pike",
+          "8": "Gullygug",
+          "9": "Gullygug",
+          "10": "Insect Swarm",
+          "11": "Insect Swarm",
+          "12": "Lamprey, Giant",
+          "13": "Lamprey, Giant",
+          "14": "Leech, Giant",
+          "15": "Leech, Giant",
+          "16": "Lizard Man",
+          "17": "Lizard Man",
+          "18": "Spider, Aquatic",
+          "19": "Termite, Water",
+          "20": "Turtle, Snapping"
+        }
+      }
+    }
+  }
+}

@@ -16,8 +16,8 @@ fn check_wandering_monster<R: Rng>(
     if time.total_turns % 2 == 0 {
         let roll: u32 = rng.gen_range(1..=6);
         if roll == 1 {
-            let table_roll: u32 = rng.gen_range(1..=20);
-            return Some(encounter::dungeon_encounter(dungeon_level, table_roll).clone());
+            let table_roll: u32 = rng.gen_range(1..=40);
+            return encounter::dungeon_encounter_d40(dungeon_level, table_roll);
         }
     }
     None
