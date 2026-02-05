@@ -267,12 +267,12 @@ impl Command for OpenCommand {
         };
         let door = match dungeon.doors.iter().find(|d| d.id == door_id) {
             Some(d) => d.clone(),
-            None => return CommandResult::error(format!("Door {} not found.", door_id)),
+            None => return CommandResult::error(format!("door {} not found.", door_id)),
         };
 
         if door.state == DoorState::Locked {
             return CommandResult::error(format!(
-                "Door {} is locked. It must be unlocked before it can be opened.", door_id
+                "door {} is locked. It must be unlocked before it can be opened.", door_id
             ));
         }
 
