@@ -255,7 +255,14 @@ fn xp_and_level_advancement() {
     }), &mut state);
     assert!(resp.success, "award xp failed: {}", resp.message);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "should have leveled up");
+    assert!(data["ready_to_train"].as_bool().unwrap(), "should be ready to train");
+
+    // Level up via LevelUp command
+    let resp = handle_request(&req("2", GMCommand::LevelUp {
+        character: "Sneaky Pete".to_string(),
+    }), &mut state);
+    assert!(resp.success, "level up failed: {}", resp.message);
+    let data = resp.data.unwrap();
     assert_eq!(data["new_level"], 2);
     assert!(data["hp_gained"].as_i64().unwrap() > 0);
 
@@ -698,7 +705,14 @@ fn level_up_from_treasure() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap());
+    assert!(data["ready_to_train"].as_bool().unwrap());
+
+    // Level up via LevelUp command
+    let resp = handle_request(&req("2", GMCommand::LevelUp {
+        character: "Goldbeard".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
     assert_eq!(data["new_level"], 2);
 
     let gb = state.party.find_member("Goldbeard").unwrap();
@@ -1472,7 +1486,14 @@ fn session_a_dungeon_crawl() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "thief should level up to 2");
+    assert!(data["ready_to_train"].as_bool().unwrap(), "thief should be ready to train");
+
+    // Level up thief
+    let resp = handle_request(&req("a31b", GMCommand::LevelUp {
+        character: "Vex".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
     assert_eq!(data["new_level"], 2);
     assert!(data["hp_gained"].as_i64().unwrap() >= 1);
 
@@ -1488,7 +1509,13 @@ fn session_a_dungeon_crawl() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "fighter should level up");
+    assert!(data["ready_to_train"].as_bool().unwrap(), "fighter should be ready to train");
+
+    // Level up fighter
+    let resp = handle_request(&req("a32b", GMCommand::LevelUp {
+        character: "Aldric the Bold".to_string(),
+    }), &mut state);
+    assert!(resp.success);
     let fighter = state.party.find_member("Aldric the Bold").unwrap();
     assert_eq!(fighter.level, 2);
     assert!(fighter.max_hp > 8);
@@ -2097,8 +2124,13 @@ fn character_progression_multi_level() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "thief should level up to 2");
-    assert_eq!(data["new_level"], 2);
+    assert!(data["ready_to_train"].as_bool().unwrap(), "thief should be ready to train");
+
+    // Level up thief to L2
+    let resp = handle_request(&req("p20b", GMCommand::LevelUp {
+        character: "Nyx".to_string(),
+    }), &mut state);
+    assert!(resp.success);
 
     let nyx = state.party.find_member("Nyx").unwrap();
     assert_eq!(nyx.level, 2);
@@ -2120,7 +2152,11 @@ fn character_progression_multi_level() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "cleric should level up");
+    assert!(data["ready_to_train"].as_bool().unwrap(), "cleric should be ready to train");
+    let resp = handle_request(&req("p22b", GMCommand::LevelUp {
+        character: "Amara".to_string(),
+    }), &mut state);
+    assert!(resp.success);
     let amara = state.party.find_member("Amara").unwrap();
     assert_eq!(amara.level, 2);
     assert!(amara.max_hp > cleric_base_hp, "cleric HP should increase");
@@ -2135,7 +2171,11 @@ fn character_progression_multi_level() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "fighter should level up");
+    assert!(data["ready_to_train"].as_bool().unwrap(), "fighter should be ready to train");
+    let resp = handle_request(&req("p23b", GMCommand::LevelUp {
+        character: "Bjorn".to_string(),
+    }), &mut state);
+    assert!(resp.success);
     let bjorn = state.party.find_member("Bjorn").unwrap();
     assert_eq!(bjorn.level, 2);
     assert!(bjorn.max_hp > fighter_base_hp, "fighter HP should increase");
@@ -2151,7 +2191,11 @@ fn character_progression_multi_level() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "magic-user should level up");
+    assert!(data["ready_to_train"].as_bool().unwrap(), "magic-user should be ready to train");
+    let resp = handle_request(&req("p24b", GMCommand::LevelUp {
+        character: "Elara".to_string(),
+    }), &mut state);
+    assert!(resp.success);
     let elara = state.party.find_member("Elara").unwrap();
     assert_eq!(elara.level, 2);
     assert!(elara.max_hp > mage_base_hp, "magic-user HP should increase");
@@ -2163,8 +2207,11 @@ fn character_progression_multi_level() {
         monster_xp: 0,
     }), &mut state);
     assert!(resp.success);
+    let resp = handle_request(&req("p30b", GMCommand::LevelUp {
+        character: "Bjorn".to_string(),
+    }), &mut state);
+    assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "fighter should reach L3");
     assert_eq!(data["new_level"], 3);
     let bjorn = state.party.find_member("Bjorn").unwrap();
     assert_eq!(bjorn.level, 3);
@@ -2178,8 +2225,10 @@ fn character_progression_multi_level() {
         monster_xp: 0,
     }), &mut state);
     assert!(resp.success);
-    let data = resp.data.unwrap();
-    assert!(data["leveled_up"].as_bool().unwrap(), "fighter should reach L4");
+    let resp = handle_request(&req("p31b", GMCommand::LevelUp {
+        character: "Bjorn".to_string(),
+    }), &mut state);
+    assert!(resp.success);
     let bjorn = state.party.find_member("Bjorn").unwrap();
     assert_eq!(bjorn.level, 4);
     // Martial L4-6 THAC0 = 17
@@ -2193,6 +2242,17 @@ fn character_progression_multi_level() {
         monster_xp: 0,
     }), &mut state);
     assert!(resp.success);
+    // Level up thief through multiple levels
+    while state.party.find_member("Nyx").unwrap().level < 3 {
+        let resp = handle_request(&req("p32b", GMCommand::LevelUp {
+            character: "Nyx".to_string(),
+        }), &mut state);
+        if !resp.success { break; }
+    }
+    // May have enough for L4 too
+    let _ = handle_request(&req("p32c", GMCommand::LevelUp {
+        character: "Nyx".to_string(),
+    }), &mut state);
     let nyx = state.party.find_member("Nyx").unwrap();
     assert!(nyx.level >= 3, "thief should be at least L3");
 

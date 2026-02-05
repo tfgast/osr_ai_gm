@@ -829,11 +829,8 @@ fn award_treasure_xp(id: &str, state: &mut GameState, char_name: &str, treasure_
         character.name, result.base_xp, treasure_gp, monster_xp,
         result.modifier_pct, result.adjusted_xp, result.new_total,
     );
-    if result.leveled_up {
-        msg.push_str(&format!(
-            " LEVEL UP to {}! Gained {} HP.",
-            result.new_level, result.hp_gained,
-        ));
+    if result.ready_to_train {
+        msg.push_str(" Ready to train!");
     }
     GMResponse::ok_with_data(
         id, msg, state.mode.clone(),
@@ -843,9 +840,7 @@ fn award_treasure_xp(id: &str, state: &mut GameState, char_name: &str, treasure_
             "modifier_pct": result.modifier_pct,
             "adjusted_xp": result.adjusted_xp,
             "total_xp": result.new_total,
-            "leveled_up": result.leveled_up,
-            "new_level": result.new_level,
-            "hp_gained": result.hp_gained,
+            "ready_to_train": result.ready_to_train,
         }),
     )
 }
@@ -1161,25 +1156,21 @@ fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
     let cls = character.class;
     match crate::rules::xp::check_level_up(cls, character.level, character.xp) {
         Some(_next_level) => {
-            let result = xp::award_xp(character, 0, 0);
-            if result.leveled_up {
-                GMResponse::ok_with_data(
-                    id,
-                    format!("{} leveled up to {}! Gained {} HP. HP: {}/{}.",
-                        character.name, result.new_level, result.hp_gained,
-                        character.hp, character.max_hp),
-                    state.mode.clone(),
-                    serde_json::json!({
-                        "character": character.name,
-                        "new_level": result.new_level,
-                        "hp_gained": result.hp_gained,
-                        "hp": character.hp,
-                        "max_hp": character.max_hp,
-                    }),
-                )
-            } else {
-                GMResponse::ok(id, format!("{} is already at level {} and cannot advance further.", character.name, character.level), state.mode.clone())
-            }
+            let result = xp::apply_level_up(character);
+            GMResponse::ok_with_data(
+                id,
+                format!("{} leveled up to {}! Gained {} HP. HP: {}/{}.",
+                    character.name, result.new_level, result.hp_gained,
+                    character.hp, character.max_hp),
+                state.mode.clone(),
+                serde_json::json!({
+                    "character": character.name,
+                    "new_level": result.new_level,
+                    "hp_gained": result.hp_gained,
+                    "hp": character.hp,
+                    "max_hp": character.max_hp,
+                }),
+            )
         }
         None => {
             let needed = crate::rules::xp::xp_for_level(cls, character.level + 1);

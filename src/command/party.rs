@@ -3,7 +3,7 @@ use crate::persist::GameState;
 use crate::engine::chargen;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::{self, Class};
-use crate::rules::xp::xp_for_level;
+use crate::rules::xp::{xp_for_level, check_level_up};
 
 pub struct ChargenCommand;
 impl Command for ChargenCommand {
@@ -166,7 +166,11 @@ impl Command for PartyCommand {
                 } else {
                     format!("{}/{}", c.xp, next_level_xp)
                 };
-                format!("HP {}/{}, AC {}, THAC0 {}, XP {}", c.hp, c.max_hp, c.ac, c.thac0, xp_str)
+                let mut status_str = format!("HP {}/{}, AC {}, THAC0 {}, XP {}", c.hp, c.max_hp, c.ac, c.thac0, xp_str);
+                if check_level_up(c.class, c.level, c.xp).is_some() {
+                    status_str.push_str(" [READY TO TRAIN]");
+                }
+                status_str
             } else {
                 "DEAD".to_string()
             };

@@ -1632,9 +1632,7 @@ fn award_treasure_xp_happy_path() {
     assert!(data["modifier_pct"].as_i64().is_some());
     assert!(data["adjusted_xp"].as_u64().is_some());
     assert!(data["total_xp"].as_u64().is_some());
-    assert!(data["leveled_up"].as_bool().is_some());
-    assert!(data["new_level"].as_u64().is_some());
-    assert!(data["hp_gained"].as_i64().is_some());
+    assert!(data["ready_to_train"].as_bool().is_some());
     // Fighter with STR 16 gets +10%
     assert_eq!(data["modifier_pct"], 10);
 }
