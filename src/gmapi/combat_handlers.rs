@@ -229,6 +229,46 @@ pub(super) fn fighting_withdrawal(id: &str, state: &mut GameState, char_name: &s
     GMResponse::ok(id, msg, state.mode.clone())
 }
 
+pub(super) fn query_combat_log(id: &str, state: &GameState) -> GMResponse {
+    let combat_state = match state.combat.as_ref() {
+        Some(c) => c,
+        None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
+    };
+    if combat_state.log.is_empty() {
+        return GMResponse::ok_with_data(
+            id,
+            "no combat events logged yet.",
+            state.mode.clone(),
+            serde_json::json!({ "log": [] }),
+        );
+    }
+    let mut out = String::from("Combat Log:\n");
+    for (i, entry) in combat_state.log.iter().enumerate() {
+        out.push_str(&format!("  {}. {}\n", i + 1, entry));
+    }
+    GMResponse::ok_with_data(
+        id, out, state.mode.clone(),
+        serde_json::json!({ "log": combat_state.log }),
+    )
+}
+
+pub(super) fn declare_spell(id: &str, state: &mut GameState, char_name: &str, spell_name: &str) -> GMResponse {
+    if state.party.find_member(char_name).is_none() {
+        return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone());
+    }
+    let combat_state = match state.combat.as_mut() {
+        Some(c) => c,
+        None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
+    };
+    combat::declare_spell(combat_state, char_name, spell_name);
+    GMResponse::ok(
+        id,
+        format!("{} declares: casting {}. Spell will be disrupted if {} takes damage before the magic phase.",
+            char_name, spell_name, char_name),
+        state.mode.clone(),
+    )
+}
+
 pub(super) fn end_combat(id: &str, state: &mut GameState) -> GMResponse {
     if state.combat.is_none() {
         return GMResponse::err(id, "no active combat.", state.mode.clone());

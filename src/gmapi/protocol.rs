@@ -106,6 +106,13 @@ pub enum GMCommand {
     FightingWithdrawal {
         character: String,
     },
+    /// Query the combat log for the current encounter.
+    QueryCombatLog,
+    /// Declare spell casting for a round (spell disrupted if caster takes damage).
+    DeclareSpell {
+        character: String,
+        spell: String,
+    },
     /// End the current combat.
     EndCombat,
 
@@ -689,6 +696,28 @@ mod tests {
         ];
         for json in &commands {
             assert!(parse_request(json).is_ok(), "failed to parse: {}", json);
+        }
+    }
+
+    #[test]
+    fn parse_query_combat_log() {
+        let json = r#"{"id":"cl1","command":{"type":"QueryCombatLog"}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "cl1");
+        assert!(matches!(req.command, GMCommand::QueryCombatLog));
+    }
+
+    #[test]
+    fn parse_declare_spell() {
+        let json = r#"{"id":"ds1","command":{"type":"DeclareSpell","params":{"character":"Mira","spell":"Sleep"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "ds1");
+        match &req.command {
+            GMCommand::DeclareSpell { character, spell } => {
+                assert_eq!(character, "Mira");
+                assert_eq!(spell, "Sleep");
+            }
+            _ => panic!("expected DeclareSpell"),
         }
     }
 

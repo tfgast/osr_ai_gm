@@ -3044,3 +3044,97 @@ fn add_rations_invalid_amount() {
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("positive integer"));
 }
+
+// ===========================================================================
+// QueryCombatLog
+// ===========================================================================
+
+#[test]
+fn query_combat_log_no_combat() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("1", GMCommand::QueryCombatLog), &mut state);
+    assert_response_format(&resp, "1");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no active combat"));
+}
+
+#[test]
+fn query_combat_log_empty() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+    let resp = handle_request(&req("1", GMCommand::QueryCombatLog), &mut state);
+    assert_response_format(&resp, "1");
+    assert!(resp.success);
+    assert!(resp.message.contains("no combat events"));
+    let data = resp.data.unwrap();
+    assert_eq!(data["log"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn query_combat_log_after_attack() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    // Perform an attack to generate a log entry
+    let resp = handle_request(&req("1", GMCommand::Attack {
+        character: "Aldric".to_string(),
+        monster_idx: 0,
+        weapon: "sword".to_string(),
+    }), &mut state);
+    assert!(resp.success, "attack should succeed: {}", resp.message);
+
+    // Now query the combat log
+    let resp = handle_request(&req("2", GMCommand::QueryCombatLog), &mut state);
+    assert_response_format(&resp, "2");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let log = data["log"].as_array().unwrap();
+    assert!(!log.is_empty(), "combat log should have entries after an attack");
+    assert_eq!(resp.mode, GameMode::Combat);
+}
+
+// ===========================================================================
+// DeclareSpell
+// ===========================================================================
+
+#[test]
+fn declare_spell_happy_path() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+    let resp = handle_request(&req("1", GMCommand::DeclareSpell {
+        character: "Aldric".to_string(),
+        spell: "Sleep".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "1");
+    assert!(resp.success);
+    assert!(resp.message.contains("Aldric"));
+    assert!(resp.message.contains("Sleep"));
+    assert!(resp.message.contains("disrupted"), "message should mention disruption");
+    assert_eq!(resp.mode, GameMode::Combat);
+}
+
+#[test]
+fn declare_spell_no_combat() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    let resp = handle_request(&req("1", GMCommand::DeclareSpell {
+        character: "Aldric".to_string(),
+        spell: "Sleep".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "1");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no active combat"));
+}
+
+#[test]
+fn declare_spell_unknown_character() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+    let resp = handle_request(&req("1", GMCommand::DeclareSpell {
+        character: "Nobody".to_string(),
+        spell: "Sleep".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "1");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no party member"));
+}

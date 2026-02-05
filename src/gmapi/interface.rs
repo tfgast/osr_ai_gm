@@ -43,6 +43,10 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::Close { character, feet } => combat_handlers::close(id, state, character, *feet),
         GMCommand::Retreat { character } => combat_handlers::retreat(id, state, character),
         GMCommand::FightingWithdrawal { character } => combat_handlers::fighting_withdrawal(id, state, character),
+        GMCommand::QueryCombatLog => combat_handlers::query_combat_log(id, state),
+        GMCommand::DeclareSpell { character, spell } => {
+            combat_handlers::declare_spell(id, state, character, spell)
+        }
         GMCommand::EndCombat => combat_handlers::end_combat(id, state),
 
         // -- Exploration --
