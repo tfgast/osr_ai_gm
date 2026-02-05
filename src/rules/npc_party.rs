@@ -8,6 +8,8 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
+use super::alignment::Alignment;
+
 // ============================================================================
 // JSON data structures
 // ============================================================================
@@ -120,24 +122,6 @@ pub struct NpcMember {
     pub level: u32,
     pub alignment: Alignment,
     pub role: Option<String>,
-}
-
-/// NPC alignment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Alignment {
-    Lawful,
-    Neutral,
-    Chaotic,
-}
-
-impl std::fmt::Display for Alignment {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Alignment::Lawful => write!(f, "Lawful"),
-            Alignment::Neutral => write!(f, "Neutral"),
-            Alignment::Chaotic => write!(f, "Chaotic"),
-        }
-    }
 }
 
 /// A generated NPC party.
