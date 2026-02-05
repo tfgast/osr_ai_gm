@@ -17,7 +17,7 @@ use command::lookup_cmds::*;
 use command::retainer_cmds::*;
 use command::wilderness_cmds::*;
 use command::treasure_cmds::TreasureCommand;
-use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, TrainCommand, RulingCommand, HealCommand, DamageCommand, SetHpCommand, SetRationsCommand, AddRationsCommand};
+use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, TrainCommand, RulingCommand, HealCommand, DamageCommand, SetHpCommand, SetRationsCommand, AddRationsCommand, SpawnEncounterCommand};
 use command::module_cmds::LoadModuleCommand;
 use command::system::*;
 use persist::GameState;
@@ -148,6 +148,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(SetHpCommand));
     registry.register(Box::new(SetRationsCommand));
     registry.register(Box::new(AddRationsCommand));
+    registry.register(Box::new(SpawnEncounterCommand));
     // Notes
     registry.register(Box::new(NoteCommand));
     registry.register(Box::new(NotesCommand));
