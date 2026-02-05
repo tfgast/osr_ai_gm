@@ -16,6 +16,7 @@ Produces:
 
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -403,6 +404,87 @@ MONSTER_DEFS = {
 }
 
 
+# --- Section definitions ---
+# Non-room content to extract from the markdown. Each entry maps a section name
+# to (start_heading, stop_heading) — content between those headings is captured.
+# The stop_heading is exclusive (content stops before it).
+
+SECTION_DEFS = [
+    {
+        "key": "introduction",
+        "start": "## Introduction",
+        "stop": "## Referee's Background",
+    },
+    {
+        "key": "background",
+        "start": "## Referee's Background",
+        "stop": "## Hooks",
+    },
+    {
+        "key": "hooks",
+        "start": "## Hooks",
+        "stop": "## Players' Background",
+    },
+    {
+        "key": "players_background",
+        "start": "## Players' Background",
+        "stop": "## Dolmenwood Lore",
+    },
+    {
+        "key": "lore",
+        "start": "## Dolmenwood Lore",
+        "stop": "## Outside the Mound",
+    },
+    {
+        "key": "epilogue",
+        "start": "## Epilogue",
+        "stop": "## Magic Items",
+    },
+    {
+        "key": "magic_items",
+        "start": "## Magic Items",
+        "stop": "## Random Shroom Effects",  # End of magic items section
+    },
+    {
+        "key": "random_events_outside",
+        "start": "## Random Events (1-in-6 Chance Every Two Turns)",
+        "stop": "## 1. Approaching the Burial Mound",
+    },
+]
+
+
+def extract_sections(text: str) -> dict[str, str]:
+    """Extract non-room sections from the markdown text."""
+    sections = {}
+    for sdef in SECTION_DEFS:
+        start_idx = text.find(sdef["start"])
+        if start_idx == -1:
+            continue
+        # Start after the heading line
+        content_start = text.find("\n", start_idx) + 1
+
+        stop_idx = text.find(sdef["stop"], content_start)
+        if stop_idx == -1:
+            # Take until end of file
+            content = text[content_start:]
+        else:
+            content = text[content_start:stop_idx]
+
+        # Clean up: remove image references and excessive whitespace
+        lines = []
+        for line in content.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("!["):
+                continue
+            lines.append(line)
+
+        cleaned = "\n".join(lines).strip()
+        if cleaned:
+            sections[sdef["key"]] = cleaned
+
+    return sections
+
+
 def parse_module(md_path: Path) -> tuple[dict, list[dict]]:
     """Parse the Winter's Daughter markdown into module.json and monsters.json."""
     text = md_path.read_text(encoding="utf-8")
@@ -413,8 +495,11 @@ def parse_module(md_path: Path) -> tuple[dict, list[dict]]:
     # Map stat blocks to monster names by finding the heading before each stat block
     named_stats = assign_stat_block_names(text, stat_blocks)
 
+    # Extract non-room sections
+    sections = extract_sections(text)
+
     # Build module.json
-    module = build_module(text)
+    module = build_module(text, sections)
 
     # Build monsters.json with stat blocks + special abilities
     monsters = build_monsters(named_stats)
@@ -513,7 +598,7 @@ NAME_MAP = {
 }
 
 
-def build_module(text: str) -> dict:
+def build_module(text: str, sections: dict[str, str]) -> dict:
     """Build the ModuleDef JSON structure."""
     rooms = {}
     for key, room_def in ROOM_DEFS.items():
@@ -539,6 +624,7 @@ def build_module(text: str) -> dict:
         "name": "Winter's Daughter",
         "level_range": [1, 3],
         "entry_room": "approaching_mound",
+        "sections": sections,
         "rooms": rooms,
     }
 
@@ -676,11 +762,19 @@ def main():
         json.dump(monsters, f, indent=2, ensure_ascii=False)
     print(f"Wrote: {monsters_path} ({len(monsters)} monsters)")
 
+    # Copy raw extracted markdown for AI GM fallback
+    raw_path = out_dir / "raw.md"
+    shutil.copy2(md_path, raw_path)
+    print(f"Wrote: {raw_path} ({raw_path.stat().st_size // 1024}KB)")
+
     # Summary
     print(f"\nModule: {module['name']}")
     print(f"Level range: {module['level_range']}")
     print(f"Entry room: {module['entry_room']}")
     print(f"Rooms: {len(module['rooms'])}")
+    print(f"Sections: {len(module.get('sections', {}))}")
+    for key, text in module.get("sections", {}).items():
+        print(f"  {key}: {len(text)} chars")
     print(f"Monsters defined: {len(monsters)}")
 
     # List rooms with their monsters/treasure

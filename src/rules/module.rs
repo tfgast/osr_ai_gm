@@ -14,6 +14,10 @@ pub struct ModuleDef {
     pub name: String,
     pub level_range: (u32, u32),
     pub entry_room: String,
+    /// Non-room content: introduction, background, hooks, lore, epilogue, etc.
+    /// Keys are section names, values are the text content.
+    #[serde(default)]
+    pub sections: HashMap<String, String>,
     pub rooms: HashMap<String, ModuleRoom>,
 }
 
@@ -224,6 +228,7 @@ mod tests {
             name: "Bad Module".to_string(),
             level_range: (1, 2),
             entry_room: "nonexistent".to_string(),
+            sections: HashMap::new(),
             rooms: HashMap::new(),
         };
         assert!(validate_module(&module).is_err());
@@ -247,6 +252,7 @@ mod tests {
             name: "Bad Exit".to_string(),
             level_range: (1, 2),
             entry_room: "start".to_string(),
+            sections: HashMap::new(),
             rooms,
         };
         assert!(validate_module(&module).is_err());
@@ -267,6 +273,7 @@ mod tests {
             name: "Bad Range".to_string(),
             level_range: (5, 2), // Invalid: min > max
             entry_room: "start".to_string(),
+            sections: HashMap::new(),
             rooms,
         };
         assert!(validate_module(&module).is_err());
@@ -368,5 +375,36 @@ mod tests {
         assert!(room.treasure.is_empty());
         assert!(room.trap.is_none());
         assert!(room.exits.is_empty());
+    }
+
+    #[test]
+    fn parse_module_with_sections() {
+        let json = r#"{
+            "name": "Test Module",
+            "level_range": [1, 3],
+            "entry_room": "start",
+            "sections": {
+                "introduction": "A short adventure for levels 1-3.",
+                "background": "Long ago, a knight fell in love with a fairy princess.",
+                "hooks": "A recurring dream leads the PCs to a burial mound."
+            },
+            "rooms": {
+                "start": {
+                    "name": "Entrance",
+                    "exits": []
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        assert_eq!(module.sections.len(), 3);
+        assert!(module.sections["introduction"].contains("short adventure"));
+        assert!(module.sections.contains_key("background"));
+        assert!(module.sections.contains_key("hooks"));
+    }
+
+    #[test]
+    fn sections_default_to_empty() {
+        let module: ModuleDef = serde_json::from_str(sample_module_json()).unwrap();
+        assert!(module.sections.is_empty());
     }
 }
