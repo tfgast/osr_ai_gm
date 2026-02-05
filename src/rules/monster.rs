@@ -48,6 +48,9 @@ pub struct MonsterDef {
     pub armor_class: i32,
     #[serde(default)]
     pub armor_class_ascending: Option<i32>,
+    /// Hit Dice notation: "3" = 3 HD, "3+1" = 3 HD + 1 hp bonus,
+    /// "½" = half HD. Asterisks denote special abilities (* = one, ** = two, etc.)
+    /// which affect XP. Ranges like "1 to 3" indicate variable HD.
     pub hit_dice: String,
     #[serde(default)]
     pub hp_typical: Option<String>,
