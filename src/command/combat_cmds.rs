@@ -199,6 +199,9 @@ impl Command for MonsterAttackCommand {
                 Some(c) => c,
                 None => return CommandResult::error("no active combat."),
             };
+            if combat.monsters.is_empty() {
+                return CommandResult::error("no monsters in combat");
+            }
             if monster_idx >= combat.monsters.len() {
                 return CommandResult::error(format!(
                     "monster index {} out of range (0-{})",

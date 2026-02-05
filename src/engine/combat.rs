@@ -212,6 +212,9 @@ pub fn resolve_character_attack(
     weapon: &equipment::WeaponDef,
     rest_penalty: i32,
 ) -> Result<AttackResult, String> {
+    if combat.monsters.is_empty() {
+        return Err("no monsters in combat".to_string());
+    }
     if monster_idx >= combat.monsters.len() {
         return Err(format!("monster index {} out of range (0-{})",
             monster_idx, combat.monsters.len() - 1));
@@ -276,6 +279,9 @@ pub fn coup_de_grace(
     character: &Character,
     monster_idx: usize,
 ) -> Result<CoupDeGraceResult, String> {
+    if combat.monsters.is_empty() {
+        return Err("no monsters in combat".to_string());
+    }
     if monster_idx >= combat.monsters.len() {
         return Err(format!("monster index {} out of range (0-{})",
             monster_idx, combat.monsters.len() - 1));
@@ -309,6 +315,9 @@ pub fn coup_de_grace(
 /// Mark a monster as helpless (sleeping, paralyzed, held, etc.).
 /// Helpless monsters can be auto-killed with coup_de_grace.
 pub fn set_monster_helpless(combat: &mut CombatState, monster_idx: usize, helpless: bool) -> Result<String, String> {
+    if combat.monsters.is_empty() {
+        return Err("no monsters in combat".to_string());
+    }
     if monster_idx >= combat.monsters.len() {
         return Err(format!("monster index {} out of range (0-{})",
             monster_idx, combat.monsters.len() - 1));
