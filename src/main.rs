@@ -5,6 +5,7 @@ pub mod model;
 pub mod persist;
 pub mod rules;
 pub mod state;
+pub mod telemetry;
 
 use command::CommandRegistry;
 use command::party::*;

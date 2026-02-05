@@ -80,10 +80,31 @@ impl CommandRegistry {
             }
             return CommandResult::ok(out);
         }
-        match self.commands.get(name) {
-            Some(cmd) => cmd.execute(args, state),
-            None => CommandResult::error(format!("unknown command: '{}'. Type 'help' for commands.", name)),
+        let (result, category) = match self.commands.get(name) {
+            Some(cmd) => (cmd.execute(args, state), "command_error"),
+            None => (
+                CommandResult::error(format!(
+                    "unknown command: '{}'. Type 'help' for commands.",
+                    name
+                )),
+                "unknown_command",
+            ),
+        };
+
+        if result.output.starts_with("Error: ") {
+            crate::telemetry::log_failed_command(&crate::telemetry::FailedCommand {
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+                raw_input: crate::telemetry::reconstruct_input(name, args),
+                category,
+                error_message: result.output.clone(),
+                game_mode: format!("{}", state.mode),
+            });
         }
+
+        result
     }
 
     pub fn commands(&self) -> Vec<(&str, &str)> {
@@ -130,5 +151,22 @@ mod tests {
         let mut state = GameState::new();
         let result = reg.dispatch("nope", &[], &mut state);
         assert!(result.output.contains("unknown command"));
+    }
+
+    #[test]
+    fn unknown_command_has_error_prefix() {
+        let reg = CommandRegistry::new();
+        let mut state = GameState::new();
+        let result = reg.dispatch("xyzzy", &[], &mut state);
+        assert!(result.output.starts_with("Error: "));
+    }
+
+    #[test]
+    fn successful_command_has_no_error_prefix() {
+        let mut reg = CommandRegistry::new();
+        reg.register(Box::new(TestCmd));
+        let mut state = GameState::new();
+        let result = reg.dispatch("test", &[], &mut state);
+        assert!(!result.output.starts_with("Error: "));
     }
 }

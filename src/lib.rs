@@ -7,3 +7,4 @@ pub mod persist;
 pub mod rules;
 pub mod session;
 pub mod state;
+pub mod telemetry;
