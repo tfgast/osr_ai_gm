@@ -512,6 +512,15 @@ fn end_combat(id: &str, state: &mut GameState) -> GMResponse {
     let dead_party = state.party.members.iter().filter(|c| !c.is_alive()).count();
     state.mode = state.pre_combat_mode.take().unwrap_or(GameMode::Idle);
 
+    // Mark placed monsters as cleared in current room (module support)
+    if let Some(dungeon) = state.dungeon.as_mut() {
+        if let Some(room_id) = dungeon.current_room {
+            if let Some(room) = dungeon.find_room_mut(room_id) {
+                room.monsters_cleared = true;
+            }
+        }
+    }
+
     GMResponse::ok_with_data(
         id,
         format!("combat ended after {} rounds. {} of {} monsters defeated.",
@@ -1751,5 +1760,59 @@ mod tests {
         }), &mut state);
         assert!(!resp.success);
         assert!(resp.error.unwrap().contains("Failed to read"));
+    }
+
+    #[test]
+    fn end_combat_marks_room_monsters_cleared() {
+        use crate::state::dungeon::{DungeonState, Room, PlacedMonsterInstance};
+        use crate::state::time::TimeTracker;
+
+        let mut state = GameState::new();
+
+        // Set up dungeon with a room that has placed monsters
+        let mut dungeon = DungeonState::new(1);
+        let monster_room = Room::new(0, "Monster Lair")
+            .with_placed_monsters(vec![PlacedMonsterInstance::new("skeleton", 3)]);
+        dungeon.add_room(monster_room).unwrap();
+        state.dungeon = Some(dungeon);
+        state.time = Some(TimeTracker::new());
+        state.mode = GameMode::Exploration;
+
+        // Verify monsters_cleared starts as false
+        assert!(
+            !state.dungeon.as_ref().unwrap().find_room(0).unwrap().monsters_cleared,
+            "monsters_cleared should start false"
+        );
+
+        // Add a character for combat
+        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        c.hp = 10;
+        c.max_hp = 10;
+        state.party.add_member(c);
+
+        // Spawn encounter (simulating monsters from the room)
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
+            name: "skeleton".to_string(),
+            count: 3,
+            hit_dice: "1".parse().unwrap(),
+            ac: 7,
+            hp: 4,
+            damage: "1d6".to_string(),
+            morale: 12,
+            distance: 10,
+            xp_value: Some(10),
+        }), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.mode, GameMode::Combat);
+
+        // End combat
+        let resp = handle_request(&make_req("2", GMCommand::EndCombat), &mut state);
+        assert!(resp.success);
+
+        // Verify monsters_cleared is now true
+        assert!(
+            state.dungeon.as_ref().unwrap().find_room(0).unwrap().monsters_cleared,
+            "monsters_cleared should be true after EndCombat"
+        );
     }
 }

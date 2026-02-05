@@ -3,7 +3,7 @@ use rand::Rng;
 use crate::model::Character;
 use crate::rules::ability;
 use crate::rules::encounter;
-use crate::state::dungeon::{DoorState, DungeonState};
+use crate::state::dungeon::{DoorState, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance};
 use crate::state::time::TimeTracker;
 
 /// Check for wandering monsters (1-in-6 every 2 turns).
@@ -29,6 +29,10 @@ pub struct ExplorationResult {
     pub messages: Vec<String>,
     /// Whether a wandering monster encounter was triggered.
     pub encounter: Option<encounter::EncounterEntry>,
+    /// Placed monsters from module that should spawn combat.
+    pub placed_monsters: Option<Vec<PlacedMonsterInstance>>,
+    /// Placed treasure from module found during search.
+    pub placed_treasure: Option<Vec<PlacedTreasureInstance>>,
 }
 
 impl ExplorationResult {
@@ -36,6 +40,8 @@ impl ExplorationResult {
         ExplorationResult {
             messages: Vec::new(),
             encounter: None,
+            placed_monsters: None,
+            placed_treasure: None,
         }
     }
 
@@ -51,6 +57,16 @@ impl std::fmt::Display for ExplorationResult {
         }
         if let Some(enc) = &self.encounter {
             writeln!(f, "*** WANDERING MONSTER: {} ({}) ***", enc.name, enc.number)?;
+        }
+        if let Some(monsters) = &self.placed_monsters {
+            for m in monsters {
+                writeln!(f, "*** PLACED MONSTER: {} x{} ***", m.name, m.count)?;
+            }
+        }
+        if let Some(treasure) = &self.placed_treasure {
+            for t in treasure {
+                writeln!(f, "*** TREASURE FOUND: {} ({}gp) ***", t.description, t.gp_value)?;
+            }
         }
         Ok(())
     }
@@ -175,6 +191,32 @@ pub fn search_room_with<R: Rng>(
         }
     } else {
         result.msg("Search reveals nothing.");
+    }
+
+    // Check for placed treasure in room (module support)
+    if let Some(current) = dungeon.current_room {
+        if let Some(room) = dungeon.find_room(current) {
+            if !room.treasure_looted && !room.placed_treasure.is_empty() {
+                let loot: Vec<_> = room.placed_treasure.iter()
+                    .filter(|t| !t.taken)
+                    .cloned()
+                    .collect();
+                if !loot.is_empty() {
+                    // Mark treasure as taken and looted
+                    if let Some(room_mut) = dungeon.find_room_mut(current) {
+                        room_mut.treasure_looted = true;
+                        for t in &mut room_mut.placed_treasure {
+                            t.taken = true;
+                        }
+                    }
+                    // Report treasure found
+                    for t in &loot {
+                        result.msg(format!("Treasure found: {} ({}gp)", t.description, t.gp_value));
+                    }
+                    result.placed_treasure = Some(loot);
+                }
+            }
+        }
     }
 
     // Always show light status so the GM can track torch burn
@@ -397,6 +439,29 @@ pub fn move_through_door_with<R: Rng>(
     // Always show light status so the GM can track torch burn
     if let Some(summary) = time.light_summary() {
         result.msg(summary);
+    }
+
+    // Check for placed monsters in new room (module support)
+    if let Some(room) = dungeon.find_room(dest) {
+        if !room.monsters_cleared {
+            let unspawned: Vec<_> = room.placed_monsters.iter()
+                .filter(|m| !m.spawned)
+                .cloned()
+                .collect();
+            if !unspawned.is_empty() {
+                // Mark as spawned
+                if let Some(room_mut) = dungeon.find_room_mut(dest) {
+                    for m in &mut room_mut.placed_monsters {
+                        m.spawned = true;
+                    }
+                }
+                // Report monsters for GM to spawn combat
+                for m in &unspawned {
+                    result.msg(format!("Monsters present: {} x{}", m.name, m.count));
+                }
+                result.placed_monsters = Some(unspawned);
+            }
+        }
     }
 
     // Wandering monster check (moving consumes a turn)
@@ -978,5 +1043,209 @@ mod tests {
             "should not show torch status in darkness, got: {}",
             output
         );
+    }
+
+    // =========================================================================
+    // Module support tests: placed monsters and treasure
+    // =========================================================================
+
+    #[test]
+    fn move_into_room_spawns_placed_monsters() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Set up rooms
+        dungeon.add_room(Room::new(0, "Entrance")).unwrap();
+        let monster_room = Room::new(1, "Monster Lair")
+            .with_placed_monsters(vec![
+                PlacedMonsterInstance::new("skeleton", 3),
+                PlacedMonsterInstance::new("zombie", 2),
+            ]);
+        dungeon.add_room(monster_room).unwrap();
+        dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+
+        // Move into monster room
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+
+        // Verify output includes monster info (check before unwrapping placed_monsters)
+        let output = format!("{}", result);
+        assert!(output.contains("skeleton x3"), "output should mention skeletons");
+        assert!(output.contains("zombie x2"), "output should mention zombies");
+
+        // Verify monsters are reported
+        assert!(result.placed_monsters.is_some(), "should report placed monsters");
+        let monsters = result.placed_monsters.unwrap();
+        assert_eq!(monsters.len(), 2, "should have 2 monster groups");
+        assert_eq!(monsters[0].name, "skeleton");
+        assert_eq!(monsters[0].count, 3);
+        assert_eq!(monsters[1].name, "zombie");
+        assert_eq!(monsters[1].count, 2);
+
+        // Verify monsters are marked as spawned
+        let room = dungeon.find_room(1).unwrap();
+        assert!(room.placed_monsters.iter().all(|m| m.spawned), "all monsters should be marked spawned");
+    }
+
+    #[test]
+    fn move_into_cleared_room_does_not_spawn_monsters() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Set up rooms with monsters already cleared
+        dungeon.add_room(Room::new(0, "Entrance")).unwrap();
+        let mut monster_room = Room::new(1, "Monster Lair")
+            .with_placed_monsters(vec![PlacedMonsterInstance::new("orc", 4)]);
+        monster_room.monsters_cleared = true;
+        dungeon.add_room(monster_room).unwrap();
+        dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+
+        // Move into cleared room
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+
+        // Should NOT report monsters (room is cleared)
+        assert!(result.placed_monsters.is_none(), "should not report monsters in cleared room");
+    }
+
+    #[test]
+    fn re_entering_room_after_spawn_does_not_spawn_again() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Set up rooms
+        dungeon.add_room(Room::new(0, "Entrance")).unwrap();
+        let monster_room = Room::new(1, "Monster Lair")
+            .with_placed_monsters(vec![PlacedMonsterInstance::new("goblin", 5)]);
+        dungeon.add_room(monster_room).unwrap();
+        dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+
+        // First entry - spawns monsters
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        assert!(result.unwrap().placed_monsters.is_some(), "first entry should spawn");
+
+        // Go back to entrance (door auto-closes, so reopen it)
+        dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+        let _ = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+
+        // Re-enter monster room (door auto-closes, so reopen it)
+        dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+
+        // Should NOT spawn again (already spawned)
+        assert!(result.placed_monsters.is_none(), "re-entry should not spawn monsters again");
+    }
+
+    #[test]
+    fn search_room_finds_placed_treasure() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Set up room with treasure
+        let treasure_room = Room::new(0, "Treasure Vault")
+            .with_placed_treasure(vec![
+                PlacedTreasureInstance::new("Gold coins", 500),
+                PlacedTreasureInstance::new("Potion of Healing", 50),
+            ]);
+        dungeon.add_room(treasure_room).unwrap();
+
+        // Search the room
+        let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+
+        // Verify output includes treasure info (check before unwrapping placed_treasure)
+        let output = format!("{}", result);
+        assert!(output.contains("Gold coins"), "output should mention gold");
+        assert!(output.contains("500gp"), "output should mention gold value");
+
+        // Verify treasure is reported
+        assert!(result.placed_treasure.is_some(), "should report placed treasure");
+        let treasure = result.placed_treasure.unwrap();
+        assert_eq!(treasure.len(), 2, "should have 2 treasure items");
+        assert_eq!(treasure[0].description, "Gold coins");
+        assert_eq!(treasure[0].gp_value, 500);
+        assert_eq!(treasure[1].description, "Potion of Healing");
+        assert_eq!(treasure[1].gp_value, 50);
+
+        // Verify treasure is marked as taken
+        let room = dungeon.find_room(0).unwrap();
+        assert!(room.treasure_looted, "room should be marked as looted");
+        assert!(room.placed_treasure.iter().all(|t| t.taken), "all treasure should be marked taken");
+    }
+
+    #[test]
+    fn search_looted_room_finds_no_treasure() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Set up room with treasure already looted
+        let mut treasure_room = Room::new(0, "Empty Vault")
+            .with_placed_treasure(vec![PlacedTreasureInstance::new("Ancient sword", 1000)]);
+        treasure_room.treasure_looted = true;
+        dungeon.add_room(treasure_room).unwrap();
+
+        // Search the room
+        let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+
+        // Should NOT report treasure (already looted)
+        assert!(result.placed_treasure.is_none(), "should not report treasure in looted room");
+    }
+
+    #[test]
+    fn search_room_twice_only_yields_treasure_once() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Set up room with treasure
+        let treasure_room = Room::new(0, "Treasury")
+            .with_placed_treasure(vec![PlacedTreasureInstance::new("Gems", 200)]);
+        dungeon.add_room(treasure_room).unwrap();
+
+        // First search - yields treasure
+        let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+        assert!(result.placed_treasure.is_some(), "first search should find treasure");
+
+        // Second search - no treasure
+        let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+        assert!(result.placed_treasure.is_none(), "second search should not find treasure");
+    }
+
+    #[test]
+    fn room_with_no_placed_content_works_normally() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Set up regular rooms (no placed monsters/treasure)
+        dungeon.add_room(Room::new(0, "Empty Hall")).unwrap();
+        dungeon.add_room(Room::new(1, "Another Room")).unwrap();
+        dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+
+        // Move into room
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(result.placed_monsters.is_none(), "empty room should have no monsters");
+
+        // Search room
+        let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
+        assert!(result.placed_treasure.is_none(), "empty room should have no treasure");
     }
 }
