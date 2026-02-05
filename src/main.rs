@@ -12,6 +12,7 @@ use command::combat_cmds::*;
 use command::exploration_cmds::*;
 use command::encounter_cmds::*;
 use command::inventory_cmds::*;
+use command::lookup_cmds::*;
 use command::retainer_cmds::*;
 use command::wilderness_cmds::*;
 use command::treasure_cmds::TreasureCommand;
@@ -145,6 +146,10 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(NoteCommand));
     registry.register(Box::new(NotesCommand));
     registry.register(Box::new(NoteDeleteCommand));
+    // Lookup
+    registry.register(Box::new(ItemCommand));
+    registry.register(Box::new(SearchItemsCommand));
+    registry.register(Box::new(TreasureTypeCommand));
     // System
     registry.register(Box::new(RollCommand));
     registry.register(Box::new(SaveCommand));

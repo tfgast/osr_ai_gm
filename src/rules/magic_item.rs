@@ -192,6 +192,51 @@ pub fn all_magic_items() -> &'static [MagicItemDef] {
     registry().all()
 }
 
+/// Search magic items by keyword (case-insensitive).
+/// Matches against name, description, and property values.
+pub fn search_magic_items(query: &str) -> Vec<&'static MagicItemDef> {
+    let query_lower = query.to_lowercase();
+    registry()
+        .all()
+        .iter()
+        .filter(|item| {
+            // Search in name
+            if item.name.to_lowercase().contains(&query_lower) {
+                return true;
+            }
+            // Search in description
+            if let Some(ref desc) = item.description {
+                if desc.to_lowercase().contains(&query_lower) {
+                    return true;
+                }
+            }
+            // Search in properties
+            for prop in &item.properties {
+                if prop.value.to_lowercase().contains(&query_lower) {
+                    return true;
+                }
+                if let Some(ref key) = prop.key {
+                    if key.to_lowercase().contains(&query_lower) {
+                        return true;
+                    }
+                }
+            }
+            false
+        })
+        .collect()
+}
+
+/// Find magic items with partial name match (case-insensitive).
+/// Returns items where the name contains the query string.
+pub fn find_magic_items_partial(name: &str) -> Vec<&'static MagicItemDef> {
+    let name_lower = name.to_lowercase();
+    registry()
+        .all()
+        .iter()
+        .filter(|item| item.name.to_lowercase().contains(&name_lower))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,5 +288,32 @@ mod tests {
     fn item_has_properties() {
         let item = find_magic_item("Bag of Holding").unwrap();
         assert!(!item.properties.is_empty(), "Bag of Holding should have properties");
+    }
+
+    #[test]
+    fn search_by_name() {
+        let results = search_magic_items("healing");
+        assert!(!results.is_empty(), "Should find items with 'healing'");
+        assert!(results.iter().any(|i| i.name.to_lowercase().contains("healing")));
+    }
+
+    #[test]
+    fn search_no_results() {
+        let results = search_magic_items("xyznonexistent123");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn partial_match_single() {
+        let results = find_magic_items_partial("Bag of Holding");
+        assert!(!results.is_empty());
+        assert!(results.iter().any(|i| i.name == "Bag of Holding"));
+    }
+
+    #[test]
+    fn partial_match_multiple() {
+        let results = find_magic_items_partial("Potion");
+        assert!(results.len() > 1, "Should find multiple potions");
+        assert!(results.iter().all(|i| i.name.to_lowercase().contains("potion")));
     }
 }
