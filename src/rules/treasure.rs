@@ -279,8 +279,9 @@ pub fn gem_value_from_roll(roll: u32) -> u32 {
 
 /// Roll values for multiple gems.
 /// Returns a vector of individual gem values in gold pieces.
+/// Count is capped at 500 to prevent excessive allocation.
 pub fn roll_gem_values(count: u32) -> Vec<u32> {
-    (0..count).map(|_| roll_gem_value()).collect()
+    (0..count.min(500)).map(|_| roll_gem_value()).collect()
 }
 
 /// Roll the value of a single piece of jewellery.
@@ -300,8 +301,9 @@ pub fn jewellery_value_from_roll(roll_3d6: u32) -> u32 {
 
 /// Roll values for multiple pieces of jewellery.
 /// Returns a vector of individual jewellery values in gold pieces.
+/// Count is capped at 500 to prevent excessive allocation.
 pub fn roll_jewellery_values(count: u32) -> Vec<u32> {
-    (0..count).map(|_| roll_jewellery_value()).collect()
+    (0..count.min(500)).map(|_| roll_jewellery_value()).collect()
 }
 
 /// Calculate damaged jewellery value (50% of normal).
@@ -321,14 +323,14 @@ pub struct ValuablesResult {
 /// Roll gems and return detailed results.
 pub fn roll_gems(count: u32) -> ValuablesResult {
     let values = roll_gem_values(count);
-    let total_gp = values.iter().sum();
+    let total_gp = values.iter().copied().fold(0u32, u32::saturating_add);
     ValuablesResult { values, total_gp }
 }
 
 /// Roll jewellery and return detailed results.
 pub fn roll_jewellery(count: u32) -> ValuablesResult {
     let values = roll_jewellery_values(count);
-    let total_gp = values.iter().sum();
+    let total_gp = values.iter().copied().fold(0u32, u32::saturating_add);
     ValuablesResult { values, total_gp }
 }
 

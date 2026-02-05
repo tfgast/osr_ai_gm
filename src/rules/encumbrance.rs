@@ -60,8 +60,8 @@ pub fn movement_rate(total_weight_cn: u32) -> u32 {
 /// Calculate total weight from inventory items.
 /// Each item weight is in coins (cn). Gold pieces also count as 1 cn each.
 pub fn total_weight(item_weights_cn: &[u32], gold_pieces: u32) -> u32 {
-    let items: u32 = item_weights_cn.iter().sum();
-    items + gold_pieces
+    let items: u32 = item_weights_cn.iter().copied().fold(0u32, u32::saturating_add);
+    items.saturating_add(gold_pieces)
 }
 
 /// Armour weight contribution for basic encumbrance.

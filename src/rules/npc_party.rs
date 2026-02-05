@@ -223,14 +223,14 @@ fn roll_dice_expr<R: Rng>(rng: &mut R, expr: &str) -> u32 {
         return 1; // Fallback
     }
 
-    let count: u32 = parts[0].parse().unwrap_or(1);
-    let sides: u32 = parts[1].parse().unwrap_or(6);
+    let count: u32 = parts[0].parse().unwrap_or(1).min(100);
+    let sides: u32 = parts[1].parse().unwrap_or(6).min(100);
 
     let mut total: i32 = 0;
     for _ in 0..count {
-        total += rng.gen_range(1..=sides) as i32;
+        total = total.saturating_add(rng.gen_range(1..=sides) as i32);
     }
-    total += modifier;
+    total = total.saturating_add(modifier);
 
     total.max(1) as u32
 }
