@@ -65,10 +65,12 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
     room_id_map.insert(module.entry_room.clone(), next_id);
     next_id += 1;
 
-    // Assign IDs to remaining rooms
-    for key in module.rooms.keys() {
-        if !room_id_map.contains_key(key) {
-            room_id_map.insert(key.clone(), next_id);
+    // Assign IDs to remaining rooms (sorted for deterministic ordering)
+    let mut sorted_keys: Vec<&String> = module.rooms.keys().collect();
+    sorted_keys.sort();
+    for key in &sorted_keys {
+        if !room_id_map.contains_key(*key) {
+            room_id_map.insert((*key).clone(), next_id);
             next_id += 1;
         }
     }
@@ -76,13 +78,14 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
     // Create dungeon with level from module
     let mut dungeon = DungeonState::new(module.level_range.0);
 
-    // Create Room structs
-    for (key, module_room) in &module.rooms {
-        let id = *room_id_map.get(key).unwrap();
+    // Create Room structs (sorted for deterministic ordering)
+    for key in &sorted_keys {
+        let module_room = &module.rooms[*key];
+        let id = *room_id_map.get(*key).unwrap();
         let mut room = Room::new(id, &module_room.name);
         room.description = module_room.description.clone();
         room.trap = module_room.trap.clone();
-        room.key = Some(key.clone());
+        room.key = Some((*key).clone());
 
         // Convert module monsters to placed monster instances
         for pm in &module_room.monsters {
@@ -106,12 +109,13 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
     dungeon.current_room = Some(entry_id);
     dungeon.explored.insert(entry_id);
 
-    // Create doors from exits (deduplicate bidirectional)
+    // Create doors from exits (deduplicate bidirectional, sorted for determinism)
     let mut door_id: u32 = 0;
     let mut created_doors: HashMap<(u32, u32), u32> = HashMap::new();
 
-    for (key, module_room) in &module.rooms {
-        let room_a = *room_id_map.get(key).unwrap();
+    for key in &sorted_keys {
+        let module_room = &module.rooms[*key];
+        let room_a = *room_id_map.get(*key).unwrap();
 
         for exit in &module_room.exits {
             let room_b = *room_id_map.get(&exit.to).ok_or_else(|| {
@@ -295,6 +299,22 @@ mod tests {
         assert_eq!(vault.placed_treasure[1].description, "Potion of Healing");
         assert_eq!(vault.placed_treasure[1].gp_value, 0); // Items have no inherent gp value
         assert!(!vault.treasure_looted);
+    }
+
+    #[test]
+    fn module_to_dungeon_deterministic_room_ids() {
+        // Run conversion multiple times — sorted iteration guarantees stable IDs
+        let module = sample_module();
+        let results: Vec<_> = (0..5)
+            .map(|_| {
+                let d = module_to_dungeon(&module).unwrap();
+                d.rooms.iter().map(|r| (r.id, r.name.clone())).collect::<Vec<_>>()
+            })
+            .collect();
+
+        for result in &results[1..] {
+            assert_eq!(&results[0], result, "room IDs should be deterministic across runs");
+        }
     }
 
     #[test]

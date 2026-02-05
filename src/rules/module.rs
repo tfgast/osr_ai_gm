@@ -97,6 +97,23 @@ fn validate_module(module: &ModuleDef) -> Result<(), String> {
         }
     }
 
+    // Check for mismatched bidirectional door states
+    for (room_key, room) in &module.rooms {
+        for exit in &room.exits {
+            if let Some(other_room) = module.rooms.get(&exit.to) {
+                if let Some(reverse_exit) = other_room.exits.iter().find(|e| e.to == *room_key) {
+                    if exit.door != reverse_exit.door {
+                        return Err(format!(
+                            "Module '{}': conflicting door states between '{}' and '{}' \
+                             ({} vs {})",
+                            module.name, room_key, exit.to, exit.door, reverse_exit.door
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     // Check level_range is valid
     if module.level_range.0 > module.level_range.1 {
         return Err(format!(
@@ -258,6 +275,75 @@ mod tests {
     #[test]
     fn validate_good_module() {
         let module: ModuleDef = serde_json::from_str(sample_module_json()).unwrap();
+        assert!(validate_module(&module).is_ok());
+    }
+
+    #[test]
+    fn validate_conflicting_bidirectional_door_states() {
+        let mut rooms = HashMap::new();
+        rooms.insert("room_a".to_string(), ModuleRoom {
+            name: "Room A".to_string(),
+            description: String::new(),
+            monsters: Vec::new(),
+            treasure: Vec::new(),
+            trap: None,
+            exits: vec![ModuleExit {
+                to: "room_b".to_string(),
+                door: DoorState::Locked,
+            }],
+        });
+        rooms.insert("room_b".to_string(), ModuleRoom {
+            name: "Room B".to_string(),
+            description: String::new(),
+            monsters: Vec::new(),
+            treasure: Vec::new(),
+            trap: None,
+            exits: vec![ModuleExit {
+                to: "room_a".to_string(),
+                door: DoorState::Closed,
+            }],
+        });
+        let module = ModuleDef {
+            name: "Conflict".to_string(),
+            level_range: (1, 2),
+            entry_room: "room_a".to_string(),
+            rooms,
+        };
+        let err = validate_module(&module).unwrap_err();
+        assert!(err.contains("conflicting door states"), "expected conflict error, got: {}", err);
+    }
+
+    #[test]
+    fn validate_matching_bidirectional_door_states() {
+        let mut rooms = HashMap::new();
+        rooms.insert("room_a".to_string(), ModuleRoom {
+            name: "Room A".to_string(),
+            description: String::new(),
+            monsters: Vec::new(),
+            treasure: Vec::new(),
+            trap: None,
+            exits: vec![ModuleExit {
+                to: "room_b".to_string(),
+                door: DoorState::Locked,
+            }],
+        });
+        rooms.insert("room_b".to_string(), ModuleRoom {
+            name: "Room B".to_string(),
+            description: String::new(),
+            monsters: Vec::new(),
+            treasure: Vec::new(),
+            trap: None,
+            exits: vec![ModuleExit {
+                to: "room_a".to_string(),
+                door: DoorState::Locked,
+            }],
+        });
+        let module = ModuleDef {
+            name: "Match".to_string(),
+            level_range: (1, 2),
+            entry_room: "room_a".to_string(),
+            rooms,
+        };
         assert!(validate_module(&module).is_ok());
     }
 
