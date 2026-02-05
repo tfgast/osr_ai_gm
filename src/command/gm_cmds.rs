@@ -8,7 +8,6 @@ use crate::rules::thief;
 use crate::rules::xp::{check_level_up, xp_for_level};
 use crate::state::game::GameMode;
 
-/// GM command: spawn an encounter with monsters.
 pub struct SpawnEncounterCommand;
 impl Command for SpawnEncounterCommand {
     fn name(&self) -> &str { "spawn_encounter" }
@@ -77,7 +76,6 @@ impl Command for SpawnEncounterCommand {
     }
 }
 
-/// GM command: advance one dungeon turn.
 pub struct AdvanceTurnCommand;
 impl Command for AdvanceTurnCommand {
     fn name(&self) -> &str { "advance_turn" }
@@ -97,7 +95,6 @@ impl Command for AdvanceTurnCommand {
     }
 }
 
-/// GM command: award XP to a character with prime requisite modifier.
 pub struct AwardXpCommand;
 impl Command for AwardXpCommand {
     fn name(&self) -> &str { "award_xp" }
@@ -132,7 +129,6 @@ impl Command for AwardXpCommand {
     }
 }
 
-/// GM command: record a ruling.
 pub struct RulingCommand;
 impl Command for RulingCommand {
     fn name(&self) -> &str { "ruling" }
@@ -147,7 +143,6 @@ impl Command for RulingCommand {
     }
 }
 
-/// GM command: heal a character.
 pub struct HealCommand;
 impl Command for HealCommand {
     fn name(&self) -> &str { "heal" }
@@ -174,7 +169,6 @@ impl Command for HealCommand {
     }
 }
 
-/// GM command: damage a character.
 pub struct DamageCommand;
 impl Command for DamageCommand {
     fn name(&self) -> &str { "damage" }
@@ -201,7 +195,6 @@ impl Command for DamageCommand {
     }
 }
 
-/// GM command: set a character's HP to an exact value.
 pub struct SetHpCommand;
 impl Command for SetHpCommand {
     fn name(&self) -> &str { "set_hp" }
@@ -228,7 +221,6 @@ impl Command for SetHpCommand {
     }
 }
 
-/// GM command: set the party's rations.
 pub struct SetRationsCommand;
 impl Command for SetRationsCommand {
     fn name(&self) -> &str { "set_rations" }
@@ -250,7 +242,6 @@ impl Command for SetRationsCommand {
     }
 }
 
-/// GM command: add rations to the party's supplies.
 pub struct AddRationsCommand;
 impl Command for AddRationsCommand {
     fn name(&self) -> &str { "add_rations" }
@@ -271,7 +262,6 @@ impl Command for AddRationsCommand {
     }
 }
 
-/// GM command: train a character to level up (requires XP and gold).
 pub struct TrainCommand;
 impl Command for TrainCommand {
     fn name(&self) -> &str { "train" }
@@ -406,7 +396,6 @@ impl Command for TrainCommand {
     }
 }
 
-/// List of command names that require GM privileges.
 pub const GM_ONLY_COMMANDS: &[&str] = &[
     "spawn_encounter",
     "advance_turn",
