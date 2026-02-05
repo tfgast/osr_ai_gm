@@ -42,6 +42,10 @@ impl Command for EncounterCommand {
                 };
                 let seq = encounter_engine::begin_encounter_dungeon();
 
+                let surprise_line = format!(
+                    "Surprise: party {}, monsters {} — {}",
+                    seq.party_surprise_roll, seq.monster_surprise_roll, seq.surprise
+                );
                 CommandResult::ok(format!(
                     "ENCOUNTER — Dungeon Level {}\n\
                      Table roll: {} → {}\n\
@@ -51,10 +55,7 @@ impl Command for EncounterCommand {
                     level,
                     table_roll, entry.name,
                     entry.number, num_appearing,
-                    format!(
-                        "Surprise: party {}, monsters {} — {}",
-                        seq.party_surprise_roll, seq.monster_surprise_roll, seq.surprise
-                    ),
+                    surprise_line,
                     seq.distance,
                 ))
             }
@@ -78,6 +79,10 @@ impl Command for EncounterCommand {
                 };
                 let seq = encounter_engine::begin_encounter_wilderness();
 
+                let surprise_line = format!(
+                    "Surprise: party {}, monsters {} — {}",
+                    seq.party_surprise_roll, seq.monster_surprise_roll, seq.surprise
+                );
                 CommandResult::ok(format!(
                     "ENCOUNTER — Wilderness ({})\n\
                      Table roll: {} → {}\n\
@@ -87,10 +92,7 @@ impl Command for EncounterCommand {
                     terrain.name(),
                     table_roll, entry.name,
                     entry.number, num_appearing,
-                    format!(
-                        "Surprise: party {}, monsters {} — {}",
-                        seq.party_surprise_roll, seq.monster_surprise_roll, seq.surprise
-                    ),
+                    surprise_line,
                     seq.distance,
                 ))
             }

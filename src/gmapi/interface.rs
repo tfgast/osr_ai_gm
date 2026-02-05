@@ -5,7 +5,6 @@ use crate::model::{CombatState, Monster};
 use crate::persist::{self, GameState};
 use crate::rules::{ability, class, encumbrance, equipment, monster, spell_data, thief};
 use crate::rules::alignment::Alignment;
-use crate::rules::attack::HitDice;
 use crate::rules::class::Class;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
 use crate::state::game::GameMode;
@@ -33,9 +32,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         }
 
         // -- Combat --
-        GMCommand::SpawnEncounter { name, count, hit_dice, ac, hp, damage, morale, distance, xp_value } => {
-            spawn_encounter(id, state, name, *count, hit_dice.clone(), *ac, *hp, damage, *morale, *distance, *xp_value)
-        }
+        GMCommand::SpawnEncounter(params) => spawn_encounter(id, state, params),
         GMCommand::RollInitiative => roll_initiative(id, state),
         GMCommand::Attack { character, monster_idx, weapon } => {
             attack(id, state, character, *monster_idx, weapon)
@@ -276,42 +273,40 @@ fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, a
 // =============================================================================
 
 fn spawn_encounter(
-    id: &str, state: &mut GameState,
-    name: &str, count: u32, hit_dice: HitDice, ac: i32, hp: i32,
-    damage: &str, morale: u32, distance: u32, xp_value: Option<u64>,
+    id: &str, state: &mut GameState, params: &crate::gmapi::protocol::EncounterParams,
 ) -> GMResponse {
     if state.combat.is_some() {
         return GMResponse::err(id, "combat already active.", state.mode.clone());
     }
-    if !(2..=12).contains(&morale) {
+    if !(2..=12).contains(&params.morale) {
         return GMResponse::err(id, "morale must be 2-12.", state.mode.clone());
     }
     // XP: use explicit value if provided, otherwise look up from monster database
-    let xp = xp_value.unwrap_or_else(|| {
-        crate::rules::monster::find_monster(name)
+    let xp = params.xp_value.unwrap_or_else(|| {
+        crate::rules::monster::find_monster(&params.name)
             .map(|m| m.xp())
             .unwrap_or(0)
     });
     let mut monsters = Vec::new();
-    for i in 0..count {
-        let monster_name = if count > 1 {
-            format!("{} {}", name, i + 1)
+    for i in 0..params.count {
+        let monster_name = if params.count > 1 {
+            format!("{} {}", params.name, i + 1)
         } else {
-            name.to_string()
+            params.name.clone()
         };
-        let hd_str = hit_dice.to_string();
+        let hd_str = params.hit_dice.to_string();
         let mut m = Monster::new(&monster_name, &hd_str);
-        m.hp = hp;
-        m.max_hp = hp;
-        m.ac = ac;
-        m.damage = damage.to_string();
-        m.morale = morale;
+        m.hp = params.hp;
+        m.max_hp = params.hp;
+        m.ac = params.ac;
+        m.damage = params.damage.clone();
+        m.morale = params.morale;
         m.xp_value = xp;
         m.attacks = vec!["attack".to_string()];
         monsters.push(m);
     }
 
-    let combat_state = CombatState::new(monsters, distance);
+    let combat_state = CombatState::new(monsters, params.distance);
     let status = combat::combat_status(&combat_state, &state.party.members);
     state.combat = Some(combat_state);
     state.pre_combat_mode = Some(state.mode.clone());
@@ -319,7 +314,7 @@ fn spawn_encounter(
 
     GMResponse::ok_with_data(
         id,
-        format!("combat started: {} {}(s) at {}' distance.", count, name, distance),
+        format!("combat started: {} {}(s) at {}' distance.", params.count, params.name, params.distance),
         state.mode.clone(),
         serde_json::json!({ "status": status }),
     )
@@ -1246,6 +1241,7 @@ fn roll_dice(id: &str, state: &GameState, notation: &str) -> GMResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gmapi::protocol::EncounterParams;
 
     fn make_req(id: &str, command: GMCommand) -> GMRequest {
         GMRequest { id: id.to_string(), command }
@@ -1310,7 +1306,7 @@ mod tests {
     #[test]
     fn spawn_encounter_and_query() {
         let mut state = GameState::new();
-        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
             name: "goblin".to_string(),
             count: 3,
             hit_dice: "1".parse().unwrap(),
@@ -1320,7 +1316,7 @@ mod tests {
             morale: 7,
             distance: 60,
             xp_value: None,
-        }), &mut state);
+        })), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
 
@@ -1333,7 +1329,7 @@ mod tests {
     #[test]
     fn spawn_encounter_invalid_morale() {
         let mut state = GameState::new();
-        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
             name: "goblin".to_string(),
             count: 1,
             hit_dice: "1".parse().unwrap(),
@@ -1343,7 +1339,7 @@ mod tests {
             morale: 13,
             distance: 60,
             xp_value: None,
-        }), &mut state);
+        })), &mut state);
         assert!(!resp.success);
     }
 
@@ -1351,7 +1347,7 @@ mod tests {
     fn combat_already_active() {
         let mut state = GameState::new();
         state.combat = Some(CombatState::new(vec![], 0));
-        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
             name: "orc".to_string(),
             count: 1,
             hit_dice: "1".parse().unwrap(),
@@ -1361,7 +1357,7 @@ mod tests {
             morale: 8,
             distance: 30,
             xp_value: None,
-        }), &mut state);
+        })), &mut state);
         assert!(!resp.success);
         assert!(resp.error.unwrap().contains("already active"));
     }
@@ -1399,7 +1395,7 @@ mod tests {
         }
 
         // Spawn goblins for combat
-        let resp = handle_request(&make_req("2", GMCommand::SpawnEncounter {
+        let resp = handle_request(&make_req("2", GMCommand::SpawnEncounter(EncounterParams {
             name: "Goblin".to_string(),
             count: 2,
             hit_dice: "1-1".parse().unwrap(),
@@ -1409,7 +1405,7 @@ mod tests {
             morale: 7,
             distance: 10,
             xp_value: Some(5),
-        }), &mut state);
+        })), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
 
@@ -1447,7 +1443,7 @@ mod tests {
         assert!(resp.success);
 
         // Spawn goblin for combat
-        let resp = handle_request(&make_req("2", GMCommand::SpawnEncounter {
+        let resp = handle_request(&make_req("2", GMCommand::SpawnEncounter(EncounterParams {
             name: "Goblin".to_string(),
             count: 1,
             hit_dice: "1-1".parse().unwrap(),
@@ -1457,7 +1453,7 @@ mod tests {
             morale: 7,
             distance: 10,
             xp_value: Some(5),
-        }), &mut state);
+        })), &mut state);
         assert!(resp.success);
 
         // Fighting withdrawal
@@ -1644,7 +1640,7 @@ mod tests {
         state.party.add_member(c);
 
         // Spawn encounter
-        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
             name: "goblin".to_string(),
             count: 1,
             hit_dice: "1".parse().unwrap(),
@@ -1654,7 +1650,7 @@ mod tests {
             morale: 7,
             distance: 5,
             xp_value: None,
-        }), &mut state);
+        })), &mut state);
         assert!(resp.success);
 
         // Roll initiative
@@ -1687,7 +1683,7 @@ mod tests {
         state.party.add_member(c);
 
         // Spawn encounter at 100' distance
-        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
             name: "goblin".to_string(),
             count: 1,
             hit_dice: "1".parse().unwrap(),
@@ -1697,7 +1693,7 @@ mod tests {
             morale: 7,
             distance: 100,
             xp_value: None,
-        }), &mut state);
+        })), &mut state);
         assert!(resp.success);
         assert_eq!(state.combat.as_ref().unwrap().distance, 100);
 
@@ -1791,7 +1787,7 @@ mod tests {
         state.party.add_member(c);
 
         // Spawn encounter (simulating monsters from the room)
-        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter {
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
             name: "skeleton".to_string(),
             count: 3,
             hit_dice: "1".parse().unwrap(),
@@ -1801,7 +1797,7 @@ mod tests {
             morale: 12,
             distance: 10,
             xp_value: Some(10),
-        }), &mut state);
+        })), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
 

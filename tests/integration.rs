@@ -2,7 +2,7 @@
 ///
 /// Full scenario: create characters -> explore dungeon -> encounter -> combat -> loot -> XP -> level up.
 
-use osr_ai_gm::gmapi::protocol::{GMCommand, GMRequest};
+use osr_ai_gm::gmapi::protocol::{EncounterParams, GMCommand, GMRequest};
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{Character, AbilityScores};
@@ -1036,7 +1036,7 @@ fn mode_transition_idle_exploration_combat_exploration() {
     assert!(dungeon_turn > 0, "turns should have advanced");
 
     // Exploration -> Combat (spawn encounter)
-    let resp = handle_request(&req("4", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("4", GMCommand::SpawnEncounter(EncounterParams {
         name: "skeleton".to_string(),
         count: 2,
         hit_dice: "1".parse().unwrap(),
@@ -1046,7 +1046,7 @@ fn mode_transition_idle_exploration_combat_exploration() {
         morale: 12,
         distance: 5,
         xp_value: Some(10),
-    }), &mut state);
+    })), &mut state);
     assert!(resp.success, "spawn encounter failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Combat);
 
@@ -1113,7 +1113,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
     assert!(travel_day > 1, "travel day should have incremented");
 
     // Wilderness -> Combat (encounter during travel)
-    let resp = handle_request(&req("4", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("4", GMCommand::SpawnEncounter(EncounterParams {
         name: "wolf".to_string(),
         count: 3,
         hit_dice: "2".parse().unwrap(),
@@ -1123,7 +1123,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
         morale: 8,
         distance: 5,
         xp_value: Some(20),
-    }), &mut state);
+    })), &mut state);
     assert!(resp.success, "spawn encounter failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Combat);
 

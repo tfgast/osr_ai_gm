@@ -20,6 +20,22 @@ pub struct GMRequest {
     pub command: GMCommand,
 }
 
+/// Parameters for spawning a custom encounter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncounterParams {
+    pub name: String,
+    pub count: u32,
+    pub hit_dice: HitDice,
+    pub ac: i32,
+    pub hp: i32,
+    pub damage: String,
+    pub morale: u32,
+    pub distance: u32,
+    /// XP per monster. If omitted, auto-looked up from monster database.
+    #[serde(default)]
+    pub xp_value: Option<u64>,
+}
+
 /// All commands an AI GM can issue through the JSON protocol.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
@@ -54,19 +70,7 @@ pub enum GMCommand {
 
     // -- GM-only: encounter & combat --
     /// Spawn an encounter with monsters.
-    SpawnEncounter {
-        name: String,
-        count: u32,
-        hit_dice: HitDice,
-        ac: i32,
-        hp: i32,
-        damage: String,
-        morale: u32,
-        distance: u32,
-        /// XP per monster. If omitted, auto-looked up from monster database.
-        #[serde(default)]
-        xp_value: Option<u64>,
-    },
+    SpawnEncounter(EncounterParams),
     /// Roll initiative for the current combat round.
     RollInitiative,
     /// Perform a character attack.
@@ -356,9 +360,9 @@ mod tests {
         let req = parse_request(json).unwrap();
         assert_eq!(req.id, "2");
         match &req.command {
-            GMCommand::SpawnEncounter { name, count, .. } => {
-                assert_eq!(name, "goblin");
-                assert_eq!(*count, 3);
+            GMCommand::SpawnEncounter(params) => {
+                assert_eq!(params.name, "goblin");
+                assert_eq!(params.count, 3);
             }
             _ => panic!("expected SpawnEncounter"),
         }

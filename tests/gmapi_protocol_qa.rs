@@ -7,7 +7,7 @@
 /// - Response data field contains correct payload types
 /// - mode field accurately reflects GameMode after each command
 
-use osr_ai_gm::gmapi::protocol::{GMCommand, GMRequest, GMResponse, parse_request};
+use osr_ai_gm::gmapi::protocol::{EncounterParams, GMCommand, GMRequest, GMResponse, parse_request};
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{AbilityScores, Character, CombatState, Monster};
@@ -466,7 +466,7 @@ fn create_character_alignment_abbreviations() {
 #[test]
 fn spawn_encounter_happy_path() {
     let mut state = GameState::new();
-    let resp = handle_request(&req("se1", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("se1", GMCommand::SpawnEncounter(EncounterParams {
         name: "Orc".to_string(),
         count: 2,
         hit_dice: "1".parse().unwrap(),
@@ -476,7 +476,7 @@ fn spawn_encounter_happy_path() {
         morale: 8,
         distance: 30,
         xp_value: Some(10),
-    }), &mut state);
+    })), &mut state);
     assert_response_format(&resp, "se1");
     assert!(resp.success);
     assert_eq!(resp.mode, GameMode::Combat);
@@ -492,7 +492,7 @@ fn spawn_encounter_combat_already_active() {
     let mut state = GameState::new();
     setup_combat(&mut state);
 
-    let resp = handle_request(&req("se2", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("se2", GMCommand::SpawnEncounter(EncounterParams {
         name: "Orc".to_string(),
         count: 1,
         hit_dice: "1".parse().unwrap(),
@@ -502,7 +502,7 @@ fn spawn_encounter_combat_already_active() {
         morale: 8,
         distance: 30,
         xp_value: None,
-    }), &mut state);
+    })), &mut state);
     assert_response_format(&resp, "se2");
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("already active"));
@@ -511,7 +511,7 @@ fn spawn_encounter_combat_already_active() {
 #[test]
 fn spawn_encounter_invalid_morale_low() {
     let mut state = GameState::new();
-    let resp = handle_request(&req("se3", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("se3", GMCommand::SpawnEncounter(EncounterParams {
         name: "Goblin".to_string(),
         count: 1,
         hit_dice: "1".parse().unwrap(),
@@ -521,7 +521,7 @@ fn spawn_encounter_invalid_morale_low() {
         morale: 1, // too low, must be 2-12
         distance: 60,
         xp_value: None,
-    }), &mut state);
+    })), &mut state);
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("morale"));
 }
@@ -529,7 +529,7 @@ fn spawn_encounter_invalid_morale_low() {
 #[test]
 fn spawn_encounter_invalid_morale_high() {
     let mut state = GameState::new();
-    let resp = handle_request(&req("se4", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("se4", GMCommand::SpawnEncounter(EncounterParams {
         name: "Goblin".to_string(),
         count: 1,
         hit_dice: "1".parse().unwrap(),
@@ -539,7 +539,7 @@ fn spawn_encounter_invalid_morale_high() {
         morale: 13, // too high
         distance: 60,
         xp_value: None,
-    }), &mut state);
+    })), &mut state);
     assert!(!resp.success);
 }
 
@@ -547,7 +547,7 @@ fn spawn_encounter_invalid_morale_high() {
 fn spawn_encounter_morale_boundary_valid() {
     let mut state = GameState::new();
     // morale=2 (minimum valid)
-    let resp = handle_request(&req("se5", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("se5", GMCommand::SpawnEncounter(EncounterParams {
         name: "Kobold".to_string(),
         count: 1,
         hit_dice: "1".parse().unwrap(),
@@ -557,13 +557,13 @@ fn spawn_encounter_morale_boundary_valid() {
         morale: 2,
         distance: 60,
         xp_value: None,
-    }), &mut state);
+    })), &mut state);
     assert!(resp.success, "morale=2 should be valid");
 
     // Reset
     let mut state2 = GameState::new();
     // morale=12 (maximum valid)
-    let resp = handle_request(&req("se6", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("se6", GMCommand::SpawnEncounter(EncounterParams {
         name: "Dragon".to_string(),
         count: 1,
         hit_dice: "8".parse().unwrap(),
@@ -573,14 +573,14 @@ fn spawn_encounter_morale_boundary_valid() {
         morale: 12,
         distance: 120,
         xp_value: Some(1200),
-    }), &mut state2);
+    })), &mut state2);
     assert!(resp.success, "morale=12 should be valid");
 }
 
 #[test]
 fn spawn_encounter_explicit_xp_value() {
     let mut state = GameState::new();
-    let resp = handle_request(&req("se7", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("se7", GMCommand::SpawnEncounter(EncounterParams {
         name: "Custom Creature".to_string(),
         count: 1,
         hit_dice: "3".parse().unwrap(),
@@ -590,7 +590,7 @@ fn spawn_encounter_explicit_xp_value() {
         morale: 9,
         distance: 40,
         xp_value: Some(500),
-    }), &mut state);
+    })), &mut state);
     assert!(resp.success);
     let combat = state.combat.as_ref().unwrap();
     assert_eq!(combat.monsters[0].xp_value, 500);
@@ -599,7 +599,7 @@ fn spawn_encounter_explicit_xp_value() {
 #[test]
 fn spawn_encounter_single_monster_no_numbering() {
     let mut state = GameState::new();
-    let resp = handle_request(&req("se8", GMCommand::SpawnEncounter {
+    let resp = handle_request(&req("se8", GMCommand::SpawnEncounter(EncounterParams {
         name: "Troll".to_string(),
         count: 1,
         hit_dice: "6".parse().unwrap(),
@@ -609,7 +609,7 @@ fn spawn_encounter_single_monster_no_numbering() {
         morale: 10,
         distance: 60,
         xp_value: Some(275),
-    }), &mut state);
+    })), &mut state);
     assert!(resp.success);
     let combat = state.combat.as_ref().unwrap();
     // Single monster should not have " 1" suffix
