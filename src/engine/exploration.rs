@@ -380,6 +380,65 @@ pub fn move_through_door(
     move_through_door_with(&mut rand::thread_rng(), time, dungeon, dungeon_level, door_id)
 }
 
+/// Check for a trap when entering a room. If the room has an untriggered trap,
+/// roll for it and mark triggered on success.
+fn check_room_trap<R: Rng>(
+    rng: &mut R,
+    dungeon: &mut DungeonState,
+    dest: u32,
+    result: &mut ExplorationResult,
+) {
+    let has_untriggered_trap = dungeon.find_room(dest)
+        .map(|r| r.trap.is_some() && !r.trap_triggered)
+        .unwrap_or(false);
+    if !has_untriggered_trap {
+        return;
+    }
+
+    let room_name = dungeon.find_room(dest)
+        .map(|r| r.name.clone())
+        .unwrap_or_else(|| format!("room {}", dest));
+    let trap = check_trap_with(rng, &room_name);
+    if trap.triggered {
+        if let Some(room) = dungeon.find_room_mut(dest) {
+            room.trap_triggered = true;
+        }
+    }
+    result.msg(trap.message);
+}
+
+/// Check for placed monsters (module support) in a room. Collects unspawned
+/// monsters, marks them spawned, and reports them on the result.
+fn collect_placed_monsters(
+    dungeon: &mut DungeonState,
+    dest: u32,
+    result: &mut ExplorationResult,
+) {
+    let unspawned: Vec<_> = dungeon.find_room(dest)
+        .filter(|room| !room.monsters_cleared)
+        .map(|room| {
+            room.placed_monsters.iter()
+                .filter(|m| !m.spawned)
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if unspawned.is_empty() {
+        return;
+    }
+
+    if let Some(room) = dungeon.find_room_mut(dest) {
+        for m in &mut room.placed_monsters {
+            m.spawned = true;
+        }
+    }
+    for m in &unspawned {
+        result.msg(format!("Monsters present: {} x{}", m.name, m.count));
+    }
+    result.placed_monsters = Some(unspawned);
+}
+
 /// Testable version.
 pub fn move_through_door_with<R: Rng>(
     rng: &mut R,
@@ -388,7 +447,6 @@ pub fn move_through_door_with<R: Rng>(
     dungeon_level: u32,
     door_id: u32,
 ) -> Result<ExplorationResult, String> {
-    // Block movement in darkness
     if !time.has_light() {
         return Err("Cannot move — the party is in DARKNESS! Light a torch or lantern first.".to_string());
     }
@@ -423,24 +481,11 @@ pub fn move_through_door_with<R: Rng>(
 
     let mut result = ExplorationResult::new();
 
-    // Check for trap in new room (only if not already triggered)
-    let has_untriggered_trap = dungeon.find_room(dest)
-        .map(|r| r.trap.is_some() && !r.trap_triggered)
-        .unwrap_or(false);
+    check_room_trap(rng, dungeon, dest, &mut result);
+
     let room_name = dungeon.find_room(dest)
         .map(|r| r.name.clone())
         .unwrap_or_else(|| format!("room {}", dest));
-
-    if has_untriggered_trap {
-        let trap = check_trap_with(rng, &room_name);
-        if trap.triggered {
-            if let Some(room) = dungeon.find_room_mut(dest) {
-                room.trap_triggered = true;
-            }
-        }
-        result.msg(trap.message);
-    }
-
     result.msg(format!("Moved to {} (room {}).", room_name, dest));
 
     // Advance time for the move
@@ -449,35 +494,12 @@ pub fn move_through_door_with<R: Rng>(
         result.msg(msg);
     }
 
-    // Always show light status so the GM can track torch burn
     if let Some(summary) = time.light_summary() {
         result.msg(summary);
     }
 
-    // Check for placed monsters in new room (module support)
-    if let Some(room) = dungeon.find_room(dest) {
-        if !room.monsters_cleared {
-            let unspawned: Vec<_> = room.placed_monsters.iter()
-                .filter(|m| !m.spawned)
-                .cloned()
-                .collect();
-            if !unspawned.is_empty() {
-                // Mark as spawned
-                if let Some(room_mut) = dungeon.find_room_mut(dest) {
-                    for m in &mut room_mut.placed_monsters {
-                        m.spawned = true;
-                    }
-                }
-                // Report monsters for GM to spawn combat
-                for m in &unspawned {
-                    result.msg(format!("Monsters present: {} x{}", m.name, m.count));
-                }
-                result.placed_monsters = Some(unspawned);
-            }
-        }
-    }
+    collect_placed_monsters(dungeon, dest, &mut result);
 
-    // Wandering monster check (moving consumes a turn)
     if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
         result.msg(format!(
             "Wandering monster! {} ({} appearing)",
