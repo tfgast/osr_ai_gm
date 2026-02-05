@@ -157,20 +157,50 @@ impl Command for LootCommand {
         let char_name = args[0];
 
         // Parse optional trailing value_gp (last arg if numeric)
-        let (item_parts, value_gp) = if args.len() >= 3 {
+        let (item_parts, explicit_gp) = if args.len() >= 3 {
             if let Ok(v) = args[args.len() - 1].parse::<u32>() {
-                (&args[1..args.len() - 1], v)
+                (&args[1..args.len() - 1], Some(v))
             } else {
-                (&args[1..], 0)
+                (&args[1..], None)
             }
         } else {
-            (&args[1..], 0)
+            (&args[1..], None)
         };
         let item_name = item_parts.join(" ");
 
         if item_name.is_empty() {
             return CommandResult::error("usage: loot <character_name> <item_name> [value_gp]");
         }
+
+        // If in a dungeon, validate item exists in current room's placed treasure
+        let room_gp = if let Some(dungeon) = &mut state.dungeon {
+            let current = match dungeon.current_room {
+                Some(id) => id,
+                None => return CommandResult::error("no current room."),
+            };
+            let room = match dungeon.find_room_mut(current) {
+                Some(r) => r,
+                None => return CommandResult::error("current room not found."),
+            };
+            // Find matching treasure (case-insensitive)
+            let idx = room.placed_treasure.iter().position(|t| {
+                !t.taken && t.description.eq_ignore_ascii_case(&item_name)
+            });
+            match idx {
+                Some(i) => {
+                    let gp = room.placed_treasure[i].gp_value;
+                    room.placed_treasure[i].taken = true;
+                    Some(gp)
+                }
+                None => return CommandResult::error(format!(
+                    "no lootable item '{}' in this room.", item_name
+                )),
+            }
+        } else {
+            None
+        };
+
+        let value_gp = explicit_gp.unwrap_or(room_gp.unwrap_or(0) as u32);
 
         let character = match state.party.find_member_mut(char_name) {
             Some(c) => c,
@@ -462,5 +492,64 @@ mod tests {
         // "sword" matches Sword, Short sword, Two-handed sword, Silver dagger doesn't match
         let suggestions = suggest_equipment("sword");
         assert!(suggestions.len() <= 3);
+    }
+
+    fn state_with_dungeon_treasure() -> GameState {
+        use crate::state::dungeon::{DungeonState, Room, PlacedTreasureInstance};
+        let mut state = state_with_fighter();
+        let mut dungeon = DungeonState::new(1);
+        let room = Room::new(0, "Vault")
+            .with_placed_treasure(vec![
+                PlacedTreasureInstance::new("Ruby gem", 500),
+                PlacedTreasureInstance::new("Old key", 0),
+            ]);
+        dungeon.add_room(room).unwrap();
+        dungeon.add_room(Room::new(1, "Empty Room")).unwrap();
+        dungeon.current_room = Some(0);
+        dungeon.explored.insert(0);
+        state.dungeon = Some(dungeon);
+        state
+    }
+
+    #[test]
+    fn loot_from_current_room() {
+        let cmd = LootCommand;
+        let mut state = state_with_dungeon_treasure();
+        let result = cmd.execute(&["Aldric", "Ruby", "gem"], &mut state);
+        assert!(result.output.contains("picks up Ruby gem"));
+        assert!(result.output.contains("500 gp"));
+        // Treasure should be marked taken
+        let room = state.dungeon.as_ref().unwrap().find_room(0).unwrap();
+        assert!(room.placed_treasure[0].taken);
+    }
+
+    #[test]
+    fn loot_item_not_in_room() {
+        let cmd = LootCommand;
+        let mut state = state_with_dungeon_treasure();
+        let result = cmd.execute(&["Aldric", "Diamond"], &mut state);
+        assert!(result.output.contains("Error"));
+        assert!(result.output.contains("no lootable item"));
+    }
+
+    #[test]
+    fn loot_already_taken() {
+        let cmd = LootCommand;
+        let mut state = state_with_dungeon_treasure();
+        // Take it once
+        cmd.execute(&["Aldric", "Ruby", "gem"], &mut state);
+        // Try again
+        let result = cmd.execute(&["Aldric", "Ruby", "gem"], &mut state);
+        assert!(result.output.contains("Error"));
+        assert!(result.output.contains("no lootable item"));
+    }
+
+    #[test]
+    fn loot_zero_value_item_from_room() {
+        let cmd = LootCommand;
+        let mut state = state_with_dungeon_treasure();
+        let result = cmd.execute(&["Aldric", "Old", "key"], &mut state);
+        assert!(result.output.contains("picks up Old key"));
+        assert!(!result.output.contains("gp"));
     }
 }
