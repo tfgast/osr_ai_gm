@@ -973,7 +973,8 @@ fn monster_attack_api_damages_character() {
     let initial_hp = state.party.find_member("Bruiser").unwrap().hp;
 
     // Monster attacks repeatedly until a hit
-    for i in 0..10 {
+    let mut hit_landed = false;
+    for i in 0..100 {
         // Reset HP for each attempt
         state.party.find_member_mut("Bruiser").unwrap().hp = initial_hp;
         let resp = handle_request(&req(&format!("a{}", i), GMCommand::MonsterAttack {
@@ -983,11 +984,11 @@ fn monster_attack_api_damages_character() {
         assert!(resp.success);
         let current_hp = state.party.find_member("Bruiser").unwrap().hp;
         if current_hp < initial_hp {
-            // Damage was applied
-            assert!(current_hp < initial_hp, "HP should decrease on hit");
-            return;
+            hit_landed = true;
+            break;
         }
     }
+    assert!(hit_landed, "Monster should land at least one hit in 100 attempts");
 }
 
 // ===========================================================================
