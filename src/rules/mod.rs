@@ -6,6 +6,7 @@ pub mod encounter;
 pub mod encumbrance;
 pub mod equipment;
 pub mod magic_item;
+pub mod module;
 pub mod monster;
 pub mod npc_party;
 pub mod save;
