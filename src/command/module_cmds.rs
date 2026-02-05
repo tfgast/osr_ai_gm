@@ -1,7 +1,7 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::rules::module::{load_module, ModuleDef, PlacedTreasure};
-use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
+use crate::state::dungeon::{Door, DoorState, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room};
 use crate::state::game::GameMode;
 use crate::state::time::TimeTracker;
 use std::collections::HashMap;
@@ -82,6 +82,21 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
         let mut room = Room::new(id, &module_room.name);
         room.description = module_room.description.clone();
         room.trap = module_room.trap.clone();
+        room.key = Some(key.clone());
+
+        // Convert module monsters to placed monster instances
+        for pm in &module_room.monsters {
+            room.placed_monsters.push(PlacedMonsterInstance::new(&pm.name, pm.count));
+        }
+
+        // Convert module treasure to placed treasure instances
+        for pt in &module_room.treasure {
+            let (desc, gp) = match pt {
+                PlacedTreasure::Coins { gp } => (format!("{} gold pieces", gp), *gp),
+                PlacedTreasure::Item { item } => (item.clone(), 0), // Items have no inherent gp value
+            };
+            room.placed_treasure.push(PlacedTreasureInstance::new(&desc, gp));
+        }
 
         dungeon.add_room(room)?;
     }
@@ -242,5 +257,58 @@ mod tests {
         let module = sample_module();
         let dungeon = module_to_dungeon(&module).unwrap();
         assert!(dungeon.log.iter().any(|m| m.contains("Test Crypt")));
+    }
+
+    #[test]
+    fn module_to_dungeon_loads_monsters() {
+        let module = sample_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        // Find the guard room (has monsters)
+        let guard = dungeon.rooms.iter()
+            .find(|r| r.name == "Guard Chamber")
+            .expect("should have Guard Chamber");
+
+        assert_eq!(guard.placed_monsters.len(), 1);
+        assert_eq!(guard.placed_monsters[0].name, "skeleton");
+        assert_eq!(guard.placed_monsters[0].count, 3);
+        assert!(!guard.placed_monsters[0].spawned);
+        assert!(!guard.monsters_cleared);
+    }
+
+    #[test]
+    fn module_to_dungeon_loads_treasure() {
+        let module = sample_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        // Find the vault (has treasure)
+        let vault = dungeon.rooms.iter()
+            .find(|r| r.name == "Treasure Vault")
+            .expect("should have Treasure Vault");
+
+        assert_eq!(vault.placed_treasure.len(), 2);
+        // First treasure: coins
+        assert!(vault.placed_treasure[0].description.contains("500"));
+        assert_eq!(vault.placed_treasure[0].gp_value, 500);
+        // Second treasure: item
+        assert_eq!(vault.placed_treasure[1].description, "Potion of Healing");
+        assert_eq!(vault.placed_treasure[1].gp_value, 0); // Items have no inherent gp value
+        assert!(!vault.treasure_looted);
+    }
+
+    #[test]
+    fn module_to_dungeon_sets_room_keys() {
+        let module = sample_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        // Entry room should have key "entrance"
+        let entry = dungeon.find_room(0).unwrap();
+        assert_eq!(entry.key, Some("entrance".to_string()));
+
+        // Guard room should have key "guard"
+        let guard = dungeon.rooms.iter()
+            .find(|r| r.name == "Guard Chamber")
+            .expect("should have Guard Chamber");
+        assert_eq!(guard.key, Some("guard".to_string()));
     }
 }
