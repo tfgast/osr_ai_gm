@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::state::dungeon::DoorState;
 
@@ -79,14 +79,96 @@ fn expand_tilde(path: &str) -> String {
     }
 }
 
-/// Load a module definition from a JSON file.
-pub fn load_module(path: &str) -> Result<ModuleDef, String> {
-    let expanded = expand_tilde(path);
+/// Default directory for module files, relative to the working directory.
+pub const DEFAULT_MODULES_DIR: &str = "data/modules";
+
+/// Validate that a user-provided module path resolves within the allowed
+/// modules directory. Returns the canonicalized path on success.
+///
+/// This prevents path traversal attacks where a user could read arbitrary
+/// files by passing paths like `../../../../etc/passwd`.
+fn validate_module_path(user_path: &str, modules_dir: &str) -> Result<PathBuf, String> {
+    let expanded = expand_tilde(user_path);
     let path = Path::new(&expanded);
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read module file {}: {}", path.display(), e))?;
+
+    // Resolve to absolute path
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|_| "Failed to resolve module path.".to_string())?
+            .join(path)
+    };
+
+    // Normalize the path (resolve `.` and `..`) without hitting the filesystem,
+    // so we can reject traversal even when the target file doesn't exist.
+    let normalized = normalize_path(&absolute);
+
+    // Normalize the base directory the same way, then canonicalize it
+    let base_abs = if Path::new(modules_dir).is_absolute() {
+        PathBuf::from(modules_dir)
+    } else {
+        std::env::current_dir()
+            .map_err(|_| "Failed to resolve module path.".to_string())?
+            .join(modules_dir)
+    };
+    let base_normalized = normalize_path(&base_abs);
+
+    // Check that the normalized path is within the modules directory.
+    // This catches traversal even if the file doesn't exist.
+    if !normalized.starts_with(&base_normalized) {
+        return Err("Module path must be within the modules directory.".to_string());
+    }
+
+    // Now verify the file actually exists and resolve symlinks
+    let base_canonical = base_abs
+        .canonicalize()
+        .map_err(|_| "Modules directory not found.".to_string())?;
+
+    let canonical = absolute
+        .canonicalize()
+        .map_err(|_| "Module file not found.".to_string())?;
+
+    // Final check after symlink resolution
+    if !canonical.starts_with(&base_canonical) {
+        return Err("Module path must be within the modules directory.".to_string());
+    }
+
+    Ok(canonical)
+}
+
+/// Normalize a path by resolving `.` and `..` components without filesystem access.
+fn normalize_path(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut parts: Vec<Component> = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir => {
+                // Only pop if the last component is a normal directory
+                if matches!(parts.last(), Some(Component::Normal(_))) {
+                    parts.pop();
+                } else {
+                    parts.push(component);
+                }
+            }
+            Component::CurDir => {} // skip
+            c => parts.push(c),
+        }
+    }
+    parts.iter().collect()
+}
+
+/// Load a module definition from a JSON file.
+///
+/// The path is validated to resolve within `modules_dir` to prevent
+/// path traversal attacks. Pass [`DEFAULT_MODULES_DIR`] for the standard
+/// location.
+pub fn load_module(path: &str, modules_dir: &str) -> Result<ModuleDef, String> {
+    let safe_path = validate_module_path(path, modules_dir)?;
+    let content = fs::read_to_string(&safe_path)
+        .map_err(|_| "Failed to read module file.".to_string())?;
     let module: ModuleDef = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse module file {}: {}", path.display(), e))?;
+        .map_err(|_| "Module file contains invalid JSON.".to_string())?;
 
     // Validate the module
     validate_module(&module)?;
@@ -441,5 +523,69 @@ mod tests {
     fn expand_tilde_no_tilde() {
         assert_eq!(expand_tilde("/absolute/path"), "/absolute/path");
         assert_eq!(expand_tilde("relative/path"), "relative/path");
+    }
+
+    #[test]
+    fn validate_path_within_modules_dir() {
+        // Valid path within data/modules should succeed
+        let result = validate_module_path(
+            "data/modules/sample_crypt/module.json",
+            "data/modules",
+        );
+        assert!(result.is_ok(), "valid module path should succeed: {:?}", result);
+    }
+
+    #[test]
+    fn validate_path_traversal_rejected() {
+        // Path traversal should be rejected
+        let result = validate_module_path(
+            "data/modules/../../Cargo.toml",
+            "data/modules",
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("must be within the modules directory"),
+            "expected modules directory error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn validate_absolute_path_outside_modules_rejected() {
+        // Absolute path outside modules dir should be rejected
+        let result = validate_module_path("/etc/passwd", "data/modules");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_nonexistent_file_rejected() {
+        // Nonexistent file should fail at canonicalization
+        let result = validate_module_path(
+            "data/modules/nonexistent/module.json",
+            "data/modules",
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn load_module_valid_path() {
+        let result = load_module(
+            "data/modules/sample_crypt/module.json",
+            "data/modules",
+        );
+        assert!(result.is_ok(), "should load valid module: {:?}", result);
+        assert_eq!(result.unwrap().name, "Sample Crypt");
+    }
+
+    #[test]
+    fn load_module_traversal_blocked() {
+        let result = load_module(
+            "data/modules/../../Cargo.toml",
+            "data/modules",
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must be within the modules directory"));
     }
 }

@@ -1,6 +1,6 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
-use crate::rules::module::{load_module, ModuleDef, PlacedTreasure};
+use crate::rules::module::{load_module, ModuleDef, PlacedTreasure, DEFAULT_MODULES_DIR};
 use crate::state::dungeon::{Door, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room};
 use crate::state::game::GameMode;
 use crate::state::time::TimeTracker;
@@ -24,7 +24,7 @@ impl Command for LoadModuleCommand {
         }
 
         let path = args.join(" ");
-        let module = match load_module(&path) {
+        let module = match load_module(&path, DEFAULT_MODULES_DIR) {
             Ok(m) => m,
             Err(e) => return CommandResult::error(e),
         };

@@ -654,7 +654,7 @@ fn load_module(id: &str, state: &mut GameState, path: &str) -> GMResponse {
     use crate::command::module_cmds::module_to_dungeon;
     use crate::rules::module;
 
-    let module_def = match module::load_module(path) {
+    let module_def = match module::load_module(path, module::DEFAULT_MODULES_DIR) {
         Ok(m) => m,
         Err(e) => return GMResponse::err(id, e, state.mode.clone()),
     };
@@ -1810,10 +1810,23 @@ mod tests {
     fn load_module_not_found() {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::LoadModule {
-            path: "nonexistent/module.json".to_string(),
+            path: "data/modules/nonexistent/module.json".to_string(),
         }), &mut state);
         assert!(!resp.success);
-        assert!(resp.error.unwrap().contains("Failed to read"));
+        assert!(resp.error.unwrap().contains("not found"));
+    }
+
+    #[test]
+    fn load_module_path_traversal_rejected() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LoadModule {
+            path: "data/modules/../../etc/passwd".to_string(),
+        }), &mut state);
+        assert!(!resp.success);
+        assert!(
+            resp.error.unwrap().contains("must be within the modules directory"),
+            "path traversal should be blocked"
+        );
     }
 
     #[test]
