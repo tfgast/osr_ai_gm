@@ -5,7 +5,7 @@ use crate::persist::{self, GameState};
 use crate::rules::{class, spell_data, thief};
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
-use super::{combat_handlers, exploration_handlers, query_handlers};
+use super::{combat_handlers, exploration_handlers, inventory_handlers, query_handlers};
 
 /// Process a GMRequest against the current GameState and return a GMResponse.
 pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
@@ -113,6 +113,12 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         }
         GMCommand::SetRations { amount } => set_rations(id, state, *amount),
         GMCommand::AddRations { amount } => add_rations(id, state, *amount),
+
+        // -- Inventory --
+        GMCommand::Buy { character, item_name } => inventory_handlers::buy(id, state, character, item_name),
+        GMCommand::Drop { character, item_name } => inventory_handlers::drop(id, state, character, item_name),
+        GMCommand::Equip { character, item_name } => inventory_handlers::equip(id, state, character, item_name),
+        GMCommand::Loot { character, item_name, value_gp } => inventory_handlers::loot(id, state, character, item_name, *value_gp),
 
         // -- System --
         GMCommand::Save { path } => save_game(id, state, path),

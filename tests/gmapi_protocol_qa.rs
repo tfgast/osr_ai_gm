@@ -10,7 +10,7 @@
 use osr_ai_gm::gmapi::protocol::{EncounterParams, GMCommand, GMRequest, GMResponse, parse_request};
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
-use osr_ai_gm::model::{AbilityScores, Character, CombatState, Monster};
+use osr_ai_gm::model::{AbilityScores, Character, CombatState, Item, Monster};
 use osr_ai_gm::rules::alignment::Alignment;
 use osr_ai_gm::rules::class::Class;
 use osr_ai_gm::state::dungeon::DoorState;
@@ -3137,4 +3137,415 @@ fn declare_spell_unknown_character() {
     assert_response_format(&resp, "1");
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("no party member"));
+}
+
+// ===========================================================================
+// Buy
+// ===========================================================================
+
+#[test]
+fn buy_happy_path() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("buy1", GMCommand::Buy {
+        character: "Aldric".to_string(),
+        item_name: "Sword".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "buy1");
+    assert!(resp.success);
+    assert!(resp.message.contains("buys Sword"));
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["character"], "Aldric");
+    assert_eq!(data["item"], "Sword");
+    assert_eq!(data["cost_gp"], 10);
+
+    let c = state.party.find_member("Aldric").unwrap();
+    assert_eq!(c.gold_gp, 110); // 120 - 10
+    assert_eq!(c.inventory.len(), 1);
+    assert_eq!(c.inventory[0].name, "Sword");
+}
+
+#[test]
+fn buy_insufficient_gold() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.gold_gp = 5;
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("buy2", GMCommand::Buy {
+        character: "Aldric".to_string(),
+        item_name: "Plate mail".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "buy2");
+    assert!(!resp.success);
+    assert!(resp.message.contains("5 gp"));
+}
+
+#[test]
+fn buy_unknown_item() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("buy3", GMCommand::Buy {
+        character: "Aldric".to_string(),
+        item_name: "Phaser".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "buy3");
+    assert!(!resp.success);
+    assert!(resp.message.contains("unknown item"));
+}
+
+#[test]
+fn buy_unknown_character() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("buy4", GMCommand::Buy {
+        character: "Nobody".to_string(),
+        item_name: "Sword".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "buy4");
+    assert!(!resp.success);
+    assert!(resp.message.contains("no party member"));
+}
+
+#[test]
+fn buy_suggests_similar() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("buy5", GMCommand::Buy {
+        character: "Aldric".to_string(),
+        item_name: "chain".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.message.contains("Did you mean"));
+}
+
+#[test]
+fn buy_json_parse() {
+    let json = r#"{"id":"bp1","command":{"type":"Buy","params":{"character":"Aldric","item_name":"Sword"}}}"#;
+    let req = parse_request(json).unwrap();
+    assert_eq!(req.id, "bp1");
+    match &req.command {
+        GMCommand::Buy { character, item_name } => {
+            assert_eq!(character, "Aldric");
+            assert_eq!(item_name, "Sword");
+        }
+        _ => panic!("expected Buy"),
+    }
+}
+
+// ===========================================================================
+// Drop
+// ===========================================================================
+
+#[test]
+fn drop_happy_path() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.inventory.push(Item::new("Sword", 60.0, 10));
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("dr1", GMCommand::Drop {
+        character: "Aldric".to_string(),
+        item_name: "Sword".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "dr1");
+    assert!(resp.success);
+    assert!(resp.message.contains("drops Sword"));
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["character"], "Aldric");
+    assert_eq!(data["item"], "Sword");
+    assert!(state.party.find_member("Aldric").unwrap().inventory.is_empty());
+}
+
+#[test]
+fn drop_missing_item() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("dr2", GMCommand::Drop {
+        character: "Aldric".to_string(),
+        item_name: "Sword".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "dr2");
+    assert!(!resp.success);
+    assert!(resp.message.contains("does not have"));
+}
+
+#[test]
+fn drop_unknown_character() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("dr3", GMCommand::Drop {
+        character: "Nobody".to_string(),
+        item_name: "Sword".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "dr3");
+    assert!(!resp.success);
+    assert!(resp.message.contains("no party member"));
+}
+
+#[test]
+fn drop_json_parse() {
+    let json = r#"{"id":"dp1","command":{"type":"Drop","params":{"character":"Aldric","item_name":"Sword"}}}"#;
+    let req = parse_request(json).unwrap();
+    assert_eq!(req.id, "dp1");
+    match &req.command {
+        GMCommand::Drop { character, item_name } => {
+            assert_eq!(character, "Aldric");
+            assert_eq!(item_name, "Sword");
+        }
+        _ => panic!("expected Drop"),
+    }
+}
+
+// ===========================================================================
+// Equip
+// ===========================================================================
+
+#[test]
+fn equip_happy_path() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.abilities.dexterity = 10; // no DEX mod
+    c.inventory.push(Item::new("Leather", 150.0, 20));
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("eq1", GMCommand::Equip {
+        character: "Aldric".to_string(),
+        item_name: "Leather".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "eq1");
+    assert!(resp.success);
+    assert!(resp.message.contains("equips Leather"));
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["character"], "Aldric");
+    assert_eq!(data["item"], "Leather");
+    assert_eq!(data["action"], "equips");
+    assert_eq!(data["ac"], 7);
+    assert_eq!(state.party.find_member("Aldric").unwrap().ac, 7);
+}
+
+#[test]
+fn equip_unequip_toggles() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.abilities.dexterity = 10;
+    let mut item = Item::new("Leather", 150.0, 20);
+    item.equipped = true;
+    c.inventory.push(item);
+    c.ac = 7;
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("eq2", GMCommand::Equip {
+        character: "Aldric".to_string(),
+        item_name: "Leather".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "eq2");
+    assert!(resp.success);
+    assert!(resp.message.contains("unequips Leather"));
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["action"], "unequips");
+    assert_eq!(data["ac"], 9); // back to unarmoured
+}
+
+#[test]
+fn equip_missing_item() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("eq3", GMCommand::Equip {
+        character: "Aldric".to_string(),
+        item_name: "Sword".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "eq3");
+    assert!(!resp.success);
+    assert!(resp.message.contains("does not have"));
+}
+
+#[test]
+fn equip_unknown_character() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("eq4", GMCommand::Equip {
+        character: "Nobody".to_string(),
+        item_name: "Sword".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "eq4");
+    assert!(!resp.success);
+    assert!(resp.message.contains("no party member"));
+}
+
+#[test]
+fn equip_json_parse() {
+    let json = r#"{"id":"ep1","command":{"type":"Equip","params":{"character":"Aldric","item_name":"Leather"}}}"#;
+    let req = parse_request(json).unwrap();
+    assert_eq!(req.id, "ep1");
+    match &req.command {
+        GMCommand::Equip { character, item_name } => {
+            assert_eq!(character, "Aldric");
+            assert_eq!(item_name, "Leather");
+        }
+        _ => panic!("expected Equip"),
+    }
+}
+
+// ===========================================================================
+// Loot
+// ===========================================================================
+
+#[test]
+fn loot_happy_path_no_dungeon() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("lo1", GMCommand::Loot {
+        character: "Aldric".to_string(),
+        item_name: "Ruby gem".to_string(),
+        value_gp: Some(500),
+    }), &mut state);
+    assert_response_format(&resp, "lo1");
+    assert!(resp.success);
+    assert!(resp.message.contains("picks up Ruby gem"));
+    assert!(resp.message.contains("500 gp"));
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["character"], "Aldric");
+    assert_eq!(data["item"], "Ruby gem");
+    assert_eq!(data["value_gp"], 500);
+
+    let c = state.party.find_member("Aldric").unwrap();
+    assert_eq!(c.inventory.len(), 1);
+    assert_eq!(c.inventory[0].name, "Ruby gem");
+    assert_eq!(c.inventory[0].value_gp, 500);
+}
+
+#[test]
+fn loot_no_value() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("lo2", GMCommand::Loot {
+        character: "Aldric".to_string(),
+        item_name: "Old key".to_string(),
+        value_gp: None,
+    }), &mut state);
+    assert_response_format(&resp, "lo2");
+    assert!(resp.success);
+    assert!(resp.message.contains("picks up Old key"));
+    assert!(!resp.message.contains("gp"));
+
+    let c = state.party.find_member("Aldric").unwrap();
+    assert_eq!(c.inventory[0].value_gp, 0);
+}
+
+#[test]
+fn loot_from_dungeon_room() {
+    use osr_ai_gm::state::dungeon::{DungeonState, Room, PlacedTreasureInstance};
+    use osr_ai_gm::state::time::TimeTracker;
+
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let mut dungeon = DungeonState::new(1);
+    let room = Room::new(0, "Vault")
+        .with_placed_treasure(vec![
+            PlacedTreasureInstance::new("Ruby gem", 500),
+        ]);
+    dungeon.add_room(room).unwrap();
+    dungeon.current_room = Some(0);
+    dungeon.explored.insert(0);
+    state.dungeon = Some(dungeon);
+    state.time = Some(TimeTracker::new());
+    state.mode = GameMode::Exploration;
+
+    let resp = handle_request(&req("lo3", GMCommand::Loot {
+        character: "Aldric".to_string(),
+        item_name: "Ruby gem".to_string(),
+        value_gp: None,
+    }), &mut state);
+    assert_response_format(&resp, "lo3");
+    assert!(resp.success);
+    assert!(resp.message.contains("picks up Ruby gem"));
+    assert!(resp.message.contains("500 gp"));
+
+    // Treasure should be marked as taken
+    let room = state.dungeon.as_ref().unwrap().find_room(0).unwrap();
+    assert!(room.placed_treasure[0].taken);
+}
+
+#[test]
+fn loot_item_not_in_room() {
+    use osr_ai_gm::state::dungeon::{DungeonState, Room, PlacedTreasureInstance};
+    use osr_ai_gm::state::time::TimeTracker;
+
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let mut dungeon = DungeonState::new(1);
+    let room = Room::new(0, "Vault")
+        .with_placed_treasure(vec![
+            PlacedTreasureInstance::new("Ruby gem", 500),
+        ]);
+    dungeon.add_room(room).unwrap();
+    dungeon.current_room = Some(0);
+    state.dungeon = Some(dungeon);
+    state.time = Some(TimeTracker::new());
+    state.mode = GameMode::Exploration;
+
+    let resp = handle_request(&req("lo4", GMCommand::Loot {
+        character: "Aldric".to_string(),
+        item_name: "Diamond".to_string(),
+        value_gp: None,
+    }), &mut state);
+    assert_response_format(&resp, "lo4");
+    assert!(!resp.success);
+    assert!(resp.message.contains("no lootable item"));
+}
+
+#[test]
+fn loot_unknown_character() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("lo5", GMCommand::Loot {
+        character: "Nobody".to_string(),
+        item_name: "Ruby gem".to_string(),
+        value_gp: Some(100),
+    }), &mut state);
+    assert_response_format(&resp, "lo5");
+    assert!(!resp.success);
+    assert!(resp.message.contains("no party member"));
+}
+
+#[test]
+fn loot_json_parse() {
+    let json = r#"{"id":"lp1","command":{"type":"Loot","params":{"character":"Aldric","item_name":"Ruby gem","value_gp":500}}}"#;
+    let req = parse_request(json).unwrap();
+    assert_eq!(req.id, "lp1");
+    match &req.command {
+        GMCommand::Loot { character, item_name, value_gp } => {
+            assert_eq!(character, "Aldric");
+            assert_eq!(item_name, "Ruby gem");
+            assert_eq!(*value_gp, Some(500));
+        }
+        _ => panic!("expected Loot"),
+    }
+}
+
+#[test]
+fn loot_json_parse_no_value() {
+    let json = r#"{"id":"lp2","command":{"type":"Loot","params":{"character":"Aldric","item_name":"Old key"}}}"#;
+    let req = parse_request(json).unwrap();
+    match &req.command {
+        GMCommand::Loot { value_gp, .. } => {
+            assert_eq!(*value_gp, None);
+        }
+        _ => panic!("expected Loot"),
+    }
 }

@@ -252,6 +252,30 @@ pub enum GMCommand {
     /// Add rations to the party supply.
     AddRations { amount: u32 },
 
+    // -- Inventory management --
+    /// Buy equipment from tables.
+    Buy {
+        character: String,
+        item_name: String,
+    },
+    /// Drop an item from inventory.
+    Drop {
+        character: String,
+        item_name: String,
+    },
+    /// Equip or unequip an item (toggles equipped state, recalculates AC).
+    Equip {
+        character: String,
+        item_name: String,
+    },
+    /// Loot treasure from current room (or free-form if no dungeon).
+    Loot {
+        character: String,
+        item_name: String,
+        #[serde(default)]
+        value_gp: Option<u32>,
+    },
+
     // -- System --
     /// Save game state.
     Save {
@@ -684,6 +708,71 @@ mod tests {
         ];
         for json in &commands {
             assert!(parse_request(json).is_ok(), "failed to parse: {}", json);
+        }
+    }
+
+    #[test]
+    fn parse_buy() {
+        let json = r#"{"id":"b1","command":{"type":"Buy","params":{"character":"Aldric","item_name":"Sword"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Buy { character, item_name } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(item_name, "Sword");
+            }
+            _ => panic!("expected Buy"),
+        }
+    }
+
+    #[test]
+    fn parse_drop() {
+        let json = r#"{"id":"d1","command":{"type":"Drop","params":{"character":"Aldric","item_name":"Sword"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Drop { character, item_name } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(item_name, "Sword");
+            }
+            _ => panic!("expected Drop"),
+        }
+    }
+
+    #[test]
+    fn parse_equip() {
+        let json = r#"{"id":"e1","command":{"type":"Equip","params":{"character":"Aldric","item_name":"Leather"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Equip { character, item_name } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(item_name, "Leather");
+            }
+            _ => panic!("expected Equip"),
+        }
+    }
+
+    #[test]
+    fn parse_loot() {
+        let json = r#"{"id":"l1","command":{"type":"Loot","params":{"character":"Aldric","item_name":"Ruby gem","value_gp":500}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Loot { character, item_name, value_gp } => {
+                assert_eq!(character, "Aldric");
+                assert_eq!(item_name, "Ruby gem");
+                assert_eq!(*value_gp, Some(500));
+            }
+            _ => panic!("expected Loot"),
+        }
+    }
+
+    #[test]
+    fn parse_loot_no_value() {
+        let json = r#"{"id":"l2","command":{"type":"Loot","params":{"character":"Aldric","item_name":"Old key"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Loot { value_gp, .. } => {
+                assert!(value_gp.is_none());
+            }
+            _ => panic!("expected Loot"),
         }
     }
 
