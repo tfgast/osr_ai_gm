@@ -1,4 +1,4 @@
-use crate::command::{Command, CommandResult};
+use super::{Command, CommandResult};
 use crate::engine::{combat, xp};
 use crate::model::{CombatState, Monster};
 use crate::persist::GameState;

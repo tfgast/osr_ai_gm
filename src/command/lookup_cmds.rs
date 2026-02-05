@@ -1,4 +1,4 @@
-use crate::command::{Command, CommandResult};
+use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::rules::magic_item::{
     find_magic_item, find_magic_items_partial, search_magic_items, ItemCategory,
