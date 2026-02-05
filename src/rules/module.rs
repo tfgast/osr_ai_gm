@@ -314,6 +314,7 @@ mod tests {
             name: "Conflict".to_string(),
             level_range: (1, 2),
             entry_room: "room_a".to_string(),
+            sections: HashMap::new(),
             rooms,
         };
         let err = validate_module(&module).unwrap_err();
@@ -349,6 +350,7 @@ mod tests {
             name: "Match".to_string(),
             level_range: (1, 2),
             entry_room: "room_a".to_string(),
+            sections: HashMap::new(),
             rooms,
         };
         assert!(validate_module(&module).is_ok());
