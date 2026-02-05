@@ -159,19 +159,21 @@ pub fn search_room_with<R: Rng>(
         result.msg(msg);
     }
 
+    let current = match dungeon.current_room {
+        Some(id) => id,
+        None => return result,
+    };
+
     let threshold = if is_elf { 2 } else { 1 };
     let roll: u32 = rng.gen_range(1..=6);
     let success = roll <= threshold;
 
-    if let Some(current) = dungeon.current_room {
-        if let Some(room) = dungeon.find_room_mut(current) {
-            room.searched = true;
-        }
+    if let Some(room) = dungeon.find_room_mut(current) {
+        room.searched = true;
     }
 
     if success {
         // Check for secret doors in this room
-        let current = dungeon.current_room.unwrap_or(0);
         let mut found_something = false;
         for door in &mut dungeon.doors {
             if door.state == DoorState::Secret && !door.discovered
@@ -194,27 +196,25 @@ pub fn search_room_with<R: Rng>(
     }
 
     // Check for placed treasure in room (module support)
-    if let Some(current) = dungeon.current_room {
-        if let Some(room) = dungeon.find_room(current) {
-            if !room.treasure_looted && !room.placed_treasure.is_empty() {
-                let loot: Vec<_> = room.placed_treasure.iter()
-                    .filter(|t| !t.taken)
-                    .cloned()
-                    .collect();
-                if !loot.is_empty() {
-                    // Mark treasure as taken and looted
-                    if let Some(room_mut) = dungeon.find_room_mut(current) {
-                        room_mut.treasure_looted = true;
-                        for t in &mut room_mut.placed_treasure {
-                            t.taken = true;
-                        }
+    if let Some(room) = dungeon.find_room(current) {
+        if !room.treasure_looted && !room.placed_treasure.is_empty() {
+            let loot: Vec<_> = room.placed_treasure.iter()
+                .filter(|t| !t.taken)
+                .cloned()
+                .collect();
+            if !loot.is_empty() {
+                // Mark treasure as taken and looted
+                if let Some(room_mut) = dungeon.find_room_mut(current) {
+                    room_mut.treasure_looted = true;
+                    for t in &mut room_mut.placed_treasure {
+                        t.taken = true;
                     }
-                    // Report treasure found
-                    for t in &loot {
-                        result.msg(format!("Treasure found: {} ({}gp)", t.description, t.gp_value));
-                    }
-                    result.placed_treasure = Some(loot);
                 }
+                // Report treasure found
+                for t in &loot {
+                    result.msg(format!("Treasure found: {} ({}gp)", t.description, t.gp_value));
+                }
+                result.placed_treasure = Some(loot);
             }
         }
     }
