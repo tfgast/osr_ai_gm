@@ -1,3 +1,4 @@
+mod location;
 mod party;
 
 use ratatui::prelude::*;
@@ -48,8 +49,20 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(p, inner);
     }
 
-    // Top-right: Location panel (placeholder)
-    render_placeholder(f, top_cols[1], " Location ", Color::Magenta);
+    // Top-right: Location panel
+    if let Some(ref state) = app.state {
+        location::render_location(f, top_cols[1], state);
+    } else {
+        let block = Block::default()
+            .title(" Location ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Magenta));
+        let inner = block.inner(top_cols[1]);
+        f.render_widget(block, top_cols[1]);
+        let p = Paragraph::new("(waiting for state...)")
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(p, inner);
+    }
 
     // Bottom-left: Log panel (placeholder)
     render_placeholder(f, bot_cols[0], " Log ", Color::Green);
