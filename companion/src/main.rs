@@ -42,6 +42,13 @@ fn main() -> io::Result<()> {
                 match key.code {
                     KeyCode::Char('q') => app.quit = true,
                     KeyCode::Char('?') => app.show_help = !app.show_help,
+                    KeyCode::Char('l') => app.show_log = !app.show_log,
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        app.log_scroll = app.log_scroll.saturating_add(1);
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        app.log_scroll = app.log_scroll.saturating_sub(1);
+                    }
                     KeyCode::Esc => {
                         if app.show_help {
                             app.show_help = false;

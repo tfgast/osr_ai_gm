@@ -1,4 +1,5 @@
 mod location;
+mod log;
 mod party;
 
 use ratatui::prelude::*;
@@ -64,8 +65,25 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(p, inner);
     }
 
-    // Bottom-left: Log panel (placeholder)
-    render_placeholder(f, bot_cols[0], " Log ", Color::Green);
+    // Bottom-left: Log panel
+    if app.show_log {
+        if let Some(ref state) = app.state {
+            log::render_log(f, bot_cols[0], state, app.log_scroll);
+        } else {
+            render_placeholder(f, bot_cols[0], " Log ", Color::Green);
+        }
+    } else {
+        let block = Block::default()
+            .title(" Log [hidden] ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::DarkGray));
+        let inner = block.inner(bot_cols[0]);
+        f.render_widget(block, bot_cols[0]);
+        let p = Paragraph::new("(press l to show)")
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center);
+        f.render_widget(p, inner);
+    }
 
     // Bottom-right: Image panel (placeholder)
     render_placeholder(f, bot_cols[1], " Image ", Color::Blue);
@@ -122,7 +140,7 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
 
 fn render_help_overlay(f: &mut Frame, area: Rect) {
     let w = 40u16.min(area.width.saturating_sub(4));
-    let h = 10u16.min(area.height.saturating_sub(4));
+    let h = 14u16.min(area.height.saturating_sub(4));
     let x = (area.width.saturating_sub(w)) / 2;
     let y = (area.height.saturating_sub(h)) / 2;
     let popup = Rect::new(x, y, w, h);
@@ -138,6 +156,9 @@ fn render_help_overlay(f: &mut Frame, area: Rect) {
         Line::raw(""),
         Line::raw("  q        Quit"),
         Line::raw("  ?        Toggle this help"),
+        Line::raw("  l        Toggle log panel"),
+        Line::raw("  j / Down Scroll log down"),
+        Line::raw("  k / Up   Scroll log up"),
         Line::raw(""),
         Line::styled(
             "  OSR AI GM Companion TUI",

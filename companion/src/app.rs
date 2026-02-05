@@ -6,6 +6,7 @@ pub struct App {
     pub state: Option<GameState>,
     pub quit: bool,
     pub show_help: bool,
+    pub show_log: bool,
     pub log_scroll: u16,
     pub last_update: Option<Instant>,
 }
@@ -16,6 +17,7 @@ impl App {
             state: None,
             quit: false,
             show_help: false,
+            show_log: true,
             log_scroll: 0,
             last_update: None,
         }
