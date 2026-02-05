@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "companion"]
+default-members = ["."]
+
 [package]
 name = "osr_ai_gm"
 version = "0.1.0"

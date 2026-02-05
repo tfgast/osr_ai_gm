@@ -129,6 +129,24 @@ pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Return the live-state export path (`~/.osr_data/live_state.json`).
+///
+/// The companion TUI watches this file for real-time state updates.
+pub fn live_state_path() -> io::Result<PathBuf> {
+    let home = std::env::var("HOME")
+        .map_err(|_| io::Error::new(io::ErrorKind::NotFound, "HOME not set"))?;
+    Ok(PathBuf::from(home).join(".osr_data").join("live_state.json"))
+}
+
+/// Export the current game state to the live-state file.
+///
+/// Uses the same atomic write (write-to-temp-then-rename) as [`save`] to
+/// prevent the companion TUI from reading a partially-written file.
+pub fn export_live_state(state: &GameState) -> io::Result<()> {
+    let path = live_state_path()?;
+    save(state, &path)
+}
+
 /// Load game state from a JSON file.
 pub fn load(path: &Path) -> io::Result<GameState> {
     let data = fs::read_to_string(path)?;
@@ -221,6 +239,39 @@ mod tests {
     fn safe_save_path_rejects_whitespace_only() {
         let result = safe_save_path("   ");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn export_live_state_roundtrip() {
+        // Override HOME so we write to a temp directory, not the real home.
+        let dir = std::env::temp_dir().join("osr_live_state_test");
+        let _ = fs::remove_dir_all(&dir);
+        let osr_data = dir.join(".osr_data");
+        fs::create_dir_all(&osr_data).unwrap();
+
+        // Temporarily set HOME for this test.
+        let orig_home = std::env::var("HOME").unwrap();
+        std::env::set_var("HOME", &dir);
+
+        let mut state = GameState::new();
+        state.party.add_member(Character::new("Tharos", Class::MagicUser));
+        state.dungeon_level = 5;
+        state.notes.push("Found the amulet.".to_string());
+
+        export_live_state(&state).unwrap();
+
+        let live_path = live_state_path().unwrap();
+        assert!(live_path.exists(), "live_state.json should exist after export");
+
+        let loaded = load(&live_path).unwrap();
+        assert_eq!(loaded.party.members.len(), 1);
+        assert_eq!(loaded.party.members[0].name, "Tharos");
+        assert_eq!(loaded.dungeon_level, 5);
+        assert_eq!(loaded.notes[0], "Found the amulet.");
+
+        // Restore HOME and clean up.
+        std::env::set_var("HOME", orig_home);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

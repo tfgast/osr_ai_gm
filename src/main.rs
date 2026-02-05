@@ -225,6 +225,9 @@ fn main() {
         let result = registry.dispatch(cmd_name, &args, &mut state);
         println!("{}", result.output);
 
+        // Export live state for the companion TUI (best-effort, ignore errors).
+        let _ = persist::export_live_state(&state);
+
         if result.quit {
             break;
         }
