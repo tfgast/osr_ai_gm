@@ -8,18 +8,39 @@ pub mod state;
 pub mod telemetry;
 
 use command::CommandRegistry;
-use command::party::*;
-use command::combat_cmds::*;
-use command::exploration_cmds::*;
-use command::encounter_cmds::*;
-use command::inventory_cmds::*;
-use command::lookup_cmds::*;
-use command::retainer_cmds::*;
-use command::wilderness_cmds::*;
-use command::treasure_cmds::TreasureCommand;
-use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, TrainCommand, RulingCommand, HealCommand, DamageCommand, SetHpCommand, SetRationsCommand, AddRationsCommand, SpawnEncounterCommand};
+use command::combat_cmds::{
+    AttackCommand, CloseCommand, CombatLogCommand, CombatStatusCommand, DeclareSpellCommand,
+    EndCombatCommand, InitiativeCommand, KillCommand, MonsterAttackCommand, MoraleCommand,
+    RetreatCommand, SetHelplessCommand, StartCombatCommand, TurnUndeadCommand, WithdrawalCommand,
+};
+use command::encounter_cmds::{
+    EncounterCommand, EvadeCommand, ReactionCommand, SpawnNpcCommand, SurpriseCommand,
+};
+use command::exploration_cmds::{
+    AddDoorCommand, AddRoomCommand, EnterDungeonCommand, ExplorationStatusCommand, ExploreCommand,
+    ForceDoorCommand, LightCommand, ListenCommand, MoveRoomCommand, OpenCommand, RestCommand,
+    SearchCommand,
+};
+use command::gm_cmds::{
+    AddRationsCommand, AdvanceTurnCommand, AwardXpCommand, DamageCommand, HealCommand,
+    RulingCommand, SetHpCommand, SetRationsCommand, SpawnEncounterCommand, TrainCommand,
+};
+use command::inventory_cmds::{BuyCommand, DropCommand, EquipCommand, LootCommand};
+use command::lookup_cmds::{ItemCommand, SearchItemsCommand, TreasureTypeCommand};
 use command::module_cmds::LoadModuleCommand;
-use command::system::*;
+use command::party::{ChargenCommand, ClassesCommand, EligibleCommand, PartyCommand};
+use command::retainer_cmds::{
+    DismissCommand, HireCommand, RetainerMoraleCommand, RetainersCommand,
+};
+use command::system::{
+    HelpCommand, LoadCommand, NoteCommand, NoteDeleteCommand, NotesCommand, QuitCommand,
+    RollCommand, SaveCommand,
+};
+use command::treasure_cmds::TreasureCommand;
+use command::wilderness_cmds::{
+    AddHexCommand, EnterWildernessCommand, ForageCommand, HuntCommand, OrientCommand,
+    TravelCommand, WildernessStatusCommand,
+};
 use persist::GameState;
 use std::io::{self, BufRead, Write};
 
