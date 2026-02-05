@@ -187,7 +187,6 @@ ROOM_DEFS = {
         "monsters": [{"name": "Floating Skeleton", "count": 2}],
         "exits": [
             {"to": "hall_of_guardians", "door": "closed"},
-            {"to": "chapel_st_sedge", "door": "open"},
             {"to": "hall_of_hounds", "door": "open"},
         ],
         "treasure": [
@@ -201,7 +200,7 @@ ROOM_DEFS = {
         "name": "Chapel of St Sedge",
         "exits": [
             {"to": "blindfolded_statue", "door": "open"},
-            {"to": "family_crypt", "door": "open"},
+            {"to": "hall_of_hounds", "door": "open"},
             {"to": "priests_quarters", "door": "locked"},
         ],
     },
@@ -239,6 +238,7 @@ ROOM_DEFS = {
         "name": "Hall of Hounds",
         "monsters": [{"name": "Stone Hound", "count": 2}],
         "exits": [
+            {"to": "chapel_st_sedge", "door": "open"},
             {"to": "family_crypt", "door": "open"},
             {"to": "statues_with_weapons", "door": "open"},
             {"to": "knights_tomb", "door": "locked"},
