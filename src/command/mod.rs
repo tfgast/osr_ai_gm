@@ -5,6 +5,7 @@ pub mod encounter_cmds;
 pub mod inventory_cmds;
 pub mod retainer_cmds;
 pub mod wilderness_cmds;
+pub mod treasure_cmds;
 pub mod gm_cmds;
 pub mod system;
 

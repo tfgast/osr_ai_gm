@@ -14,6 +14,7 @@ use command::encounter_cmds::*;
 use command::inventory_cmds::*;
 use command::retainer_cmds::*;
 use command::wilderness_cmds::*;
+use command::treasure_cmds::TreasureCommand;
 use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, RulingCommand, HealCommand, DamageCommand, SetHpCommand, SetRationsCommand, AddRationsCommand};
 use command::system::*;
 use persist::GameState;
@@ -116,6 +117,8 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(SurpriseCommand));
     registry.register(Box::new(ReactionCommand));
     registry.register(Box::new(EvadeCommand));
+    // Treasure
+    registry.register(Box::new(TreasureCommand));
     // Wilderness
     registry.register(Box::new(EnterWildernessCommand));
     registry.register(Box::new(AddHexCommand));
