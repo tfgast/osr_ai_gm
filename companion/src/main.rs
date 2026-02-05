@@ -1,97 +1,66 @@
-use std::path::PathBuf;
+mod app;
+mod ui;
+mod watcher;
+
+use std::io;
 use std::sync::mpsc;
-use std::thread;
 use std::time::Duration;
 
-use notify::{EventKind, RecursiveMode, Watcher};
-use osr_ai_gm::persist::GameState;
+use crossterm::event::{self, Event, KeyCode};
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
+use crossterm::ExecutableCommand;
+use ratatui::prelude::*;
 
-fn live_state_path() -> PathBuf {
-    let home = std::env::var("HOME").expect("HOME not set");
-    PathBuf::from(home).join(".osr_data").join("live_state.json")
-}
+fn main() -> io::Result<()> {
+    // Set up terminal
+    enable_raw_mode()?;
+    io::stdout().execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(io::stdout());
+    let mut terminal = Terminal::new(backend)?;
 
-fn print_summary(state: &GameState) {
-    println!("=== OSR AI GM — Live State ===");
-    println!("Mode: {}", state.mode);
-    println!(
-        "Party: {} member{}",
-        state.party.members.len(),
-        if state.party.members.len() == 1 { "" } else { "s" }
-    );
-    for c in &state.party.members {
-        println!(
-            "  {} — {:?} L{} | HP {}/{} | AC {} | XP {}",
-            c.name, c.class, c.level, c.hp, c.max_hp, c.ac, c.xp
-        );
-    }
-    if !state.retainers.is_empty() {
-        println!("Retainers: {}", state.retainers.len());
-    }
-    if let Some(ref combat) = state.combat {
-        println!(
-            "Combat: round {} | {} monster{} alive | distance {}",
-            combat.round,
-            combat.living_monster_count(),
-            if combat.living_monster_count() == 1 { "" } else { "s" },
-            combat.distance,
-        );
-    }
-    println!("Dungeon level: {}", state.dungeon_level);
-    println!("Turn: {}", state.turn());
-    println!("Gold: {} gp", state.party.gold);
-    if !state.notes.is_empty() {
-        println!("Notes: {}", state.notes.len());
-    }
-    println!();
-}
-
-fn try_read_and_print(path: &PathBuf) {
-    match std::fs::read_to_string(path) {
-        Ok(data) => match serde_json::from_str::<GameState>(&data) {
-            Ok(state) => print_summary(&state),
-            Err(e) => eprintln!("Parse error: {e}"),
-        },
-        Err(e) => eprintln!("Read error: {e}"),
-    }
-}
-
-fn main() {
-    let path = live_state_path();
-    let watch_dir = path.parent().expect("live_state.json has no parent dir");
-
-    println!("Companion watching: {}", path.display());
-    println!();
-
-    // Print current state if file already exists.
-    if path.exists() {
-        try_read_and_print(&path);
-    }
-
+    // Spawn file watcher
     let (tx, rx) = mpsc::channel();
+    let _watch_path = watcher::spawn_watcher(tx);
 
-    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-        if let Ok(event) = res {
-            let _ = tx.send(event);
+    let mut app = app::App::new();
+
+    // Main event loop
+    loop {
+        // Drain state updates from watcher
+        while let Ok(state) = rx.try_recv() {
+            app.update_state(state);
         }
-    })
-    .expect("failed to create file watcher");
 
-    // Watch the parent directory so we catch atomic renames into the target.
-    std::fs::create_dir_all(watch_dir).ok();
-    watcher
-        .watch(watch_dir.as_ref(), RecursiveMode::NonRecursive)
-        .expect("failed to watch directory");
+        // Draw
+        terminal.draw(|f| ui::draw(f, &app))?;
 
-    for event in rx {
-        let dominated = matches!(
-            event.kind,
-            EventKind::Create(_) | EventKind::Modify(_)
-        );
-        if dominated && event.paths.iter().any(|p| p.ends_with("live_state.json")) {
-            // 10ms delay to let atomic rename settle.
-            thread::sleep(Duration::from_millis(10));
-            try_read_and_print(&path);
+        // Poll for keyboard events (100ms timeout)
+        if event::poll(Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('q') => app.quit = true,
+                    KeyCode::Char('?') => app.show_help = !app.show_help,
+                    KeyCode::Esc => {
+                        if app.show_help {
+                            app.show_help = false;
+                        } else {
+                            app.quit = true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if app.quit {
+            break;
         }
     }
+
+    // Restore terminal
+    disable_raw_mode()?;
+    io::stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
 }
