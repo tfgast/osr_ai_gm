@@ -1,5 +1,5 @@
-/// Monster stat blocks loaded from JSON data files.
-/// Supports layered loading: core → modules → user customizations.
+//! Monster stat blocks loaded from JSON data files.
+//! Supports layered loading: core → modules → user customizations.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

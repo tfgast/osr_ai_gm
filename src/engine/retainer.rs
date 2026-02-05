@@ -1,5 +1,5 @@
-/// Retainer/hireling system per OSE Rules Tome.
-/// CHA-based max retainers, hiring reaction rolls, loyalty/morale.
+//! Retainer/hireling system per OSE Rules Tome.
+//! CHA-based max retainers, hiring reaction rolls, loyalty/morale.
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};

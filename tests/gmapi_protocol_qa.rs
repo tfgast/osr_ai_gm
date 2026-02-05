@@ -1,11 +1,11 @@
-/// GM API protocol QA — comprehensive tests for gmapi/interface.rs
-///
-/// Tests every GMCommand variant for:
-/// - Happy path (correct response format: id, success, message, mode, data)
-/// - At least one error path
-/// - State validation (commands reject in wrong game mode)
-/// - Response data field contains correct payload types
-/// - mode field accurately reflects GameMode after each command
+//! GM API protocol QA — comprehensive tests for gmapi/interface.rs
+//!
+//! Tests every GMCommand variant for:
+//! - Happy path (correct response format: id, success, message, mode, data)
+//! - At least one error path
+//! - State validation (commands reject in wrong game mode)
+//! - Response data field contains correct payload types
+//! - mode field accurately reflects GameMode after each command
 
 use osr_ai_gm::gmapi::protocol::{EncounterParams, GMCommand, GMRequest, GMResponse, parse_request};
 use osr_ai_gm::gmapi::interface::handle_request;

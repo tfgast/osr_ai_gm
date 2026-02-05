@@ -1,11 +1,11 @@
-/// Combat engine for OSE.
-///
-/// Implements the full combat round sequence per OSE Reference Booklet p116-124:
-/// 1. Declarations (spell casters, retreats)
-/// 2. Initiative (group d6, each side)
-/// 3. Winning side acts: morale -> movement -> missile -> magic -> melee
-/// 4. Losing side acts (same sub-phase order)
-/// 5. End-of-round bookkeeping
+//! Combat engine for OSE.
+//!
+//! Implements the full combat round sequence per OSE Reference Booklet p116-124:
+//! 1. Declarations (spell casters, retreats)
+//! 2. Initiative (group d6, each side)
+//! 3. Winning side acts: morale -> movement -> missile -> magic -> melee
+//! 4. Losing side acts (same sub-phase order)
+//! 5. End-of-round bookkeeping
 
 use rand::Rng;
 use std::fmt;

@@ -1,6 +1,6 @@
-/// Character generation engine for OSE.
-/// Implements the full chargen pipeline: roll abilities, validate class,
-/// apply racial modifiers, roll HP, roll gold, calculate derived stats.
+//! Character generation engine for OSE.
+//! Implements the full chargen pipeline: roll abilities, validate class,
+//! apply racial modifiers, roll HP, roll gold, calculate derived stats.
 
 use rand::Rng;
 use crate::dice;

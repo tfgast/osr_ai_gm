@@ -1,21 +1,21 @@
-/// Turn undead tables per OSE Reference Booklet p18.
-///
-/// Clerics can attempt to turn undead by presenting their holy symbol.
-/// The result depends on cleric level vs undead rank (based on HD).
-///
-/// Undead ranks:
-///   1 = Skeleton (1 HD)     5 = Wraith (5 HD)     9 = Infernal (9+ HD)
-///   2 = Zombie (2 HD)       6 = Mummy (6 HD)
-///   3 = Ghoul (3 HD)        7 = Spectre (7 HD)
-///   4 = Wight (4 HD)        8 = Vampire (8 HD)
-///
-/// The table follows a diagonal pattern based on (cleric_level - undead_rank):
-///   diff <= -3:  Impossible (cannot turn)
-///   diff == -2:  Need 11+ on 2d6
-///   diff == -1:  Need 9+ on 2d6
-///   diff ==  0:  Need 7+ on 2d6
-///   diff 1..=2:  Automatic Turn (T)
-///   diff >= 3:   Automatic Destroy (D)
+//! Turn undead tables per OSE Reference Booklet p18.
+//!
+//! Clerics can attempt to turn undead by presenting their holy symbol.
+//! The result depends on cleric level vs undead rank (based on HD).
+//!
+//! Undead ranks:
+//!   1 = Skeleton (1 HD)     5 = Wraith (5 HD)     9 = Infernal (9+ HD)
+//!   2 = Zombie (2 HD)       6 = Mummy (6 HD)
+//!   3 = Ghoul (3 HD)        7 = Spectre (7 HD)
+//!   4 = Wight (4 HD)        8 = Vampire (8 HD)
+//!
+//! The table follows a diagonal pattern based on (cleric_level - undead_rank):
+//!   diff <= -3:  Impossible (cannot turn)
+//!   diff == -2:  Need 11+ on 2d6
+//!   diff == -1:  Need 9+ on 2d6
+//!   diff ==  0:  Need 7+ on 2d6
+//!   diff 1..=2:  Automatic Turn (T)
+//!   diff >= 3:   Automatic Destroy (D)
 
 use serde::{Deserialize, Serialize};
 

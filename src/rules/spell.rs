@@ -1,4 +1,4 @@
-/// Spell slot progression tables per OSE Reference Booklet p16-17.
+//! Spell slot progression tables per OSE Reference Booklet p16-17.
 
 /// Spell slots available at a given level. Index 0 = 1st level spells, etc.
 /// A value of 0 means no spells of that level available.

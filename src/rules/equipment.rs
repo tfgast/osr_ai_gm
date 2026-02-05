@@ -1,5 +1,5 @@
-/// Equipment tables loaded from JSON data files.
-/// Covers adventuring gear, weapons, armour, ammunition, poisons, mounts, vehicles, and more.
+//! Equipment tables loaded from JSON data files.
+//! Covers adventuring gear, weapons, armour, ammunition, poisons, mounts, vehicles, and more.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

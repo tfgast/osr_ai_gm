@@ -1,5 +1,5 @@
-/// Magic item definitions loaded from JSON data files.
-/// Covers armor, miscellaneous items, potions, rings, rods, staves, wands, scrolls, swords, and weapons.
+//! Magic item definitions loaded from JSON data files.
+//! Covers armor, miscellaneous items, potions, rings, rods, staves, wands, scrolls, swords, and weapons.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

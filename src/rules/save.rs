@@ -1,4 +1,4 @@
-/// Saving throw tables per OSE Reference Booklet p13.
+//! Saving throw tables per OSE Reference Booklet p13.
 
 /// Five saving throw categories (D, W, P, B, S).
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]

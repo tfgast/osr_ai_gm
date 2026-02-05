@@ -1,5 +1,5 @@
-/// Class definitions for OSE B/X 7 + Advanced Fantasy 15 = 22 classes.
-/// Data from OSE Reference Booklet p12, p19 and Players Tomes.
+//! Class definitions for OSE B/X 7 + Advanced Fantasy 15 = 22 classes.
+//! Data from OSE Reference Booklet p12, p19 and Players Tomes.
 
 use serde::{Deserialize, Serialize};
 use super::save::SaveCategory;

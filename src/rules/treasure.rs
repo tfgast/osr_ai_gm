@@ -1,6 +1,6 @@
-/// Treasure type definitions loaded from JSON data files.
-/// Covers hoard treasures (A-O), individual treasures (P-T), and group treasures (U-V).
-/// Also includes gem and jewellery value tables.
+//! Treasure type definitions loaded from JSON data files.
+//! Covers hoard treasures (A-O), individual treasures (P-T), and group treasures (U-V).
+//! Also includes gem and jewellery value tables.
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};

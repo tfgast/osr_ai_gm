@@ -1,6 +1,6 @@
-/// Integration tests for the OSR AI GM engine.
-///
-/// Full scenario: create characters -> explore dungeon -> encounter -> combat -> loot -> XP -> level up.
+//! Integration tests for the OSR AI GM engine.
+//!
+//! Full scenario: create characters -> explore dungeon -> encounter -> combat -> loot -> XP -> level up.
 
 use osr_ai_gm::gmapi::protocol::{EncounterParams, GMCommand, GMRequest};
 use osr_ai_gm::gmapi::interface::handle_request;

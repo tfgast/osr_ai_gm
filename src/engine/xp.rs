@@ -1,4 +1,4 @@
-/// XP engine: award XP, check level advancement, apply level-up changes.
+//! XP engine: award XP, check level advancement, apply level-up changes.
 
 use rand::Rng;
 use crate::model::Character;

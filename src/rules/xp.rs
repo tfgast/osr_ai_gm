@@ -1,5 +1,5 @@
-/// XP thresholds and level advancement per OSE Rules Tome.
-/// Each class has its own XP progression table.
+//! XP thresholds and level advancement per OSE Rules Tome.
+//! Each class has its own XP progression table.
 
 use super::class::Class;
 

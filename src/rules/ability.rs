@@ -1,4 +1,4 @@
-/// Ability score modifier lookups per OSE Reference Booklet.
+//! Ability score modifier lookups per OSE Reference Booklet.
 
 /// STR melee modifier (attack and damage).
 pub fn str_melee_mod(score: i32) -> i32 {

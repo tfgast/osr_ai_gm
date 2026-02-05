@@ -1,5 +1,5 @@
-/// Spell definitions loaded from JSON data files.
-/// Covers Cleric, Magic-User, Druid, and Illusionist spell lists.
+//! Spell definitions loaded from JSON data files.
+//! Covers Cleric, Magic-User, Druid, and Illusionist spell lists.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

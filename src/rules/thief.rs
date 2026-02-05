@@ -1,5 +1,5 @@
-/// Thief skill tables per OSE Rules Tome.
-/// Most skills are d% (percentile), Hear Noise is d6.
+//! Thief skill tables per OSE Rules Tome.
+//! Most skills are d% (percentile), Hear Noise is d6.
 
 /// Thief skills available.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,5 +1,5 @@
-/// Adventure module definitions loaded from JSON files.
-/// Modules are prewritten dungeon adventures with rooms, monsters, treasure, and exits.
+//! Adventure module definitions loaded from JSON files.
+//! Modules are prewritten dungeon adventures with rooms, monsters, treasure, and exits.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
