@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OSE NPC Party Generation",
+  "description": "Tables for generating random NPC adventuring parties",
+  "type": "object",
+  "required": ["source", "counts", "class_level_table", "alignment_table", "party_types"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "description": "Source file name"
+    },
+    "counts": {
+      "type": "object",
+      "properties": {
+        "class_entries": { "type": "integer" },
+        "alignment_entries": { "type": "integer" },
+        "party_types": { "type": "integer" },
+        "ruler_reactions": { "type": "integer" }
+      }
+    },
+    "general_notes": {
+      "type": "object",
+      "properties": {
+        "spells": { "type": "string" },
+        "equipment": { "type": "string" },
+        "treasure": { "type": "string" },
+        "marching_order": { "type": "string" }
+      }
+    },
+    "class_level_table": {
+      "type": "array",
+      "description": "d20 table for random NPC class and level",
+      "items": {
+        "$ref": "#/definitions/class_entry"
+      }
+    },
+    "alignment_table": {
+      "type": "array",
+      "description": "d6 table for random alignment",
+      "items": {
+        "$ref": "#/definitions/alignment_entry"
+      }
+    },
+    "party_types": {
+      "type": "object",
+      "description": "Different party composition types",
+      "additionalProperties": {
+        "$ref": "#/definitions/party_type"
+      }
+    },
+    "strongholds": {
+      "$ref": "#/definitions/stronghold_data"
+    }
+  },
+  "definitions": {
+    "class_entry": {
+      "type": "object",
+      "required": ["roll", "class", "basic_level_dice", "expert_level_dice"],
+      "properties": {
+        "roll": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "class": { "type": "string" },
+        "basic_level_dice": { "type": "string" },
+        "expert_level_dice": { "type": "string" },
+        "demihuman": { "type": "boolean" },
+        "underworld_alternative": { "type": "string" }
+      }
+    },
+    "alignment_entry": {
+      "type": "object",
+      "required": ["min_roll", "max_roll", "alignment"],
+      "properties": {
+        "min_roll": { "type": "integer" },
+        "max_roll": { "type": "integer" },
+        "alignment": { "type": "string", "enum": ["Lawful", "Neutral", "Chaotic"] }
+      }
+    },
+    "party_type": {
+      "type": "object",
+      "properties": {
+        "party_size_dice": { "type": "string" },
+        "level_tier": { "type": "string", "enum": ["basic", "expert"] },
+        "mounted_chance": { "type": "integer" },
+        "magic_item_chance_per_level": { "type": "integer" },
+        "leader": {
+          "type": "object",
+          "properties": {
+            "class": { "type": "string" },
+            "level_dice": { "type": "string" }
+          }
+        },
+        "companions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "class": { "type": "string" },
+              "count_dice": { "type": "string" },
+              "level_dice": { "type": "string" },
+              "role": { "type": "string" }
+            }
+          }
+        },
+        "alternatives": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "stronghold_data": {
+      "type": "object",
+      "properties": {
+        "rulers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "level_dice": { "type": "string" },
+              "examples": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "patrols": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "count_dice": { "type": "string" },
+              "type": { "type": "string" },
+              "ac": {
+                "type": "object",
+                "properties": {
+                  "descending": { "type": "integer" },
+                  "ascending": { "type": "integer" }
+                }
+              },
+              "equipment": { "type": "string" },
+              "morale": { "type": "integer" }
+            }
+          }
+        },
+        "ruler_reactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "roll": { "type": "integer" },
+              "arcane": { "type": "string" },
+              "divine": { "type": "string" },
+              "martial": { "type": "string" }
+            }
+          }
+        },
+        "reaction_descriptions": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  }
+}

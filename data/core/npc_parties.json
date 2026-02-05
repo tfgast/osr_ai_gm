@@ -1,0 +1,359 @@
+{
+  "source": "Advanced_Fantasy_Referees_Tome_v1-3.md",
+  "counts": {
+    "class_entries": 20,
+    "alignment_entries": 3,
+    "party_types": 5,
+    "ruler_reactions": 6
+  },
+  "general_notes": {
+    "spells": "If spell casters present, choose or roll memorized spells",
+    "equipment": "Normal adventuring gear",
+    "treasure": "Treasure types U+V, shared among group",
+    "marching_order": "Decided by referee"
+  },
+  "class_level_table": [
+    {
+      "roll": 1,
+      "class": "Acrobat",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+4"
+    },
+    {
+      "roll": 2,
+      "class": "Assassin",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+4"
+    },
+    {
+      "roll": 3,
+      "class": "Barbarian",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 4,
+      "class": "Bard",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 5,
+      "class": "Cleric",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 6,
+      "class": "Druid",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 7,
+      "class": "Dwarf",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+6",
+      "demihuman": true,
+      "underworld_alternative": "Duergar"
+    },
+    {
+      "roll": 8,
+      "class": "Elf",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+2",
+      "demihuman": true,
+      "underworld_alternative": "Drow"
+    },
+    {
+      "roll": 9,
+      "class": "Fighter",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 10,
+      "class": "Fighter",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+5"
+    },
+    {
+      "roll": 11,
+      "class": "Gnome",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+2",
+      "demihuman": true,
+      "underworld_alternative": "Svirfneblin"
+    },
+    {
+      "roll": 12,
+      "class": "Half-Elf",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+2"
+    },
+    {
+      "roll": 13,
+      "class": "Halfling",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+2"
+    },
+    {
+      "roll": 14,
+      "class": "Half-Orc",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+4"
+    },
+    {
+      "roll": 15,
+      "class": "Illusionist",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 16,
+      "class": "Knight",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 17,
+      "class": "Magic-User",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 18,
+      "class": "Paladin",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 19,
+      "class": "Ranger",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+3"
+    },
+    {
+      "roll": 20,
+      "class": "Thief",
+      "basic_level_dice": "1d3",
+      "expert_level_dice": "1d6+4"
+    }
+  ],
+  "alignment_table": [
+    {
+      "min_roll": 1,
+      "max_roll": 2,
+      "alignment": "Lawful"
+    },
+    {
+      "min_roll": 3,
+      "max_roll": 4,
+      "alignment": "Neutral"
+    },
+    {
+      "min_roll": 5,
+      "max_roll": 6,
+      "alignment": "Chaotic"
+    }
+  ],
+  "party_types": {
+    "basic_adventurers": {
+      "party_size_dice": "1d4+4",
+      "level_tier": "basic",
+      "notes": [
+        "Roll alignment per NPC or once for party"
+      ]
+    },
+    "expert_adventurers": {
+      "party_size_dice": "1d6+3",
+      "level_tier": "expert",
+      "mounted_chance": 75,
+      "magic_item_chance_per_level": 5,
+      "notes": [
+        "Roll alignment per NPC or once for party",
+        "75% chance mounted in wilderness",
+        "Magic item chance: 5% per level per suitable sub-table"
+      ]
+    },
+    "high_level_cleric": {
+      "leader": {
+        "class": "Cleric",
+        "level_dice": "1d6+6"
+      },
+      "companions": [
+        {
+          "class": "Cleric",
+          "count_dice": "1d4",
+          "level_dice": "1d4+1"
+        },
+        {
+          "class": "Fighter",
+          "count_dice": "1d3",
+          "level_dice": "1d6"
+        }
+      ],
+      "alternatives": [
+        "Bard",
+        "Druid",
+        "Paladin"
+      ],
+      "notes": [
+        "Mounts and magic items as Expert Adventurers"
+      ]
+    },
+    "high_level_fighter": {
+      "leader": {
+        "class": "Fighter",
+        "level_dice": "1d4+6"
+      },
+      "companions": [
+        {
+          "class": "any",
+          "count_dice": "2d4",
+          "level_dice": "1d4+2"
+        }
+      ],
+      "alternatives": [
+        "Barbarian",
+        "Knight",
+        "Paladin",
+        "Ranger"
+      ],
+      "notes": [
+        "Retainers may be any class",
+        "Often on way to/from war",
+        "Mounts and magic items as Expert Adventurers"
+      ]
+    },
+    "high_level_magic_user": {
+      "leader": {
+        "class": "Magic-User",
+        "level_dice": "1d4+6"
+      },
+      "companions": [
+        {
+          "class": "Magic-User",
+          "count_dice": "1d4",
+          "level_dice": "1d3",
+          "role": "apprentice"
+        },
+        {
+          "class": "Fighter",
+          "count_dice": "1d4",
+          "level_dice": "1d4+1",
+          "role": "mercenary"
+        }
+      ],
+      "alternatives": [
+        "Illusionist"
+      ],
+      "notes": [
+        "Apprentices share leader's alignment",
+        "Mercenaries may differ in alignment",
+        "Often on quest for arcane lore",
+        "Mounts and magic items as Expert Adventurers"
+      ]
+    }
+  },
+  "strongholds": {
+    "rulers": {
+      "arcane": {
+        "level_dice": "1d4+10",
+        "examples": [
+          "Illusionist",
+          "Magic-User"
+        ]
+      },
+      "divine": {
+        "level_dice": "1d8+6",
+        "examples": [
+          "Cleric",
+          "Paladin"
+        ]
+      },
+      "martial": {
+        "level_dice": "1d6+8",
+        "examples": [
+          "Fighter",
+          "Knight"
+        ]
+      }
+    },
+    "patrols": {
+      "arcane": {
+        "count_dice": "2d6",
+        "type": "Heavy Footmen",
+        "ac": {
+          "descending": 4,
+          "ascending": 15
+        },
+        "equipment": "Chainmail + shield, swords",
+        "morale": 8
+      },
+      "divine": {
+        "count_dice": "2d6",
+        "type": "Medium Horsemen",
+        "ac": {
+          "descending": 5,
+          "ascending": 14
+        },
+        "equipment": "Chainmail, lances",
+        "morale": 9
+      },
+      "martial": {
+        "count_dice": "2d6",
+        "type": "Heavy Horsemen",
+        "ac": {
+          "descending": 3,
+          "ascending": 16
+        },
+        "equipment": "Plate mail, lances, swords",
+        "morale": 9
+      }
+    },
+    "ruler_reactions": [
+      {
+        "roll": 1,
+        "arcane": "Chase",
+        "divine": "Chase",
+        "martial": "Chase"
+      },
+      {
+        "roll": 2,
+        "arcane": "Ignore",
+        "divine": "Chase",
+        "martial": "Chase"
+      },
+      {
+        "roll": 3,
+        "arcane": "Ignore",
+        "divine": "Ignore",
+        "martial": "Chase"
+      },
+      {
+        "roll": 4,
+        "arcane": "Ignore",
+        "divine": "Ignore",
+        "martial": "Ignore"
+      },
+      {
+        "roll": 5,
+        "arcane": "Ignore",
+        "divine": "Invite",
+        "martial": "Ignore"
+      },
+      {
+        "roll": 6,
+        "arcane": "Invite",
+        "divine": "Invite",
+        "martial": "Invite"
+      }
+    ],
+    "reaction_descriptions": {
+      "Chase": "Patrol chases intruders or demands toll. May attack, drive away, or imprison if toll refused.",
+      "Ignore": "Patrol leaves PCs to their business.",
+      "Invite": "Patrol brings invitation to stay at stronghold. Motive depends on ruler's personality."
+    }
+  }
+}

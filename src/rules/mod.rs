@@ -7,6 +7,7 @@ pub mod encumbrance;
 pub mod equipment;
 pub mod magic_item;
 pub mod monster;
+pub mod npc_party;
 pub mod save;
 pub mod spell;
 pub mod spell_data;
