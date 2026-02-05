@@ -174,11 +174,8 @@ pub fn travel_day_with<R: Rng>(
         } else {
             let idx = rng.gen_range(0..adjacent.len());
             let (rx, ry) = adjacent[idx];
-            match wilderness.move_to(rx, ry) {
-                Err(e) => {
-                    result.msg(format!("The party tries to wander but cannot: {}", e));
-                }
-                Ok(()) => {}
+            if let Err(e) = wilderness.move_to(rx, ry) {
+                result.msg(format!("The party tries to wander but cannot: {}", e));
             }
             let terrain_name = wilderness.current_hex()
                 .map(|h| h.terrain.name())

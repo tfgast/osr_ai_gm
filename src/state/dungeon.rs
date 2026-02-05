@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// State of a door in the dungeon.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum DoorState {
     /// Standard door — must force open (2-in-6 base, modified by STR).
     #[serde(alias = "closed")]
+    #[default]
     Closed,
     /// Door is open (forced or otherwise). Per OSE, doors close automatically.
     #[serde(alias = "open")]
@@ -24,12 +25,6 @@ pub enum DoorState {
     /// Spiked open — door has been held with iron spikes, won't auto-close.
     #[serde(alias = "spiked")]
     Spiked,
-}
-
-impl Default for DoorState {
-    fn default() -> Self {
-        DoorState::Closed
-    }
 }
 
 impl fmt::Display for DoorState {

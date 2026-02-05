@@ -126,10 +126,10 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
             };
 
             // Only create door if we haven't seen this pair
-            if !created_doors.contains_key(&pair) {
+            if let std::collections::hash_map::Entry::Vacant(e) = created_doors.entry(pair) {
                 let door = Door::new(door_id, pair.0, pair.1, exit.door)?;
                 dungeon.add_door(door)?;
-                created_doors.insert(pair, door_id);
+                e.insert(door_id);
                 door_id += 1;
             }
         }

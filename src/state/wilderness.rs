@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// Terrain types for wilderness hexes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Terrain {
     #[serde(alias = "clear")]
+    #[default]
     Clear,
     #[serde(alias = "forest")]
     Forest,
@@ -28,12 +29,6 @@ pub enum Terrain {
     Barren,
     #[serde(alias = "city")]
     City,
-}
-
-impl Default for Terrain {
-    fn default() -> Self {
-        Terrain::Clear
-    }
 }
 
 impl fmt::Display for Terrain {
@@ -110,10 +105,7 @@ impl Terrain {
 
     /// Whether foraging is possible in this terrain.
     pub fn can_forage(self) -> bool {
-        match self {
-            Terrain::Ocean | Terrain::City | Terrain::Barren => false,
-            _ => true,
-        }
+        !matches!(self, Terrain::Ocean | Terrain::City | Terrain::Barren)
     }
 
     /// Chance of successful foraging (X-in-6).

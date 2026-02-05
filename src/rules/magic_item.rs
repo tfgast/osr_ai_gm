@@ -100,9 +100,7 @@ impl MagicItemRegistry {
             let idx = self.items.len();
 
             // Index by name (first occurrence wins)
-            if !self.by_name.contains_key(&key) {
-                self.by_name.insert(key, idx);
-            }
+            self.by_name.entry(key).or_insert(idx);
 
             // Index by category
             self.by_category.entry(category).or_default().push(idx);

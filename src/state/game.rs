@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 /// The current game mode — determines which commands are valid.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum GameMode {
     /// No active game mode. Party management and setup only.
+    #[default]
     Idle,
     /// Character creation in progress.
     CharGen,
@@ -15,12 +16,6 @@ pub enum GameMode {
     Combat,
     /// Downtime activities (training, research, etc.).
     Downtime,
-}
-
-impl Default for GameMode {
-    fn default() -> Self {
-        GameMode::Idle
-    }
 }
 
 impl std::fmt::Display for GameMode {

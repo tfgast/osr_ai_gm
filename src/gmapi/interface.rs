@@ -928,7 +928,7 @@ fn backstab(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize
 
     // Roll attack with backstab bonus
     let target_ac = combat_state.monsters[monster_idx].ac;
-    let target_number = (character.thac0 as i32 - target_ac - attack_bonus - str_mod).max(2).min(20);
+    let target_number = (character.thac0 as i32 - target_ac - attack_bonus - str_mod).clamp(2, 20);
     let attack_roll: i32 = rand::Rng::gen_range(&mut rand::thread_rng(), 1..=20);
 
     let hit = attack_roll == 20 || (attack_roll != 1 && attack_roll >= target_number);
