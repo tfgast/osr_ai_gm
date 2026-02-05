@@ -65,9 +65,24 @@ pub struct ModuleExit {
     pub door: DoorState,
 }
 
+/// Expand a leading `~` to the user's home directory.
+fn expand_tilde(path: &str) -> String {
+    if path == "~" {
+        std::env::var("HOME").unwrap_or_else(|_| path.to_string())
+    } else if let Some(rest) = path.strip_prefix("~/") {
+        match std::env::var("HOME") {
+            Ok(home) => format!("{}/{}", home, rest),
+            Err(_) => path.to_string(),
+        }
+    } else {
+        path.to_string()
+    }
+}
+
 /// Load a module definition from a JSON file.
 pub fn load_module(path: &str) -> Result<ModuleDef, String> {
-    let path = Path::new(path);
+    let expanded = expand_tilde(path);
+    let path = Path::new(&expanded);
     let content = fs::read_to_string(path)
         .map_err(|e| format!("Failed to read module file {}: {}", path.display(), e))?;
     let module: ModuleDef = serde_json::from_str(&content)
@@ -408,5 +423,23 @@ mod tests {
     fn sections_default_to_empty() {
         let module: ModuleDef = serde_json::from_str(sample_module_json()).unwrap();
         assert!(module.sections.is_empty());
+    }
+
+    #[test]
+    fn expand_tilde_with_subpath() {
+        let home = std::env::var("HOME").unwrap();
+        assert_eq!(expand_tilde("~/foo/bar.json"), format!("{}/foo/bar.json", home));
+    }
+
+    #[test]
+    fn expand_tilde_alone() {
+        let home = std::env::var("HOME").unwrap();
+        assert_eq!(expand_tilde("~"), home);
+    }
+
+    #[test]
+    fn expand_tilde_no_tilde() {
+        assert_eq!(expand_tilde("/absolute/path"), "/absolute/path");
+        assert_eq!(expand_tilde("relative/path"), "relative/path");
     }
 }
