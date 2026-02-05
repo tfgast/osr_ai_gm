@@ -17,6 +17,7 @@ use command::retainer_cmds::*;
 use command::wilderness_cmds::*;
 use command::treasure_cmds::TreasureCommand;
 use command::gm_cmds::{AdvanceTurnCommand, AwardXpCommand, RulingCommand, HealCommand, DamageCommand, SetHpCommand, SetRationsCommand, AddRationsCommand};
+use command::module_cmds::LoadModuleCommand;
 use command::system::*;
 use persist::GameState;
 use std::io::{self, BufRead, Write};
@@ -113,6 +114,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(MoveRoomCommand));
     registry.register(Box::new(RestCommand));
     registry.register(Box::new(ExplorationStatusCommand));
+    registry.register(Box::new(LoadModuleCommand));
     // Encounter
     registry.register(Box::new(EncounterCommand));
     registry.register(Box::new(SurpriseCommand));

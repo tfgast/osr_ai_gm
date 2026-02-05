@@ -1,0 +1,27 @@
+{
+  "name": "Sample Crypt",
+  "level_range": [1, 2],
+  "entry_room": "entrance",
+  "rooms": {
+    "entrance": {
+      "name": "Crypt Entrance",
+      "description": "Crumbling stone steps lead down into darkness. The air smells of dust and decay.",
+      "exits": [{"to": "guard", "door": "closed"}]
+    },
+    "guard": {
+      "name": "Guard Chamber",
+      "description": "Bones litter the floor. Rusted weapons hang on the walls.",
+      "monsters": [{"name": "skeleton", "count": 3}],
+      "exits": [
+        {"to": "entrance", "door": "closed"},
+        {"to": "vault", "door": "locked"}
+      ]
+    },
+    "vault": {
+      "name": "Treasure Vault",
+      "description": "A dusty chest sits in the corner. Cobwebs hang from the ceiling.",
+      "treasure": [{"gp": 500}, {"item": "Potion of Healing"}],
+      "exits": [{"to": "guard", "door": "locked"}]
+    }
+  }
+}

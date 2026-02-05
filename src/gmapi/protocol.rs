@@ -136,6 +136,8 @@ pub enum GMCommand {
         source: LightSourceKind,
         carrier: String,
     },
+    /// Load a prewritten adventure module from a JSON file.
+    LoadModule { path: String },
 
     // -- GM-only: wilderness --
     /// Enter wilderness travel mode.
@@ -558,6 +560,19 @@ mod tests {
         ];
         for json in &commands {
             assert!(parse_request(json).is_ok(), "failed to parse: {}", json);
+        }
+    }
+
+    #[test]
+    fn parse_load_module() {
+        let json = r#"{"id":"m1","command":{"type":"LoadModule","params":{"path":"data/modules/sample_crypt/module.json"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "m1");
+        match &req.command {
+            GMCommand::LoadModule { path } => {
+                assert_eq!(path, "data/modules/sample_crypt/module.json");
+            }
+            _ => panic!("expected LoadModule"),
         }
     }
 }

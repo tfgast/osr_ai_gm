@@ -64,6 +64,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::MoveRoom { door_id } => move_room(id, state, *door_id),
         GMCommand::Search { is_elf } => search(id, state, *is_elf),
         GMCommand::Light { source, carrier } => light(id, state, *source, carrier),
+        GMCommand::LoadModule { path } => load_module(id, state, path),
 
         // -- Wilderness --
         GMCommand::EnterWilderness { terrain } => enter_wilderness(id, state, *terrain),
@@ -640,6 +641,41 @@ fn light(id: &str, state: &mut GameState, source: LightSourceKind, carrier: &str
     };
     time.light(source, carrier);
     GMResponse::ok(id, format!("{} lights a {}.", carrier, source.name()), state.mode.clone())
+}
+
+fn load_module(id: &str, state: &mut GameState, path: &str) -> GMResponse {
+    use crate::command::module_cmds::module_to_dungeon;
+    use crate::rules::module;
+
+    let module_def = match module::load_module(path) {
+        Ok(m) => m,
+        Err(e) => return GMResponse::err(id, e, state.mode.clone()),
+    };
+
+    let dungeon = match module_to_dungeon(&module_def) {
+        Ok(d) => d,
+        Err(e) => return GMResponse::err(id, e, state.mode.clone()),
+    };
+
+    let module_name = module_def.name.clone();
+    let level_range = module_def.level_range;
+    let room_count = dungeon.rooms.len();
+
+    state.dungeon = Some(dungeon);
+    state.time = Some(TimeTracker::new());
+    state.dungeon_level = level_range.0;
+    state.mode = GameMode::Exploration;
+
+    GMResponse::ok_with_data(
+        id,
+        format!("loaded module: {} (levels {}-{}). {} rooms.", module_name, level_range.0, level_range.1, room_count),
+        state.mode.clone(),
+        serde_json::json!({
+            "module_name": module_name,
+            "level_range": [level_range.0, level_range.1],
+            "room_count": room_count,
+        }),
+    )
 }
 
 // =============================================================================
@@ -1679,5 +1715,41 @@ mod tests {
         }), &mut state);
         assert!(!resp.success);
         assert!(resp.error.unwrap().contains("too far"));
+    }
+
+    #[test]
+    fn load_module_success() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LoadModule {
+            path: "data/modules/sample_crypt/module.json".to_string(),
+        }), &mut state);
+        assert!(resp.success, "load_module should succeed: {:?}", resp.error);
+        assert_eq!(state.mode, GameMode::Exploration);
+        assert!(state.dungeon.is_some());
+        assert!(state.time.is_some());
+
+        let dungeon = state.dungeon.as_ref().unwrap();
+        assert_eq!(dungeon.rooms.len(), 3);
+        assert_eq!(dungeon.doors.len(), 2);
+        assert_eq!(dungeon.current_room, Some(0));
+
+        // Verify entry room is named correctly
+        let entry = dungeon.find_room(0).unwrap();
+        assert_eq!(entry.name, "Crypt Entrance");
+
+        // Check response data
+        let data = resp.data.unwrap();
+        assert_eq!(data["module_name"], "Sample Crypt");
+        assert_eq!(data["room_count"], 3);
+    }
+
+    #[test]
+    fn load_module_not_found() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LoadModule {
+            path: "nonexistent/module.json".to_string(),
+        }), &mut state);
+        assert!(!resp.success);
+        assert!(resp.error.unwrap().contains("Failed to read"));
     }
 }
