@@ -92,6 +92,46 @@ impl Door {
     }
 }
 
+/// A placed monster instance from a module, tracking spawn state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlacedMonsterInstance {
+    pub name: String,
+    pub count: u32,
+    /// Whether this monster group has been spawned into combat.
+    #[serde(default)]
+    pub spawned: bool,
+}
+
+impl PlacedMonsterInstance {
+    pub fn new(name: &str, count: u32) -> Self {
+        PlacedMonsterInstance {
+            name: name.to_string(),
+            count,
+            spawned: false,
+        }
+    }
+}
+
+/// A placed treasure instance from a module, tracking loot state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlacedTreasureInstance {
+    pub description: String,
+    pub gp_value: u64,
+    /// Whether this treasure has been taken.
+    #[serde(default)]
+    pub taken: bool,
+}
+
+impl PlacedTreasureInstance {
+    pub fn new(description: &str, gp_value: u64) -> Self {
+        PlacedTreasureInstance {
+            description: description.to_string(),
+            gp_value,
+            taken: false,
+        }
+    }
+}
+
 /// A room or area in the dungeon.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Room {
@@ -101,6 +141,21 @@ pub struct Room {
     pub searched: bool,
     pub trap: Option<String>,
     pub trap_triggered: bool,
+    /// Module room key for cross-referencing (e.g., "entrance", "guard").
+    #[serde(default)]
+    pub key: Option<String>,
+    /// Monsters placed by module definition.
+    #[serde(default)]
+    pub placed_monsters: Vec<PlacedMonsterInstance>,
+    /// Treasure placed by module definition.
+    #[serde(default)]
+    pub placed_treasure: Vec<PlacedTreasureInstance>,
+    /// Whether all placed monsters have been defeated.
+    #[serde(default)]
+    pub monsters_cleared: bool,
+    /// Whether placed treasure has been looted.
+    #[serde(default)]
+    pub treasure_looted: bool,
 }
 
 impl Room {
@@ -112,6 +167,11 @@ impl Room {
             searched: false,
             trap: None,
             trap_triggered: false,
+            key: None,
+            placed_monsters: Vec::new(),
+            placed_treasure: Vec::new(),
+            monsters_cleared: false,
+            treasure_looted: false,
         }
     }
 
@@ -122,6 +182,21 @@ impl Room {
 
     pub fn with_trap(mut self, trap: &str) -> Self {
         self.trap = Some(trap.to_string());
+        self
+    }
+
+    pub fn with_key(mut self, key: &str) -> Self {
+        self.key = Some(key.to_string());
+        self
+    }
+
+    pub fn with_placed_monsters(mut self, monsters: Vec<PlacedMonsterInstance>) -> Self {
+        self.placed_monsters = monsters;
+        self
+    }
+
+    pub fn with_placed_treasure(mut self, treasure: Vec<PlacedTreasureInstance>) -> Self {
+        self.placed_treasure = treasure;
         self
     }
 }
@@ -429,5 +504,87 @@ mod tests {
         let s = ds.status();
         assert!(s.contains("Entrance"));
         assert!(s.contains("Level: 1"));
+    }
+
+    #[test]
+    fn room_with_module_fields() {
+        let monsters = vec![
+            PlacedMonsterInstance::new("skeleton", 3),
+            PlacedMonsterInstance::new("zombie", 2),
+        ];
+        let treasure = vec![
+            PlacedTreasureInstance::new("Gold coins", 500),
+            PlacedTreasureInstance::new("Potion of Healing", 50),
+        ];
+        let room = Room::new(0, "Guard Chamber")
+            .with_key("guard")
+            .with_placed_monsters(monsters)
+            .with_placed_treasure(treasure);
+
+        assert_eq!(room.key, Some("guard".to_string()));
+        assert_eq!(room.placed_monsters.len(), 2);
+        assert_eq!(room.placed_monsters[0].name, "skeleton");
+        assert_eq!(room.placed_monsters[0].count, 3);
+        assert!(!room.placed_monsters[0].spawned);
+        assert_eq!(room.placed_treasure.len(), 2);
+        assert_eq!(room.placed_treasure[0].gp_value, 500);
+        assert!(!room.placed_treasure[0].taken);
+        assert!(!room.monsters_cleared);
+        assert!(!room.treasure_looted);
+    }
+
+    #[test]
+    fn old_room_json_loads_with_defaults() {
+        // Simulate loading an old save without the new fields
+        let old_json = r#"{
+            "id": 1,
+            "name": "Old Room",
+            "description": "A dusty chamber",
+            "searched": false,
+            "trap": null,
+            "trap_triggered": false
+        }"#;
+        let room: Room = serde_json::from_str(old_json).unwrap();
+        assert_eq!(room.id, 1);
+        assert_eq!(room.name, "Old Room");
+        assert!(room.key.is_none());
+        assert!(room.placed_monsters.is_empty());
+        assert!(room.placed_treasure.is_empty());
+        assert!(!room.monsters_cleared);
+        assert!(!room.treasure_looted);
+    }
+
+    #[test]
+    fn new_room_fields_serialize() {
+        let room = Room::new(0, "Test")
+            .with_key("test_key")
+            .with_placed_monsters(vec![PlacedMonsterInstance::new("goblin", 4)]);
+
+        let json = serde_json::to_string(&room).unwrap();
+        assert!(json.contains("test_key"));
+        assert!(json.contains("goblin"));
+
+        // Round-trip
+        let loaded: Room = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.key, Some("test_key".to_string()));
+        assert_eq!(loaded.placed_monsters.len(), 1);
+        assert_eq!(loaded.placed_monsters[0].name, "goblin");
+        assert_eq!(loaded.placed_monsters[0].count, 4);
+    }
+
+    #[test]
+    fn placed_monster_instance_defaults() {
+        let monster = PlacedMonsterInstance::new("orc", 5);
+        assert_eq!(monster.name, "orc");
+        assert_eq!(monster.count, 5);
+        assert!(!monster.spawned);
+    }
+
+    #[test]
+    fn placed_treasure_instance_defaults() {
+        let treasure = PlacedTreasureInstance::new("Ancient sword", 1000);
+        assert_eq!(treasure.description, "Ancient sword");
+        assert_eq!(treasure.gp_value, 1000);
+        assert!(!treasure.taken);
     }
 }
