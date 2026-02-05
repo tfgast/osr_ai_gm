@@ -72,6 +72,12 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::AddHex { x, y, terrain } => exploration_handlers::add_hex(id, state, *x, *y, *terrain),
         GMCommand::Travel { x, y } => exploration_handlers::travel(id, state, *x, *y),
         GMCommand::Orient => exploration_handlers::orient(id, state),
+        GMCommand::Forage => exploration_handlers::forage(id, state),
+        GMCommand::Hunt => exploration_handlers::hunt(id, state),
+        GMCommand::RollEncounter => exploration_handlers::roll_encounter(id, state),
+        GMCommand::Evade { monster_count, monster_movement } => {
+            exploration_handlers::evade(id, state, *monster_count, *monster_movement)
+        }
 
         // -- Encounter resolution --
         GMCommand::RollSurprise => combat_handlers::roll_surprise(id, state),

@@ -1,4 +1,4 @@
-use crate::engine::{exploration, wilderness_engine};
+use crate::engine::{encounter_engine, exploration, wilderness_engine};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
@@ -323,4 +323,189 @@ pub(super) fn orient(id: &str, state: &mut GameState) -> GMResponse {
         "travel_day": ws.travel_day,
     });
     GMResponse::ok_with_data(id, result.message, state.mode.clone(), data)
+}
+
+pub(super) fn forage(id: &str, state: &mut GameState) -> GMResponse {
+    let ws = match state.wilderness.as_ref() {
+        Some(w) => w,
+        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
+    };
+    let result = wilderness_engine::forage(ws, &mut state.party);
+    GMResponse::ok_with_data(
+        id,
+        result.message,
+        state.mode.clone(),
+        serde_json::json!({
+            "success": result.success,
+            "quantity": result.quantity,
+        }),
+    )
+}
+
+pub(super) fn hunt(id: &str, state: &mut GameState) -> GMResponse {
+    let ws = match state.wilderness.as_ref() {
+        Some(w) => w,
+        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
+    };
+    let result = wilderness_engine::hunt(ws, &mut state.party);
+    GMResponse::ok_with_data(
+        id,
+        result.message,
+        state.mode.clone(),
+        serde_json::json!({
+            "success": result.success,
+            "quantity": result.quantity,
+        }),
+    )
+}
+
+pub(super) fn roll_encounter(id: &str, state: &mut GameState) -> GMResponse {
+    use crate::rules::encounter as encounter_tables;
+
+    let mut rng = rand::thread_rng();
+    let table_roll: u32 = rand::Rng::gen_range(&mut rng, 1..=20);
+
+    match state.mode {
+        GameMode::Exploration => {
+            let level = state.dungeon_level;
+            if level == 0 {
+                return GMResponse::err(
+                    id,
+                    "dungeon level not set. Use EnterDungeon first.",
+                    state.mode.clone(),
+                );
+            }
+            let entry = match encounter_tables::dungeon_encounter_d40(level, table_roll) {
+                Some(e) => e,
+                None => return GMResponse::err(id, "no encounter found for this roll.", state.mode.clone()),
+            };
+            let num_appearing = match roll_number_appearing(&entry.number) {
+                Ok(n) => n,
+                Err(e) => return GMResponse::err(id, e, state.mode.clone()),
+            };
+            let seq = encounter_engine::begin_encounter_dungeon();
+
+            GMResponse::ok_with_data(
+                id,
+                format!(
+                    "ENCOUNTER — Dungeon Level {}\n\
+                     Table roll: {} → {}\n\
+                     Number appearing: {} → {}\n\
+                     Surprise: party {}, monsters {} — {}\n\
+                     Distance: {}' feet",
+                    level, table_roll, entry.name,
+                    entry.number, num_appearing,
+                    seq.party_surprise_roll, seq.monster_surprise_roll, seq.surprise,
+                    seq.distance,
+                ),
+                state.mode.clone(),
+                serde_json::json!({
+                    "context": "dungeon",
+                    "level": level,
+                    "table_roll": table_roll,
+                    "monster_name": entry.name,
+                    "number_notation": entry.number,
+                    "number_appearing": num_appearing,
+                    "party_surprise_roll": seq.party_surprise_roll,
+                    "monster_surprise_roll": seq.monster_surprise_roll,
+                    "surprise": format!("{}", seq.surprise),
+                    "distance": seq.distance,
+                }),
+            )
+        }
+        GameMode::Wilderness => {
+            let ws = match state.wilderness.as_ref() {
+                Some(w) => w,
+                None => return GMResponse::err(id, "no wilderness state.", state.mode.clone()),
+            };
+            let hex = match ws.current_hex() {
+                Some(h) => h,
+                None => return GMResponse::err(id, "no current hex.", state.mode.clone()),
+            };
+            let terrain = hex.terrain;
+            let entry = match encounter_tables::wilderness_encounter_simple(terrain, table_roll) {
+                Some(e) => e,
+                None => return GMResponse::err(id, "no encounter found for this terrain.", state.mode.clone()),
+            };
+            let num_appearing = match roll_number_appearing(&entry.number) {
+                Ok(n) => n,
+                Err(e) => return GMResponse::err(id, e, state.mode.clone()),
+            };
+            let seq = encounter_engine::begin_encounter_wilderness();
+
+            GMResponse::ok_with_data(
+                id,
+                format!(
+                    "ENCOUNTER — Wilderness ({})\n\
+                     Table roll: {} → {}\n\
+                     Number appearing: {} → {}\n\
+                     Surprise: party {}, monsters {} — {}\n\
+                     Distance: {} yards",
+                    terrain.name(), table_roll, entry.name,
+                    entry.number, num_appearing,
+                    seq.party_surprise_roll, seq.monster_surprise_roll, seq.surprise,
+                    seq.distance,
+                ),
+                state.mode.clone(),
+                serde_json::json!({
+                    "context": "wilderness",
+                    "terrain": terrain.name(),
+                    "table_roll": table_roll,
+                    "monster_name": entry.name,
+                    "number_notation": entry.number,
+                    "number_appearing": num_appearing,
+                    "party_surprise_roll": seq.party_surprise_roll,
+                    "monster_surprise_roll": seq.monster_surprise_roll,
+                    "surprise": format!("{}", seq.surprise),
+                    "distance": seq.distance,
+                }),
+            )
+        }
+        _ => GMResponse::err(
+            id,
+            "encounter requires exploration or wilderness mode.",
+            state.mode.clone(),
+        ),
+    }
+}
+
+/// Roll number appearing. Handles both dice notation ("2d4") and plain integers ("1").
+fn roll_number_appearing(notation: &str) -> Result<i32, String> {
+    if let Ok(n) = notation.parse::<i32>() {
+        return Ok(n);
+    }
+    crate::dice::roll_str(notation)
+        .map(|r| r.total)
+        .map_err(|e| format!("bad dice expr '{}': {}", notation, e))
+}
+
+pub(super) fn evade(id: &str, state: &GameState, monster_count: u32, monster_movement: u32) -> GMResponse {
+    let party_size = state.party.members.iter().filter(|c| c.is_alive()).count() as u32;
+    if party_size == 0 {
+        return GMResponse::err(id, "no living party members.", state.mode.clone());
+    }
+    let party_movement = state.party.members.iter()
+        .filter(|c| c.is_alive())
+        .map(|c| c.movement_rate)
+        .min()
+        .unwrap_or(120);
+    let result = encounter_engine::attempt_evasion(
+        party_size, party_movement, monster_count, monster_movement,
+    );
+    let escaped = matches!(result, encounter_engine::EvasionResult::Escaped);
+    GMResponse::ok_with_data(
+        id,
+        format!(
+            "Party ({} members, {}' movement) vs {} monsters ({}' movement)\n{}",
+            party_size, party_movement, monster_count, monster_movement, result,
+        ),
+        state.mode.clone(),
+        serde_json::json!({
+            "escaped": escaped,
+            "party_size": party_size,
+            "party_movement": party_movement,
+            "monster_count": monster_count,
+            "monster_movement": monster_movement,
+        }),
+    )
 }

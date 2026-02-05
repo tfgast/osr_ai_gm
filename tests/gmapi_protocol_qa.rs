@@ -4250,3 +4250,220 @@ fn eligible_classes_mode_unchanged() {
     }), &mut state);
     assert_eq!(resp.mode, GameMode::Idle);
 }
+// ===========================================================================
+// Forage
+// ===========================================================================
+
+#[test]
+fn forage_happy_path() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+
+    let resp = handle_request(&req("f1", GMCommand::Forage), &mut state);
+    assert_response_format(&resp, "f1");
+    assert!(resp.success);
+    assert_eq!(resp.mode, GameMode::Wilderness);
+    let data = resp.data.expect("forage should have data");
+    assert!(data.get("success").is_some(), "data should have 'success' field");
+    assert!(data.get("quantity").is_some(), "data should have 'quantity' field");
+}
+
+#[test]
+fn forage_not_in_wilderness() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("f2", GMCommand::Forage), &mut state);
+    assert_response_format(&resp, "f2");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not in wilderness mode"));
+}
+
+#[test]
+fn forage_in_dungeon_mode() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    let resp = handle_request(&req("f3", GMCommand::Forage), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not in wilderness mode"));
+}
+
+// ===========================================================================
+// Hunt
+// ===========================================================================
+
+#[test]
+fn hunt_happy_path() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+
+    let resp = handle_request(&req("h1", GMCommand::Hunt), &mut state);
+    assert_response_format(&resp, "h1");
+    assert!(resp.success);
+    assert_eq!(resp.mode, GameMode::Wilderness);
+    let data = resp.data.expect("hunt should have data");
+    assert!(data.get("success").is_some(), "data should have 'success' field");
+    assert!(data.get("quantity").is_some(), "data should have 'quantity' field");
+}
+
+#[test]
+fn hunt_not_in_wilderness() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("h2", GMCommand::Hunt), &mut state);
+    assert_response_format(&resp, "h2");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not in wilderness mode"));
+}
+
+#[test]
+fn hunt_in_dungeon_mode() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    let resp = handle_request(&req("h3", GMCommand::Hunt), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not in wilderness mode"));
+}
+
+// ===========================================================================
+// RollEncounter
+// ===========================================================================
+
+#[test]
+fn roll_encounter_dungeon_happy_path() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    let resp = handle_request(&req("re1", GMCommand::RollEncounter), &mut state);
+    assert_response_format(&resp, "re1");
+    assert!(resp.success);
+    assert_eq!(resp.mode, GameMode::Exploration);
+    assert!(resp.message.contains("ENCOUNTER"), "message should contain ENCOUNTER header");
+    assert!(resp.message.contains("Dungeon Level"), "message should mention dungeon level");
+
+    let data = resp.data.expect("roll_encounter should have data");
+    assert_eq!(data["context"], "dungeon");
+    assert!(data["level"].as_u64().unwrap() >= 1);
+    assert!(data["table_roll"].as_u64().is_some());
+    assert!(data["monster_name"].as_str().is_some());
+    assert!(data["number_appearing"].as_i64().unwrap() >= 1);
+    assert!(data["distance"].as_u64().is_some());
+}
+
+#[test]
+fn roll_encounter_wilderness_happy_path() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+
+    let resp = handle_request(&req("re2", GMCommand::RollEncounter), &mut state);
+    assert_response_format(&resp, "re2");
+    assert!(resp.success);
+    assert_eq!(resp.mode, GameMode::Wilderness);
+    assert!(resp.message.contains("ENCOUNTER"), "message should contain ENCOUNTER header");
+    assert!(resp.message.contains("Wilderness"), "message should mention wilderness");
+
+    let data = resp.data.expect("roll_encounter should have data");
+    assert_eq!(data["context"], "wilderness");
+    assert!(data["terrain"].as_str().is_some());
+    assert!(data["table_roll"].as_u64().is_some());
+    assert!(data["monster_name"].as_str().is_some());
+    assert!(data["number_appearing"].as_i64().unwrap() >= 1);
+    assert!(data["distance"].as_u64().is_some());
+}
+
+#[test]
+fn roll_encounter_idle_mode_error() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("re3", GMCommand::RollEncounter), &mut state);
+    assert_response_format(&resp, "re3");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("exploration or wilderness mode"));
+}
+
+#[test]
+fn roll_encounter_combat_mode_error() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    let resp = handle_request(&req("re4", GMCommand::RollEncounter), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("exploration or wilderness mode"));
+}
+
+// ===========================================================================
+// Evade
+// ===========================================================================
+
+#[test]
+fn evade_happy_path() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("ev1", GMCommand::Evade {
+        monster_count: 5,
+        monster_movement: 120,
+    }), &mut state);
+    assert_response_format(&resp, "ev1");
+    assert!(resp.success);
+    assert!(resp.message.contains("Party"));
+    assert!(resp.message.contains("monsters"));
+
+    let data = resp.data.expect("evade should have data");
+    assert!(data.get("escaped").is_some(), "data should have 'escaped' field");
+    assert_eq!(data["party_size"], 1);
+    assert_eq!(data["monster_count"], 5);
+    assert_eq!(data["monster_movement"], 120);
+}
+
+#[test]
+fn evade_no_party_members() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("ev2", GMCommand::Evade {
+        monster_count: 3,
+        monster_movement: 90,
+    }), &mut state);
+    assert_response_format(&resp, "ev2");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no living party members"));
+}
+
+#[test]
+fn evade_json_parse() {
+    let json = r#"{"id":"ev3","command":{"type":"Evade","params":{"monster_count":5,"monster_movement":120}}}"#;
+    let parsed = parse_request(json).unwrap();
+    assert_eq!(parsed.id, "ev3");
+    match &parsed.command {
+        GMCommand::Evade { monster_count, monster_movement } => {
+            assert_eq!(*monster_count, 5);
+            assert_eq!(*monster_movement, 120);
+        }
+        _ => panic!("expected Evade"),
+    }
+}
+
+#[test]
+fn forage_json_parse() {
+    let json = r#"{"id":"fp1","command":{"type":"Forage"}}"#;
+    let parsed = parse_request(json).unwrap();
+    assert_eq!(parsed.id, "fp1");
+    assert!(matches!(parsed.command, GMCommand::Forage));
+}
+
+#[test]
+fn hunt_json_parse() {
+    let json = r#"{"id":"hp1","command":{"type":"Hunt"}}"#;
+    let parsed = parse_request(json).unwrap();
+    assert_eq!(parsed.id, "hp1");
+    assert!(matches!(parsed.command, GMCommand::Hunt));
+}
+
+#[test]
+fn roll_encounter_json_parse() {
+    let json = r#"{"id":"rep1","command":{"type":"RollEncounter"}}"#;
+    let parsed = parse_request(json).unwrap();
+    assert_eq!(parsed.id, "rep1");
+    assert!(matches!(parsed.command, GMCommand::RollEncounter));
+}

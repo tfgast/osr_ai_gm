@@ -177,6 +177,17 @@ pub enum GMCommand {
     Travel { x: i32, y: i32 },
     /// Attempt to orient when lost (takes a full day).
     Orient,
+    /// Forage for food in the current hex (takes a full day).
+    Forage,
+    /// Hunt for game in the current hex (takes a full day).
+    Hunt,
+    /// Roll a full encounter from tables (type + number + surprise + distance).
+    RollEncounter,
+    /// Attempt to evade an encounter.
+    Evade {
+        monster_count: u32,
+        monster_movement: u32,
+    },
 
     // -- GM-only: encounter resolution --
     /// Roll surprise.
