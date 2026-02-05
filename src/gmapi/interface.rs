@@ -19,7 +19,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::QueryState => query_state(id, state),
         GMCommand::QueryMode => GMResponse::ok_with_data(
             id, format!("current mode: {}", state.mode), state.mode.clone(),
-            serde_json::json!({ "mode": format!("{}", state.mode) }),
+            serde_json::json!({ "mode": state.mode.to_string() }),
         ),
         GMCommand::QueryParty => query_party(id, state),
         GMCommand::QueryCombat => query_combat(id, state),
@@ -115,7 +115,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 
 fn query_state(id: &str, state: &GameState) -> GMResponse {
     let data = serde_json::json!({
-        "mode": format!("{}", state.mode),
+        "mode": state.mode.to_string(),
         "turn": state.turn(),
         "dungeon_level": state.dungeon_level,
         "party_size": state.party.members.len(),
@@ -360,7 +360,7 @@ fn attack(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize, 
     };
 
     match combat::resolve_character_attack(combat_state, &character, monster_idx, weapon, rest_penalty) {
-        Ok(result) => GMResponse::ok(id, format!("{}", result), state.mode.clone()),
+        Ok(result) => GMResponse::ok(id, result.to_string(), state.mode.clone()),
         Err(e) => GMResponse::err(id, e, state.mode.clone()),
     }
 }
@@ -387,7 +387,7 @@ fn monster_attack(id: &str, state: &mut GameState, monster_idx: usize, char_name
     }
     let combat_state = state.combat.as_mut().unwrap();
     let result = combat::monster_attack(combat_state, monster_idx, character);
-    GMResponse::ok(id, format!("{}", result), state.mode.clone())
+    GMResponse::ok(id, result.to_string(), state.mode.clone())
 }
 
 fn check_morale(id: &str, state: &mut GameState) -> GMResponse {
@@ -404,7 +404,7 @@ fn check_morale(id: &str, state: &mut GameState) -> GMResponse {
         .max()
         .unwrap_or(6);
     let result = combat::check_morale(combat_state, morale_score);
-    GMResponse::ok(id, format!("{}", result), state.mode.clone())
+    GMResponse::ok(id, result.to_string(), state.mode.clone())
 }
 
 fn turn_undead(id: &str, state: &mut GameState, char_name: &str, monster_idx: usize) -> GMResponse {
@@ -427,7 +427,7 @@ fn turn_undead(id: &str, state: &mut GameState, char_name: &str, monster_idx: us
         return GMResponse::err(id, "target is already dead.", state.mode.clone());
     }
     let result = combat::resolve_turn_undead(combat_state, &character, character.level, monster_idx);
-    GMResponse::ok(id, format!("{}", result), state.mode.clone())
+    GMResponse::ok(id, result.to_string(), state.mode.clone())
 }
 
 fn close(id: &str, state: &mut GameState, char_name: &str, feet: Option<u32>) -> GMResponse {
@@ -463,7 +463,7 @@ fn retreat(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
     let result = combat::retreat(combat_state, character);
     GMResponse::ok_with_data(
         id,
-        format!("{}", result),
+        result.to_string(),
         state.mode.clone(),
         serde_json::json!({
             "retreater": result.retreater,
@@ -578,7 +578,7 @@ fn advance_turn(id: &str, state: &mut GameState) -> GMResponse {
             "number": enc.number,
         });
     }
-    GMResponse::ok_with_data(id, format!("{}", result), state.mode.clone(), data)
+    GMResponse::ok_with_data(id, result.to_string(), state.mode.clone(), data)
 }
 
 fn add_room(id: &str, state: &mut GameState, room_id: u32, name: &str) -> GMResponse {
@@ -622,7 +622,7 @@ fn move_room(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
         None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
     };
     match exploration::move_through_door(time, dungeon, dungeon_level, door_id) {
-        Ok(result) => GMResponse::ok(id, format!("{}", result), state.mode.clone()),
+        Ok(result) => GMResponse::ok(id, result.to_string(), state.mode.clone()),
         Err(e) => GMResponse::err(id, e, state.mode.clone()),
     }
 }
@@ -638,7 +638,7 @@ fn search(id: &str, state: &mut GameState, is_elf: bool) -> GMResponse {
         None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
     };
     let result = exploration::search_room(time, dungeon, dungeon_level, is_elf);
-    GMResponse::ok(id, format!("{}", result), state.mode.clone())
+    GMResponse::ok(id, result.to_string(), state.mode.clone())
 }
 
 fn light(id: &str, state: &mut GameState, source: LightSourceKind, carrier: &str) -> GMResponse {
@@ -739,7 +739,7 @@ fn travel(id: &str, state: &mut GameState, x: i32, y: i32) -> GMResponse {
         "starving": result.starving,
         "rations_remaining": state.party.rations,
     });
-    GMResponse::ok_with_data(id, format!("{}", result), state.mode.clone(), data)
+    GMResponse::ok_with_data(id, result.to_string(), state.mode.clone(), data)
 }
 
 fn orient(id: &str, state: &mut GameState) -> GMResponse {
@@ -770,7 +770,7 @@ fn roll_surprise(id: &str, state: &GameState) -> GMResponse {
         serde_json::json!({
             "party_roll": p,
             "monster_roll": m,
-            "result": format!("{}", result),
+            "result": result.to_string(),
         }),
     )
 }
@@ -794,7 +794,7 @@ fn roll_reaction(id: &str, state: &GameState, char_name: &str) -> GMResponse {
             "cha_modifier": cha_mod,
             "raw_roll": raw,
             "modified_roll": modified,
-            "reaction": format!("{}", reaction),
+            "reaction": reaction.to_string(),
         }),
     )
 }
@@ -1288,11 +1288,11 @@ fn roll_dice(id: &str, state: &GameState, notation: &str) -> GMResponse {
     match dice::roll_str(notation) {
         Ok(result) => GMResponse::ok_with_data(
             id,
-            format!("{}", result),
+            result.to_string(),
             state.mode.clone(),
             serde_json::json!({ "total": result.total }),
         ),
-        Err(e) => GMResponse::err(id, format!("{}", e), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 

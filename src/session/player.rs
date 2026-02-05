@@ -79,16 +79,16 @@ mod tests {
         let p = Player::new("p1", "Alice", PlayerKind::HumanCli, Role::Player);
         assert_eq!(p.id, "p1");
         assert!(!p.is_gm());
-        assert_eq!(format!("{}", p.kind), "human-cli");
-        assert_eq!(format!("{}", p.role), "player");
+        assert_eq!(p.kind.to_string(), "human-cli");
+        assert_eq!(p.role.to_string(), "player");
     }
 
     #[test]
     fn ai_gm() {
         let p = Player::new("gm", "GPT-GM", PlayerKind::AiGm, Role::Gm);
         assert!(p.is_gm());
-        assert_eq!(format!("{}", p.kind), "ai-gm");
-        assert_eq!(format!("{}", p.role), "gm");
+        assert_eq!(p.kind.to_string(), "ai-gm");
+        assert_eq!(p.role.to_string(), "gm");
     }
 
     #[test]

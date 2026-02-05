@@ -632,7 +632,7 @@ mod tests {
             dungeon.move_to(1).unwrap(); // Guard Room has secret door
 
             let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
-            let output = format!("{}", result);
+            let output = result.to_string();
             if output.contains("Secret door found") {
                 found = true;
                 break;
@@ -828,7 +828,7 @@ mod tests {
             dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
             dungeon.move_to(1).unwrap();
             let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, true);
-            if format!("{}", result).contains("Secret door found") {
+            if result.to_string().contains("Secret door found") {
                 elf_finds += 1;
             }
 
@@ -840,7 +840,7 @@ mod tests {
             dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
             dungeon.move_to(1).unwrap();
             let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
-            if format!("{}", result).contains("Secret door found") {
+            if result.to_string().contains("Secret door found") {
                 human_finds += 1;
             }
         }
@@ -965,7 +965,7 @@ mod tests {
 
             let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 2);
             assert!(result.is_ok());
-            let output = format!("{}", result.unwrap());
+            let output = result.unwrap().to_string();
             if output.contains("TRAP TRIGGERED") {
                 triggered = true;
                 // Verify trap_triggered flag is set
@@ -984,7 +984,7 @@ mod tests {
         time.light(LightSourceKind::Torch, "Arden");
 
         let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
-        let output = format!("{}", result);
+        let output = result.to_string();
         assert!(
             output.contains("Torch: 5 turns remaining"),
             "explore output should show torch status, got: {}",
@@ -1000,7 +1000,7 @@ mod tests {
         time.light(LightSourceKind::Torch, "Arden");
 
         let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
-        let output = format!("{}", result);
+        let output = result.to_string();
         assert!(
             output.contains("Torch: 5 turns remaining"),
             "search output should show torch status, got: {}",
@@ -1016,7 +1016,7 @@ mod tests {
         time.light(LightSourceKind::Torch, "Arden");
 
         let result = listen_at_door_with(&mut rng, &mut time, &dungeon, 1, false);
-        let output = format!("{}", result);
+        let output = result.to_string();
         assert!(
             output.contains("Torch: 5 turns remaining"),
             "listen output should show torch status, got: {}",
@@ -1034,7 +1034,7 @@ mod tests {
 
         let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
         assert!(result.is_ok());
-        let output = format!("{}", result.unwrap());
+        let output = result.unwrap().to_string();
         assert!(
             output.contains("Lantern: 23 turns remaining"),
             "move output should show lantern status, got: {}",
@@ -1050,7 +1050,7 @@ mod tests {
         // No light source — should show DARKNESS, not torch status
 
         let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
-        let output = format!("{}", result);
+        let output = result.to_string();
         assert!(output.contains("DARKNESS"), "should mention darkness");
         assert!(
             !output.contains("turns remaining"),
@@ -1086,7 +1086,7 @@ mod tests {
         let result = result.unwrap();
 
         // Verify output includes monster info (check before unwrapping placed_monsters)
-        let output = format!("{}", result);
+        let output = result.to_string();
         assert!(output.contains("skeleton x3"), "output should mention skeletons");
         assert!(output.contains("zombie x2"), "output should mention zombies");
 
@@ -1180,7 +1180,7 @@ mod tests {
         let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
 
         // Verify output includes treasure info (check before unwrapping placed_treasure)
-        let output = format!("{}", result);
+        let output = result.to_string();
         assert!(output.contains("Gold coins"), "output should mention gold");
         assert!(output.contains("500gp"), "output should mention gold value");
 

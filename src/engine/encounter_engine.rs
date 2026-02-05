@@ -263,7 +263,7 @@ pub fn begin_encounter_dungeon_with<R: Rng>(rng: &mut R) -> EncounterSequence {
         "Surprise: party rolled {}, monsters rolled {}.",
         p_roll, m_roll
     ));
-    messages.push(format!("{}", surprise));
+    messages.push(surprise.to_string());
     messages.push(format!("Encounter distance: {}' feet.", distance));
 
     EncounterSequence {
@@ -294,7 +294,7 @@ pub fn begin_encounter_wilderness_with<R: Rng>(rng: &mut R) -> EncounterSequence
         "Surprise: party rolled {}, monsters rolled {}.",
         p_roll, m_roll
     ));
-    messages.push(format!("{}", surprise));
+    messages.push(surprise.to_string());
     messages.push(format!("Encounter distance: {} yards.", distance_yards));
 
     EncounterSequence {
@@ -478,19 +478,19 @@ mod tests {
 
     #[test]
     fn surprise_display() {
-        let s = format!("{}", SurpriseResult::PartySurprises);
+        let s = SurpriseResult::PartySurprises.to_string();
         assert!(s.contains("surprises"));
     }
 
     #[test]
     fn reaction_display() {
-        let s = format!("{}", Reaction::Hostile);
+        let s = Reaction::Hostile.to_string();
         assert!(s.contains("Hostile"));
     }
 
     #[test]
     fn evasion_display() {
-        let s = format!("{}", EvasionResult::Escaped);
+        let s = EvasionResult::Escaped.to_string();
         assert!(s.contains("evades"));
     }
 }

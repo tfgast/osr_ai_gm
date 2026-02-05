@@ -86,7 +86,7 @@ impl Command for TravelCommand {
         }
         let ws = state.wilderness.as_mut().unwrap();
         let result = wilderness_engine::travel_day(ws, &mut state.party, x, y, party_movement);
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 

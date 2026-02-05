@@ -162,7 +162,7 @@ impl Command for PartyCommand {
             let status = if c.is_alive() {
                 let next_level_xp = xp_for_level(c.class, c.level + 1);
                 let xp_str = if next_level_xp == u64::MAX {
-                    format!("{}", c.xp) // At max level, just show current XP
+                    c.xp.to_string() // At max level, just show current XP
                 } else {
                     format!("{}/{}", c.xp, next_level_xp)
                 };

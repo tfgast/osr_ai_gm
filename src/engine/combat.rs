@@ -35,7 +35,7 @@ impl fmt::Display for AttackResult {
         let mod_str = if self.modifiers > 0 {
             format!("+{}", self.modifiers)
         } else if self.modifiers < 0 {
-            format!("{}", self.modifiers)
+            self.modifiers.to_string()
         } else {
             String::new()
         };
@@ -302,7 +302,7 @@ pub fn coup_de_grace(
         target: target_name,
         target_was_helpless: true,
     };
-    combat.log.push(format!("{}", result));
+    combat.log.push(result.to_string());
     Ok(result)
 }
 
@@ -398,7 +398,7 @@ pub fn character_melee_attack_with<R: Rng>(
         target_hp_after,
         target_killed,
     };
-    combat.log.push(format!("{}", result));
+    combat.log.push(result.to_string());
     result
 }
 
@@ -480,7 +480,7 @@ pub fn character_missile_attack_with<R: Rng>(
         target_hp_after,
         target_killed,
     };
-    combat.log.push(format!("{}", result));
+    combat.log.push(result.to_string());
     Ok(result)
 }
 
@@ -561,7 +561,7 @@ fn monster_attack_modified_with<R: Rng>(
         target_hp_after,
         target_killed,
     };
-    combat.log.push(format!("{}", result));
+    combat.log.push(result.to_string());
     result
 }
 
@@ -589,7 +589,7 @@ pub fn check_morale_with<R: Rng>(combat: &mut CombatState, morale_score: u32, rn
     let passed = roll <= morale_score as i32;
 
     let result = MoraleResult { roll, morale_score, passed };
-    combat.log.push(format!("{}", result));
+    combat.log.push(result.to_string());
     result
 }
 
@@ -683,7 +683,7 @@ pub fn resolve_turn_undead_with<R: Rng>(
         hd_affected,
         destroyed,
     };
-    combat.log.push(format!("{}", result));
+    combat.log.push(result.to_string());
     result
 }
 
@@ -2226,7 +2226,7 @@ mod tests {
             target: "Goblin".to_string(),
             target_was_helpless: true,
         };
-        let display = format!("{}", result);
+        let display = result.to_string();
         assert!(display.contains("dispatches"));
         assert!(display.contains("Grond"));
         assert!(display.contains("Goblin"));

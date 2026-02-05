@@ -154,7 +154,7 @@ impl Command for AttackCommand {
             && combat.monsters[monster_idx].helpless
         {
             match combat::coup_de_grace(combat, &character, monster_idx) {
-                Ok(result) => return CommandResult::ok(format!("{}", result)),
+                Ok(result) => return CommandResult::ok(result.to_string()),
                 Err(e) => return CommandResult::error(e),
             }
         }
@@ -172,7 +172,7 @@ impl Command for AttackCommand {
         let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
 
         match combat::resolve_character_attack(combat, &character, monster_idx, weapon, rest_penalty) {
-            Ok(result) => CommandResult::ok(format!("{}", result)),
+            Ok(result) => CommandResult::ok(result.to_string()),
             Err(e) => CommandResult::error(e),
         }
     }
@@ -224,7 +224,7 @@ impl Command for MonsterAttackCommand {
 
         let combat = state.combat.as_mut().unwrap();
         let result = combat::monster_attack(combat, monster_idx, character);
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 
@@ -254,7 +254,7 @@ impl Command for MoraleCommand {
                 .unwrap_or(7)
         };
         let result = combat::check_morale(combat, morale_score);
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 
@@ -305,7 +305,7 @@ impl Command for TurnUndeadCommand {
         let result = combat::resolve_turn_undead(
             combat, &character, character.level, monster_idx,
         );
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 
@@ -334,7 +334,7 @@ impl Command for RetreatCommand {
         }
         let combat = state.combat.as_mut().unwrap();
         let result = combat::retreat(combat, character);
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 
@@ -587,7 +587,7 @@ impl Command for KillCommand {
         };
 
         match combat::coup_de_grace(combat, &character, monster_idx) {
-            Ok(result) => CommandResult::ok(format!("{}", result)),
+            Ok(result) => CommandResult::ok(result.to_string()),
             Err(e) => CommandResult::error(e),
         }
     }

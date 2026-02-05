@@ -115,7 +115,7 @@ impl CommandRegistry {
                 raw_input: crate::telemetry::reconstruct_input(name, args),
                 category,
                 error_message: result.output.clone(),
-                game_mode: format!("{}", state.mode),
+                game_mode: state.mode.to_string(),
             });
         }
 

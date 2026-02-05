@@ -12,8 +12,8 @@ impl Command for RollCommand {
         }
         let notation = args.join("");
         match dice::roll_str(&notation) {
-            Ok(result) => CommandResult::ok(format!("{}", result)),
-            Err(e) => CommandResult::error(format!("{}", e)),
+            Ok(result) => CommandResult::ok(result.to_string()),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }

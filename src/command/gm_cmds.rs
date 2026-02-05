@@ -93,7 +93,7 @@ impl Command for AdvanceTurnCommand {
             None => return CommandResult::error("no dungeon state."),
         };
         let result = crate::engine::exploration::advance_dungeon_turn(time, dungeon, level);
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 
@@ -117,7 +117,7 @@ impl Command for AwardXpCommand {
         let result = xp::award_xp(character, amount, 0);
         let next_xp = xp_for_level(character.class, character.level + 1);
         let xp_str = if next_xp == u64::MAX {
-            format!("{}", result.new_total)
+            result.new_total.to_string()
         } else {
             format!("{}/{}", result.new_total, next_xp)
         };

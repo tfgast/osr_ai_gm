@@ -79,7 +79,7 @@ impl Command for ExploreCommand {
             None => return CommandResult::error("no dungeon state."),
         };
         let result = exploration::advance_dungeon_turn(time, dungeon, level);
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 
@@ -99,7 +99,7 @@ impl Command for SearchCommand {
             None => return CommandResult::error("no dungeon state."),
         };
         let result = exploration::search_room(time, dungeon, level, is_elf);
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 
@@ -121,7 +121,7 @@ impl Command for ListenCommand {
             None => return CommandResult::error("no dungeon state."),
         };
         let result = exploration::listen_at_door(time, dungeon, level, is_demihuman);
-        CommandResult::ok(format!("{}", result))
+        CommandResult::ok(result.to_string())
     }
 }
 
@@ -242,7 +242,7 @@ impl Command for MoveRoomCommand {
             None => return CommandResult::error("no dungeon state."),
         };
         match exploration::move_through_door(time, dungeon, level, door_id) {
-            Ok(result) => CommandResult::ok(format!("{}", result)),
+            Ok(result) => CommandResult::ok(result.to_string()),
             Err(e) => CommandResult::error(e),
         }
     }
@@ -311,7 +311,7 @@ impl Command for OpenCommand {
         let dungeon = state.dungeon.as_mut().unwrap();
         match exploration::move_through_door(time, dungeon, level, door_id) {
             Ok(result) => {
-                output.push(format!("{}", result));
+                output.push(result.to_string());
                 CommandResult::ok(output.join("\n"))
             }
             Err(e) => {

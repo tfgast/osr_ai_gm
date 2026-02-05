@@ -42,12 +42,12 @@ mod tests {
 
     #[test]
     fn display_modes() {
-        assert_eq!(format!("{}", GameMode::Idle), "idle");
-        assert_eq!(format!("{}", GameMode::Combat), "combat");
-        assert_eq!(format!("{}", GameMode::Exploration), "exploration");
-        assert_eq!(format!("{}", GameMode::Wilderness), "wilderness");
-        assert_eq!(format!("{}", GameMode::CharGen), "chargen");
-        assert_eq!(format!("{}", GameMode::Downtime), "downtime");
+        assert_eq!(GameMode::Idle.to_string(), "idle");
+        assert_eq!(GameMode::Combat.to_string(), "combat");
+        assert_eq!(GameMode::Exploration.to_string(), "exploration");
+        assert_eq!(GameMode::Wilderness.to_string(), "wilderness");
+        assert_eq!(GameMode::CharGen.to_string(), "chargen");
+        assert_eq!(GameMode::Downtime.to_string(), "downtime");
     }
 
     #[test]

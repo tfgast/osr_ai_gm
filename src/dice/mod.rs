@@ -265,7 +265,7 @@ mod tests {
             modifier: 3,
             total: 12,
         };
-        let display = format!("{}", result);
+        let display = result.to_string();
         assert!(display.contains("2d6+3"));
         assert!(display.contains("12"));
     }
