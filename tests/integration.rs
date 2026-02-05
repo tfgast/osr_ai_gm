@@ -126,10 +126,13 @@ fn full_dungeon_session() {
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert!(resp.success, "light torch failed: {}", resp.message);
+    assert_eq!(state.time.as_ref().unwrap().lights.len(), 1, "should have 1 light source");
+    assert_eq!(state.time.as_ref().unwrap().lights[0].carrier, "Aldric");
 
     // -- STEP 4: Advance a dungeon turn --
     let resp = handle_request(&req("12", GMCommand::AdvanceTurn), &mut state);
     assert!(resp.success, "advance turn failed: {}", resp.message);
+    assert_eq!(state.time.as_ref().unwrap().total_turns, 1, "turn should have advanced to 1");
 
     // -- STEP 5: Add rooms and explore --
     let resp = handle_request(&req("13", GMCommand::AddRoom {
@@ -137,6 +140,7 @@ fn full_dungeon_session() {
         name: "Guard Room".to_string(),
     }), &mut state);
     assert!(resp.success, "add room failed: {}", resp.message);
+    assert_eq!(state.dungeon.as_ref().unwrap().rooms.len(), 2, "should have 2 rooms");
 
     let resp = handle_request(&req("14", GMCommand::AddDoor {
         id: 0,
@@ -145,10 +149,12 @@ fn full_dungeon_session() {
         state: DoorState::Closed,
     }), &mut state);
     assert!(resp.success, "add door failed: {}", resp.message);
+    assert_eq!(state.dungeon.as_ref().unwrap().doors.len(), 1, "should have 1 door");
 
     // -- STEP 6: Search the room --
     let resp = handle_request(&req("15", GMCommand::Search { is_elf: false }), &mut state);
     assert!(resp.success, "search failed: {}", resp.message);
+    assert!(!resp.message.is_empty(), "search should have result message");
 
     // -- STEP 7: Spawn an encounter from the monster database --
     let resp = handle_request(&req("20", GMCommand::SpawnMonster {
@@ -171,14 +177,23 @@ fn full_dungeon_session() {
     // -- STEP 8: Roll initiative --
     let resp = handle_request(&req("21", GMCommand::RollInitiative), &mut state);
     assert!(resp.success, "initiative failed: {}", resp.message);
+    let combat = state.combat.as_ref().unwrap();
+    assert!(combat.party_initiative > 0, "party initiative should be set");
+    assert!(combat.monster_initiative > 0, "monster initiative should be set");
 
     // -- STEP 9: Fighter attacks --
+    let pre_attack_hp = state.combat.as_ref().unwrap().monsters[0].hp;
     let resp = handle_request(&req("22", GMCommand::Attack {
         character: "Aldric".to_string(),
         monster_idx: 0,
         weapon: "sword".to_string(),
     }), &mut state);
     assert!(resp.success, "attack failed: {}", resp.message);
+    // Attack returns result in message, verify state mutation
+    let post_attack_hp = state.combat.as_ref().unwrap().monsters[0].hp;
+    if resp.message.contains("HIT") {
+        assert!(post_attack_hp < pre_attack_hp, "monster HP should decrease on hit");
+    }
 
     // -- STEP 10: Thief attempts backstab on a different goblin --
     let resp = handle_request(&req("23", GMCommand::Backstab {
@@ -196,6 +211,7 @@ fn full_dungeon_session() {
     // -- STEP 11: Check morale --
     let resp = handle_request(&req("24", GMCommand::CheckMorale), &mut state);
     assert!(resp.success, "morale check failed: {}", resp.message);
+    assert!(!resp.message.is_empty(), "morale check should have result message");
 
     // -- STEP 12: End combat --
     let resp = handle_request(&req("25", GMCommand::EndCombat), &mut state);
@@ -225,6 +241,7 @@ fn full_dungeon_session() {
         monster_xp: total_xp,
     }), &mut state);
     assert!(resp.success, "award thief xp failed: {}", resp.message);
+    assert!(state.party.find_member("Shade").unwrap().xp > 0, "Shade should have XP after award");
 
     // -- STEP 14: Query the party to verify state --
     let resp = handle_request(&req("40", GMCommand::QueryParty), &mut state);
@@ -550,6 +567,9 @@ fn complete_ose_session() {
         room_name: "Mossy Staircase".to_string(),
     }), &mut state);
     assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Exploration);
+    assert!(state.dungeon.is_some(), "dungeon state should be initialized");
+    assert!(state.time.is_some(), "time tracker should be initialized");
 
     // Light source
     let resp = handle_request(&req("d2", GMCommand::Light {
@@ -557,14 +577,20 @@ fn complete_ose_session() {
         carrier: "Brother Tomas".to_string(),
     }), &mut state);
     assert!(resp.success);
+    assert_eq!(state.time.as_ref().unwrap().lights.len(), 1, "should have 1 light source");
 
     // Advance turn
     let resp = handle_request(&req("d3", GMCommand::AdvanceTurn), &mut state);
     assert!(resp.success);
+    assert!(state.turn() > 0, "turn counter should have advanced");
 
     // Add rooms
-    handle_request(&req("d4", GMCommand::AddRoom { id: 1, name: "Goblin Lair".to_string() }), &mut state);
-    handle_request(&req("d5", GMCommand::AddDoor { id: 0, room_a: 0, room_b: 1, state: DoorState::Stuck }), &mut state);
+    let resp = handle_request(&req("d4", GMCommand::AddRoom { id: 1, name: "Goblin Lair".to_string() }), &mut state);
+    assert!(resp.success, "add room failed: {}", resp.message);
+    assert_eq!(state.dungeon.as_ref().unwrap().rooms.len(), 2);
+    let resp = handle_request(&req("d5", GMCommand::AddDoor { id: 0, room_a: 0, room_b: 1, state: DoorState::Stuck }), &mut state);
+    assert!(resp.success, "add door failed: {}", resp.message);
+    assert_eq!(state.dungeon.as_ref().unwrap().doors.len(), 1);
 
     // Thief listens at the door
     let resp = handle_request(&req("d6", GMCommand::ThiefSkillCheck {
@@ -572,6 +598,8 @@ fn complete_ose_session() {
         skill: "hear noise".to_string(),
     }), &mut state);
     assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["skill"], "Hear Noise");
 
     // === ENCOUNTER: GOBLINS ===
     let resp = handle_request(&req("c1", GMCommand::SpawnMonster {
@@ -585,45 +613,70 @@ fn complete_ose_session() {
     // Roll surprise
     let resp = handle_request(&req("c2", GMCommand::RollSurprise), &mut state);
     assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["party_roll"].as_u64().is_some(), "surprise should have party roll");
+    assert!(data["monster_roll"].as_u64().is_some(), "surprise should have monster roll");
 
     // Roll initiative
     let resp = handle_request(&req("c3", GMCommand::RollInitiative), &mut state);
     assert!(resp.success);
+    let combat = state.combat.as_ref().unwrap();
+    assert!(combat.party_initiative > 0, "party initiative should be set");
+    assert!(combat.monster_initiative > 0, "monster initiative should be set");
 
     // Fighter attacks
+    let pre_hp_0 = state.combat.as_ref().unwrap().monsters[0].hp;
     let resp = handle_request(&req("c4", GMCommand::Attack {
         character: "Sir Aldric".to_string(),
         monster_idx: 0,
         weapon: "sword".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[0].hp < pre_hp_0, "goblin 0 HP should decrease on hit");
+    }
 
     // Thief backstabs
+    let pre_hp_1 = state.combat.as_ref().unwrap().monsters[1].hp;
     let resp = handle_request(&req("c5", GMCommand::Backstab {
         character: "Nyx the Shadow".to_string(),
         monster_idx: 1,
         weapon: "dagger".to_string(),
     }), &mut state);
     assert!(resp.success);
+    let data = resp.data.as_ref().unwrap();
+    if data["hit"].as_bool().unwrap_or(false) {
+        assert_eq!(data["multiplier"], 2, "level 1 backstab should be x2");
+        assert!(state.combat.as_ref().unwrap().monsters[1].hp < pre_hp_1, "goblin 1 HP should decrease on hit");
+    }
 
     // Cleric attacks
+    let pre_hp_2 = state.combat.as_ref().unwrap().monsters[2].hp;
     let resp = handle_request(&req("c6", GMCommand::Attack {
         character: "Brother Tomas".to_string(),
         monster_idx: 2,
         weapon: "mace".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[2].hp < pre_hp_2, "goblin 2 HP should decrease on hit");
+    }
 
     // Monster attacks back
+    let pre_aldric_hp = state.party.find_member("Sir Aldric").unwrap().hp;
     let resp = handle_request(&req("c7", GMCommand::MonsterAttack {
         monster_idx: 3,
         character: "Sir Aldric".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.party.find_member("Sir Aldric").unwrap().hp < pre_aldric_hp, "Aldric HP should decrease on hit");
+    }
 
     // Check morale
     let resp = handle_request(&req("c8", GMCommand::CheckMorale), &mut state);
     assert!(resp.success);
+    assert!(!resp.message.is_empty(), "morale check should have result");
 
     // End combat
     let resp = handle_request(&req("c9", GMCommand::EndCombat), &mut state);
@@ -657,6 +710,9 @@ fn complete_ose_session() {
         character: "Sir Aldric".to_string(),
     }), &mut state);
     assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["total_weight_cn"].as_u64().is_some(), "encumbrance should have weight");
+    assert!(data["movement_rate"].as_u64().is_some(), "encumbrance should have movement rate");
 
     // === SPELL LOOKUP ===
     let resp = handle_request(&req("s1", GMCommand::LookupSpell {
@@ -664,6 +720,9 @@ fn complete_ose_session() {
         list: "cleric".to_string(),
     }), &mut state);
     assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["name"], "Cure Light Wounds");
+    assert_eq!(data["list"], "Cleric");
 
     // === RETAINER HIRING ===
     let resp = handle_request(&req("r1", GMCommand::HireRetainer {
@@ -673,6 +732,9 @@ fn complete_ose_session() {
         retainer_level: 0,
     }), &mut state);
     assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["retainer"], "Bort the Torchbearer");
+    assert_eq!(data["employer"], "Sir Aldric");
 
     // === VERIFY FINAL STATE ===
     let resp = handle_request(&req("q1", GMCommand::QueryState), &mut state);
@@ -881,6 +943,12 @@ fn turn_undead_via_api() {
         monster_idx: 0,
     }), &mut state);
     assert!(resp.success);
+    // Turn undead result is in the message — verify it contains meaningful content
+    assert!(!resp.message.is_empty(), "turn undead should have result message");
+    // At cleric level 3 vs skeletons, turn undead should always succeed (auto-turn)
+    // so the message should indicate the outcome
+    assert!(resp.message.contains("turn") || resp.message.contains("Turn") || resp.message.contains("undead"),
+        "turn undead message should describe outcome: {}", resp.message);
 }
 
 // ===========================================================================
@@ -903,30 +971,44 @@ fn multi_round_combat_api() {
     // === Round 1 ===
     let resp = handle_request(&req("2", GMCommand::RollInitiative), &mut state);
     assert!(resp.success);
+    assert_eq!(state.combat.as_ref().unwrap().round, 1, "should be round 1");
 
+    let pre_orc0_hp = state.combat.as_ref().unwrap().monsters[0].hp;
     let resp = handle_request(&req("3", GMCommand::Attack {
         character: "Sir Brave".to_string(),
         monster_idx: 0,
         weapon: "sword".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[0].hp < pre_orc0_hp);
+    }
 
+    let pre_orc1_hp = state.combat.as_ref().unwrap().monsters[1].hp;
     let resp = handle_request(&req("4", GMCommand::Attack {
         character: "Father Stone".to_string(),
         monster_idx: 1,
         weapon: "mace".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[1].hp < pre_orc1_hp);
+    }
 
     // Monster attacks (use orc 2, which hasn't been attacked)
+    let pre_brave_hp = state.party.find_member("Sir Brave").unwrap().hp;
     let resp = handle_request(&req("5", GMCommand::MonsterAttack {
         monster_idx: 2,
         character: "Sir Brave".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.party.find_member("Sir Brave").unwrap().hp < pre_brave_hp, "HP should decrease on hit");
+    }
 
     let resp = handle_request(&req("6", GMCommand::CheckMorale), &mut state);
     assert!(resp.success);
+    assert!(!resp.message.is_empty(), "morale check should have result");
 
     // === Round 2 ===
     let resp = handle_request(&req("7", GMCommand::RollInitiative), &mut state);
@@ -1013,14 +1095,21 @@ fn wilderness_encounter() {
         terrain: Terrain::Hills,
     }), &mut state);
     assert!(resp.success);
+    assert!(state.wilderness.as_ref().unwrap().hexes.len() >= 2, "should have at least 2 hexes");
 
     // Travel
+    let pre_travel_day = state.wilderness.as_ref().unwrap().travel_day;
     let resp = handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
     assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["lost"].as_bool().is_some(), "travel should report lost status");
+    assert!(state.wilderness.as_ref().unwrap().travel_day > pre_travel_day, "travel day should advance");
 
     // Query wilderness state
     let resp = handle_request(&req("4", GMCommand::QueryWilderness), &mut state);
     assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["travel_day"].as_u64().unwrap() >= 2, "should be at least day 2");
 }
 
 // ===========================================================================
@@ -1214,6 +1303,8 @@ fn dungeon_exploration_flow() {
         carrier: "Aldric".to_string(),
     }), &mut state);
     assert!(resp.success);
+    assert!(!state.time.as_ref().unwrap().lights.is_empty(), "should have active light");
+    assert_eq!(state.time.as_ref().unwrap().lights[0].carrier, "Aldric");
 
     // Now exploration should work
     let resp = handle_request(&req("4", GMCommand::AdvanceTurn), &mut state);
@@ -1221,14 +1312,17 @@ fn dungeon_exploration_flow() {
     assert!(!resp.message.contains("DARKNESS"), "should not be in darkness with torch");
 
     // Build out the dungeon
-    handle_request(&req("5a", GMCommand::AddRoom { id: 1, name: "Guard Room".to_string() }), &mut state);
-    handle_request(&req("5b", GMCommand::AddDoor {
+    let resp = handle_request(&req("5a", GMCommand::AddRoom { id: 1, name: "Guard Room".to_string() }), &mut state);
+    assert!(resp.success, "add room failed: {}", resp.message);
+    let resp = handle_request(&req("5b", GMCommand::AddDoor {
         id: 0, room_a: 0, room_b: 1, state: DoorState::Closed,
     }), &mut state);
+    assert!(resp.success, "add door failed: {}", resp.message);
 
     // Search the room
     let resp = handle_request(&req("6", GMCommand::Search { is_elf: false }), &mut state);
     assert!(resp.success);
+    assert!(!resp.message.is_empty(), "search should have result message");
 
     // Check exploration status
     let resp = handle_request(&req("7", GMCommand::QueryExploration), &mut state);
@@ -1399,14 +1493,19 @@ fn session_a_dungeon_crawl() {
     assert_eq!(combat.round, 1);
 
     // Fighter attacks goblin 0
+    let pre_g0_hp = state.combat.as_ref().unwrap().monsters[0].hp;
     let resp = handle_request(&req("a23", GMCommand::Attack {
         character: "Aldric the Bold".to_string(),
         monster_idx: 0,
         weapon: "sword".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[0].hp < pre_g0_hp);
+    }
 
     // Thief backstabs goblin 1
+    let pre_g1_hp = state.combat.as_ref().unwrap().monsters[1].hp;
     let resp = handle_request(&req("a24", GMCommand::Backstab {
         character: "Vex".to_string(),
         monster_idx: 1,
@@ -1416,34 +1515,48 @@ fn session_a_dungeon_crawl() {
     let data = resp.data.unwrap();
     if data["hit"].as_bool().unwrap_or(false) {
         assert_eq!(data["multiplier"], 2); // level 1 backstab = x2
+        assert!(state.combat.as_ref().unwrap().monsters[1].hp < pre_g1_hp);
     }
 
     // Cleric attacks goblin 2
+    let pre_g2_hp = state.combat.as_ref().unwrap().monsters[2].hp;
     let resp = handle_request(&req("a25", GMCommand::Attack {
         character: "Sister Mira".to_string(),
         monster_idx: 2,
         weapon: "mace".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[2].hp < pre_g2_hp);
+    }
 
     // Magic-User attacks goblin 3 with dagger (can't use swords)
+    let pre_g3_hp = state.combat.as_ref().unwrap().monsters[3].hp;
     let resp = handle_request(&req("a26", GMCommand::Attack {
         character: "Zanthus".to_string(),
         monster_idx: 3,
         weapon: "dagger".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[3].hp < pre_g3_hp);
+    }
 
     // Monster attacks back
+    let pre_aldric_hp = state.party.find_member("Aldric the Bold").unwrap().hp;
     let resp = handle_request(&req("a27", GMCommand::MonsterAttack {
         monster_idx: 4,
         character: "Aldric the Bold".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.party.find_member("Aldric the Bold").unwrap().hp < pre_aldric_hp);
+    }
 
     // Check morale
     let resp = handle_request(&req("a28", GMCommand::CheckMorale), &mut state);
     assert!(resp.success);
+    assert!(!resp.message.is_empty(), "morale check should have result");
 
     // End combat — restores Exploration mode
     let resp = handle_request(&req("a29", GMCommand::EndCombat), &mut state);
@@ -1740,6 +1853,7 @@ fn session_c_retainers() {
         carrier: "Captain Kael".to_string(),
     }), &mut state);
     assert!(resp.success);
+    assert!(!state.time.as_ref().unwrap().lights.is_empty(), "should have active light");
 
     // === Retainer loyalty check ===
     // Tormund loyalty check (base loyalty for CHA 16 employer = 9)
@@ -1767,30 +1881,43 @@ fn session_c_retainers() {
     assert!(resp.success);
 
     // Party members attack
+    let pre_hob0_hp = state.combat.as_ref().unwrap().monsters[0].hp;
     let resp = handle_request(&req("c8", GMCommand::Attack {
         character: "Captain Kael".to_string(),
         monster_idx: 0,
         weapon: "sword".to_string(),
     }), &mut state);
     assert!(resp.success, "attack failed: {}", resp.message);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[0].hp < pre_hob0_hp);
+    }
 
+    let pre_hob1_hp = state.combat.as_ref().unwrap().monsters[1].hp;
     let resp = handle_request(&req("c9", GMCommand::Attack {
         character: "Deacon Brin".to_string(),
         monster_idx: 1,
         weapon: "mace".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[1].hp < pre_hob1_hp);
+    }
 
     // Monster attacks back
+    let pre_kael_hp = state.party.find_member("Captain Kael").unwrap().hp;
     let resp = handle_request(&req("c10", GMCommand::MonsterAttack {
         monster_idx: 2,
         character: "Captain Kael".to_string(),
     }), &mut state);
     assert!(resp.success);
+    if resp.message.contains("HIT") {
+        assert!(state.party.find_member("Captain Kael").unwrap().hp < pre_kael_hp, "HP should decrease on hit");
+    }
 
     // Check morale
     let resp = handle_request(&req("c11", GMCommand::CheckMorale), &mut state);
     assert!(resp.success);
+    assert!(!resp.message.is_empty(), "morale check should have result");
 
     // End combat
     let resp = handle_request(&req("c12", GMCommand::EndCombat), &mut state);

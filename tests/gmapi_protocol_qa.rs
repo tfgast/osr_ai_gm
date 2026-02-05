@@ -636,6 +636,10 @@ fn roll_initiative_happy_path() {
     assert!(data["monster_initiative"].as_i64().is_some());
     let winner = data["winner"].as_str().unwrap();
     assert!(["party", "monsters", "simultaneous"].contains(&winner));
+    // Verify state mutation: initiative values stored in combat state
+    let combat = state.combat.as_ref().unwrap();
+    assert!(combat.party_initiative > 0, "party initiative should be set in state");
+    assert!(combat.monster_initiative > 0, "monster initiative should be set in state");
 }
 
 #[test]
@@ -656,6 +660,7 @@ fn attack_happy_path() {
     let mut state = GameState::new();
     setup_combat(&mut state);
 
+    let pre_hp = state.combat.as_ref().unwrap().monsters[0].hp;
     let resp = handle_request(&req("a1", GMCommand::Attack {
         character: "Aldric".to_string(),
         monster_idx: 0,
@@ -664,6 +669,11 @@ fn attack_happy_path() {
     assert_response_format(&resp, "a1");
     assert!(resp.success);
     assert_eq!(resp.mode, GameMode::Combat);
+    // Verify state mutation: on hit, monster HP should decrease
+    if resp.message.contains("HIT") {
+        assert!(state.combat.as_ref().unwrap().monsters[0].hp < pre_hp,
+            "monster HP should decrease on hit");
+    }
 }
 
 #[test]
@@ -788,6 +798,7 @@ fn monster_attack_happy_path() {
     let mut state = GameState::new();
     setup_combat(&mut state);
 
+    let pre_hp = state.party.find_member("Aldric").unwrap().hp;
     let resp = handle_request(&req("ma1", GMCommand::MonsterAttack {
         monster_idx: 0,
         character: "Aldric".to_string(),
@@ -795,6 +806,11 @@ fn monster_attack_happy_path() {
     assert_response_format(&resp, "ma1");
     assert!(resp.success);
     assert_eq!(resp.mode, GameMode::Combat);
+    // Verify state mutation: on hit, character HP should decrease
+    if resp.message.contains("HIT") {
+        assert!(state.party.find_member("Aldric").unwrap().hp < pre_hp,
+            "character HP should decrease on hit");
+    }
 }
 
 #[test]
@@ -877,6 +893,8 @@ fn check_morale_happy_path() {
     assert_response_format(&resp, "cm1");
     assert!(resp.success);
     assert_eq!(resp.mode, GameMode::Combat);
+    // Morale result is in the message; verify it contains meaningful content
+    assert!(!resp.message.is_empty(), "morale check should describe outcome");
 }
 
 #[test]
@@ -926,6 +944,8 @@ fn turn_undead_cleric_happy_path() {
     }), &mut state);
     assert_response_format(&resp, "tu1");
     assert!(resp.success);
+    // Turn undead result is in the message
+    assert!(!resp.message.is_empty(), "turn undead should describe outcome");
 }
 
 #[test]
@@ -1087,6 +1107,7 @@ fn advance_turn_happy_path() {
     let mut state = GameState::new();
     setup_exploration(&mut state);
 
+    let pre_turns = state.time.as_ref().unwrap().total_turns;
     let resp = handle_request(&req("at1", GMCommand::AdvanceTurn), &mut state);
     assert_response_format(&resp, "at1");
     assert!(resp.success);
@@ -1095,6 +1116,9 @@ fn advance_turn_happy_path() {
     assert!(data["messages"].as_array().is_some());
     // has_encounter is a boolean
     assert!(data["has_encounter"].as_bool().is_some());
+    // Verify state mutation: turn counter advanced
+    assert!(state.time.as_ref().unwrap().total_turns > pre_turns,
+        "total_turns should increment after advance");
 }
 
 #[test]
@@ -1120,6 +1144,8 @@ fn add_room_happy_path() {
     assert_response_format(&resp, "ar1");
     assert!(resp.success);
     assert!(resp.message.contains("Guard Room"));
+    // Verify state mutation: room was actually added
+    assert_eq!(state.dungeon.as_ref().unwrap().rooms.len(), 2, "should have 2 rooms after adding");
 }
 
 #[test]
@@ -1168,6 +1194,8 @@ fn add_door_happy_path() {
     }), &mut state);
     assert_response_format(&resp, "ad1");
     assert!(resp.success);
+    // Verify state mutation: door was actually added
+    assert_eq!(state.dungeon.as_ref().unwrap().doors.len(), 1, "should have 1 door after adding");
 }
 
 #[test]
@@ -1232,9 +1260,12 @@ fn move_room_happy_path() {
         id: 0, room_a: 0, room_b: 1, state: DoorState::Open,
     }), &mut state);
 
+    assert_eq!(state.dungeon.as_ref().unwrap().current_room, Some(0), "should start in room 0");
     let resp = handle_request(&req("mr1", GMCommand::MoveRoom { door_id: 0 }), &mut state);
     assert_response_format(&resp, "mr1");
     assert!(resp.success, "move room failed: {}", resp.message);
+    // Verify state mutation: current room changed
+    assert_eq!(state.dungeon.as_ref().unwrap().current_room, Some(1), "should be in room 1 after move");
 }
 
 #[test]
@@ -1256,6 +1287,8 @@ fn search_happy_path() {
     let resp = handle_request(&req("s1", GMCommand::Search { is_elf: false }), &mut state);
     assert_response_format(&resp, "s1");
     assert!(resp.success);
+    // Search result is in the message
+    assert!(!resp.message.is_empty(), "search should describe what was found");
 }
 
 #[test]
@@ -1266,6 +1299,7 @@ fn search_as_elf() {
     let resp = handle_request(&req("s2", GMCommand::Search { is_elf: true }), &mut state);
     assert_response_format(&resp, "s2");
     assert!(resp.success);
+    assert!(!resp.message.is_empty(), "elf search should describe what was found");
 }
 
 #[test]
@@ -1291,6 +1325,11 @@ fn light_torch_happy_path() {
     assert_response_format(&resp, "l1");
     assert!(resp.success);
     assert!(resp.message.contains("torch"));
+    // Verify state mutation: light was added
+    let lights = &state.time.as_ref().unwrap().lights;
+    assert_eq!(lights.len(), 1, "should have 1 light source");
+    assert_eq!(lights[0].carrier, "Aldric");
+    assert_eq!(lights[0].remaining_turns, 6, "torch should have 6 turns");
 }
 
 #[test]
@@ -1304,6 +1343,10 @@ fn light_lantern_happy_path() {
     }), &mut state);
     assert!(resp.success);
     assert!(resp.message.contains("lantern"));
+    // Verify state mutation: lantern was added
+    let lights = &state.time.as_ref().unwrap().lights;
+    assert_eq!(lights.len(), 1, "should have 1 light source");
+    assert_eq!(lights[0].remaining_turns, 24, "lantern should have 24 turns");
 }
 
 #[test]
@@ -1375,11 +1418,15 @@ fn add_hex_happy_path() {
     let mut state = GameState::new();
     setup_wilderness(&mut state);
 
+    let pre_hex_count = state.wilderness.as_ref().unwrap().hexes.len();
     let resp = handle_request(&req("ah1", GMCommand::AddHex {
         x: 1, y: 0, terrain: Terrain::Hills,
     }), &mut state);
     assert_response_format(&resp, "ah1");
     assert!(resp.success);
+    // Verify state mutation: hex was added
+    assert_eq!(state.wilderness.as_ref().unwrap().hexes.len(), pre_hex_count + 1,
+        "should have one more hex after adding");
 }
 
 #[test]
@@ -1425,6 +1472,7 @@ fn travel_happy_path() {
         x: 1, y: 0, terrain: Terrain::Clear,
     }), &mut state);
 
+    let pre_day = state.wilderness.as_ref().unwrap().travel_day;
     let resp = handle_request(&req("t1", GMCommand::Travel { x: 1, y: 0 }), &mut state);
     assert_response_format(&resp, "t1");
     assert!(resp.success);
@@ -1434,6 +1482,9 @@ fn travel_happy_path() {
     assert!(data["lost"].as_bool().is_some());
     assert!(data["has_encounter"].as_bool().is_some());
     assert!(data["encounters"].as_array().is_some());
+    // Verify state mutation: travel day advanced
+    assert!(state.wilderness.as_ref().unwrap().travel_day > pre_day,
+        "travel day should advance after travel");
 }
 
 #[test]
@@ -1635,6 +1686,10 @@ fn award_treasure_xp_happy_path() {
     assert!(data["ready_to_train"].as_bool().is_some());
     // Fighter with STR 16 gets +10%
     assert_eq!(data["modifier_pct"], 10);
+    // Verify state mutation: character XP was actually updated
+    let aldric = state.party.find_member("Aldric").unwrap();
+    assert!(aldric.xp > 0, "character XP should be updated in state");
+    assert_eq!(aldric.xp, data["total_xp"].as_u64().unwrap(), "state XP should match response");
 }
 
 #[test]
