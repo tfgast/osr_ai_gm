@@ -5,7 +5,7 @@ use crate::persist::{self, GameState};
 use crate::rules::{class, spell_data, thief};
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
-use super::{combat_handlers, exploration_handlers, inventory_handlers, query_handlers};
+use super::{combat_handlers, exploration_handlers, inventory_handlers, lookup_handlers, query_handlers};
 
 /// Process a GMRequest against the current GameState and return a GMResponse.
 pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
@@ -123,6 +123,14 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::Drop { character, item_name } => inventory_handlers::drop(id, state, character, item_name),
         GMCommand::Equip { character, item_name } => inventory_handlers::equip(id, state, character, item_name),
         GMCommand::Loot { character, item_name, value_gp } => inventory_handlers::loot(id, state, character, item_name, *value_gp),
+
+        // -- Lookup & reference --
+        GMCommand::LookupItem { name } => lookup_handlers::lookup_item(id, state, name),
+        GMCommand::SearchItems { query } => lookup_handlers::search_items(id, state, query),
+        GMCommand::LookupTreasureType { letter } => lookup_handlers::lookup_treasure_type(id, state, letter),
+        GMCommand::RollTreasure { letter } => lookup_handlers::roll_treasure(id, state, letter),
+        GMCommand::ListClasses => lookup_handlers::list_classes(id, state),
+        GMCommand::EligibleClasses { abilities } => lookup_handlers::eligible_classes(id, state, abilities),
 
         // -- System --
         GMCommand::Save { path } => save_game(id, state, path),
@@ -1112,6 +1120,106 @@ mod tests {
         }), &mut state);
         assert!(!resp.success);
         assert!(resp.error.unwrap().contains("unknown party type"));
+    }
+
+    #[test]
+    fn lookup_item_success() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LookupItem {
+            name: "Bag of Holding".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        assert_eq!(data["name"], "Bag of Holding");
+    }
+
+    #[test]
+    fn lookup_item_not_found() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LookupItem {
+            name: "Nonexistent XYZ".to_string(),
+        }), &mut state);
+        assert!(!resp.success);
+    }
+
+    #[test]
+    fn search_items_success() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::SearchItems {
+            query: "healing".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        assert!(data["count"].as_u64().unwrap() > 0);
+    }
+
+    #[test]
+    fn lookup_treasure_type_success() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LookupTreasureType {
+            letter: "A".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        assert_eq!(data["letter"], "A");
+    }
+
+    #[test]
+    fn lookup_treasure_type_invalid() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LookupTreasureType {
+            letter: "Z".to_string(),
+        }), &mut state);
+        assert!(!resp.success);
+    }
+
+    #[test]
+    fn roll_treasure_success() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::RollTreasure {
+            letter: "P".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        assert!(!data["items"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn roll_treasure_invalid() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::RollTreasure {
+            letter: "Z".to_string(),
+        }), &mut state);
+        assert!(!resp.success);
+    }
+
+    #[test]
+    fn list_classes_success() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::ListClasses), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        assert_eq!(data["classes"].as_array().unwrap().len(), 22);
+    }
+
+    #[test]
+    fn eligible_classes_success() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::EligibleClasses {
+            abilities: [16, 10, 10, 12, 14, 12],
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        assert!(data["eligible"].as_array().unwrap().iter().any(|c| c == "Fighter"));
+    }
+
+    #[test]
+    fn eligible_classes_invalid_score() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::EligibleClasses {
+            abilities: [20, 10, 10, 10, 10, 10],
+        }), &mut state);
+        assert!(!resp.success);
     }
 
     #[test]

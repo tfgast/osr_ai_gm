@@ -287,6 +287,20 @@ pub enum GMCommand {
         value_gp: Option<u32>,
     },
 
+    // -- Lookup & reference --
+    /// Look up a magic item by name.
+    LookupItem { name: String },
+    /// Search magic items by keyword.
+    SearchItems { query: String },
+    /// Look up a treasure type table by letter (A-V).
+    LookupTreasureType { letter: String },
+    /// Roll on a treasure type table to generate treasure.
+    RollTreasure { letter: String },
+    /// List all character classes with requirements.
+    ListClasses,
+    /// Show eligible classes for given ability scores.
+    EligibleClasses { abilities: [i32; 6] },
+
     // -- System --
     /// Save game state.
     Save {
@@ -883,6 +897,71 @@ mod tests {
         let json = r#"{"id":"r1","command":{"type":"Rest"}}"#;
         let req = parse_request(json).unwrap();
         assert!(matches!(req.command, GMCommand::Rest));
+    }
+
+    #[test]
+    fn parse_lookup_item() {
+        let json = r#"{"id":"li1","command":{"type":"LookupItem","params":{"name":"Bag of Holding"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "li1");
+        match &req.command {
+            GMCommand::LookupItem { name } => assert_eq!(name, "Bag of Holding"),
+            _ => panic!("expected LookupItem"),
+        }
+    }
+
+    #[test]
+    fn parse_search_items() {
+        let json = r#"{"id":"si1","command":{"type":"SearchItems","params":{"query":"healing"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "si1");
+        match &req.command {
+            GMCommand::SearchItems { query } => assert_eq!(query, "healing"),
+            _ => panic!("expected SearchItems"),
+        }
+    }
+
+    #[test]
+    fn parse_lookup_treasure_type() {
+        let json = r#"{"id":"lt1","command":{"type":"LookupTreasureType","params":{"letter":"A"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "lt1");
+        match &req.command {
+            GMCommand::LookupTreasureType { letter } => assert_eq!(letter, "A"),
+            _ => panic!("expected LookupTreasureType"),
+        }
+    }
+
+    #[test]
+    fn parse_roll_treasure() {
+        let json = r#"{"id":"rt1","command":{"type":"RollTreasure","params":{"letter":"P"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "rt1");
+        match &req.command {
+            GMCommand::RollTreasure { letter } => assert_eq!(letter, "P"),
+            _ => panic!("expected RollTreasure"),
+        }
+    }
+
+    #[test]
+    fn parse_list_classes() {
+        let json = r#"{"id":"lc1","command":{"type":"ListClasses"}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "lc1");
+        assert!(matches!(req.command, GMCommand::ListClasses));
+    }
+
+    #[test]
+    fn parse_eligible_classes() {
+        let json = r#"{"id":"ec1","command":{"type":"EligibleClasses","params":{"abilities":[16,10,10,12,14,12]}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "ec1");
+        match &req.command {
+            GMCommand::EligibleClasses { abilities } => {
+                assert_eq!(*abilities, [16, 10, 10, 12, 14, 12]);
+            }
+            _ => panic!("expected EligibleClasses"),
+        }
     }
 
     #[test]

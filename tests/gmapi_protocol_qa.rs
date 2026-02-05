@@ -3728,3 +3728,363 @@ fn loot_json_parse_no_value() {
         _ => panic!("expected Loot"),
     }
 }
+// ===========================================================================
+// LookupItem
+// ===========================================================================
+
+#[test]
+fn lookup_item_exact_match() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("li1", GMCommand::LookupItem {
+        name: "Bag of Holding".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "li1");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["name"], "Bag of Holding");
+    assert!(data["category"].as_str().is_some());
+}
+
+#[test]
+fn lookup_item_case_insensitive() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("li2", GMCommand::LookupItem {
+        name: "bag of holding".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "li2");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["name"], "Bag of Holding");
+}
+
+#[test]
+fn lookup_item_not_found() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("li3", GMCommand::LookupItem {
+        name: "Nonexistent Item XYZ123".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "li3");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no magic item found"));
+}
+
+#[test]
+fn lookup_item_partial_match() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("li4", GMCommand::LookupItem {
+        name: "Bag".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "li4");
+    // Should succeed with either a single match or multiple matches
+    assert!(resp.success);
+}
+
+#[test]
+fn lookup_item_mode_unchanged() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("li5", GMCommand::LookupItem {
+        name: "Bag of Holding".to_string(),
+    }), &mut state);
+    assert_eq!(resp.mode, GameMode::Idle);
+}
+
+// ===========================================================================
+// SearchItems
+// ===========================================================================
+
+#[test]
+fn search_items_finds_results() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("si1", GMCommand::SearchItems {
+        query: "healing".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "si1");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["count"].as_u64().unwrap() > 0);
+    assert!(data["by_category"].is_object());
+}
+
+#[test]
+fn search_items_no_results() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("si2", GMCommand::SearchItems {
+        query: "xyznonexistent123".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "si2");
+    assert!(resp.success); // No results is still a successful search
+    let data = resp.data.unwrap();
+    assert_eq!(data["count"], 0);
+}
+
+#[test]
+fn search_items_sword() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("si3", GMCommand::SearchItems {
+        query: "sword".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "si3");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["count"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn search_items_mode_unchanged() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("si4", GMCommand::SearchItems {
+        query: "healing".to_string(),
+    }), &mut state);
+    assert_eq!(resp.mode, GameMode::Idle);
+}
+
+// ===========================================================================
+// LookupTreasureType
+// ===========================================================================
+
+#[test]
+fn lookup_treasure_type_a() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lt1", GMCommand::LookupTreasureType {
+        letter: "A".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "lt1");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["letter"], "A");
+    assert_eq!(data["category"], "Hoard");
+    assert_eq!(data["average_gp"], 18000.0);
+    assert!(data["entries"].as_array().unwrap().len() > 0);
+}
+
+#[test]
+fn lookup_treasure_type_lowercase() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lt2", GMCommand::LookupTreasureType {
+        letter: "a".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "lt2");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["letter"], "A");
+}
+
+#[test]
+fn lookup_treasure_type_individual() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lt3", GMCommand::LookupTreasureType {
+        letter: "P".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "lt3");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["category"], "Individual");
+}
+
+#[test]
+fn lookup_treasure_type_invalid() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lt4", GMCommand::LookupTreasureType {
+        letter: "Z".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "lt4");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("unknown treasure type"));
+}
+
+#[test]
+fn lookup_treasure_type_mode_unchanged() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lt5", GMCommand::LookupTreasureType {
+        letter: "A".to_string(),
+    }), &mut state);
+    assert_eq!(resp.mode, GameMode::Idle);
+}
+
+// ===========================================================================
+// RollTreasure
+// ===========================================================================
+
+#[test]
+fn roll_treasure_type_p() {
+    let mut state = GameState::new();
+    // Type P has 100% chance of copper pieces, so always has results
+    let resp = handle_request(&req("rt1", GMCommand::RollTreasure {
+        letter: "P".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "rt1");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["letter"], "P");
+    assert_eq!(data["category"], "Individual");
+    let items = data["items"].as_array().unwrap();
+    assert!(!items.is_empty(), "Type P should always have treasure");
+    assert!(data["total_gp"].as_f64().unwrap() > 0.0);
+}
+
+#[test]
+fn roll_treasure_invalid_type() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("rt2", GMCommand::RollTreasure {
+        letter: "Z".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "rt2");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("unknown treasure type"));
+}
+
+#[test]
+fn roll_treasure_lowercase() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("rt3", GMCommand::RollTreasure {
+        letter: "p".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "rt3");
+    assert!(resp.success);
+}
+
+#[test]
+fn roll_treasure_has_structured_items() {
+    let mut state = GameState::new();
+    // Run multiple times to ensure we get results from Type A (not guaranteed per roll)
+    let resp = handle_request(&req("rt4", GMCommand::RollTreasure {
+        letter: "P".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let items = data["items"].as_array().unwrap();
+    for item in items {
+        assert!(item["type"].as_str().is_some(), "each item should have a type");
+        assert!(item["quantity"].as_i64().is_some(), "each item should have a quantity");
+    }
+}
+
+#[test]
+fn roll_treasure_mode_unchanged() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("rt5", GMCommand::RollTreasure {
+        letter: "P".to_string(),
+    }), &mut state);
+    assert_eq!(resp.mode, GameMode::Idle);
+}
+
+// ===========================================================================
+// ListClasses
+// ===========================================================================
+
+#[test]
+fn list_classes_returns_all() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lc1", GMCommand::ListClasses), &mut state);
+    assert_response_format(&resp, "lc1");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let classes = data["classes"].as_array().unwrap();
+    assert_eq!(classes.len(), 22); // 22 OSE classes
+    // Verify each class has expected fields
+    for class in classes {
+        assert!(class["name"].as_str().is_some());
+        assert!(class["hit_die"].as_u64().is_some());
+        assert!(class["requirements"].as_array().is_some());
+        assert!(class["is_demihuman"].as_bool().is_some());
+    }
+}
+
+#[test]
+fn list_classes_includes_fighter() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lc2", GMCommand::ListClasses), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let classes = data["classes"].as_array().unwrap();
+    let fighter = classes.iter().find(|c| c["name"] == "Fighter");
+    assert!(fighter.is_some(), "Fighter should be in class list");
+}
+
+#[test]
+fn list_classes_mode_unchanged() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lc3", GMCommand::ListClasses), &mut state);
+    assert_eq!(resp.mode, GameMode::Idle);
+}
+
+// ===========================================================================
+// EligibleClasses
+// ===========================================================================
+
+#[test]
+fn eligible_classes_all_high_scores() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ec1", GMCommand::EligibleClasses {
+        abilities: [16, 16, 16, 16, 16, 16],
+    }), &mut state);
+    assert_response_format(&resp, "ec1");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let eligible = data["eligible"].as_array().unwrap();
+    assert!(eligible.len() > 1, "high scores should qualify for multiple classes");
+    assert!(data["count"].as_u64().unwrap() > 1);
+    // Fighter should always be eligible with these scores
+    assert!(eligible.iter().any(|c| c == "Fighter"));
+}
+
+#[test]
+fn eligible_classes_minimum_scores() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ec2", GMCommand::EligibleClasses {
+        abilities: [3, 3, 3, 3, 3, 3],
+    }), &mut state);
+    assert_response_format(&resp, "ec2");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let eligible = data["eligible"].as_array().unwrap();
+    // Fighter should be eligible (no requirements)
+    assert!(eligible.iter().any(|c| c == "Fighter"));
+}
+
+#[test]
+fn eligible_classes_invalid_score_too_high() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ec3", GMCommand::EligibleClasses {
+        abilities: [20, 10, 10, 10, 10, 10],
+    }), &mut state);
+    assert_response_format(&resp, "ec3");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("3-18"));
+}
+
+#[test]
+fn eligible_classes_invalid_score_too_low() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ec4", GMCommand::EligibleClasses {
+        abilities: [2, 10, 10, 10, 10, 10],
+    }), &mut state);
+    assert_response_format(&resp, "ec4");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("3-18"));
+}
+
+#[test]
+fn eligible_classes_abilities_in_response() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ec5", GMCommand::EligibleClasses {
+        abilities: [12, 13, 11, 14, 10, 8],
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["abilities"]["STR"], 12);
+    assert_eq!(data["abilities"]["INT"], 13);
+    assert_eq!(data["abilities"]["WIS"], 11);
+    assert_eq!(data["abilities"]["DEX"], 14);
+    assert_eq!(data["abilities"]["CON"], 10);
+    assert_eq!(data["abilities"]["CHA"], 8);
+}
+
+#[test]
+fn eligible_classes_mode_unchanged() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ec6", GMCommand::EligibleClasses {
+        abilities: [10, 10, 10, 10, 10, 10],
+    }), &mut state);
+    assert_eq!(resp.mode, GameMode::Idle);
+}
