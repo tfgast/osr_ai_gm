@@ -88,6 +88,9 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::SpawnMonster { name, count, distance } => {
             spawn_monster(id, state, name, *count, *distance)
         }
+        GMCommand::SpawnNpcParty { party_type, distance } => {
+            spawn_npc_party(id, state, party_type, *distance)
+        }
         GMCommand::LookupSpell { name, list } => lookup_spell(id, state, name, list),
         GMCommand::HireRetainer { employer, retainer_name, retainer_class, retainer_level } => {
             hire_retainer(id, state, employer, retainer_name, *retainer_class, *retainer_level)
@@ -1061,6 +1064,70 @@ fn spawn_monster(id: &str, state: &mut GameState, name: &str, count: u32, distan
     )
 }
 
+fn spawn_npc_party(id: &str, state: &mut GameState, party_type: &str, distance: u32) -> GMResponse {
+    use crate::rules::npc_party;
+
+    if state.combat.is_some() {
+        return GMResponse::err(id, "combat already active.", state.mode.clone());
+    }
+
+    let mut rng = rand::thread_rng();
+    let party = match party_type {
+        "basic" => npc_party::generate_basic_party(&mut rng),
+        "expert" => npc_party::generate_expert_party(&mut rng),
+        "cleric" => npc_party::generate_high_level_cleric_party(&mut rng),
+        "fighter" => npc_party::generate_high_level_fighter_party(&mut rng),
+        "mage" => npc_party::generate_high_level_magic_user_party(&mut rng),
+        _ => return GMResponse::err(
+            id,
+            format!("unknown party type '{}'. Valid: basic, expert, cleric, fighter, mage.", party_type),
+            state.mode.clone(),
+        ),
+    };
+
+    let member_info: Vec<serde_json::Value> = party.members.iter().map(|m| {
+        serde_json::json!({
+            "class": m.class,
+            "level": m.level,
+            "alignment": m.alignment.to_string(),
+            "role": m.role,
+        })
+    }).collect();
+
+    let monsters: Vec<Monster> = party.members.iter()
+        .map(|m| npc_party::npc_member_to_monster(m))
+        .collect();
+
+    let count = monsters.len();
+    let combat_state = CombatState::new(monsters, distance);
+    let status = combat::combat_status(&combat_state, &state.party.members);
+    state.combat = Some(combat_state);
+    state.pre_combat_mode = Some(state.mode.clone());
+    state.mode = GameMode::Combat;
+
+    let mut msg = format!(
+        "combat started: {} NPC adventurers ({}) at {}' distance.",
+        count, party.party_type, distance
+    );
+    if party.mounted {
+        msg.push_str(" Party is mounted.");
+    }
+    for note in &party.notes {
+        msg.push_str(&format!(" {}", note));
+    }
+
+    GMResponse::ok_with_data(
+        id, msg, state.mode.clone(),
+        serde_json::json!({
+            "status": status,
+            "party_type": party.party_type,
+            "member_count": count,
+            "members": member_info,
+            "mounted": party.mounted,
+        }),
+    )
+}
+
 fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &str) -> GMResponse {
     let list = if list_name.is_empty() {
         None
@@ -1747,6 +1814,35 @@ mod tests {
         }), &mut state);
         assert!(!resp.success);
         assert!(resp.error.unwrap().contains("Failed to read"));
+    }
+
+    #[test]
+    fn spawn_npc_party_basic() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::SpawnNpcParty {
+            party_type: "basic".to_string(),
+            distance: 60,
+        }), &mut state);
+        assert!(resp.success, "spawn_npc_party should succeed: {:?}", resp.error);
+        assert_eq!(state.mode, GameMode::Combat);
+        assert!(state.combat.is_some());
+        let combat = state.combat.as_ref().unwrap();
+        assert!(combat.monsters.len() >= 5); // 1d4+4 = 5-8
+        assert!(combat.monsters.len() <= 8);
+        assert_eq!(combat.distance, 60);
+        let data = resp.data.unwrap();
+        assert_eq!(data["party_type"], "Basic Adventurers");
+    }
+
+    #[test]
+    fn spawn_npc_party_invalid_type() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::SpawnNpcParty {
+            party_type: "invalid".to_string(),
+            distance: 60,
+        }), &mut state);
+        assert!(!resp.success);
+        assert!(resp.error.unwrap().contains("unknown party type"));
     }
 
     #[test]

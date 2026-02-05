@@ -199,6 +199,12 @@ pub enum GMCommand {
         #[serde(default = "default_distance")]
         distance: u32,
     },
+    /// Spawn a random NPC adventuring party.
+    SpawnNpcParty {
+        party_type: String,
+        #[serde(default = "default_distance")]
+        distance: u32,
+    },
     /// Look up a spell definition.
     LookupSpell {
         name: String,
@@ -577,6 +583,20 @@ mod tests {
                 assert_eq!(path, "data/modules/sample_crypt/module.json");
             }
             _ => panic!("expected LoadModule"),
+        }
+    }
+
+    #[test]
+    fn parse_spawn_npc_party() {
+        let json = r#"{"id":"n1","command":{"type":"SpawnNpcParty","params":{"party_type":"basic","distance":60}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "n1");
+        match &req.command {
+            GMCommand::SpawnNpcParty { party_type, distance } => {
+                assert_eq!(party_type, "basic");
+                assert_eq!(*distance, 60);
+            }
+            _ => panic!("expected SpawnNpcParty"),
         }
     }
 }

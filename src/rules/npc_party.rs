@@ -3,8 +3,6 @@
 //! Provides random generation of NPC adventuring parties for encounters,
 //! including class/level determination, alignment, and stronghold reactions.
 
-#![allow(dead_code)]
-
 use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -15,6 +13,7 @@ use std::sync::OnceLock;
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NpcPartyData {
     class_level_table: Vec<ClassLevelEntry>,
     alignment_table: Vec<AlignmentEntry>,
@@ -23,6 +22,7 @@ struct NpcPartyData {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 struct ClassLevelEntry {
     roll: u32,
     class: String,
@@ -41,6 +41,7 @@ struct AlignmentEntry {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 struct PartyType {
     party_size_dice: Option<String>,
     level_tier: Option<String>,
@@ -53,12 +54,14 @@ struct PartyType {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 struct LeaderDef {
     class: String,
     level_dice: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 struct CompanionDef {
     class: String,
     count_dice: String,
@@ -67,6 +70,7 @@ struct CompanionDef {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 struct StrongholdData {
     rulers: HashMap<String, RulerDef>,
     patrols: HashMap<String, PatrolDef>,
@@ -75,6 +79,7 @@ struct StrongholdData {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 struct RulerDef {
     level_dice: String,
     examples: Vec<String>,
@@ -577,6 +582,55 @@ pub fn reaction_description(reaction: RulerReaction) -> &'static str {
     }
 }
 
+/// Convert an NPC party member into a Monster for combat.
+///
+/// Derives combat stats from the member's class and level using class definitions
+/// and the OSE attack tables.
+pub fn npc_member_to_monster(member: &NpcMember) -> crate::model::Monster {
+    use crate::model::Monster;
+    use crate::rules::class::{Class, class_def, CombatAptitude};
+    use crate::dice;
+
+    let class = Class::parse(&member.class);
+    let (hit_die, aptitude) = match class {
+        Some(c) => {
+            let def = class_def(c);
+            (def.hit_die, def.combat_aptitude)
+        }
+        None => (6, CombatAptitude::SemiMartial), // sensible default for unknown classes
+    };
+
+    // Roll HP: level * hit_die (e.g. level 3 Fighter = 3d8)
+    let hd_expr = format!("{}d{}", member.level, hit_die);
+    let hp = dice::roll_str(&hd_expr)
+        .map(|r| r.total.max(1))
+        .unwrap_or((member.level as i32 * hit_die as i32 / 2).max(1));
+
+    // AC by combat aptitude (descending): Martial=5 (chain), SemiMartial=7 (leather+shield), NonMartial=9
+    let ac = match aptitude {
+        CombatAptitude::Martial => 5,
+        CombatAptitude::SemiMartial => 7,
+        CombatAptitude::NonMartial => 9,
+    };
+
+    // Damage by combat aptitude
+    let damage = match aptitude {
+        CombatAptitude::Martial => "1d8",
+        _ => "1d6",
+    };
+
+    let name = format!("NPC {} Lv{}", member.class, member.level);
+    let mut m = Monster::new(&name, &hd_expr);
+    m.hp = hp;
+    m.max_hp = hp;
+    m.ac = ac;
+    m.damage = damage.to_string();
+    m.morale = 9;
+    m.xp_value = 0; // No XP for NPC adventurers
+    m.attacks = vec!["attack".to_string()];
+    m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -739,5 +793,37 @@ mod tests {
         assert!(found_classes.contains("Cleric"));
         assert!(found_classes.contains("Magic-User"));
         assert!(found_classes.contains("Thief"));
+    }
+
+    #[test]
+    fn npc_member_to_monster_fighter() {
+        let member = NpcMember {
+            class: "Fighter".to_string(),
+            level: 5,
+            alignment: Alignment::Neutral,
+            role: None,
+        };
+        let m = npc_member_to_monster(&member);
+        assert_eq!(m.name, "NPC Fighter Lv5");
+        assert_eq!(m.ac, 5); // Martial = chain
+        assert_eq!(m.damage, "1d8"); // Martial damage
+        assert_eq!(m.morale, 9);
+        assert_eq!(m.xp_value, 0);
+        assert!(m.hp >= 5 && m.hp <= 40); // 5d8
+    }
+
+    #[test]
+    fn npc_member_to_monster_magic_user() {
+        let member = NpcMember {
+            class: "Magic-User".to_string(),
+            level: 3,
+            alignment: Alignment::Chaotic,
+            role: None,
+        };
+        let m = npc_member_to_monster(&member);
+        assert_eq!(m.name, "NPC Magic-User Lv3");
+        assert_eq!(m.ac, 9); // NonMartial = unarmored
+        assert_eq!(m.damage, "1d6");
+        assert!(m.hp >= 3 && m.hp <= 12); // 3d4
     }
 }

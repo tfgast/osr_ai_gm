@@ -122,6 +122,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(SurpriseCommand));
     registry.register(Box::new(ReactionCommand));
     registry.register(Box::new(EvadeCommand));
+    registry.register(Box::new(SpawnNpcCommand));
     // Treasure
     registry.register(Box::new(TreasureCommand));
     // Wilderness

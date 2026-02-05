@@ -174,6 +174,75 @@ impl Command for EvadeCommand {
     }
 }
 
+pub struct SpawnNpcCommand;
+impl Command for SpawnNpcCommand {
+    fn name(&self) -> &str { "spawn_npc" }
+    fn help(&self) -> &str { "Spawn NPC party (spawn_npc <basic|expert|cleric|fighter|mage> [distance])" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        use crate::model::{CombatState, Monster};
+        use crate::engine::combat;
+        use crate::rules::npc_party;
+
+        if state.combat.is_some() {
+            return CommandResult::error("combat already active. Use 'end_combat' first.");
+        }
+        if args.is_empty() {
+            return CommandResult::error(
+                "usage: spawn_npc <party_type> [distance]\n  \
+                 party_type: basic, expert, cleric, fighter, mage\n  \
+                 distance: encounter distance in feet (default 60)"
+            );
+        }
+        let party_type = args[0];
+        let distance: u32 = if args.len() >= 2 {
+            match args[1].parse() {
+                Ok(n) => n,
+                _ => return CommandResult::error("distance must be a non-negative integer"),
+            }
+        } else {
+            60
+        };
+
+        let mut rng = rand::thread_rng();
+        let party = match party_type {
+            "basic" => npc_party::generate_basic_party(&mut rng),
+            "expert" => npc_party::generate_expert_party(&mut rng),
+            "cleric" => npc_party::generate_high_level_cleric_party(&mut rng),
+            "fighter" => npc_party::generate_high_level_fighter_party(&mut rng),
+            "mage" => npc_party::generate_high_level_magic_user_party(&mut rng),
+            _ => return CommandResult::error(
+                "unknown party type. Valid: basic, expert, cleric, fighter, mage"
+            ),
+        };
+
+        let mut output = format!("NPC {} party ({} members) at {}' distance:\n",
+            party.party_type, party.members.len(), distance);
+        for m in &party.members {
+            let role_str = m.role.as_deref().map(|r| format!(" ({})", r)).unwrap_or_default();
+            output.push_str(&format!("  {} Lv{} [{}]{}\n", m.class, m.level, m.alignment, role_str));
+        }
+        if party.mounted {
+            output.push_str("  Party is mounted.\n");
+        }
+        for note in &party.notes {
+            output.push_str(&format!("  {}\n", note));
+        }
+
+        let monsters: Vec<Monster> = party.members.iter()
+            .map(|m| npc_party::npc_member_to_monster(m))
+            .collect();
+
+        let combat_state = CombatState::new(monsters, distance);
+        let status = combat::combat_status(&combat_state, &state.party.members);
+        state.combat = Some(combat_state);
+        state.pre_combat_mode = Some(state.mode.clone());
+        state.mode = GameMode::Combat;
+
+        output.push_str(&format!("\nCombat started! {}", serde_json::to_string(&status).unwrap_or_default()));
+        CommandResult::ok(output)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
