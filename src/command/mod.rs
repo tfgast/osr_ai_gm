@@ -56,6 +56,19 @@ pub trait Command {
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult;
 }
 
+/// Resolve common aliases to canonical command names.
+fn resolve_alias(name: &str) -> &str {
+    match name {
+        "look" | "l" => "exploration_status",
+        "go" => "move",
+        "status" => "exploration_status",
+        "inventory" | "i" => "party",
+        "examine" => "party",
+        "take" | "grab" | "pick" => "loot",
+        _ => name,
+    }
+}
+
 /// Registry that maps command names to command implementations.
 pub struct CommandRegistry {
     commands: HashMap<String, Box<dyn Command>>,
@@ -80,6 +93,7 @@ impl CommandRegistry {
             }
             return CommandResult::ok(out);
         }
+        let name = resolve_alias(name);
         let (result, category) = match self.commands.get(name) {
             Some(cmd) => (cmd.execute(args, state), "command_error"),
             None => (
@@ -168,5 +182,41 @@ mod tests {
         let mut state = GameState::new();
         let result = reg.dispatch("test", &[], &mut state);
         assert!(!result.output.starts_with("Error: "));
+    }
+
+    #[test]
+    fn alias_look_resolves() {
+        assert_eq!(resolve_alias("look"), "exploration_status");
+        assert_eq!(resolve_alias("l"), "exploration_status");
+    }
+
+    #[test]
+    fn alias_go_resolves() {
+        assert_eq!(resolve_alias("go"), "move");
+    }
+
+    #[test]
+    fn alias_inventory_resolves() {
+        assert_eq!(resolve_alias("inventory"), "party");
+        assert_eq!(resolve_alias("i"), "party");
+        assert_eq!(resolve_alias("examine"), "party");
+    }
+
+    #[test]
+    fn alias_take_resolves() {
+        assert_eq!(resolve_alias("take"), "loot");
+        assert_eq!(resolve_alias("grab"), "loot");
+        assert_eq!(resolve_alias("pick"), "loot");
+    }
+
+    #[test]
+    fn alias_status_resolves() {
+        assert_eq!(resolve_alias("status"), "exploration_status");
+    }
+
+    #[test]
+    fn non_alias_passes_through() {
+        assert_eq!(resolve_alias("attack"), "attack");
+        assert_eq!(resolve_alias("chargen"), "chargen");
     }
 }
