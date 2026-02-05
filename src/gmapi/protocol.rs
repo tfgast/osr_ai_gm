@@ -246,6 +246,14 @@ pub enum GMCommand {
     LevelUp { character: String },
     /// Issue a GM ruling (free-text note recorded in the session log).
     Ruling { text: String },
+    /// List all session notes.
+    ListNotes,
+    /// Delete a note by 1-based index.
+    DeleteNote { index: usize },
+    /// List all retainers.
+    ListRetainers,
+    /// Dismiss a retainer by name.
+    DismissRetainer { name: String },
 
     // -- GM-only: fiat commands (direct state manipulation) --
     /// Heal a character (capped at max HP).
@@ -513,6 +521,40 @@ mod tests {
                 assert!(text.contains("portcullis"));
             }
             _ => panic!("expected Ruling"),
+        }
+    }
+
+    #[test]
+    fn parse_list_notes() {
+        let json = r#"{"id":"8","command":{"type":"ListNotes"}}"#;
+        let req = parse_request(json).unwrap();
+        assert!(matches!(req.command, GMCommand::ListNotes));
+    }
+
+    #[test]
+    fn parse_delete_note() {
+        let json = r#"{"id":"9","command":{"type":"DeleteNote","params":{"index":2}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::DeleteNote { index } => assert_eq!(*index, 2),
+            _ => panic!("expected DeleteNote"),
+        }
+    }
+
+    #[test]
+    fn parse_list_retainers() {
+        let json = r#"{"id":"10","command":{"type":"ListRetainers"}}"#;
+        let req = parse_request(json).unwrap();
+        assert!(matches!(req.command, GMCommand::ListRetainers));
+    }
+
+    #[test]
+    fn parse_dismiss_retainer() {
+        let json = r#"{"id":"11","command":{"type":"DismissRetainer","params":{"name":"Gurd"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::DismissRetainer { name } => assert_eq!(name, "Gurd"),
+            _ => panic!("expected DismissRetainer"),
         }
     }
 

@@ -7,6 +7,7 @@
 //! - Response data field contains correct payload types
 //! - mode field accurately reflects GameMode after each command
 
+use osr_ai_gm::engine::retainer::Retainer;
 use osr_ai_gm::gmapi::protocol::{EncounterParams, GMCommand, GMRequest, GMResponse, parse_request};
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
@@ -2258,7 +2259,168 @@ fn ruling_multiple() {
 }
 
 // ===========================================================================
-// 38. Save
+// 38. ListNotes
+// ===========================================================================
+
+#[test]
+fn list_notes_empty() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("ln1", GMCommand::ListNotes), &mut state);
+    assert_response_format(&resp, "ln1");
+    assert!(resp.success);
+    assert!(resp.message.contains("no notes"));
+    let data = resp.data.unwrap();
+    assert_eq!(data["notes"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn list_notes_with_entries() {
+    let mut state = GameState::new();
+    state.notes.push("[RULING] The bridge holds 3 people.".to_string());
+    state.notes.push("Encountered a wandering merchant.".to_string());
+    let resp = handle_request(&req("ln2", GMCommand::ListNotes), &mut state);
+    assert_response_format(&resp, "ln2");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let notes = data["notes"].as_array().unwrap();
+    assert_eq!(notes.len(), 2);
+    assert_eq!(notes[0]["index"], 1);
+    assert!(notes[0]["text"].as_str().unwrap().contains("bridge"));
+    assert_eq!(notes[1]["index"], 2);
+}
+
+// ===========================================================================
+// 39. DeleteNote
+// ===========================================================================
+
+#[test]
+fn delete_note_happy_path() {
+    let mut state = GameState::new();
+    state.notes.push("First note.".to_string());
+    state.notes.push("Second note.".to_string());
+    let resp = handle_request(&req("dn1", GMCommand::DeleteNote { index: 1 }), &mut state);
+    assert_response_format(&resp, "dn1");
+    assert!(resp.success);
+    assert!(resp.message.contains("deleted note"));
+    assert_eq!(state.notes.len(), 1);
+    assert!(state.notes[0].contains("Second"));
+    let data = resp.data.unwrap();
+    assert_eq!(data["index"], 1);
+    assert!(data["deleted"].as_str().unwrap().contains("First"));
+}
+
+#[test]
+fn delete_note_out_of_range() {
+    let mut state = GameState::new();
+    state.notes.push("Only note.".to_string());
+    let resp = handle_request(&req("dn2", GMCommand::DeleteNote { index: 5 }), &mut state);
+    assert_response_format(&resp, "dn2");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("out of range"));
+    assert_eq!(state.notes.len(), 1);
+}
+
+#[test]
+fn delete_note_empty() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("dn3", GMCommand::DeleteNote { index: 1 }), &mut state);
+    assert_response_format(&resp, "dn3");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no notes"));
+}
+
+// ===========================================================================
+// 40. ListRetainers
+// ===========================================================================
+
+#[test]
+fn list_retainers_empty() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lr1", GMCommand::ListRetainers), &mut state);
+    assert_response_format(&resp, "lr1");
+    assert!(resp.success);
+    assert!(resp.message.contains("no retainers"));
+    let data = resp.data.unwrap();
+    assert_eq!(data["retainers"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn list_retainers_with_entries() {
+    let mut state = GameState::new();
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Mira", "Cleric", 2, 8, 9, 50));
+    let resp = handle_request(&req("lr2", GMCommand::ListRetainers), &mut state);
+    assert_response_format(&resp, "lr2");
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let retainers = data["retainers"].as_array().unwrap();
+    assert_eq!(retainers.len(), 2);
+    assert_eq!(retainers[0]["name"], "Gurd");
+    assert_eq!(retainers[0]["class"], "Fighter");
+    assert_eq!(retainers[0]["level"], 1);
+    assert_eq!(retainers[0]["loyalty"], 7);
+    assert!(retainers[0]["alive"].as_bool().unwrap());
+    assert_eq!(retainers[1]["name"], "Mira");
+}
+
+#[test]
+fn list_retainers_dead_retainer() {
+    let mut state = GameState::new();
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 0, 7, 25));
+    let resp = handle_request(&req("lr3", GMCommand::ListRetainers), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let retainers = data["retainers"].as_array().unwrap();
+    assert!(!retainers[0]["alive"].as_bool().unwrap());
+    assert!(resp.message.contains("DEAD"));
+}
+
+// ===========================================================================
+// 41. DismissRetainer
+// ===========================================================================
+
+#[test]
+fn dismiss_retainer_happy_path() {
+    let mut state = GameState::new();
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
+    let resp = handle_request(&req("dr1", GMCommand::DismissRetainer {
+        name: "Gurd".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "dr1");
+    assert!(resp.success);
+    assert!(resp.message.contains("dismissed"));
+    assert!(state.retainers.is_empty());
+    let data = resp.data.unwrap();
+    assert_eq!(data["name"], "Gurd");
+    assert_eq!(data["class"], "Fighter");
+}
+
+#[test]
+fn dismiss_retainer_case_insensitive() {
+    let mut state = GameState::new();
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
+    let resp = handle_request(&req("dr2", GMCommand::DismissRetainer {
+        name: "gurd".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    assert!(state.retainers.is_empty());
+}
+
+#[test]
+fn dismiss_retainer_not_found() {
+    let mut state = GameState::new();
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
+    let resp = handle_request(&req("dr3", GMCommand::DismissRetainer {
+        name: "Nobody".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "dr3");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("no retainer named"));
+    assert_eq!(state.retainers.len(), 1);
+}
+
+// ===========================================================================
+// 42. Save
 // ===========================================================================
 
 #[test]
@@ -2288,7 +2450,7 @@ fn save_invalid_path() {
 }
 
 // ===========================================================================
-// 39. Load
+// 43. Load
 // ===========================================================================
 
 #[test]
@@ -2345,7 +2507,7 @@ fn load_path_traversal_rejected() {
 }
 
 // ===========================================================================
-// 40. Roll
+// 44. Roll
 // ===========================================================================
 
 #[test]
@@ -2385,7 +2547,7 @@ fn roll_invalid_notation() {
 }
 
 // ===========================================================================
-// 41. Quit
+// 45. Quit
 // ===========================================================================
 
 #[test]

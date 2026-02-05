@@ -104,6 +104,10 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         }
         GMCommand::LevelUp { character } => level_up(id, state, character),
         GMCommand::Ruling { text } => ruling(id, state, text),
+        GMCommand::ListNotes => list_notes(id, state),
+        GMCommand::DeleteNote { index } => delete_note(id, state, *index),
+        GMCommand::ListRetainers => list_retainers(id, state),
+        GMCommand::DismissRetainer { name } => dismiss_retainer(id, state, name),
 
         // -- Fiat commands --
         GMCommand::Heal { character, amount } => heal(id, state, character, *amount),
@@ -509,6 +513,92 @@ fn ruling(id: &str, state: &mut GameState, text: &str) -> GMResponse {
         format!("ruling recorded: {}", text),
         state.mode.clone(),
     )
+}
+
+fn list_notes(id: &str, state: &GameState) -> GMResponse {
+    if state.notes.is_empty() {
+        return GMResponse::ok_with_data(
+            id, "no notes yet.", state.mode.clone(),
+            serde_json::json!({ "notes": [] }),
+        );
+    }
+    let mut msg = String::from("Session notes:\n");
+    let notes_data: Vec<serde_json::Value> = state.notes.iter().enumerate().map(|(i, note)| {
+        msg.push_str(&format!("  [{}] {}\n", i + 1, note));
+        serde_json::json!({ "index": i + 1, "text": note })
+    }).collect();
+    GMResponse::ok_with_data(id, msg, state.mode.clone(), serde_json::json!({ "notes": notes_data }))
+}
+
+fn delete_note(id: &str, state: &mut GameState, index: usize) -> GMResponse {
+    if state.notes.is_empty() {
+        return GMResponse::err(id, "no notes to delete.", state.mode.clone());
+    }
+    if index < 1 || index > state.notes.len() {
+        return GMResponse::err(
+            id,
+            format!("index {} out of range; have {} note{}.",
+                index, state.notes.len(), if state.notes.len() == 1 { "" } else { "s" }),
+            state.mode.clone(),
+        );
+    }
+    let removed = state.notes.remove(index - 1);
+    GMResponse::ok_with_data(
+        id,
+        format!("deleted note [{}]: {}", index, removed),
+        state.mode.clone(),
+        serde_json::json!({ "index": index, "deleted": removed }),
+    )
+}
+
+fn list_retainers(id: &str, state: &GameState) -> GMResponse {
+    if state.retainers.is_empty() {
+        return GMResponse::ok_with_data(
+            id, "no retainers.", state.mode.clone(),
+            serde_json::json!({ "retainers": [] }),
+        );
+    }
+    let mut msg = format!("Retainers ({}):\n", state.retainers.len());
+    let retainers_data: Vec<serde_json::Value> = state.retainers.iter().map(|r| {
+        let status = if r.is_alive() {
+            format!("HP {}/{}, Loyalty {}, Wage {} gp/mo", r.hp, r.max_hp, r.loyalty, r.wage_gp)
+        } else {
+            "DEAD".to_string()
+        };
+        msg.push_str(&format!("  {} ({} L{}) — {}\n", r.name, r.class, r.level, status));
+        serde_json::json!({
+            "name": r.name,
+            "class": r.class,
+            "level": r.level,
+            "hp": r.hp,
+            "max_hp": r.max_hp,
+            "loyalty": r.loyalty,
+            "wage_gp": r.wage_gp,
+            "alive": r.is_alive(),
+        })
+    }).collect();
+    GMResponse::ok_with_data(id, msg, state.mode.clone(), serde_json::json!({ "retainers": retainers_data }))
+}
+
+fn dismiss_retainer(id: &str, state: &mut GameState, name: &str) -> GMResponse {
+    let idx = state.retainers.iter()
+        .position(|r| r.name.eq_ignore_ascii_case(name));
+    match idx {
+        Some(i) => {
+            let removed = state.retainers.remove(i);
+            GMResponse::ok_with_data(
+                id,
+                format!("{} ({}) dismissed from service.", removed.name, removed.class),
+                state.mode.clone(),
+                serde_json::json!({ "name": removed.name, "class": removed.class }),
+            )
+        }
+        None => GMResponse::err(
+            id,
+            format!("no retainer named '{}'.", name),
+            state.mode.clone(),
+        ),
+    }
 }
 
 // =============================================================================
