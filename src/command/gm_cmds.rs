@@ -1,8 +1,7 @@
 use crate::command::{Command, CommandResult};
-use crate::engine::{combat, encounter_engine, xp};
+use crate::engine::{combat, xp};
 use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
-use crate::rules::ability;
 use crate::rules::class::class_def;
 use crate::rules::spell;
 use crate::rules::thief;
@@ -95,30 +94,6 @@ impl Command for AdvanceTurnCommand {
         };
         let result = crate::engine::exploration::advance_dungeon_turn(time, dungeon, level);
         CommandResult::ok(format!("{}", result))
-    }
-}
-
-/// GM command: roll NPC reaction.
-pub struct RollReactionCommand;
-impl Command for RollReactionCommand {
-    fn name(&self) -> &str { "roll_reaction" }
-    fn help(&self) -> &str { "GM: roll NPC reaction (roll_reaction <character_name>)" }
-    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        if args.is_empty() {
-            return CommandResult::error("usage: roll_reaction <character_name>");
-        }
-        let character = match state.party.find_member(args[0]) {
-            Some(c) => c,
-            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
-        };
-        let cha = character.abilities.charisma;
-        let (reaction, raw, modified) = encounter_engine::reaction_roll(cha);
-        let cha_mod = ability::cha_reaction_mod(cha);
-        CommandResult::ok(format!(
-            "{} speaks (CHA {}, modifier {:+}).\n\
-             Reaction roll: {} (2d6) {:+} = {}\n{}",
-            character.name, cha, cha_mod, raw, cha_mod, modified, reaction
-        ))
     }
 }
 
@@ -435,7 +410,6 @@ impl Command for TrainCommand {
 pub const GM_ONLY_COMMANDS: &[&str] = &[
     "spawn_encounter",
     "advance_turn",
-    "roll_reaction",
     "award_xp",
     "train",
     "ruling",
