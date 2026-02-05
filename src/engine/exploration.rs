@@ -341,18 +341,31 @@ pub fn force_door_with<R: Rng>(
     }
 }
 
+/// Result of a trap check.
+#[derive(Debug)]
+pub struct TrapResult {
+    pub triggered: bool,
+    pub message: String,
+}
+
 /// Check for trap trigger. Traps trigger on 1-2 on d6.
-pub fn check_trap(room_name: &str) -> String {
+pub fn check_trap(room_name: &str) -> TrapResult {
     check_trap_with(&mut rand::thread_rng(), room_name)
 }
 
 /// Testable version.
-pub fn check_trap_with<R: Rng>(rng: &mut R, room_name: &str) -> String {
+pub fn check_trap_with<R: Rng>(rng: &mut R, room_name: &str) -> TrapResult {
     let roll: u32 = rng.gen_range(1..=6);
     if roll <= 2 {
-        format!("TRAP TRIGGERED in {}! (rolled {})", room_name, roll)
+        TrapResult {
+            triggered: true,
+            message: format!("TRAP TRIGGERED in {}! (rolled {})", room_name, roll),
+        }
     } else {
-        format!("No trap triggered in {}. (rolled {})", room_name, roll)
+        TrapResult {
+            triggered: false,
+            message: format!("No trap triggered in {}. (rolled {})", room_name, roll),
+        }
     }
 }
 
@@ -419,13 +432,13 @@ pub fn move_through_door_with<R: Rng>(
         .unwrap_or_else(|| format!("room {}", dest));
 
     if has_untriggered_trap {
-        let trap_msg = check_trap_with(rng, &room_name);
-        if trap_msg.contains("TRIGGERED") {
+        let trap = check_trap_with(rng, &room_name);
+        if trap.triggered {
             if let Some(room) = dungeon.find_room_mut(dest) {
                 room.trap_triggered = true;
             }
         }
-        result.msg(trap_msg);
+        result.msg(trap.message);
     }
 
     result.msg(format!("Moved to {} (room {}).", room_name, dest));
@@ -694,7 +707,8 @@ mod tests {
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let result = check_trap_with(&mut rng, "Test Room");
-            if result.contains("TRIGGERED") {
+            if result.triggered {
+                assert!(result.message.contains("TRIGGERED"), "triggered message should contain TRIGGERED");
                 triggered = true;
                 break;
             }
