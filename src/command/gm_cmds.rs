@@ -1,10 +1,10 @@
 use super::{Command, CommandResult};
+use crate::dice;
 use crate::engine::{combat, xp};
 use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
 use crate::rules::class::class_def;
-use crate::rules::spell;
-use crate::rules::thief;
+use crate::rules::{ability, equipment, spell, thief};
 use crate::rules::xp::{check_level_up, xp_for_level};
 use crate::state::game::GameMode;
 
@@ -396,10 +396,134 @@ impl Command for TrainCommand {
     }
 }
 
+pub struct BackstabCommand;
+impl Command for BackstabCommand {
+    fn name(&self) -> &str { "backstab" }
+    fn help(&self) -> &str { "Thief backstab (backstab <character> <monster_idx> [weapon])" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error(
+                "usage: backstab <character_name> <monster_index> [weapon_name]\n  \
+                 Default weapon: sword. Only Thieves and Assassins can backstab."
+            );
+        }
+        let char_name = args[0];
+        let monster_idx: usize = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("monster_index must be a number"),
+        };
+        let weapon_name = if args.len() >= 3 { args[2] } else { "sword" };
+
+        let weapon = match equipment::find_weapon(weapon_name) {
+            Some(w) => w,
+            None => return CommandResult::error(format!("unknown weapon '{}'.", weapon_name)),
+        };
+        let character = match state.party.find_member(char_name) {
+            Some(c) => c.clone(),
+            None => return CommandResult::error(format!("no party member named '{}'.", char_name)),
+        };
+        if !thief::can_backstab(character.class) {
+            return CommandResult::error(format!(
+                "{} ({}) cannot backstab.", character.name, character.class.name()
+            ));
+        }
+        let combat_state = match state.combat.as_mut() {
+            Some(c) => c,
+            None => return CommandResult::error("no active combat."),
+        };
+        if monster_idx >= combat_state.monsters.len() {
+            return CommandResult::error(format!("monster index {} out of range.", monster_idx));
+        }
+        if !combat_state.monsters[monster_idx].is_alive() {
+            return CommandResult::error(format!(
+                "{} is already dead.", combat_state.monsters[monster_idx].name
+            ));
+        }
+
+        let multiplier = thief::backstab_multiplier(character.level);
+        let str_mod = ability::str_melee_mod(character.abilities.strength);
+        let attack_bonus = thief::BACKSTAB_ATTACK_BONUS;
+
+        let target_ac = combat_state.monsters[monster_idx].ac;
+        let target_number = (character.thac0 as i32 - target_ac - attack_bonus - str_mod).clamp(2, 20);
+        let attack_roll: i32 = rand::Rng::gen_range(&mut rand::thread_rng(), 1..=20);
+
+        let hit = attack_roll == 20 || (attack_roll != 1 && attack_roll >= target_number);
+
+        if hit {
+            let base_damage = match dice::roll_str(weapon.damage_dice()) {
+                Ok(r) => r.total.max(1),
+                Err(_) => 1,
+            };
+            let total_damage = (base_damage + str_mod).max(1) * multiplier as i32;
+            combat_state.monsters[monster_idx].hp -= total_damage;
+            let monster_name = combat_state.monsters[monster_idx].name.clone();
+            let alive = combat_state.monsters[monster_idx].is_alive();
+            combat_state.log.push(format!(
+                "{} backstabs {} for {} damage (x{}){}", character.name, monster_name,
+                total_damage, multiplier, if !alive { " — KILLED!" } else { "" }
+            ));
+            CommandResult::ok(format!(
+                "{} backstabs {} (+{} to hit, x{} damage)! Rolled {} vs target {}: HIT for {} damage{}.",
+                character.name, monster_name, attack_bonus, multiplier,
+                attack_roll, target_number, total_damage,
+                if !alive { " — KILLED!" } else { "" }
+            ))
+        } else {
+            combat_state.log.push(format!(
+                "{} backstab attempt on {} missed",
+                character.name, combat_state.monsters[monster_idx].name
+            ));
+            CommandResult::ok(format!(
+                "{} backstab attempt: rolled {} vs target {} — MISS.",
+                character.name, attack_roll, target_number
+            ))
+        }
+    }
+}
+
+pub struct AwardTreasureXpCommand;
+impl Command for AwardTreasureXpCommand {
+    fn name(&self) -> &str { "award_treasure_xp" }
+    fn help(&self) -> &str { "GM: award treasure XP (award_treasure_xp <character> <treasure_gp> <monster_xp>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 3 {
+            return CommandResult::error(
+                "usage: award_treasure_xp <character_name> <treasure_gp> <monster_xp>\n  \
+                 1gp = 1xp base, with prime requisite modifier applied."
+            );
+        }
+        let treasure_gp: u64 = match args[1].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("treasure_gp must be a non-negative integer"),
+        };
+        let monster_xp: u64 = match args[2].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("monster_xp must be a non-negative integer"),
+        };
+        let character = match state.party.find_member_mut(args[0]) {
+            Some(c) => c,
+            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
+        };
+        let result = xp::award_xp(character, treasure_gp, monster_xp);
+        let mut msg = format!(
+            "{}: base {}xp ({}gp treasure + {}xp monsters), {:+}% prime req modifier = {} adjusted XP. Total: {}.",
+            character.name, result.base_xp, treasure_gp, monster_xp,
+            result.modifier_pct, result.adjusted_xp, result.new_total,
+        );
+        if result.ready_to_train {
+            msg.push_str(" Ready to train!");
+        }
+        CommandResult::ok(msg)
+    }
+}
+
 pub const GM_ONLY_COMMANDS: &[&str] = &[
     "spawn_encounter",
     "advance_turn",
     "award_xp",
+    "award_treasure_xp",
+    "backstab",
     "train",
     "ruling",
     "heal",
@@ -816,5 +940,158 @@ mod tests {
         // STR 16 = +10%
         assert!(result.output.contains("+10%"));
         assert!(result.output.contains("1100 XP")); // 1000 * 1.10
+    }
+
+    // === BackstabCommand tests ===
+
+    fn make_combat_state_with_thief() -> GameState {
+        let mut state = GameState::new();
+        let mut c = Character::new("Shadow", Class::Thief);
+        c.hp = 6;
+        c.max_hp = 6;
+        c.thac0 = 19;
+        c.abilities.strength = 12;
+        state.party.add_member(c);
+        // Set up active combat with a monster
+        let mut m = crate::model::Monster::new("Goblin", "1");
+        m.hp = 5;
+        m.max_hp = 5;
+        m.ac = 6;
+        state.combat = Some(CombatState::new(vec![m], 10));
+        state.mode = GameMode::Combat;
+        state
+    }
+
+    #[test]
+    fn backstab_basic() {
+        let mut state = make_combat_state_with_thief();
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Shadow", "0", "sword"], &mut state);
+        assert!(!result.output.starts_with("Error"), "backstab should succeed: {}", result.output);
+        assert!(result.output.contains("backstab"));
+    }
+
+    #[test]
+    fn backstab_default_weapon() {
+        let mut state = make_combat_state_with_thief();
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Shadow", "0"], &mut state);
+        assert!(!result.output.starts_with("Error"), "backstab with default weapon: {}", result.output);
+    }
+
+    #[test]
+    fn backstab_non_thief_rejected() {
+        let mut state = make_combat_state_with_thief();
+        // Add a fighter and try to backstab with them
+        let mut f = Character::new("Aldric", Class::Fighter);
+        f.hp = 10;
+        f.max_hp = 10;
+        state.party.add_member(f);
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Aldric", "0"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("cannot backstab"));
+    }
+
+    #[test]
+    fn backstab_no_combat() {
+        let mut state = GameState::new();
+        let c = Character::new("Shadow", Class::Thief);
+        state.party.add_member(c);
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Shadow", "0"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("no active combat"));
+    }
+
+    #[test]
+    fn backstab_invalid_monster_index() {
+        let mut state = make_combat_state_with_thief();
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Shadow", "99"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("out of range"));
+    }
+
+    #[test]
+    fn backstab_no_character() {
+        let mut state = make_combat_state_with_thief();
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Nobody", "0"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("no party member"));
+    }
+
+    #[test]
+    fn backstab_missing_args() {
+        let mut state = GameState::new();
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Shadow"], &mut state);
+        assert!(result.output.starts_with("Error"));
+    }
+
+    #[test]
+    fn backstab_unknown_weapon() {
+        let mut state = make_combat_state_with_thief();
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Shadow", "0", "blastergun"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("unknown weapon"));
+    }
+
+    // === AwardTreasureXpCommand tests ===
+
+    #[test]
+    fn award_treasure_xp_basic() {
+        let mut state = GameState::new();
+        state.party.add_member(make_leveled_fighter("Aldric", 0, 500));
+        let cmd = AwardTreasureXpCommand;
+        let result = cmd.execute(&["Aldric", "500", "100"], &mut state);
+        assert!(!result.output.starts_with("Error"), "award_treasure_xp failed: {}", result.output);
+        assert!(result.output.contains("500gp treasure"));
+        assert!(result.output.contains("100xp monsters"));
+        assert!(result.output.contains("prime req modifier"));
+    }
+
+    #[test]
+    fn award_treasure_xp_applies_modifier() {
+        let mut state = GameState::new();
+        state.party.add_member(make_leveled_fighter("Aldric", 0, 500));
+        let cmd = AwardTreasureXpCommand;
+        let result = cmd.execute(&["Aldric", "1000", "0"], &mut state);
+        // STR 16 = +10% prime req
+        assert!(result.output.contains("+10%"));
+    }
+
+    #[test]
+    fn award_treasure_xp_no_character() {
+        let mut state = GameState::new();
+        let cmd = AwardTreasureXpCommand;
+        let result = cmd.execute(&["Nobody", "100", "50"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("no party member"));
+    }
+
+    #[test]
+    fn award_treasure_xp_missing_args() {
+        let mut state = GameState::new();
+        let cmd = AwardTreasureXpCommand;
+        let result = cmd.execute(&["Aldric", "100"], &mut state);
+        assert!(result.output.starts_with("Error"));
+    }
+
+    #[test]
+    fn award_treasure_xp_invalid_amount() {
+        let mut state = GameState::new();
+        state.party.add_member(make_leveled_fighter("Aldric", 0, 500));
+        let cmd = AwardTreasureXpCommand;
+        let result = cmd.execute(&["Aldric", "abc", "100"], &mut state);
+        assert!(result.output.starts_with("Error"));
+    }
+
+    #[test]
+    fn gm_commands_include_new() {
+        assert!(GM_ONLY_COMMANDS.contains(&"backstab"));
+        assert!(GM_ONLY_COMMANDS.contains(&"award_treasure_xp"));
     }
 }

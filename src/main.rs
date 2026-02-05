@@ -22,11 +22,12 @@ use command::exploration_cmds::{
     SearchCommand,
 };
 use command::gm_cmds::{
-    AddRationsCommand, AdvanceTurnCommand, AwardXpCommand, DamageCommand, HealCommand,
-    RulingCommand, SetHpCommand, SetRationsCommand, SpawnEncounterCommand, TrainCommand,
+    AddRationsCommand, AdvanceTurnCommand, AwardTreasureXpCommand, AwardXpCommand,
+    BackstabCommand, DamageCommand, HealCommand, RulingCommand, SetHpCommand, SetRationsCommand,
+    SpawnEncounterCommand, TrainCommand,
 };
 use command::inventory_cmds::{BuyCommand, DropCommand, EquipCommand, LootCommand};
-use command::lookup_cmds::{ItemCommand, SearchItemsCommand, TreasureTypeCommand};
+use command::lookup_cmds::{ItemCommand, SearchItemsCommand, SpellCommand, TreasureTypeCommand};
 use command::module_cmds::LoadModuleCommand;
 use command::party::{ChargenCommand, ClassesCommand, EligibleCommand, PartyCommand};
 use command::retainer_cmds::{
@@ -162,6 +163,8 @@ fn build_registry() -> CommandRegistry {
     // GM
     registry.register(Box::new(AdvanceTurnCommand));
     registry.register(Box::new(AwardXpCommand));
+    registry.register(Box::new(AwardTreasureXpCommand));
+    registry.register(Box::new(BackstabCommand));
     registry.register(Box::new(TrainCommand));
     registry.register(Box::new(RulingCommand));
     registry.register(Box::new(HealCommand));
@@ -177,6 +180,7 @@ fn build_registry() -> CommandRegistry {
     // Lookup
     registry.register(Box::new(ItemCommand));
     registry.register(Box::new(SearchItemsCommand));
+    registry.register(Box::new(SpellCommand));
     registry.register(Box::new(TreasureTypeCommand));
     // System
     registry.register(Box::new(RollCommand));

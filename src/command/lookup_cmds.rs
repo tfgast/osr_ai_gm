@@ -3,6 +3,7 @@ use crate::persist::GameState;
 use crate::rules::magic_item::{
     find_magic_item, find_magic_items_partial, search_magic_items, ItemCategory,
 };
+use crate::rules::spell_data;
 use crate::rules::treasure::{find_treasure_type, TreasureItemType};
 
 /// Look up a magic item by name.
@@ -217,6 +218,70 @@ impl Command for TreasureTypeCommand {
     }
 }
 
+/// Look up a spell by name and optional list.
+pub struct SpellCommand;
+impl Command for SpellCommand {
+    fn name(&self) -> &str {
+        "spell"
+    }
+    fn help(&self) -> &str {
+        "Look up spell by name (spell <name> [list])"
+    }
+    fn execute(&self, args: &[&str], _state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error(
+                "usage: spell <name> [list]\n  \
+                 Lists: cleric, magicuser (or mu/mage), druid, illusionist"
+            );
+        }
+
+        // Check if last arg is a spell list name
+        let (name_args, list) = if args.len() >= 2 {
+            match parse_spell_list(args[args.len() - 1]) {
+                Some(l) => (&args[..args.len() - 1], Some(l)),
+                None => (args, None),
+            }
+        } else {
+            (args, None)
+        };
+
+        let query = name_args.join(" ");
+
+        match spell_data::find_spell(&query, list) {
+            Some(spell) => {
+                let mut out = format!(
+                    "=== {} ===\nList: {} (Level {})\nRange: {}\nDuration: {}\n",
+                    spell.name, spell.list.name(), spell.level,
+                    spell.range, spell.duration,
+                );
+                if spell.reversible {
+                    if let Some(ref rev_name) = spell.reversed_name {
+                        out.push_str(&format!("Reversible: {}\n", rev_name));
+                    } else {
+                        out.push_str("Reversible: yes\n");
+                    }
+                }
+                out.push_str(&format!("\n{}", spell.description));
+                CommandResult::ok(out)
+            }
+            None => {
+                let list_hint = list.map(|l| format!(" in {} list", l.name())).unwrap_or_default();
+                CommandResult::error(format!("spell '{}' not found{}.", query, list_hint))
+            }
+        }
+    }
+}
+
+fn parse_spell_list(s: &str) -> Option<spell_data::SpellList> {
+    match s.to_lowercase().as_str() {
+        "cleric" => Some(spell_data::SpellList::Cleric),
+        "magicuser" | "magic-user" | "magic_user" | "mu" | "mage" => Some(spell_data::SpellList::MagicUser),
+        "druid" => Some(spell_data::SpellList::Druid),
+        "illusionist" => Some(spell_data::SpellList::Illusionist),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -351,5 +416,61 @@ mod tests {
         let result = cmd.execute(&["H"], &mut state);
         assert!(!result.output.contains("Error"), "{}", result.output);
         assert!(result.output.contains("60000")); // High average value
+    }
+
+    #[test]
+    fn spell_lookup_exact() {
+        let cmd = SpellCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&["Magic", "Missile"], &mut state);
+        assert!(!result.output.contains("Error"), "{}", result.output);
+        assert!(result.output.contains("Magic Missile"));
+        assert!(result.output.contains("Magic-User"));
+        assert!(result.output.contains("Level 1"));
+    }
+
+    #[test]
+    fn spell_lookup_case_insensitive() {
+        let cmd = SpellCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&["magic", "missile"], &mut state);
+        assert!(!result.output.contains("Error"), "{}", result.output);
+        assert!(result.output.contains("Magic Missile"));
+    }
+
+    #[test]
+    fn spell_lookup_with_list_filter() {
+        let cmd = SpellCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&["Cure", "Light", "Wounds", "cleric"], &mut state);
+        assert!(!result.output.contains("Error"), "{}", result.output);
+        assert!(result.output.contains("Cure Light Wounds"));
+        assert!(result.output.contains("Cleric"));
+    }
+
+    #[test]
+    fn spell_lookup_with_mu_alias() {
+        let cmd = SpellCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&["Sleep", "mu"], &mut state);
+        assert!(!result.output.contains("Error"), "{}", result.output);
+        assert!(result.output.contains("Sleep"));
+    }
+
+    #[test]
+    fn spell_lookup_not_found() {
+        let cmd = SpellCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&["Nonexistent", "Spell", "XYZ"], &mut state);
+        assert!(result.output.contains("Error"));
+        assert!(result.output.contains("not found"));
+    }
+
+    #[test]
+    fn spell_lookup_missing_args() {
+        let cmd = SpellCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.output.contains("Error"));
     }
 }
