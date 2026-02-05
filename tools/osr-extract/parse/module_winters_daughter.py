@@ -159,7 +159,6 @@ ROOM_DEFS = {
             {"to": "blindfolded_statue", "door": "open"},
             {"to": "freezing_mirror", "door": "open"},
             {"to": "family_crypt", "door": "closed"},
-            {"to": "statues_with_weapons", "door": "open"},
         ],
     },
     "blindfolded_statue": {
@@ -167,6 +166,7 @@ ROOM_DEFS = {
         "name": "Blindfolded Statue",
         "exits": [
             {"to": "hall_of_guardians", "door": "open"},
+            {"to": "chapel_st_sedge", "door": "open"},
             {"to": "warded_pool", "door": "open"},
         ],
     },
@@ -176,6 +176,7 @@ ROOM_DEFS = {
         "trap": "Full-length mirror: save vs paralysis or be frozen still. Bypass by covering mirror. Unfreeze with holy water, cure light wounds, or sunlight.",
         "exits": [
             {"to": "hall_of_guardians", "door": "open"},
+            {"to": "statues_with_weapons", "door": "open"},
             {"to": "warded_pool", "door": "open"},
         ],
         "treasure": [{"item": "Silver-framed mirror (1,000gp)"}],
@@ -187,6 +188,7 @@ ROOM_DEFS = {
         "exits": [
             {"to": "hall_of_guardians", "door": "closed"},
             {"to": "chapel_st_sedge", "door": "open"},
+            {"to": "hall_of_hounds", "door": "open"},
         ],
         "treasure": [
             {"item": "Pearl necklace (500gp)"},
@@ -198,6 +200,7 @@ ROOM_DEFS = {
         "number": 9,
         "name": "Chapel of St Sedge",
         "exits": [
+            {"to": "blindfolded_statue", "door": "open"},
             {"to": "family_crypt", "door": "open"},
             {"to": "priests_quarters", "door": "locked"},
         ],
@@ -223,7 +226,7 @@ ROOM_DEFS = {
         "number": 11,
         "name": "Statues With Weapons",
         "exits": [
-            {"to": "hall_of_guardians", "door": "open"},
+            {"to": "freezing_mirror", "door": "open"},
             {"to": "hall_of_hounds", "door": "open"},
         ],
         "treasure": [
@@ -236,6 +239,7 @@ ROOM_DEFS = {
         "name": "Hall of Hounds",
         "monsters": [{"name": "Stone Hound", "count": 2}],
         "exits": [
+            {"to": "family_crypt", "door": "open"},
             {"to": "statues_with_weapons", "door": "open"},
             {"to": "knights_tomb", "door": "locked"},
         ],
