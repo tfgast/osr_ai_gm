@@ -1,104 +1,34 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
-use crate::engine::encounter_engine;
-use crate::rules::ability;
-use crate::rules::encounter as encounter_tables;
+use crate::engine::encounter;
+use crate::engine::result::EngineError;
 use crate::state::game::GameMode;
-use crate::dice;
-
-/// Roll number appearing. Handles both dice notation ("2d4") and plain integers ("1").
-fn roll_number_appearing(notation: &str) -> Result<i32, String> {
-    if let Ok(n) = notation.parse::<i32>() {
-        return Ok(n);
-    }
-    dice::roll_str(notation)
-        .map(|r| r.total)
-        .map_err(|e| format!("bad dice expr '{}': {}", notation, e))
-}
 
 pub struct EncounterCommand;
 impl Command for EncounterCommand {
     fn name(&self) -> &str { "encounter" }
     fn help(&self) -> &str { "Roll a full encounter: table + number appearing + surprise + distance" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        let mut rng = rand::thread_rng();
-        let table_roll: u32 = rand::Rng::gen_range(&mut rng, 1..=20);
-
-        match state.mode {
-            GameMode::Exploration => {
-                let level = state.dungeon_level;
-                if level == 0 {
-                    return CommandResult::error(
-                        "dungeon level not set. Use 'enter_dungeon <level>' first.",
-                    );
-                }
-                let entry = match encounter_tables::dungeon_encounter_d40(level, table_roll) {
-                    Some(e) => e,
-                    None => return CommandResult::error("no encounter found for this roll"),
+        match encounter::action_roll_encounter(state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => {
+                let msg = match &e {
+                    EngineError::WrongState(s) if s == "dungeon level not set. Use EnterDungeon first." => {
+                        "dungeon level not set. Use 'enter_dungeon <level>' first.".to_string()
+                    }
+                    EngineError::WrongState(s) if s == "encounter requires exploration or wilderness mode." => {
+                        "encounter requires exploration or wilderness mode. Use 'enter_dungeon' or 'enter_wilderness' first.".to_string()
+                    }
+                    EngineError::Internal(s) if s == "no encounter found for this roll." => {
+                        "no encounter found for this roll".to_string()
+                    }
+                    EngineError::Internal(s) if s == "no encounter found for this terrain." => {
+                        "no encounter found for this terrain".to_string()
+                    }
+                    _ => e.to_string(),
                 };
-                let num_appearing = match roll_number_appearing(&entry.number) {
-                    Ok(n) => n,
-                    Err(e) => return CommandResult::error(e),
-                };
-                let seq = encounter_engine::begin_encounter_dungeon();
-
-                let surprise_line = format!(
-                    "Surprise: party {}, monsters {} — {}",
-                    seq.party_surprise_roll, seq.monster_surprise_roll, seq.surprise
-                );
-                CommandResult::ok(format!(
-                    "ENCOUNTER — Dungeon Level {}\n\
-                     Table roll: {} → {}\n\
-                     Number appearing: {} → {}\n\
-                     {}\n\
-                     Distance: {}' feet",
-                    level,
-                    table_roll, entry.name,
-                    entry.number, num_appearing,
-                    surprise_line,
-                    seq.distance,
-                ))
+                CommandResult::error(msg)
             }
-            GameMode::Wilderness => {
-                let ws = match state.wilderness.as_ref() {
-                    Some(w) => w,
-                    None => return CommandResult::error("no wilderness state."),
-                };
-                let hex = match ws.current_hex() {
-                    Some(h) => h,
-                    None => return CommandResult::error("no current hex."),
-                };
-                let terrain = hex.terrain;
-                let entry = match encounter_tables::wilderness_encounter_simple(terrain, table_roll) {
-                    Some(e) => e,
-                    None => return CommandResult::error("no encounter found for this terrain"),
-                };
-                let num_appearing = match roll_number_appearing(&entry.number) {
-                    Ok(n) => n,
-                    Err(e) => return CommandResult::error(e),
-                };
-                let seq = encounter_engine::begin_encounter_wilderness();
-
-                let surprise_line = format!(
-                    "Surprise: party {}, monsters {} — {}",
-                    seq.party_surprise_roll, seq.monster_surprise_roll, seq.surprise
-                );
-                CommandResult::ok(format!(
-                    "ENCOUNTER — Wilderness ({})\n\
-                     Table roll: {} → {}\n\
-                     Number appearing: {} → {}\n\
-                     {}\n\
-                     Distance: {} yards",
-                    terrain.name(),
-                    table_roll, entry.name,
-                    entry.number, num_appearing,
-                    surprise_line,
-                    seq.distance,
-                ))
-            }
-            _ => CommandResult::error(
-                "encounter requires exploration or wilderness mode. Use 'enter_dungeon' or 'enter_wilderness' first.",
-            ),
         }
     }
 }
@@ -107,12 +37,11 @@ pub struct SurpriseCommand;
 impl Command for SurpriseCommand {
     fn name(&self) -> &str { "surprise" }
     fn help(&self) -> &str { "Roll surprise for an encounter (1-2 on d6 = surprised)" }
-    fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
-        let (result, p, m) = encounter_engine::check_surprise();
-        CommandResult::ok(format!(
-            "Party roll: {}  Monster roll: {}\n{}",
-            p, m, result
-        ))
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        match encounter::action_roll_surprise(state) {
+            Ok(result) => CommandResult::ok(result.cli_message()),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -124,18 +53,10 @@ impl Command for ReactionCommand {
         if args.is_empty() {
             return CommandResult::error("usage: reaction <character_name>");
         }
-        let character = match state.party.find_member(args[0]) {
-            Some(c) => c,
-            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
-        };
-        let cha = character.abilities.charisma;
-        let (reaction, raw, modified) = encounter_engine::reaction_roll(cha);
-        let cha_mod = ability::cha_reaction_mod(cha);
-        CommandResult::ok(format!(
-            "{} speaks (CHA {}, modifier {:+}).\n\
-             Reaction roll: {} (2d6) {:+} = {}\n{}",
-            character.name, cha, cha_mod, raw, cha_mod, modified, reaction
-        ))
+        match encounter::action_roll_reaction(state, args[0]) {
+            Ok(result) => CommandResult::ok(result.cli_message()),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -155,22 +76,10 @@ impl Command for EvadeCommand {
             Ok(n) => n,
             _ => return CommandResult::error("monster_movement must be a non-negative integer"),
         };
-        let party_size = state.party.members.iter().filter(|c| c.is_alive()).count() as u32;
-        if party_size == 0 {
-            return CommandResult::error("no living party members.");
+        match encounter::action_evade(state, monster_count, monster_movement) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        let party_movement = state.party.members.iter()
-            .filter(|c| c.is_alive())
-            .map(|c| c.movement_rate)
-            .min()
-            .unwrap_or(120);
-        let result = encounter_engine::attempt_evasion(
-            party_size, party_movement, monster_count, monster_movement,
-        );
-        CommandResult::ok(format!(
-            "Party ({} members, {}' movement) vs {} monsters ({}' movement)\n{}",
-            party_size, party_movement, monster_count, monster_movement, result
-        ))
     }
 }
 

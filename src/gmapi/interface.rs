@@ -91,9 +91,9 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::Orient => exploration_handlers::orient(id, state),
         GMCommand::Forage => exploration_handlers::forage(id, state),
         GMCommand::Hunt => exploration_handlers::hunt(id, state),
-        GMCommand::RollEncounter => exploration_handlers::roll_encounter(id, state),
+        GMCommand::RollEncounter => combat_handlers::roll_encounter(id, state),
         GMCommand::Evade { monster_count, monster_movement } => {
-            exploration_handlers::evade(id, state, *monster_count, *monster_movement)
+            combat_handlers::evade(id, state, *monster_count, *monster_movement)
         }
 
         // -- Encounter resolution --
