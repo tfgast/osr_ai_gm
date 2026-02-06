@@ -1,14 +1,13 @@
 use crate::engine::result::EngineError;
 use crate::persist::GameState;
-use crate::rules::module;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
 use crate::state::game::GameMode;
 use crate::state::time::{LightSourceKind, TimeTracker};
 
 use super::results::{
     AddDoorResult, AddRoomResult, AdvanceDungeonTurnResult, EnterDungeonResult, ForceDoorResult,
-    ExplorationStatusResult, ListenAtDoorResult, LightResult, LoadModuleResult,
-    MoveThroughDoorResult, OpenDoorResult, RestResult, SearchRoomResult,
+    ExplorationStatusResult, ListenAtDoorResult, LightResult, MoveThroughDoorResult,
+    OpenDoorResult, RestResult, SearchRoomResult,
 };
 use super::{
     advance_dungeon_turn, exploration_status, force_door, listen_at_door, move_through_door,
@@ -319,35 +318,6 @@ pub fn action_open_door(
             }
         }
     }
-}
-
-pub fn action_load_module(
-    state: &mut GameState,
-    path: &str,
-) -> Result<LoadModuleResult, EngineError> {
-    let module_def = module::load_module(path, module::DEFAULT_MODULES_DIR)
-        .map_err(EngineError::InvalidInput)?;
-    let dungeon = crate::command::module_cmds::module_to_dungeon(&module_def)
-        .map_err(EngineError::InvalidInput)?;
-
-    let module_name = module_def.name.clone();
-    let level_range = module_def.level_range;
-    let room_count = dungeon.rooms.len();
-
-    state.dungeon = Some(dungeon);
-    state.time = Some(TimeTracker::new());
-    state.dungeon_level = level_range.0;
-    state.mode = GameMode::Exploration;
-
-    Ok(LoadModuleResult {
-        message: format!(
-            "loaded module: {} (levels {}-{}). {} rooms.",
-            module_name, level_range.0, level_range.1, room_count
-        ),
-        module_name,
-        level_range,
-        room_count,
-    })
 }
 
 pub fn action_exploration_status(state: &GameState) -> Result<ExplorationStatusResult, EngineError> {

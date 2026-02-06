@@ -1,4 +1,4 @@
-use crate::engine::{encounter_engine, exploration, wilderness};
+use crate::engine::{encounter_engine, exploration, module as module_engine, wilderness};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
 use crate::state::dungeon::DoorState;
@@ -73,7 +73,7 @@ pub(super) fn light(id: &str, state: &mut GameState, source: LightSourceKind, ca
 }
 
 pub(super) fn load_module(id: &str, state: &mut GameState, path: &str) -> GMResponse {
-    match exploration::action_load_module(state, path) {
+    match module_engine::action_load_module(state, path) {
         Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
