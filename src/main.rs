@@ -203,7 +203,10 @@ fn main() {
     for line in stdin.lock().lines() {
         let line = match line {
             Ok(l) => l,
-            Err(_) => break,
+            Err(e) => {
+                eprintln!("error reading input: {}", e);
+                break;
+            }
         };
 
         let trimmed = line.trim();

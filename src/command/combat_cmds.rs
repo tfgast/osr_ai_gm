@@ -205,7 +205,7 @@ impl Command for MonsterAttackCommand {
             if monster_idx >= combat.monsters.len() {
                 return CommandResult::error(format!(
                     "monster index {} out of range (0-{})",
-                    monster_idx, combat.monsters.len() - 1
+                    monster_idx, combat.monsters.len().saturating_sub(1)
                 ));
             }
             if !combat.monsters[monster_idx].is_alive() {

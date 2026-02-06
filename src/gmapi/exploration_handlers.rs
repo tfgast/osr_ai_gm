@@ -191,8 +191,11 @@ pub(super) fn open_door(id: &str, state: &mut GameState, door_id: u32) -> GMResp
         output.push(force_result);
 
         // Check if forcing succeeded
-        let door_after = state.dungeon.as_ref().unwrap()
-            .doors.iter().find(|d| d.id == door_id).unwrap();
+        let door_after = match state.dungeon.as_ref().unwrap()
+            .doors.iter().find(|d| d.id == door_id) {
+            Some(d) => d,
+            None => return GMResponse::err(id, format!("door {} not found after forcing.", door_id), state.mode.clone()),
+        };
         if !door_after.is_passable() {
             return GMResponse::ok(id, output.join("\n"), state.mode.clone());
         }

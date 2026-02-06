@@ -123,6 +123,14 @@ pub fn parse(input: &str) -> Result<DiceExpr, ParseError> {
         return Err(ParseError::InvalidFormat(
             "count and sides must be > 0".to_string()));
     }
+    if count > 1000 {
+        return Err(ParseError::InvalidFormat(
+            format!("dice count {} exceeds maximum of 1000", count)));
+    }
+    if sides > 10000 {
+        return Err(ParseError::InvalidFormat(
+            format!("dice sides {} exceeds maximum of 10000", sides)));
+    }
 
     Ok(DiceExpr::Standard { count, sides, modifier })
 }
@@ -218,6 +226,18 @@ mod tests {
         assert!(parse("2d0").is_err());
         assert!(parse("7-in-6").is_err());
         assert!(parse("0-in-6").is_err());
+    }
+
+    #[test]
+    fn parse_rejects_excessive_count() {
+        assert!(parse("1001d6").is_err());
+        assert!(parse("1000d6").is_ok());
+    }
+
+    #[test]
+    fn parse_rejects_excessive_sides() {
+        assert!(parse("1d10001").is_err());
+        assert!(parse("1d10000").is_ok());
     }
 
     #[test]

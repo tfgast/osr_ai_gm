@@ -412,9 +412,128 @@ impl GMResponse {
 // Parsing helpers
 // =============================================================================
 
-/// Parse a JSON line into a GMRequest.
+/// Maximum request size in bytes (64KB).
+const MAX_REQUEST_SIZE: usize = 65_536;
+
+/// Parse a JSON line into a GMRequest, with size and field validation.
 pub fn parse_request(line: &str) -> Result<GMRequest, String> {
-    serde_json::from_str(line).map_err(|e| format!("invalid JSON request: {}", e))
+    if line.len() > MAX_REQUEST_SIZE {
+        return Err(format!("request too large: {} bytes (max {})", line.len(), MAX_REQUEST_SIZE));
+    }
+    let req: GMRequest = serde_json::from_str(line).map_err(|e| format!("invalid JSON request: {}", e))?;
+    req.validate()?;
+    Ok(req)
+}
+
+fn check_len(field: &str, value: &str, max: usize) -> Result<(), String> {
+    if value.len() > max {
+        Err(format!("{} too long ({} chars, max {})", field, value.len(), max))
+    } else {
+        Ok(())
+    }
+}
+
+fn check_count(field: &str, value: u32, max: u32) -> Result<(), String> {
+    if value > max {
+        Err(format!("{} too large ({}, max {})", field, value, max))
+    } else {
+        Ok(())
+    }
+}
+
+impl GMRequest {
+    fn validate(&self) -> Result<(), String> {
+        check_len("id", &self.id, 64)?;
+        self.command.validate()
+    }
+}
+
+impl GMCommand {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            GMCommand::CreateCharacter { name, .. } => check_len("name", name, 128),
+            GMCommand::SpawnEncounter(p) => {
+                check_len("name", &p.name, 128)?;
+                check_len("damage", &p.damage, 128)?;
+                check_count("count", p.count, 100)
+            }
+            GMCommand::Attack { character, weapon, .. } => {
+                check_len("character", character, 128)?;
+                check_len("weapon", weapon, 128)
+            }
+            GMCommand::MonsterAttack { character, .. } => check_len("character", character, 128),
+            GMCommand::TurnUndead { character, .. } => check_len("character", character, 128),
+            GMCommand::Close { character, .. } => check_len("character", character, 128),
+            GMCommand::Retreat { character } => check_len("character", character, 128),
+            GMCommand::FightingWithdrawal { character } => check_len("character", character, 128),
+            GMCommand::DeclareSpell { character, spell } => {
+                check_len("character", character, 128)?;
+                check_len("spell", spell, 128)
+            }
+            GMCommand::EnterDungeon { room_name, .. } => check_len("room_name", room_name, 128),
+            GMCommand::AddRoom { name, .. } => check_len("name", name, 128),
+            GMCommand::Light { carrier, .. } => check_len("carrier", carrier, 128),
+            GMCommand::LoadModule { path } => check_len("path", path, 512),
+            GMCommand::ForceDoor { character, .. } => check_len("character", character, 128),
+            GMCommand::AwardXp { character, .. } => check_len("character", character, 128),
+            GMCommand::AwardTreasureXp { character, .. } => check_len("character", character, 128),
+            GMCommand::ThiefSkillCheck { character, skill } => {
+                check_len("character", character, 128)?;
+                check_len("skill", skill, 128)
+            }
+            GMCommand::Backstab { character, weapon, .. } => {
+                check_len("character", character, 128)?;
+                check_len("weapon", weapon, 128)
+            }
+            GMCommand::QueryEncumbrance { character } => check_len("character", character, 128),
+            GMCommand::SpawnMonster { name, count, .. } => {
+                check_len("name", name, 128)?;
+                check_count("count", *count, 100)
+            }
+            GMCommand::SpawnNpcParty { party_type, .. } => check_len("party_type", party_type, 128),
+            GMCommand::LookupSpell { name, list } => {
+                check_len("name", name, 128)?;
+                check_len("list", list, 128)
+            }
+            GMCommand::HireRetainer { employer, retainer_name, .. } => {
+                check_len("employer", employer, 128)?;
+                check_len("retainer_name", retainer_name, 128)
+            }
+            GMCommand::LoyaltyCheck { retainer_name, .. } => check_len("retainer_name", retainer_name, 128),
+            GMCommand::LevelUp { character } => check_len("character", character, 128),
+            GMCommand::Ruling { text } => check_len("text", text, 4096),
+            GMCommand::DismissRetainer { name } => check_len("name", name, 128),
+            GMCommand::Heal { character, .. } => check_len("character", character, 128),
+            GMCommand::Damage { character, .. } => check_len("character", character, 128),
+            GMCommand::SetHp { character, .. } => check_len("character", character, 128),
+            GMCommand::Kill { character, .. } => check_len("character", character, 128),
+            GMCommand::Buy { character, item_name } => {
+                check_len("character", character, 128)?;
+                check_len("item_name", item_name, 128)
+            }
+            GMCommand::Drop { character, item_name } => {
+                check_len("character", character, 128)?;
+                check_len("item_name", item_name, 128)
+            }
+            GMCommand::Equip { character, item_name } => {
+                check_len("character", character, 128)?;
+                check_len("item_name", item_name, 128)
+            }
+            GMCommand::Loot { character, item_name, .. } => {
+                check_len("character", character, 128)?;
+                check_len("item_name", item_name, 128)
+            }
+            GMCommand::LookupItem { name } => check_len("name", name, 128),
+            GMCommand::SearchItems { query } => check_len("query", query, 128),
+            GMCommand::LookupTreasureType { letter } => check_len("letter", letter, 16),
+            GMCommand::RollTreasure { letter } => check_len("letter", letter, 16),
+            GMCommand::RollReaction { character } => check_len("character", character, 128),
+            GMCommand::Save { path } => check_len("path", path, 512),
+            GMCommand::Load { path } => check_len("path", path, 512),
+            GMCommand::Roll { notation } => check_len("notation", notation, 128),
+            _ => Ok(()),
+        }
+    }
 }
 
 /// Serialize a GMResponse to a JSON line.
@@ -1029,5 +1148,46 @@ mod tests {
             }
             _ => panic!("expected SpawnNpcParty"),
         }
+    }
+
+    #[test]
+    fn reject_oversized_request() {
+        let big = "x".repeat(MAX_REQUEST_SIZE + 1);
+        assert!(parse_request(&big).is_err());
+    }
+
+    #[test]
+    fn reject_long_request_id() {
+        let long_id = "a".repeat(65);
+        let json = format!(r#"{{"id":"{}","command":{{"type":"QueryState"}}}}"#, long_id);
+        let result = parse_request(&json);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("id too long"));
+    }
+
+    #[test]
+    fn reject_long_character_name() {
+        let long_name = "a".repeat(129);
+        let json = format!(
+            r#"{{"id":"v1","command":{{"type":"Attack","params":{{"character":"{}","monster_idx":0}}}}}}"#,
+            long_name
+        );
+        let result = parse_request(&json);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too long"));
+    }
+
+    #[test]
+    fn reject_excessive_monster_count() {
+        let json = r#"{"id":"v2","command":{"type":"SpawnMonster","params":{"name":"goblin","count":101}}}"#;
+        let result = parse_request(json);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too large"));
+    }
+
+    #[test]
+    fn accept_valid_monster_count() {
+        let json = r#"{"id":"v3","command":{"type":"SpawnMonster","params":{"name":"goblin","count":100}}}"#;
+        assert!(parse_request(json).is_ok());
     }
 }
