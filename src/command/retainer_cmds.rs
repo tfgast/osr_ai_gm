@@ -1,13 +1,15 @@
 use super::{Command, CommandResult};
-use crate::engine::retainer::{
-    self, HireReaction, LoyaltyResult, Retainer,
-};
+use crate::engine::retainers::{self as retainer_actions, results::HireRetainerMode};
 use crate::persist::GameState;
-use crate::rules::class::{self, Class};
+use crate::rules::class::Class;
+
+#[cfg(test)]
+use crate::engine::retainer::Retainer;
 
 /// Generate a unique retainer name by auto-numbering if duplicates exist.
 /// E.g., if "Torchbearer" exists, returns "Torchbearer 2".
 /// If "Torchbearer" and "Torchbearer 2" exist, returns "Torchbearer 3".
+#[cfg(test)]
 fn unique_retainer_name(base_name: &str, existing: &[Retainer]) -> String {
     // Check if base name (or numbered variants) already exist
     let base_lower = base_name.to_lowercase();
@@ -60,99 +62,18 @@ impl Command for HireCommand {
                 "unknown class '{}'. Use 'classes' to list available classes.", args[1]
             )),
         };
-
-        // Find the employing character (for CHA-based rolls)
-        let employer = if args.len() >= 3 {
-            match state.party.find_member(args[2]) {
-                Some(c) => c.clone(),
-                None => return CommandResult::error(format!(
-                    "no party member named '{}'.", args[2]
-                )),
-            }
-        } else {
-            match state.party.members.first() {
-                Some(c) => c.clone(),
-                None => return CommandResult::error(
-                    "no party members. Use 'chargen' to create a character first."
-                ),
-            }
-        };
-
-        let cha = employer.abilities.charisma;
-
-        // Check max retainers
-        let max = retainer::max_retainers(cha);
-        let current = state.retainers.len() as u32;
-        if current >= max {
-            return CommandResult::error(format!(
-                "{} already has max retainers ({}) for CHA {}.",
-                employer.name, max, cha
-            ));
+        let employer = args.get(2).copied();
+        match retainer_actions::action_hire_retainer(
+            state,
+            ret_name,
+            class,
+            employer,
+            1,
+            HireRetainerMode::RecruitToParty,
+        ) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
         }
-
-        // Roll hiring reaction
-        let reaction = retainer::hiring_reaction(cha);
-        let mut out = format!(
-            "Hiring {} ({}) — {} (CHA {}) offers employment.\n",
-            ret_name, class.name(), employer.name, cha
-        );
-        out.push_str(&format!("Reaction roll: {}\n", reaction.name()));
-
-        match reaction {
-            HireReaction::Refused | HireReaction::Reluctant => {
-                out.push_str(&format!("{} will not join the party.", ret_name));
-                return CommandResult::ok(out);
-            }
-            HireReaction::Uncertain => {
-                out.push_str(&format!(
-                    "{} is uncertain. Try again with a better offer (re-run hire).",
-                    ret_name
-                ));
-                return CommandResult::ok(out);
-            }
-            HireReaction::Accepts | HireReaction::Eager => {}
-        }
-
-        // Create the retainer with a unique name
-        let def = class::class_def(class);
-        let base_loyalty = retainer::base_loyalty(cha);
-        let loyalty = if reaction == HireReaction::Eager {
-            base_loyalty + 1
-        } else {
-            base_loyalty
-        };
-
-        let hp = {
-            use rand::Rng;
-            let mut rng = rand::thread_rng();
-            let roll: i32 = rng.gen_range(1..=def.hit_die as i32);
-            roll.max(1)
-        };
-
-        // Auto-number duplicate names to ensure uniqueness
-        let unique_name = unique_retainer_name(ret_name, &state.retainers);
-
-        let wage = retainer::standard_wage(1);
-        let r = Retainer::new(&unique_name, class.name(), 1, hp, loyalty, wage);
-
-        // Note if the name was auto-numbered
-        if unique_name != ret_name {
-            out.push_str(&format!(
-                "(Named '{}' to distinguish from existing retainer)\n",
-                unique_name
-            ));
-        }
-
-        out.push_str(&format!(
-            "{} joins as a level 1 {}!\n  HP: {}, Loyalty: {}, Wage: {} gp/month",
-            r.name, r.class, r.hp, r.loyalty, r.wage_gp
-        ));
-        if reaction == HireReaction::Eager {
-            out.push_str(" (+1 loyalty bonus)");
-        }
-
-        state.retainers.push(r);
-        CommandResult::ok(out)
     }
 }
 
@@ -161,21 +82,26 @@ impl Command for RetainersCommand {
     fn name(&self) -> &str { "retainers" }
     fn help(&self) -> &str { "List current retainers" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        if state.retainers.is_empty() {
-            return CommandResult::ok("No retainers. Use 'hire' to recruit one.");
+        match retainer_actions::action_list_retainers(state) {
+            Ok(result) => {
+                if result.retainers.is_empty() {
+                    return CommandResult::ok("No retainers. Use 'hire' to recruit one.");
+                }
+                let mut out = format!("Retainers ({}):\n", result.retainers.len());
+                for r in &result.retainers {
+                    let status = if r.alive {
+                        format!("HP {}/{}, Loyalty {}, Wage {} gp/mo",
+                            r.hp, r.max_hp, r.loyalty, r.wage_gp)
+                    } else {
+                        "DEAD".to_string()
+                    };
+                    out.push_str(&format!("  {} ({} L{}) — {}\n",
+                        r.name, r.class, r.level, status));
+                }
+                CommandResult::ok(out)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        let mut out = format!("Retainers ({}):\n", state.retainers.len());
-        for r in &state.retainers {
-            let status = if r.is_alive() {
-                format!("HP {}/{}, Loyalty {}, Wage {} gp/mo",
-                    r.hp, r.max_hp, r.loyalty, r.wage_gp)
-            } else {
-                "DEAD".to_string()
-            };
-            out.push_str(&format!("  {} ({} L{}) — {}\n",
-                r.name, r.class, r.level, status));
-        }
-        CommandResult::ok(out)
     }
 }
 
@@ -188,16 +114,17 @@ impl Command for DismissCommand {
             return CommandResult::error("usage: dismiss <retainer_name>");
         }
         let name = args[0];
-        let idx = state.retainers.iter()
-            .position(|r| r.name.eq_ignore_ascii_case(name));
-        match idx {
-            Some(i) => {
-                let removed = state.retainers.remove(i);
-                CommandResult::ok(format!("{} ({}) dismissed from service.", removed.name, removed.class))
+        match retainer_actions::action_dismiss_retainer(state, name) {
+            Ok(result) => {
+                CommandResult::ok(format!("{} ({}) dismissed from service.", result.name, result.class))
             }
-            None => CommandResult::error(format!(
-                "no retainer named '{}'. Use 'retainers' to list.", name
-            )),
+            Err(e) => {
+                if e.to_string().starts_with("no retainer named") {
+                    CommandResult::error(format!("{} Use 'retainers' to list.", e))
+                } else {
+                    CommandResult::error(e.to_string())
+                }
+            }
         }
     }
 }
@@ -207,43 +134,16 @@ impl Command for RetainerMoraleCommand {
     fn name(&self) -> &str { "retainer_morale" }
     fn help(&self) -> &str { "Check loyalty/morale for retainers (retainer_morale [name])" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        if state.retainers.is_empty() {
-            return CommandResult::error("no retainers to check morale for.");
-        }
-
-        let retainers_to_check: Vec<&Retainer> = if let Some(name) = args.first() {
-            match state.retainers.iter().find(|r| r.name.eq_ignore_ascii_case(name)) {
-                Some(r) => vec![r],
-                None => return CommandResult::error(format!(
-                    "no retainer named '{}'. Use 'retainers' to list.", name
-                )),
+        match retainer_actions::action_retainer_morale(state, args.first().copied()) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => {
+                if e.to_string().starts_with("no retainer named") {
+                    CommandResult::error(format!("{} Use 'retainers' to list.", e))
+                } else {
+                    CommandResult::error(e.to_string())
+                }
             }
-        } else {
-            state.retainers.iter().filter(|r| r.is_alive()).collect()
-        };
-
-        if retainers_to_check.is_empty() {
-            return CommandResult::error("no living retainers to check.");
         }
-
-        let mut out = String::from("Retainer morale checks:\n");
-        let results: Vec<(String, u32, LoyaltyResult)> = retainers_to_check.iter()
-            .map(|r| {
-                let result = retainer::loyalty_check(r.loyalty);
-                (r.name.clone(), r.loyalty, result)
-            })
-            .collect();
-
-        for (name, loyalty, result) in &results {
-            let desc = match result {
-                LoyaltyResult::Loyal => "LOYAL — stays and fights",
-                LoyaltyResult::Wavering => "WAVERING — uncertain, may need encouragement",
-                LoyaltyResult::Disloyal => "DISLOYAL — flees or refuses orders",
-            };
-            out.push_str(&format!("  {} (loyalty {}): {}\n", name, loyalty, desc));
-        }
-
-        CommandResult::ok(out)
     }
 }
 
