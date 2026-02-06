@@ -299,6 +299,20 @@ Classification:
 | `declare_spell` | `DeclareSpell` | Same declaration mutation | Equivalent message semantics | A | Same `combat::declare_spell` orchestration |
 | `end_combat` | `EndCombat` | Divergent post-processing side effects | CLI reports retainer XP/loyalty text; API returns structured totals and room-clear update | C | Known divergence: retainer XP + endpoint-specific post-processing |
 
+## Phase 0b: Party/Chargen Command Parity Audit (2026-02-06)
+
+Audit method:
+- Executed CLI and GM API paths with identical pre-state + equivalent inputs.
+- Captured paired snapshots in `src/engine/party/golden_tests.rs`.
+- Compared state mutation, human-readable output, and API structured data.
+
+| CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
+|-------------|----------------|------------------------|--------------------|-------|-------|
+| `chargen` | `CreateCharacter` | Same (no party mutation) for ineligible-abilities case | Divergent success contract: CLI returns `CommandResult::ok`, API returns error response | C | Known divergence: ineligible abilities are soft-fail in CLI, hard-fail in API |
+| `classes` | `ListClasses` | Read-only parity | Same class source, different response envelope (CLI text table vs API `data.classes`) | B | Shared `Class::ALL` and `class_def` data |
+| `eligible` | `EligibleClasses` | Read-only parity | Same eligibility evaluation, different message/data formatting | B | Shared `class::eligible_classes` rules |
+| `party` | `QueryParty` | Read-only parity | CLI includes readiness/starvation annotations; API emits normalized member payload | B | Same underlying party members, adapter-level presentation differs |
+
 ### Testing Strategy
 
 1. Existing tests pass unchanged (both CLI integration and API protocol tests).
