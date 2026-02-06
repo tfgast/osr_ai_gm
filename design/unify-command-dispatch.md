@@ -470,6 +470,31 @@ Notes:
 | `treasure` | `RollTreasure` | Same state mutation (read-only) | Same roll intent with adapter-specific contracts (CLI formatted haul vs API itemized payload) | B | Random rolls differ independently between paths; parity anchors on shared type/category fields |
 | `load_module` | `LoadModule` | Same dungeon/time/mode mutation via shared action | Same message, API includes typed payload fields | B | Both adapters call `exploration::action_load_module`; API adds `module_name`, `level_range`, `room_count` |
 
+## Phase 0d: Wilderness Command Parity Audit (2026-02-06)
+
+Audit method:
+- Compared pre-migration (`a7840e2^`) and post-migration (`a7840e2`) adapter code for all seven CLI wilderness commands.
+- Executed runtime checks with `cargo test wilderness -- --nocapture`, including `gmapi_protocol_qa` wilderness command coverage.
+- Verified API payload keys derive from typed structs in `src/engine/wilderness/results.rs` via adapter serialization (`ok_with_typed_data`).
+
+Notes:
+- CLI output text for all seven wilderness commands remains parity-equivalent with pre-migration behavior.
+- `travel`/`forage`/`hunt`/`orient` include RNG-driven outcomes; parity checks anchor on shared orchestration, state effects, and payload schema rather than exact per-run rolled values.
+- `wilderness_status` pairs with `QueryWilderness` (legacy query handler) and remains read-only parity over shared `wilderness_engine::wilderness_status` text generation.
+
+| CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
+|-------------|----------------|------------------------|--------------------|-------|-------|
+| `enter_wilderness` | `EnterWilderness` | Same wilderness init + mode transition (`state.wilderness`, `state.mode`) | CLI keeps instructional multiline text; API returns typed payload (`message`, `terrain`, `x`, `y`) | B | Core behavior unified through `wilderness::action_enter_wilderness`; adapter contracts intentionally differ |
+| `add_hex` | `AddHex` | Same hex insertion and duplicate-hex rejection | CLI human string vs API typed payload (`message`, `x`, `y`, `terrain`) | B | Shared `wilderness::action_add_hex` validates identical preconditions |
+| `travel` | `Travel` | Same travel-day mutation path (rations, starvation, lost state, travel day, movement) | Message sourced from shared `TravelResult::message`; API includes structured fields from typed result | B | API typed payload adds structured `foraged`, `starvation_damage`, and optional encounter `hd` metadata |
+| `forage` | `Forage` | Same forage resolution + party ration mutation | CLI message parity; API exposes typed (`success`, `quantity`, `rations_remaining`) | B | Shared `wilderness::action_forage` orchestration |
+| `hunt` | `Hunt` | Same hunt resolution + party ration mutation | CLI message parity; API exposes typed (`success`, `quantity`, `rations_remaining`) | B | Shared `wilderness::action_hunt` orchestration |
+| `orient` | `Orient` | Same lost-state and travel-day mutation semantics | CLI message parity; API exposes typed (`success`, `terrain`, `lost`, `travel_day`) | B | Shared `wilderness::action_orient` orchestration |
+| `wilderness_status` | `QueryWilderness` | Read-only parity | Same status text source; API adds structured position/day flags | B | `QueryWilderness` remains legacy query adapter, but uses same status engine function as CLI |
+
+Class C findings:
+- None. No follow-up Class C bug beads were filed from this audit.
+
 ### Testing Strategy
 
 1. **Golden tests (Phase 0):** Capture CLI output and API response snapshots
