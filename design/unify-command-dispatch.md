@@ -495,6 +495,32 @@ Notes:
 Class C findings:
 - None. No follow-up Class C bug beads were filed from this audit.
 
+## Phase 0e: GM Fiat Command Parity Audit (commit `6a5b889`, audited 2026-02-06)
+
+Audit method:
+- Compared `6a5b889^` vs `6a5b889` implementations in:
+  - `src/command/gm_cmds.rs`
+  - `src/gmapi/interface.rs`
+  - `src/engine/gm/actions.rs`
+  - `src/engine/gm/results.rs`
+- Verified CLI output parity for migrated CLI adapters.
+- Verified GM API `data` JSON shapes against typed result structs.
+- Verified state mutation parity, including edge-case overflow behavior.
+
+| CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
+|-------------|----------------|------------------------|--------------------|-------|-------|
+| `award_xp` | `AwardXp` | **Divergent on overflow edge:** API path now saturates (`u64::saturating_add`) while pre-migration used `+=` | CLI text unchanged; API contract keys unchanged (`character`, `xp_awarded`, `total_xp`) | C | Follow-up bug: `oag-gyymh.1` |
+| `ruling` | `Ruling` | Same note append semantics (`[RULING] <text>`) | CLI/API messages unchanged from pre-migration behavior | A | Shared `action_ruling` preserves prior behavior |
+| `heal` | `Heal` | Same HP mutation semantics | Success payload unchanged; invalid-amount API error string lost trailing period via shared `EngineError` text | B | Formatting-only response drift |
+| `damage` | `Damage` | Same HP mutation semantics | API payload now includes extra `status` field from typed struct (pre-migration payload omitted it) | B | Backward-compatible enrichment, but parity drift |
+| `set_hp` | `SetHp` | Same HP assignment semantics | API payload now includes extra `status` field from typed struct (pre-migration payload omitted it) | B | Backward-compatible enrichment, but parity drift |
+| `set_rations` | `SetRations` | Same rations assignment semantics | CLI/API output and API payload shape unchanged | A | Shared `action_set_rations` preserves behavior |
+| `add_rations` | `AddRations` | **Divergent on overflow edge:** migrated action saturates (`u32::saturating_add`) vs pre-migration `+=` | Success payload unchanged; invalid-amount API error punctuation drift (period removed) | C | Follow-up bug: `oag-gyymh.1` |
+| `notes` | `ListNotes` | Same read-only behavior | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
+| `note_delete` | `DeleteNote` | Same note deletion semantics | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
+| `retainers` | `ListRetainers` | Same read-only behavior | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
+| `dismiss` | `DismissRetainer` | Same retainer removal semantics | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
+
 ### Testing Strategy
 
 1. **Golden tests (Phase 0):** Capture CLI output and API response snapshots
