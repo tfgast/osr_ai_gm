@@ -10,3 +10,6 @@ pub mod system;
 pub mod wilderness;
 pub mod wilderness_engine;
 pub mod xp;
+
+#[cfg(test)]
+mod encounter;
