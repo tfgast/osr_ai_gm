@@ -4,8 +4,12 @@ use crate::persist::GameState;
 
 pub struct RollCommand;
 impl Command for RollCommand {
-    fn name(&self) -> &str { "roll" }
-    fn help(&self) -> &str { "Roll dice (e.g., roll 2d6+3, roll d%, roll 3-in-6)" }
+    fn name(&self) -> &str {
+        "roll"
+    }
+    fn help(&self) -> &str {
+        "Roll dice (e.g., roll 2d6+3, roll d%, roll 3-in-6)"
+    }
     fn execute(&self, args: &[&str], _state: &mut GameState) -> CommandResult {
         if args.is_empty() {
             return CommandResult::error("usage: roll <dice expression>");
@@ -20,8 +24,12 @@ impl Command for RollCommand {
 
 pub struct SaveCommand;
 impl Command for SaveCommand {
-    fn name(&self) -> &str { "save" }
-    fn help(&self) -> &str { "Save game state (e.g., save mycamp)" }
+    fn name(&self) -> &str {
+        "save"
+    }
+    fn help(&self) -> &str {
+        "Save game state (e.g., save mycamp)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         let filename = args.first().copied().unwrap_or("save");
         match system::action_save_game(state, filename) {
@@ -33,8 +41,12 @@ impl Command for SaveCommand {
 
 pub struct LoadCommand;
 impl Command for LoadCommand {
-    fn name(&self) -> &str { "load" }
-    fn help(&self) -> &str { "Load game state (e.g., load mycamp)" }
+    fn name(&self) -> &str {
+        "load"
+    }
+    fn help(&self) -> &str {
+        "Load game state (e.g., load mycamp)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         let filename = args.first().copied().unwrap_or("save");
         match system::action_load_game(state, filename) {
@@ -57,23 +69,14 @@ impl Command for LoadCommand {
     }
 }
 
-pub struct HelpCommand;
-
-impl Command for HelpCommand {
-    fn name(&self) -> &str { "help" }
-    fn help(&self) -> &str { "Show available commands" }
-    fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
-        match system::action_help(&[]) {
-            Ok(result) => CommandResult::ok(result.output),
-            Err(e) => CommandResult::error(e.to_string()),
-        }
-    }
-}
-
 pub struct NoteCommand;
 impl Command for NoteCommand {
-    fn name(&self) -> &str { "note" }
-    fn help(&self) -> &str { "Add a session note (note <text>)" }
+    fn name(&self) -> &str {
+        "note"
+    }
+    fn help(&self) -> &str {
+        "Add a session note (note <text>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.is_empty() {
             return CommandResult::error("usage: note <text>");
@@ -86,8 +89,12 @@ impl Command for NoteCommand {
 
 pub struct NotesCommand;
 impl Command for NotesCommand {
-    fn name(&self) -> &str { "notes" }
-    fn help(&self) -> &str { "List all session notes" }
+    fn name(&self) -> &str {
+        "notes"
+    }
+    fn help(&self) -> &str {
+        "List all session notes"
+    }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
         if state.notes.is_empty() {
             return CommandResult::ok("No notes yet.".to_string());
@@ -102,8 +109,12 @@ impl Command for NotesCommand {
 
 pub struct NoteDeleteCommand;
 impl Command for NoteDeleteCommand {
-    fn name(&self) -> &str { "note_delete" }
-    fn help(&self) -> &str { "Delete a note by index (note_delete <index>)" }
+    fn name(&self) -> &str {
+        "note_delete"
+    }
+    fn help(&self) -> &str {
+        "Delete a note by index (note_delete <index>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.is_empty() {
             return CommandResult::error("usage: note_delete <index>");
@@ -133,8 +144,12 @@ impl Command for NoteDeleteCommand {
 
 pub struct QuitCommand;
 impl Command for QuitCommand {
-    fn name(&self) -> &str { "quit" }
-    fn help(&self) -> &str { "Exit the game" }
+    fn name(&self) -> &str {
+        "quit"
+    }
+    fn help(&self) -> &str {
+        "Exit the game"
+    }
     fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
         match system::action_quit() {
             Ok(_) => CommandResult::quit(),
@@ -172,15 +187,6 @@ mod tests {
         let result = cmd.execute(&["bad/path"], &mut state);
         assert!(!result.success);
         assert!(result.output.contains("load failed"));
-    }
-
-    #[test]
-    fn help_lists_header() {
-        let mut state = GameState::new();
-        let cmd = HelpCommand;
-        let result = cmd.execute(&[], &mut state);
-        assert!(result.success);
-        assert_eq!(result.output, "Available commands:\n");
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use crate::command::system::{HelpCommand, LoadCommand, QuitCommand, RollCommand, SaveCommand};
-use crate::command::{Command, CommandResult};
+use crate::command::system::{LoadCommand, QuitCommand, RollCommand, SaveCommand};
+use crate::command::{Command, CommandRegistry, CommandResult};
 use crate::gmapi::interface::handle_request;
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::GameState;
@@ -184,11 +184,14 @@ fn system_command_parity_golden_scaffold_captures_snapshots() {
         capture_cli_only(
             "help",
             GameState::new(),
-            |state| HelpCommand.execute(&[], state),
+            |state| {
+                let registry = CommandRegistry::new();
+                registry.dispatch("help", &[], state)
+            },
             "C",
             "n/a",
             "different",
-            "CLI has a help command in system.rs; GM API has no Help command variant, so no direct parity path exists in interface.rs.",
+            "CLI help is handled by CommandRegistry dispatch; GM API has no Help command variant, so no direct parity path exists in interface.rs.",
         ),
     ];
 

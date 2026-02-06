@@ -1,7 +1,4 @@
-pub mod protocol;
-pub mod interface;
 mod combat_handlers;
-mod exploration_handlers;
-mod inventory_handlers;
-mod lookup_handlers;
+pub mod interface;
+pub mod protocol;
 mod query_handlers;
