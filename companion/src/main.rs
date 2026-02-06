@@ -12,8 +12,12 @@ use crossterm::terminal::{
 };
 use crossterm::ExecutableCommand;
 use ratatui::prelude::*;
+use ratatui_image::picker::Picker;
 
 fn main() -> io::Result<()> {
+    // Query terminal for graphics protocol before entering alt screen.
+    let picker = Picker::from_query_stdio().ok();
+
     // Set up terminal
     enable_raw_mode()?;
     io::stdout().execute(EnterAlternateScreen)?;
@@ -24,23 +28,27 @@ fn main() -> io::Result<()> {
     let (tx, rx) = mpsc::channel();
     let _watch_path = watcher::spawn_watcher(tx);
 
-    let mut app = app::App::new();
+    let mut app = app::App::new(picker);
 
     // Main event loop
     loop {
-        // Drain state updates from watcher
-        while let Ok(state) = rx.try_recv() {
-            app.update_state(state);
+        // Drain updates from watcher
+        while let Ok(update) = rx.try_recv() {
+            match update {
+                watcher::WatcherUpdate::State(state) => app.update_state(state),
+                watcher::WatcherUpdate::Image(path) => app.update_image(&path),
+            }
         }
 
         // Draw
-        terminal.draw(|f| ui::draw(f, &app))?;
+        terminal.draw(|f| ui::draw(f, &mut app))?;
 
         // Poll for keyboard events (100ms timeout)
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => app.quit = true,
+                    KeyCode::Char('i') => app.show_image = !app.show_image,
                     KeyCode::Char('?') => app.show_help = !app.show_help,
                     KeyCode::Char('l') => app.show_log = !app.show_log,
                     KeyCode::Char('j') | KeyCode::Down => {

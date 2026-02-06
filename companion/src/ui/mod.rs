@@ -1,3 +1,4 @@
+mod image;
 mod location;
 mod log;
 mod party;
@@ -7,7 +8,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
 use crate::app::App;
 
-pub fn draw(f: &mut Frame, app: &App) {
+pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.area();
 
     // Main layout: body + footer
@@ -85,8 +86,8 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(p, inner);
     }
 
-    // Bottom-right: Image panel (placeholder)
-    render_placeholder(f, bot_cols[1], " Image ", Color::Blue);
+    // Bottom-right: Image panel
+    image::render_image(f, bot_cols[1], app);
 
     // Footer bar
     render_footer(f, footer_area, app);
@@ -131,7 +132,7 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
             format!("[Mode: {}] ", mode_str),
             Style::default().fg(Color::Yellow),
         ),
-        Span::styled("[?=Help q=Quit]", Style::default().fg(Color::DarkGray)),
+        Span::styled("[i=Image ?=Help q=Quit]", Style::default().fg(Color::DarkGray)),
     ]);
 
     let p = Paragraph::new(footer);
@@ -140,7 +141,7 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
 
 fn render_help_overlay(f: &mut Frame, area: Rect) {
     let w = 40u16.min(area.width.saturating_sub(4));
-    let h = 14u16.min(area.height.saturating_sub(4));
+    let h = 16u16.min(area.height.saturating_sub(4));
     let x = (area.width.saturating_sub(w)) / 2;
     let y = (area.height.saturating_sub(h)) / 2;
     let popup = Rect::new(x, y, w, h);
@@ -155,6 +156,7 @@ fn render_help_overlay(f: &mut Frame, area: Rect) {
     let text = vec![
         Line::raw(""),
         Line::raw("  q        Quit"),
+        Line::raw("  i        Toggle image panel"),
         Line::raw("  ?        Toggle this help"),
         Line::raw("  l        Toggle log panel"),
         Line::raw("  j / Down Scroll log down"),
@@ -166,6 +168,10 @@ fn render_help_overlay(f: &mut Frame, area: Rect) {
         ),
         Line::styled(
             "  Watches ~/.osr_data/live_state.json",
+            Style::default().fg(Color::DarkGray),
+        ),
+        Line::styled(
+            "  Image:  ~/.osr_data/live/image.png",
             Style::default().fg(Color::DarkGray),
         ),
     ];
