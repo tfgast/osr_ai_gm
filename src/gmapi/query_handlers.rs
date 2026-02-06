@@ -17,34 +17,6 @@ pub(super) fn query_state(id: &str, state: &GameState) -> GMResponse {
     GMResponse::ok_with_data(id, "game state summary", state.mode.clone(), data)
 }
 
-pub(super) fn query_party(id: &str, state: &GameState) -> GMResponse {
-    if state.party.members.is_empty() {
-        return GMResponse::ok_with_data(
-            id, "no party members.", state.mode.clone(),
-            serde_json::json!({ "members": [] }),
-        );
-    }
-    let members: Vec<serde_json::Value> = state.party.members.iter().map(|c| {
-        serde_json::json!({
-            "name": c.name,
-            "class": c.class.name(),
-            "level": c.level,
-            "hp": c.hp,
-            "max_hp": c.max_hp,
-            "ac": c.ac,
-            "thac0": c.thac0,
-            "xp": c.xp,
-            "alive": c.is_alive(),
-            "alignment": c.alignment.name(),
-            "movement_rate": c.movement_rate,
-        })
-    }).collect();
-    GMResponse::ok_with_data(
-        id, format!("{} party members.", members.len()), state.mode.clone(),
-        serde_json::json!({ "members": members }),
-    )
-}
-
 pub(super) fn query_combat(id: &str, state: &GameState) -> GMResponse {
     match &state.combat {
         Some(combat_state) => {
