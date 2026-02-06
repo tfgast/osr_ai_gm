@@ -6,3 +6,6 @@ pub use actions::{
     action_dismiss_retainer, action_heal, action_list_notes, action_list_retainers, action_ruling,
     action_set_hp, action_set_rations,
 };
+
+#[cfg(test)]
+mod golden_tests;
