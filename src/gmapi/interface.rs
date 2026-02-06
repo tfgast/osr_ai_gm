@@ -1,7 +1,6 @@
-use crate::dice;
-use crate::engine::{chargen, gm, retainer, xp};
+use crate::engine::{chargen, gm, retainer, system, xp};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
-use crate::persist::{self, GameState};
+use crate::persist::GameState;
 use crate::rules::{class, spell_data, thief};
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
@@ -163,7 +162,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::Save { path } => save_game(id, state, path),
         GMCommand::Load { path } => load_game(id, state, path),
         GMCommand::Roll { notation } => roll_dice(id, state, notation),
-        GMCommand::Quit => GMResponse::ok(id, "session ended.", state.mode.clone()),
+        GMCommand::Quit => quit_session(id, state),
     }
 }
 
@@ -570,29 +569,31 @@ fn dismiss_retainer(id: &str, state: &mut GameState, name: &str) -> GMResponse {
 // System
 // =============================================================================
 
+fn quit_session(id: &str, state: &GameState) -> GMResponse {
+    match system::action_quit() {
+        Ok(_) => GMResponse::ok(id, "session ended.", state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
 fn save_game(id: &str, state: &GameState, path: &str) -> GMResponse {
-    let safe_path = match persist::safe_save_path(path) {
-        Ok(p) => p,
-        Err(e) => return GMResponse::err(id, format!("save failed: {}.", e), state.mode.clone()),
-    };
-    match persist::save(state, &safe_path) {
-        Ok(()) => GMResponse::ok(id, format!("game saved to {}.", safe_path.display()), state.mode.clone()),
+    match system::action_save_game(state, path) {
+        Ok(result) => GMResponse::ok(
+            id,
+            format!("game saved to {}.", result.path.display()),
+            state.mode.clone(),
+        ),
         Err(e) => GMResponse::err(id, format!("save failed: {}.", e), state.mode.clone()),
     }
 }
 
 fn load_game(id: &str, state: &mut GameState, path: &str) -> GMResponse {
-    let safe_path = match persist::safe_save_path(path) {
-        Ok(p) => p,
-        Err(e) => return GMResponse::err(id, format!("load failed: {}.", e), state.mode.clone()),
-    };
-    match persist::load(&safe_path) {
-        Ok(loaded) => {
+    match system::action_load_game(state, path) {
+        Ok(result) => {
             let msg = format!(
                 "loaded: turn {}, dungeon level {}, {} party members.",
-                loaded.turn(), loaded.dungeon_level, loaded.party.members.len(),
+                result.turn, result.dungeon_level, result.party_members,
             );
-            *state = loaded;
             GMResponse::ok(id, msg, state.mode.clone())
         }
         Err(e) => GMResponse::err(id, format!("load failed: {}.", e), state.mode.clone()),
@@ -600,10 +601,10 @@ fn load_game(id: &str, state: &mut GameState, path: &str) -> GMResponse {
 }
 
 fn roll_dice(id: &str, state: &GameState, notation: &str) -> GMResponse {
-    match dice::roll_str(notation) {
+    match system::action_roll_dice(notation) {
         Ok(result) => GMResponse::ok_with_data(
             id,
-            result.to_string(),
+            result.rendered,
             state.mode.clone(),
             serde_json::json!({ "total": result.total }),
         ),
