@@ -1,9 +1,8 @@
 use super::{Command, CommandResult};
+use crate::engine::exploration;
 use crate::persist::GameState;
-use crate::rules::module::{load_module, ModuleDef, PlacedTreasure, DEFAULT_MODULES_DIR};
+use crate::rules::module::{ModuleDef, PlacedTreasure};
 use crate::state::dungeon::{Door, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room};
-use crate::state::game::GameMode;
-use crate::state::time::TimeTracker;
 use std::collections::HashMap;
 
 /// Load a prewritten adventure module from a JSON file.
@@ -24,31 +23,10 @@ impl Command for LoadModuleCommand {
         }
 
         let path = args.join(" ");
-        let module = match load_module(&path, DEFAULT_MODULES_DIR) {
-            Ok(m) => m,
-            Err(e) => return CommandResult::error(e),
-        };
-
-        let dungeon = match module_to_dungeon(&module) {
-            Ok(d) => d,
-            Err(e) => return CommandResult::error(e),
-        };
-
-        let module_name = module.name.clone();
-        let level_range = module.level_range;
-        let room_count = dungeon.rooms.len();
-
-        state.dungeon = Some(dungeon);
-        state.time = Some(TimeTracker::new());
-        state.dungeon_level = level_range.0;
-        state.mode = GameMode::Exploration;
-
-        CommandResult::ok(format!(
-            "Loaded module: {} (levels {}-{}). {} rooms.\n\
-             Use 'light torch <carrier>' or 'light lantern <carrier>' to light the way.\n\
-             Use 'exploration_status' to see current position.",
-            module_name, level_range.0, level_range.1, room_count
-        ))
+        match exploration::action_load_module(state, &path) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 

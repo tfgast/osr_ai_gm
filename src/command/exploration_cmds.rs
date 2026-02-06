@@ -1,9 +1,8 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::engine::exploration;
-use crate::state::dungeon::{DungeonState, Room, Door, DoorState};
-use crate::state::game::GameMode;
-use crate::state::time::{TimeTracker, LightSourceKind};
+use crate::state::dungeon::DoorState;
+use crate::state::time::LightSourceKind;
 
 pub struct EnterDungeonCommand;
 impl Command for EnterDungeonCommand {
@@ -19,23 +18,10 @@ impl Command for EnterDungeonCommand {
         };
         let room_name = if args.len() > 1 { args[1..].join(" ") } else { "Entrance".to_string() };
 
-        let mut dungeon = DungeonState::new(level);
-        dungeon.add_room(Room::new(0, &room_name)).unwrap();
-        dungeon.explore_current();
-
-        let time = TimeTracker::new();
-
-        state.dungeon = Some(dungeon);
-        state.time = Some(time);
-        state.dungeon_level = level;
-        state.mode = GameMode::Exploration;
-
-        CommandResult::ok(format!(
-            "Entered dungeon level {}. Starting room: {}.\n\
-             Use 'light torch <carrier>' or 'light lantern <carrier>' to light the way.\n\
-             Use 'explore' to advance a dungeon turn.",
-            level, room_name
-        ))
+        match exploration::action_enter_dungeon(state, level, &room_name) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -51,16 +37,10 @@ impl Command for LightCommand {
             Ok(k) => k,
             Err(e) => return CommandResult::error(e),
         };
-        let carrier = args[1];
-        let time = match state.time.as_mut() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode. Use 'enter_dungeon' first."),
-        };
-        time.light(kind, carrier);
-        CommandResult::ok(format!(
-            "{} lights a {} ({} turns).",
-            carrier, kind.name(), kind.max_turns()
-        ))
+        match exploration::action_light(state, kind, args[1]) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -69,17 +49,10 @@ impl Command for ExploreCommand {
     fn name(&self) -> &str { "explore" }
     fn help(&self) -> &str { "Advance one dungeon turn of exploration" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        let level = state.dungeon_level;
-        let time = match state.time.as_mut() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode."),
-        };
-        let dungeon = match state.dungeon.as_mut() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        let result = exploration::advance_dungeon_turn(time, dungeon, level);
-        CommandResult::ok(result.to_string())
+        match exploration::action_advance_dungeon_turn(state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -89,17 +62,10 @@ impl Command for SearchCommand {
     fn help(&self) -> &str { "Search the current room (1-in-6, elves 2-in-6). Takes one turn." }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         let is_elf = args.first().map(|a| a.eq_ignore_ascii_case("elf")).unwrap_or(false);
-        let level = state.dungeon_level;
-        let time = match state.time.as_mut() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode."),
-        };
-        let dungeon = match state.dungeon.as_mut() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        let result = exploration::search_room(time, dungeon, level, is_elf);
-        CommandResult::ok(result.to_string())
+        match exploration::action_search_room(state, is_elf) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -111,17 +77,10 @@ impl Command for ListenCommand {
         let is_demihuman = args.first()
             .map(|a| a.eq_ignore_ascii_case("demihuman") || a.eq_ignore_ascii_case("elf"))
             .unwrap_or(false);
-        let level = state.dungeon_level;
-        let time = match state.time.as_mut() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode."),
-        };
-        let dungeon = match state.dungeon.as_ref() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        let result = exploration::listen_at_door(time, dungeon, level, is_demihuman);
-        CommandResult::ok(result.to_string())
+        match exploration::action_listen_at_door(state, is_demihuman) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -137,17 +96,10 @@ impl Command for ForceDoorCommand {
             Ok(n) => n,
             _ => return CommandResult::error("door_id must be a number"),
         };
-        let char_name = args[1];
-        let character = match state.party.find_member(char_name) {
-            Some(c) => c.clone(),
-            None => return CommandResult::error(format!("no party member named '{}'.", char_name)),
-        };
-        let dungeon = match state.dungeon.as_mut() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        let result = exploration::force_door(dungeon, door_id, &character);
-        CommandResult::ok(result)
+        match exploration::action_force_door(state, door_id, args[1]) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -164,13 +116,9 @@ impl Command for AddRoomCommand {
             _ => return CommandResult::error("room id must be a number"),
         };
         let name = args[1..].join(" ");
-        let dungeon = match state.dungeon.as_mut() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        match dungeon.add_room(Room::new(id, &name)) {
-            Ok(()) => CommandResult::ok(format!("Added room {}: {}", id, name)),
-            Err(e) => CommandResult::error(e),
+        match exploration::action_add_room(state, id, &name) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
@@ -205,17 +153,9 @@ impl Command for AddDoorCommand {
         } else {
             DoorState::default()
         };
-        let dungeon = match state.dungeon.as_mut() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        let door = match Door::new(id, room_a, room_b, door_state) {
-            Ok(d) => d,
-            Err(e) => return CommandResult::error(e),
-        };
-        match dungeon.add_door(door) {
-            Ok(()) => CommandResult::ok(format!("Added door {} between rooms {} and {} ({:?})", id, room_a, room_b, door_state)),
-            Err(e) => CommandResult::error(e),
+        match exploration::action_add_door(state, id, room_a, room_b, door_state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
@@ -232,18 +172,9 @@ impl Command for MoveRoomCommand {
             Ok(n) => n,
             _ => return CommandResult::error("door_id must be a number"),
         };
-        let level = state.dungeon_level;
-        let time = match state.time.as_mut() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode."),
-        };
-        let dungeon = match state.dungeon.as_mut() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        match exploration::move_through_door(time, dungeon, level, door_id) {
-            Ok(result) => CommandResult::ok(result.to_string()),
-            Err(e) => CommandResult::error(e),
+        match exploration::action_move_through_door(state, door_id) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
@@ -260,68 +191,9 @@ impl Command for OpenCommand {
             Ok(n) => n,
             _ => return CommandResult::error("door_id must be a number"),
         };
-
-        let dungeon = match state.dungeon.as_ref() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        let door = match dungeon.doors.iter().find(|d| d.id == door_id) {
-            Some(d) => d.clone(),
-            None => return CommandResult::error(format!("door {} not found.", door_id)),
-        };
-
-        if door.state == DoorState::Locked {
-            return CommandResult::error(format!(
-                "door {} is locked. It must be unlocked before it can be opened.", door_id
-            ));
-        }
-
-        let mut output = Vec::new();
-
-        // If not passable (closed/stuck), force it with the strongest party member
-        if !door.is_passable() {
-            let strongest = state.party.members
-                .iter()
-                .filter(|c| c.hp > 0)
-                .max_by_key(|c| c.abilities.strength)
-                .cloned();
-            let character = match strongest {
-                Some(c) => c,
-                None => return CommandResult::error("no living party members to force the door."),
-            };
-            let force_result = exploration::force_door(
-                state.dungeon.as_mut().unwrap(), door_id, &character,
-            );
-            output.push(force_result);
-
-            // Check if forcing succeeded
-            let door_after = state.dungeon.as_ref().unwrap()
-                .doors.iter().find(|d| d.id == door_id).unwrap();
-            if !door_after.is_passable() {
-                return CommandResult::ok(output.join("\n"));
-            }
-        }
-
-        // Door is now open — move through it
-        let level = state.dungeon_level;
-        let time = match state.time.as_mut() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode."),
-        };
-        let dungeon = state.dungeon.as_mut().unwrap();
-        match exploration::move_through_door(time, dungeon, level, door_id) {
-            Ok(result) => {
-                output.push(result.to_string());
-                CommandResult::ok(output.join("\n"))
-            }
-            Err(e) => {
-                if output.is_empty() {
-                    CommandResult::error(e)
-                } else {
-                    output.push(format!("Error: {}", e));
-                    CommandResult::ok(output.join("\n"))
-                }
-            }
+        match exploration::action_open_door(state, door_id) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
@@ -331,12 +203,10 @@ impl Command for RestCommand {
     fn name(&self) -> &str { "rest" }
     fn help(&self) -> &str { "Rest for one turn (required after 5 turns of activity)" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        let time = match state.time.as_mut() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode."),
-        };
-        time.rest();
-        CommandResult::ok("Party rests for one turn. Activity counter reset.")
+        match exploration::action_rest(state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -345,16 +215,10 @@ impl Command for ExplorationStatusCommand {
     fn name(&self) -> &str { "exploration_status" }
     fn help(&self) -> &str { "Show current exploration state (time, light, dungeon map)" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        let time = match state.time.as_ref() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode."),
-        };
-        let dungeon = match state.dungeon.as_ref() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        let status = exploration::exploration_status(time, dungeon);
-        CommandResult::ok(status)
+        match exploration::action_exploration_status(state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -363,6 +227,7 @@ mod tests {
     use super::*;
     use crate::model::Character;
     use crate::rules::class::Class;
+    use crate::state::game::GameMode;
     use crate::state::dungeon::{Door, Room, DungeonState};
     use crate::state::time::TimeTracker;
 

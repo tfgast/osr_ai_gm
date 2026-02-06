@@ -1,13 +1,18 @@
 use crate::engine::{encounter_engine, exploration, wilderness};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
-use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
+use crate::state::dungeon::DoorState;
 use crate::state::game::GameMode;
-use crate::state::time::{LightSourceKind, TimeTracker};
+use crate::state::time::LightSourceKind;
 use crate::state::wilderness::Terrain;
 use serde::Serialize;
 
-fn ok_with_typed_data<T: Serialize>(id: &str, mode: &GameMode, message: String, payload: T) -> GMResponse {
+fn ok_with_typed_data<T: Serialize>(
+    id: &str,
+    mode: &GameMode,
+    message: String,
+    payload: T,
+) -> GMResponse {
     match serde_json::to_value(payload) {
         Ok(data) => GMResponse::ok_with_data(id, message, mode.clone(), data),
         Err(err) => GMResponse::err(
@@ -19,257 +24,87 @@ fn ok_with_typed_data<T: Serialize>(id: &str, mode: &GameMode, message: String, 
 }
 
 pub(super) fn enter_dungeon(id: &str, state: &mut GameState, level: u32, room_name: &str) -> GMResponse {
-    if level == 0 {
-        return GMResponse::err(id, "level must be a positive integer.", state.mode.clone());
+    match exploration::action_enter_dungeon(state, level, room_name) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let mut dungeon = DungeonState::new(level);
-    dungeon.add_room(Room::new(0, room_name)).unwrap();
-    dungeon.explore_current();
-    state.dungeon = Some(dungeon);
-    state.time = Some(TimeTracker::new());
-    state.dungeon_level = level;
-    state.mode = GameMode::Exploration;
-
-    GMResponse::ok(
-        id,
-        format!("entered dungeon level {}. starting room: {}.", level, room_name),
-        state.mode.clone(),
-    )
 }
 
 pub(super) fn advance_turn(id: &str, state: &mut GameState) -> GMResponse {
-    let level = state.dungeon_level;
-    let time = match state.time.as_mut() {
-        Some(t) => t,
-        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
-    };
-    let dungeon = match state.dungeon.as_mut() {
-        Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
-    };
-    let result = exploration::advance_dungeon_turn(time, dungeon, level);
-    let has_encounter = result.encounter.is_some();
-    let mut data = serde_json::json!({
-        "messages": result.messages,
-        "has_encounter": has_encounter,
-    });
-    if let Some(enc) = &result.encounter {
-        data["encounter"] = serde_json::json!({
-            "name": enc.name,
-            "number": enc.number,
-        });
+    match exploration::action_advance_dungeon_turn(state) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    GMResponse::ok_with_data(id, result.to_string(), state.mode.clone(), data)
 }
 
 pub(super) fn add_room(id: &str, state: &mut GameState, room_id: u32, name: &str) -> GMResponse {
-    let dungeon = match state.dungeon.as_mut() {
-        Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
-    };
-    if let Err(e) = dungeon.add_room(Room::new(room_id, name)) {
-        return GMResponse::err(id, e, state.mode.clone());
+    match exploration::action_add_room(state, room_id, name) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    GMResponse::ok(id, format!("added room {}: {}.", room_id, name), state.mode.clone())
 }
 
 pub(super) fn add_door(id: &str, state: &mut GameState, door_id: u32, room_a: u32, room_b: u32, door_state: DoorState) -> GMResponse {
-    let dungeon = match state.dungeon.as_mut() {
-        Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
-    };
-    let door = match Door::new(door_id, room_a, room_b, door_state) {
-        Ok(d) => d,
-        Err(e) => return GMResponse::err(id, e, state.mode.clone()),
-    };
-    if let Err(e) = dungeon.add_door(door) {
-        return GMResponse::err(id, e, state.mode.clone());
+    match exploration::action_add_door(state, door_id, room_a, room_b, door_state) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    GMResponse::ok(
-        id,
-        format!("added door {} between rooms {} and {} ({}).", door_id, room_a, room_b, door_state),
-        state.mode.clone(),
-    )
 }
 
 pub(super) fn move_room(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
-    let dungeon_level = state.dungeon_level;
-    let time = match state.time.as_mut() {
-        Some(t) => t,
-        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
-    };
-    let dungeon = match state.dungeon.as_mut() {
-        Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
-    };
-    match exploration::move_through_door(time, dungeon, dungeon_level, door_id) {
-        Ok(result) => GMResponse::ok(id, result.to_string(), state.mode.clone()),
-        Err(e) => GMResponse::err(id, e, state.mode.clone()),
+    match exploration::action_move_through_door(state, door_id) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn search(id: &str, state: &mut GameState, is_elf: bool) -> GMResponse {
-    let dungeon_level = state.dungeon_level;
-    let time = match state.time.as_mut() {
-        Some(t) => t,
-        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
-    };
-    let dungeon = match state.dungeon.as_mut() {
-        Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
-    };
-    let result = exploration::search_room(time, dungeon, dungeon_level, is_elf);
-    GMResponse::ok(id, result.to_string(), state.mode.clone())
+    match exploration::action_search_room(state, is_elf) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn light(id: &str, state: &mut GameState, source: LightSourceKind, carrier: &str) -> GMResponse {
-    let time = match state.time.as_mut() {
-        Some(t) => t,
-        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
-    };
-    time.light(source, carrier);
-    GMResponse::ok(id, format!("{} lights a {}.", carrier, source.name()), state.mode.clone())
+    match exploration::action_light(state, source, carrier) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn load_module(id: &str, state: &mut GameState, path: &str) -> GMResponse {
-    use crate::command::module_cmds::module_to_dungeon;
-    use crate::rules::module;
-
-    let module_def = match module::load_module(path, module::DEFAULT_MODULES_DIR) {
-        Ok(m) => m,
-        Err(e) => return GMResponse::err(id, e, state.mode.clone()),
-    };
-
-    let dungeon = match module_to_dungeon(&module_def) {
-        Ok(d) => d,
-        Err(e) => return GMResponse::err(id, e, state.mode.clone()),
-    };
-
-    let module_name = module_def.name.clone();
-    let level_range = module_def.level_range;
-    let room_count = dungeon.rooms.len();
-
-    state.dungeon = Some(dungeon);
-    state.time = Some(TimeTracker::new());
-    state.dungeon_level = level_range.0;
-    state.mode = GameMode::Exploration;
-
-    GMResponse::ok_with_data(
-        id,
-        format!("loaded module: {} (levels {}-{}). {} rooms.", module_name, level_range.0, level_range.1, room_count),
-        state.mode.clone(),
-        serde_json::json!({
-            "module_name": module_name,
-            "level_range": [level_range.0, level_range.1],
-            "room_count": room_count,
-        }),
-    )
+    match exploration::action_load_module(state, path) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn open_door(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
-    let dungeon = match state.dungeon.as_ref() {
-        Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
-    };
-    let door = match dungeon.doors.iter().find(|d| d.id == door_id) {
-        Some(d) => d.clone(),
-        None => return GMResponse::err(id, format!("door {} not found.", door_id), state.mode.clone()),
-    };
-
-    if door.state == DoorState::Locked {
-        return GMResponse::err(
-            id,
-            format!("door {} is locked. it must be unlocked before it can be opened.", door_id),
-            state.mode.clone(),
-        );
-    }
-
-    let mut output = Vec::new();
-
-    // If not passable (closed/stuck), force with the strongest party member
-    if !door.is_passable() {
-        let strongest = state.party.members
-            .iter()
-            .filter(|c| c.hp > 0)
-            .max_by_key(|c| c.abilities.strength)
-            .cloned();
-        let character = match strongest {
-            Some(c) => c,
-            None => return GMResponse::err(id, "no living party members to force the door.", state.mode.clone()),
-        };
-        let force_result = exploration::force_door(
-            state.dungeon.as_mut().unwrap(), door_id, &character,
-        );
-        output.push(force_result);
-
-        // Check if forcing succeeded
-        let door_after = match state.dungeon.as_ref().unwrap()
-            .doors.iter().find(|d| d.id == door_id) {
-            Some(d) => d,
-            None => return GMResponse::err(id, format!("door {} not found after forcing.", door_id), state.mode.clone()),
-        };
-        if !door_after.is_passable() {
-            return GMResponse::ok(id, output.join("\n"), state.mode.clone());
-        }
-    }
-
-    // Door is now open — move through it
-    let level = state.dungeon_level;
-    let time = match state.time.as_mut() {
-        Some(t) => t,
-        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
-    };
-    let dungeon = state.dungeon.as_mut().unwrap();
-    match exploration::move_through_door(time, dungeon, level, door_id) {
-        Ok(result) => {
-            output.push(result.to_string());
-            GMResponse::ok(id, output.join("\n"), state.mode.clone())
-        }
-        Err(e) => {
-            if output.is_empty() {
-                GMResponse::err(id, e, state.mode.clone())
-            } else {
-                output.push(format!("error: {}", e));
-                GMResponse::ok(id, output.join("\n"), state.mode.clone())
-            }
-        }
+    match exploration::action_open_door(state, door_id) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn force_door(id: &str, state: &mut GameState, door_id: u32, char_name: &str) -> GMResponse {
-    let character = match state.party.find_member(char_name) {
-        Some(c) => c.clone(),
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
-    };
-    let dungeon = match state.dungeon.as_mut() {
-        Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
-    };
-    let result = exploration::force_door(dungeon, door_id, &character);
-    GMResponse::ok(id, result, state.mode.clone())
+    match exploration::action_force_door(state, door_id, char_name) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn listen(id: &str, state: &mut GameState, is_demihuman: bool) -> GMResponse {
-    let dungeon_level = state.dungeon_level;
-    let time = match state.time.as_mut() {
-        Some(t) => t,
-        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
-    };
-    let dungeon = match state.dungeon.as_ref() {
-        Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
-    };
-    let result = exploration::listen_at_door(time, dungeon, dungeon_level, is_demihuman);
-    GMResponse::ok(id, result.to_string(), state.mode.clone())
+    match exploration::action_listen_at_door(state, is_demihuman) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn rest(id: &str, state: &mut GameState) -> GMResponse {
-    let time = match state.time.as_mut() {
-        Some(t) => t,
-        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
-    };
-    time.rest();
-    GMResponse::ok(id, "party rests for one turn. activity counter reset.", state.mode.clone())
+    match exploration::action_rest(state) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn enter_wilderness(id: &str, state: &mut GameState, terrain: Terrain) -> GMResponse {

@@ -1,5 +1,15 @@
 use rand::Rng;
 
+mod actions;
+pub mod results;
+
+pub use actions::{
+    action_add_door, action_add_room, action_advance_dungeon_turn, action_enter_dungeon,
+    action_exploration_status, action_force_door, action_light, action_listen_at_door,
+    action_load_module, action_move_through_door, action_open_door, action_rest,
+    action_search_room,
+};
+
 use crate::model::Character;
 use crate::rules::ability;
 use crate::rules::encounter;
