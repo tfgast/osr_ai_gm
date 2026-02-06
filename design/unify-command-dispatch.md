@@ -451,6 +451,25 @@ Audit method:
 | `eligible` | `EligibleClasses` | Read-only parity | Same eligibility evaluation, different message/data formatting | B | Shared `class::eligible_classes` rules |
 | `party` | `QueryParty` | Read-only parity | CLI includes readiness/starvation annotations; API emits normalized member payload | B | Same underlying party members, adapter-level presentation differs |
 
+## Phase 0c: Treasure + Module Command Parity Audit (2026-02-06)
+
+Audit method:
+- Executed CLI and GM API paths with identical pre-state + equivalent inputs.
+- Captured paired snapshots in `src/engine/gm/golden_tests.rs`.
+- Compared state mutation, human-readable output, and API structured data.
+
+Notes:
+- `treasure_type` CLI lives in `src/command/lookup_cmds.rs` (not `treasure_cmds.rs`);
+  this is the second treasure command paired with `LookupTreasureType`.
+- `treasure`/`RollTreasure` outcomes are RNG-driven per-path, so parity checks
+  compare shared header fields and state effects, not exact rolled quantities.
+
+| CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
+|-------------|----------------|------------------------|--------------------|-------|-------|
+| `treasure_type` | `LookupTreasureType` | Same state mutation (read-only) | Same treasure metadata with adapter-specific formatting (CLI prose vs API JSON) | B | API includes structured `entries`; CLI prints table text |
+| `treasure` | `RollTreasure` | Same state mutation (read-only) | Same roll intent with adapter-specific contracts (CLI formatted haul vs API itemized payload) | B | Random rolls differ independently between paths; parity anchors on shared type/category fields |
+| `load_module` | `LoadModule` | Same dungeon/time/mode mutation via shared action | Same message, API includes typed payload fields | B | Both adapters call `exploration::action_load_module`; API adds `module_name`, `level_range`, `room_count` |
+
 ### Testing Strategy
 
 1. **Golden tests (Phase 0):** Capture CLI output and API response snapshots
