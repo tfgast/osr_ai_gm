@@ -9,7 +9,7 @@ use osr_ai_gm::persist::GameState;
 const MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
 
 pub enum WatcherUpdate {
-    State(GameState),
+    State(Box<GameState>),
     Image(PathBuf),
     Error(String),
 }
@@ -49,7 +49,7 @@ pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> Result<PathBuf, String>
     // Send initial state if file already exists.
     if state_path.exists() {
         if let Some(state) = try_read_state(&state_path) {
-            let _ = tx.send(WatcherUpdate::State(state));
+            let _ = tx.send(WatcherUpdate::State(Box::new(state)));
         }
     }
 
@@ -112,16 +112,14 @@ pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> Result<PathBuf, String>
             for path in &event.paths {
                 if path.ends_with("live_state.json") {
                     if let Some(state) = try_read_state(&state_path) {
-                        let _ = tx.send(WatcherUpdate::State(state));
+                        let _ = tx.send(WatcherUpdate::State(Box::new(state)));
                     }
                 } else if path.ends_with("image.png")
                     && path.parent().and_then(|p| p.file_name())
                         == Some(std::ffi::OsStr::new("live"))
-                {
-                    if image_size_ok(&img_path) {
+                    && image_size_ok(&img_path) {
                         let _ = tx.send(WatcherUpdate::Image(img_path.clone()));
                     }
-                }
             }
         }
     });

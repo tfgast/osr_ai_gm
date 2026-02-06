@@ -38,7 +38,7 @@ fn main() -> io::Result<()> {
     // Spawn file watcher
     let (tx, rx) = mpsc::channel();
     let _watch_path = watcher::spawn_watcher(tx)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        .map_err(io::Error::other)?;
 
     let mut app = app::App::new(picker);
 
@@ -47,7 +47,7 @@ fn main() -> io::Result<()> {
         // Drain updates from watcher
         while let Ok(update) = rx.try_recv() {
             match update {
-                watcher::WatcherUpdate::State(state) => app.update_state(state),
+                watcher::WatcherUpdate::State(state) => app.update_state(*state),
                 watcher::WatcherUpdate::Image(path) => app.update_image(&path),
                 watcher::WatcherUpdate::Error(msg) => {
                     app.status_message = Some(msg);

@@ -289,10 +289,10 @@ impl Command for TrainCommand {
                         "{} is at maximum level ({}).", character.name, character.level
                     ));
                 }
-                return CommandResult::error(format!(
+                CommandResult::error(format!(
                     "{} needs {} XP for level {} (has {}).",
                     character.name, needed, character.level + 1, character.xp
-                ));
+                ))
             }
             Some(next_level) => {
                 let cost = next_level * 100;

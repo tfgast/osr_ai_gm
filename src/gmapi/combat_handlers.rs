@@ -482,7 +482,7 @@ pub(super) fn spawn_npc_party(id: &str, state: &mut GameState, party_type: &str,
     }).collect();
 
     let monsters: Vec<Monster> = party.members.iter()
-        .map(|m| npc_party::npc_member_to_monster(m))
+        .map(npc_party::npc_member_to_monster)
         .collect();
 
     let count = monsters.len();

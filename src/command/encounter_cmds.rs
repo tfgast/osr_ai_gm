@@ -229,7 +229,7 @@ impl Command for SpawnNpcCommand {
         }
 
         let monsters: Vec<Monster> = party.members.iter()
-            .map(|m| npc_party::npc_member_to_monster(m))
+            .map(npc_party::npc_member_to_monster)
             .collect();
 
         let combat_state = CombatState::new(monsters, distance);

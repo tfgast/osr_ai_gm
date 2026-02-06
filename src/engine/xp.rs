@@ -82,7 +82,7 @@ pub fn apply_level_up_with<R: Rng>(rng: &mut R, character: &mut Character) -> Le
     character.thac0 = crate::engine::chargen::thac0(def.combat_aptitude, new_level);
     let save_cat = def.save_category;
     let new_saves = saving_throws(save_cat, new_level);
-    character.saving_throws = Some(new_saves.clone());
+    character.saving_throws = Some(new_saves);
 
     let new_spell_slots = spell::spell_slots(def.spell_progression, new_level);
 
