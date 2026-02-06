@@ -29,23 +29,7 @@ fn door_state_style(state: &DoorState) -> (Color, &'static str) {
     }
 }
 
-fn hp_bar(hp: i32, max_hp: i32, width: usize) -> (String, Color) {
-    if max_hp <= 0 {
-        return ("DEAD".to_string(), Color::Red);
-    }
-    let ratio = (hp.max(0) as f64 / max_hp as f64).min(1.0);
-    let filled = (ratio * width as f64).round() as usize;
-    let empty = width.saturating_sub(filled);
-    let color = if ratio > 0.5 {
-        Color::Green
-    } else if ratio > 0.25 {
-        Color::Yellow
-    } else {
-        Color::Red
-    };
-    let bar = format!("[{}{}] {}/{}", "█".repeat(filled), "░".repeat(empty), hp, max_hp);
-    (bar, color)
-}
+use super::hp_bar;
 
 pub fn render_location(f: &mut Frame, area: Rect, state: &GameState) {
     let block = Block::default()
@@ -152,14 +136,14 @@ fn render_exploration(state: &GameState) -> Vec<Line<'static>> {
 
     // Exits
     let doors = dungeon.doors_from_current();
-    if !doors.is_empty() {
+    if let Some(current) = dungeon.current_room {
+      if !doors.is_empty() {
         lines.push(Line::raw(""));
         lines.push(Line::from(Span::styled(
             "── Exits ──",
             Style::default().fg(Color::DarkGray),
         )));
 
-        let current = dungeon.current_room.unwrap();
         for d in &doors {
             let dest = if d.room_a == current {
                 d.room_b
@@ -181,6 +165,7 @@ fn render_exploration(state: &GameState) -> Vec<Line<'static>> {
                 Span::styled(format!("[{}]", label), Style::default().fg(color)),
             ]));
         }
+      }
     }
 
     lines

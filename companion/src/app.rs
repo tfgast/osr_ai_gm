@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use osr_ai_gm::persist::GameState;
@@ -39,7 +39,7 @@ impl App {
         self.last_update = Some(Instant::now());
     }
 
-    pub fn update_image(&mut self, path: &PathBuf) {
+    pub fn update_image(&mut self, path: &Path) {
         let picker = match self.picker.as_mut() {
             Some(p) => p,
             None => return,

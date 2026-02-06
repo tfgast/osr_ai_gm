@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -27,12 +27,12 @@ pub fn image_path() -> Result<PathBuf, String> {
         .join("image.png"))
 }
 
-fn try_read_state(path: &PathBuf) -> Option<GameState> {
+fn try_read_state(path: &Path) -> Option<GameState> {
     let data = std::fs::read_to_string(path).ok()?;
     serde_json::from_str(&data).ok()
 }
 
-fn image_size_ok(path: &PathBuf) -> bool {
+fn image_size_ok(path: &Path) -> bool {
     std::fs::metadata(path)
         .map(|m| m.len() <= MAX_IMAGE_SIZE)
         .unwrap_or(false)
@@ -98,11 +98,11 @@ pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> Result<PathBuf, String>
         }
 
         for event in notify_rx {
-            let dominated = matches!(
+            let is_write_event = matches!(
                 event.kind,
                 EventKind::Create(_) | EventKind::Modify(_)
             );
-            if !dominated {
+            if !is_write_event {
                 continue;
             }
 

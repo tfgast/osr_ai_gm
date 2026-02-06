@@ -2,31 +2,7 @@ use osr_ai_gm::persist::GameState;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-fn hp_color(hp: i32, max_hp: i32) -> Color {
-    if max_hp <= 0 {
-        return Color::Red;
-    }
-    let pct = (hp as f64 / max_hp as f64) * 100.0;
-    if pct > 50.0 {
-        Color::Green
-    } else if pct > 25.0 {
-        Color::Yellow
-    } else {
-        Color::Red
-    }
-}
-
-fn hp_bar(hp: i32, max_hp: i32, width: usize) -> (String, Color) {
-    let color = hp_color(hp, max_hp);
-    if max_hp <= 0 {
-        return ("DEAD".to_string(), Color::Red);
-    }
-    let ratio = (hp.max(0) as f64 / max_hp as f64).min(1.0);
-    let filled = (ratio * width as f64).round() as usize;
-    let empty = width.saturating_sub(filled);
-    let bar = format!("[{}{}] {}/{}", "█".repeat(filled), "░".repeat(empty), hp, max_hp);
-    (bar, color)
-}
+use super::hp_bar;
 
 pub fn render_party(f: &mut Frame, area: Rect, state: &GameState) {
     let block = Block::default()

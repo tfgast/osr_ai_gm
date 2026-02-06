@@ -84,9 +84,12 @@ pub fn render_log(f: &mut Frame, area: Rect, state: &GameState, scroll: u16) {
         })
         .collect();
 
+    let max_scroll = (logs.len() as u16).saturating_sub(inner.height);
+    let clamped_scroll = scroll.min(max_scroll);
+
     let paragraph = Paragraph::new(lines)
         .wrap(Wrap { trim: false })
-        .scroll((scroll, 0));
+        .scroll((clamped_scroll, 0));
 
     f.render_widget(paragraph, inner);
 }
