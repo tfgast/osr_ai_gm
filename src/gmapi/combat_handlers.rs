@@ -366,80 +366,10 @@ pub(super) fn spawn_npc_party(
     party_type: &str,
     distance: u32,
 ) -> GMResponse {
-    use crate::rules::npc_party;
-
-    if state.combat.is_some() {
-        return GMResponse::err(id, "combat already active.", state.mode.clone());
+    match encounter::action_spawn_npc_party(state, party_type, distance) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-
-    let mut rng = rand::thread_rng();
-    let party = match party_type {
-        "basic" => npc_party::generate_basic_party(&mut rng),
-        "expert" => npc_party::generate_expert_party(&mut rng),
-        "cleric" => npc_party::generate_high_level_cleric_party(&mut rng),
-        "fighter" => npc_party::generate_high_level_fighter_party(&mut rng),
-        "mage" => npc_party::generate_high_level_magic_user_party(&mut rng),
-        _ => {
-            return GMResponse::err(
-                id,
-                format!(
-                    "unknown party type '{}'. Valid: basic, expert, cleric, fighter, mage.",
-                    party_type
-                ),
-                state.mode.clone(),
-            )
-        }
-    };
-
-    let member_info: Vec<serde_json::Value> = party
-        .members
-        .iter()
-        .map(|m| {
-            serde_json::json!({
-                "class": m.class,
-                "level": m.level,
-                "alignment": m.alignment.to_string(),
-                "role": m.role,
-            })
-        })
-        .collect();
-
-    let monsters: Vec<Monster> = party
-        .members
-        .iter()
-        .map(npc_party::npc_member_to_monster)
-        .collect();
-
-    let count = monsters.len();
-    let combat_state = CombatState::new(monsters, distance);
-    let status = combat::combat_status(&combat_state, &state.party.members);
-    state.combat = Some(combat_state);
-    state.pre_combat_mode = Some(state.mode.clone());
-    state.mode = GameMode::Combat;
-
-    let mut msg = format!(
-        "combat started: {} NPC adventurers ({}) at {}' distance.",
-        count, party.party_type, distance
-    );
-    if party.mounted {
-        msg.push_str(" Party is mounted.");
-    }
-    for note in &party.notes {
-        msg.push_str(&format!(" {}", note));
-    }
-
-    GMResponse::ok_with_data(
-        id,
-        msg,
-        state.mode.clone(),
-        serde_json::json!({
-            "status": status,
-            "party_type": party.party_type,
-            "member_count": count,
-            "members": member_info,
-            "mounted": party.mounted,
-        }),
-    )
 }
 
 pub(super) fn roll_encounter(id: &str, state: &mut GameState) -> GMResponse {

@@ -1,13 +1,16 @@
 use super::{Command, CommandResult};
-use crate::persist::GameState;
 use crate::engine::encounter;
 use crate::engine::result::EngineError;
-use crate::state::game::GameMode;
+use crate::persist::GameState;
 
 pub struct EncounterCommand;
 impl Command for EncounterCommand {
-    fn name(&self) -> &str { "encounter" }
-    fn help(&self) -> &str { "Roll a full encounter: table + number appearing + surprise + distance" }
+    fn name(&self) -> &str {
+        "encounter"
+    }
+    fn help(&self) -> &str {
+        "Roll a full encounter: table + number appearing + surprise + distance"
+    }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
         match encounter::action_roll_encounter(state) {
             Ok(result) => CommandResult::ok(result.message),
@@ -35,8 +38,12 @@ impl Command for EncounterCommand {
 
 pub struct SurpriseCommand;
 impl Command for SurpriseCommand {
-    fn name(&self) -> &str { "surprise" }
-    fn help(&self) -> &str { "Roll surprise for an encounter (1-2 on d6 = surprised)" }
+    fn name(&self) -> &str {
+        "surprise"
+    }
+    fn help(&self) -> &str {
+        "Roll surprise for an encounter (1-2 on d6 = surprised)"
+    }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
         match encounter::action_roll_surprise(state) {
             Ok(result) => CommandResult::ok(result.cli_message()),
@@ -47,8 +54,12 @@ impl Command for SurpriseCommand {
 
 pub struct ReactionCommand;
 impl Command for ReactionCommand {
-    fn name(&self) -> &str { "reaction" }
-    fn help(&self) -> &str { "Roll NPC reaction (reaction <character_name>). Uses CHA modifier." }
+    fn name(&self) -> &str {
+        "reaction"
+    }
+    fn help(&self) -> &str {
+        "Roll NPC reaction (reaction <character_name>). Uses CHA modifier."
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.is_empty() {
             return CommandResult::error("usage: reaction <character_name>");
@@ -62,8 +73,12 @@ impl Command for ReactionCommand {
 
 pub struct EvadeCommand;
 impl Command for EvadeCommand {
-    fn name(&self) -> &str { "evade" }
-    fn help(&self) -> &str { "Attempt to evade an encounter (evade <monster_count> <monster_movement>)" }
+    fn name(&self) -> &str {
+        "evade"
+    }
+    fn help(&self) -> &str {
+        "Attempt to evade an encounter (evade <monster_count> <monster_movement>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error("usage: evade <monster_count> <monster_movement>");
@@ -85,21 +100,18 @@ impl Command for EvadeCommand {
 
 pub struct SpawnNpcCommand;
 impl Command for SpawnNpcCommand {
-    fn name(&self) -> &str { "spawn_npc" }
-    fn help(&self) -> &str { "Spawn NPC party (spawn_npc <basic|expert|cleric|fighter|mage> [distance])" }
+    fn name(&self) -> &str {
+        "spawn_npc"
+    }
+    fn help(&self) -> &str {
+        "Spawn NPC party (spawn_npc <basic|expert|cleric|fighter|mage> [distance])"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        use crate::model::{CombatState, Monster};
-        use crate::engine::combat;
-        use crate::rules::npc_party;
-
-        if state.combat.is_some() {
-            return CommandResult::error("combat already active. Use 'end_combat' first.");
-        }
         if args.is_empty() {
             return CommandResult::error(
                 "usage: spawn_npc <party_type> [distance]\n  \
                  party_type: basic, expert, cleric, fighter, mage\n  \
-                 distance: encounter distance in feet (default 60)"
+                 distance: encounter distance in feet (default 60)",
             );
         }
         let party_type = args[0];
@@ -112,43 +124,37 @@ impl Command for SpawnNpcCommand {
             60
         };
 
-        let mut rng = rand::thread_rng();
-        let party = match party_type {
-            "basic" => npc_party::generate_basic_party(&mut rng),
-            "expert" => npc_party::generate_expert_party(&mut rng),
-            "cleric" => npc_party::generate_high_level_cleric_party(&mut rng),
-            "fighter" => npc_party::generate_high_level_fighter_party(&mut rng),
-            "mage" => npc_party::generate_high_level_magic_user_party(&mut rng),
-            _ => return CommandResult::error(
-                "unknown party type. Valid: basic, expert, cleric, fighter, mage"
-            ),
-        };
-
-        let mut output = format!("NPC {} party ({} members) at {}' distance:\n",
-            party.party_type, party.members.len(), distance);
-        for m in &party.members {
-            let role_str = m.role.as_deref().map(|r| format!(" ({})", r)).unwrap_or_default();
-            output.push_str(&format!("  {} Lv{} [{}]{}\n", m.class, m.level, m.alignment, role_str));
+        match encounter::action_spawn_npc_party(state, party_type, distance) {
+            Ok(result) => {
+                let mut output = format!(
+                    "NPC {} party ({} members) at {}' distance:\n",
+                    result.party_type, result.member_count, result.distance
+                );
+                for member in &result.member_info {
+                    let role_str = member
+                        .role
+                        .as_deref()
+                        .map(|role| format!(" ({role})"))
+                        .unwrap_or_default();
+                    output.push_str(&format!(
+                        "  {} Lv{} [{}]{}\n",
+                        member.class, member.level, member.alignment, role_str
+                    ));
+                }
+                if result.mounted {
+                    output.push_str("  Party is mounted.\n");
+                }
+                for note in &result.notes {
+                    output.push_str(&format!("  {note}\n"));
+                }
+                output.push_str(&format!(
+                    "\nCombat started! {}",
+                    serde_json::to_string(&result.status).unwrap_or_default()
+                ));
+                CommandResult::ok(output)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        if party.mounted {
-            output.push_str("  Party is mounted.\n");
-        }
-        for note in &party.notes {
-            output.push_str(&format!("  {}\n", note));
-        }
-
-        let monsters: Vec<Monster> = party.members.iter()
-            .map(npc_party::npc_member_to_monster)
-            .collect();
-
-        let combat_state = CombatState::new(monsters, distance);
-        let status = combat::combat_status(&combat_state, &state.party.members);
-        state.combat = Some(combat_state);
-        state.pre_combat_mode = Some(state.mode.clone());
-        state.mode = GameMode::Combat;
-
-        output.push_str(&format!("\nCombat started! {}", serde_json::to_string(&status).unwrap_or_default()));
-        CommandResult::ok(output)
     }
 }
 
@@ -156,8 +162,9 @@ impl Command for SpawnNpcCommand {
 mod tests {
     use super::*;
     use crate::state::dungeon::DungeonState;
+    use crate::state::game::GameMode;
     use crate::state::time::TimeTracker;
-    use crate::state::wilderness::{WildernessState, HexCell, Terrain};
+    use crate::state::wilderness::{HexCell, Terrain, WildernessState};
 
     fn dungeon_state(level: u32) -> GameState {
         let mut state = GameState::new();
@@ -183,13 +190,41 @@ mod tests {
         let mut state = dungeon_state(1);
         let result = cmd.execute(&[], &mut state);
         assert!(!result.quit);
-        assert!(result.output.contains("ENCOUNTER"), "missing header: {}", result.output);
-        assert!(result.output.contains("Dungeon Level 1"), "missing level: {}", result.output);
-        assert!(result.output.contains("Table roll:"), "missing table roll: {}", result.output);
-        assert!(result.output.contains("Number appearing:"), "missing number: {}", result.output);
-        assert!(result.output.contains("Surprise:"), "missing surprise: {}", result.output);
-        assert!(result.output.contains("Distance:"), "missing distance: {}", result.output);
-        assert!(result.output.contains("feet"), "missing feet unit: {}", result.output);
+        assert!(
+            result.output.contains("ENCOUNTER"),
+            "missing header: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Dungeon Level 1"),
+            "missing level: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Table roll:"),
+            "missing table roll: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Number appearing:"),
+            "missing number: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Surprise:"),
+            "missing surprise: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Distance:"),
+            "missing distance: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("feet"),
+            "missing feet unit: {}",
+            result.output
+        );
     }
 
     #[test]
@@ -198,13 +233,41 @@ mod tests {
         let mut state = wilderness_state(Terrain::Forest);
         let result = cmd.execute(&[], &mut state);
         assert!(!result.quit);
-        assert!(result.output.contains("ENCOUNTER"), "missing header: {}", result.output);
-        assert!(result.output.contains("Wilderness"), "missing wilderness: {}", result.output);
-        assert!(result.output.contains("Forest"), "missing terrain: {}", result.output);
-        assert!(result.output.contains("Table roll:"), "missing table roll: {}", result.output);
-        assert!(result.output.contains("Number appearing:"), "missing number: {}", result.output);
-        assert!(result.output.contains("Surprise:"), "missing surprise: {}", result.output);
-        assert!(result.output.contains("yards"), "missing yards unit: {}", result.output);
+        assert!(
+            result.output.contains("ENCOUNTER"),
+            "missing header: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Wilderness"),
+            "missing wilderness: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Forest"),
+            "missing terrain: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Table roll:"),
+            "missing table roll: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Number appearing:"),
+            "missing number: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("Surprise:"),
+            "missing surprise: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("yards"),
+            "missing yards unit: {}",
+            result.output
+        );
     }
 
     #[test]
@@ -212,8 +275,16 @@ mod tests {
         let cmd = EncounterCommand;
         let mut state = GameState::new();
         let result = cmd.execute(&[], &mut state);
-        assert!(result.output.contains("Error"), "expected error: {}", result.output);
-        assert!(result.output.contains("exploration or wilderness"), "{}", result.output);
+        assert!(
+            result.output.contains("Error"),
+            "expected error: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("exploration or wilderness"),
+            "{}",
+            result.output
+        );
     }
 
     #[test]
@@ -222,7 +293,11 @@ mod tests {
         let mut state = GameState::new();
         state.mode = GameMode::Exploration;
         let result = cmd.execute(&[], &mut state);
-        assert!(result.output.contains("Error"), "expected error: {}", result.output);
+        assert!(
+            result.output.contains("Error"),
+            "expected error: {}",
+            result.output
+        );
         assert!(result.output.contains("dungeon level"), "{}", result.output);
     }
 
@@ -232,7 +307,11 @@ mod tests {
         let mut state = GameState::new();
         state.mode = GameMode::Wilderness;
         let result = cmd.execute(&[], &mut state);
-        assert!(result.output.contains("Error"), "expected error: {}", result.output);
+        assert!(
+            result.output.contains("Error"),
+            "expected error: {}",
+            result.output
+        );
     }
 
     #[test]
@@ -242,9 +321,15 @@ mod tests {
         // Run multiple times to exercise randomness
         for _ in 0..20 {
             let result = cmd.execute(&[], &mut state);
-            assert!(result.output.contains("Number appearing:"), "{}", result.output);
+            assert!(
+                result.output.contains("Number appearing:"),
+                "{}",
+                result.output
+            );
             // The number after the arrow should be >= 1
-            let num_line = result.output.lines()
+            let num_line = result
+                .output
+                .lines()
                 .find(|l| l.contains("Number appearing:"))
                 .unwrap();
             let total: &str = num_line.rsplit("→ ").next().unwrap().trim();
@@ -259,8 +344,12 @@ mod tests {
         for level in 1..=9 {
             let mut state = dungeon_state(level);
             let result = cmd.execute(&[], &mut state);
-            assert!(!result.output.starts_with("Error"),
-                "level {} failed: {}", level, result.output);
+            assert!(
+                !result.output.starts_with("Error"),
+                "level {} failed: {}",
+                level,
+                result.output
+            );
         }
     }
 
@@ -268,15 +357,24 @@ mod tests {
     fn encounter_all_wilderness_terrains() {
         let cmd = EncounterCommand;
         let terrains = [
-            Terrain::Clear, Terrain::Forest, Terrain::Hills,
-            Terrain::Mountains, Terrain::Desert, Terrain::Swamp,
-            Terrain::Jungle, Terrain::Ocean,
+            Terrain::Clear,
+            Terrain::Forest,
+            Terrain::Hills,
+            Terrain::Mountains,
+            Terrain::Desert,
+            Terrain::Swamp,
+            Terrain::Jungle,
+            Terrain::Ocean,
         ];
         for terrain in &terrains {
             let mut state = wilderness_state(*terrain);
             let result = cmd.execute(&[], &mut state);
-            assert!(!result.output.starts_with("Error"),
-                "{:?} failed: {}", terrain, result.output);
+            assert!(
+                !result.output.starts_with("Error"),
+                "{:?} failed: {}",
+                terrain,
+                result.output
+            );
         }
     }
 }

@@ -1,12 +1,16 @@
 use crate::dice;
+use crate::engine::combat;
 use crate::engine::encounter::results::{
     EvadeResult, RollEncounterResult, RollReactionResult, RollSurpriseResult,
+    SpawnNpcPartyMemberInfo, SpawnNpcPartyResult,
 };
 use crate::engine::encounter_engine;
 use crate::engine::result::EngineError;
+use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
 use crate::rules::ability;
 use crate::rules::encounter as encounter_tables;
+use crate::rules::npc_party;
 use crate::state::game::GameMode;
 
 /// Roll number appearing. Handles both dice notation ("2d4") and plain integers ("1").
@@ -31,9 +35,10 @@ pub fn action_roll_encounter(state: &mut GameState) -> Result<RollEncounterResul
                     "dungeon level not set. Use EnterDungeon first.".to_string(),
                 ));
             }
-            let entry = encounter_tables::dungeon_encounter_d40(level, table_roll).ok_or_else(|| {
-                EngineError::Internal("no encounter found for this roll.".to_string())
-            })?;
+            let entry =
+                encounter_tables::dungeon_encounter_d40(level, table_roll).ok_or_else(|| {
+                    EngineError::Internal("no encounter found for this roll.".to_string())
+                })?;
             let num_appearing = roll_number_appearing(&entry.number)?;
             let seq = encounter_engine::begin_encounter_dungeon();
 
@@ -77,7 +82,9 @@ pub fn action_roll_encounter(state: &mut GameState) -> Result<RollEncounterResul
                 .ok_or_else(|| EngineError::WrongState("no current hex.".to_string()))?;
             let terrain = hex.terrain;
             let entry = encounter_tables::wilderness_encounter_simple(terrain, table_roll)
-                .ok_or_else(|| EngineError::Internal("no encounter found for this terrain.".to_string()))?;
+                .ok_or_else(|| {
+                    EngineError::Internal("no encounter found for this terrain.".to_string())
+                })?;
             let num_appearing = roll_number_appearing(&entry.number)?;
             let seq = encounter_engine::begin_encounter_wilderness();
 
@@ -193,5 +200,78 @@ pub fn action_evade(
         party_movement,
         monster_count,
         monster_movement,
+    })
+}
+
+pub fn action_spawn_npc_party(
+    state: &mut GameState,
+    party_type: &str,
+    distance: u32,
+) -> Result<SpawnNpcPartyResult, EngineError> {
+    if state.combat.is_some() {
+        return Err(EngineError::WrongState(
+            "combat already active. Use 'end_combat' first.".to_string(),
+        ));
+    }
+
+    let mut rng = rand::thread_rng();
+    let party = match party_type {
+        "basic" => npc_party::generate_basic_party(&mut rng),
+        "expert" => npc_party::generate_expert_party(&mut rng),
+        "cleric" => npc_party::generate_high_level_cleric_party(&mut rng),
+        "fighter" => npc_party::generate_high_level_fighter_party(&mut rng),
+        "mage" => npc_party::generate_high_level_magic_user_party(&mut rng),
+        _ => {
+            return Err(EngineError::InvalidInput(format!(
+                "unknown party type '{}'. Valid: basic, expert, cleric, fighter, mage.",
+                party_type
+            )))
+        }
+    };
+
+    let member_info: Vec<SpawnNpcPartyMemberInfo> = party
+        .members
+        .iter()
+        .map(|member| SpawnNpcPartyMemberInfo {
+            class: member.class.clone(),
+            level: member.level,
+            alignment: member.alignment.to_string(),
+            role: member.role.clone(),
+        })
+        .collect();
+
+    let monsters: Vec<Monster> = party
+        .members
+        .iter()
+        .map(npc_party::npc_member_to_monster)
+        .collect();
+
+    let member_count = monsters.len();
+    let combat_state = CombatState::new(monsters, distance);
+    let status = combat::combat_status(&combat_state, &state.party.members);
+    state.combat = Some(combat_state);
+    state.pre_combat_mode = Some(state.mode.clone());
+    state.mode = GameMode::Combat;
+
+    let mut message = format!(
+        "combat started: {} NPC adventurers ({}) at {}' distance.",
+        member_count, party.party_type, distance
+    );
+    if party.mounted {
+        message.push_str(" Party is mounted.");
+    }
+    for note in &party.notes {
+        message.push_str(&format!(" {}", note));
+    }
+
+    Ok(SpawnNpcPartyResult {
+        message,
+        party_type: party.party_type,
+        member_count,
+        member_info,
+        mounted: party.mounted,
+        notes: party.notes,
+        status,
+        distance,
     })
 }

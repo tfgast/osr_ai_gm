@@ -98,3 +98,28 @@ pub struct EvadeResult {
     pub monster_count: u32,
     pub monster_movement: u32,
 }
+
+/// Structured NPC member details returned by `spawn_npc_party`.
+#[derive(Debug, Clone, Serialize)]
+pub struct SpawnNpcPartyMemberInfo {
+    pub class: String,
+    pub level: u32,
+    pub alignment: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+}
+
+/// Typed success payload for `spawn_npc_party`.
+#[derive(Debug, Clone, Serialize)]
+pub struct SpawnNpcPartyResult {
+    #[serde(skip_serializing)]
+    pub message: String,
+    pub party_type: String,
+    pub member_count: usize,
+    #[serde(rename = "members")]
+    pub member_info: Vec<SpawnNpcPartyMemberInfo>,
+    pub mounted: bool,
+    pub notes: Vec<String>,
+    pub status: String,
+    pub distance: u32,
+}
