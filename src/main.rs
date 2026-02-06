@@ -1,4 +1,3 @@
-use osr_ai_gm::command::CommandRegistry;
 use osr_ai_gm::command::combat_cmds::{
     AttackCommand, CloseCommand, CombatLogCommand, CombatStatusCommand, DeclareSpellCommand,
     EndCombatCommand, InitiativeCommand, KillCommand, MonsterAttackCommand, MoraleCommand,
@@ -13,26 +12,29 @@ use osr_ai_gm::command::exploration_cmds::{
     SearchCommand,
 };
 use osr_ai_gm::command::gm_cmds::{
-    AddRationsCommand, AdvanceTurnCommand, AwardTreasureXpCommand, AwardXpCommand,
-    BackstabCommand, DamageCommand, HealCommand, RulingCommand, SetHpCommand, SetRationsCommand,
+    AddRationsCommand, AdvanceTurnCommand, AwardTreasureXpCommand, AwardXpCommand, BackstabCommand,
+    DamageCommand, HealCommand, RulingCommand, SetHpCommand, SetRationsCommand,
     SpawnEncounterCommand, TrainCommand,
 };
 use osr_ai_gm::command::inventory_cmds::{BuyCommand, DropCommand, EquipCommand, LootCommand};
-use osr_ai_gm::command::lookup_cmds::{ItemCommand, SearchItemsCommand, SpellCommand, TreasureTypeCommand};
+use osr_ai_gm::command::lookup_cmds::{
+    ItemCommand, SearchItemsCommand, SpellCommand, TreasureTypeCommand,
+};
 use osr_ai_gm::command::module_cmds::LoadModuleCommand;
 use osr_ai_gm::command::party::{ChargenCommand, ClassesCommand, EligibleCommand, PartyCommand};
 use osr_ai_gm::command::retainer_cmds::{
     DismissCommand, HireCommand, RetainerMoraleCommand, RetainersCommand,
 };
 use osr_ai_gm::command::system::{
-    HelpCommand, LoadCommand, NoteCommand, NoteDeleteCommand, NotesCommand, QuitCommand,
-    RollCommand, SaveCommand,
+    LoadCommand, NoteCommand, NoteDeleteCommand, NotesCommand, QuitCommand, RollCommand,
+    SaveCommand,
 };
 use osr_ai_gm::command::treasure_cmds::TreasureCommand;
 use osr_ai_gm::command::wilderness_cmds::{
     AddHexCommand, EnterWildernessCommand, ForageCommand, HuntCommand, OrientCommand,
     TravelCommand, WildernessStatusCommand,
 };
+use osr_ai_gm::command::CommandRegistry;
 use osr_ai_gm::persist::{self, GameState};
 use std::io::{self, BufRead, Write};
 
@@ -177,7 +179,6 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(RollCommand));
     registry.register(Box::new(SaveCommand));
     registry.register(Box::new(LoadCommand));
-    registry.register(Box::new(HelpCommand));
     registry.register(Box::new(QuitCommand));
     registry
 }
