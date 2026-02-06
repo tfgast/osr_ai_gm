@@ -1,5 +1,5 @@
 use crate::dice;
-use crate::engine::{combat, encounter_engine};
+use crate::engine::{combat, encounter};
 use crate::gmapi::protocol::GMResponse;
 use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
@@ -442,18 +442,30 @@ pub(super) fn spawn_npc_party(
     )
 }
 
+pub(super) fn roll_encounter(id: &str, state: &mut GameState) -> GMResponse {
+    match encounter::action_roll_encounter(state) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+pub(super) fn evade(
+    id: &str,
+    state: &GameState,
+    monster_count: u32,
+    monster_movement: u32,
+) -> GMResponse {
+    match encounter::action_evade(state, monster_count, monster_movement) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
 pub(super) fn roll_surprise(id: &str, state: &GameState) -> GMResponse {
-    let (result, p, m) = encounter_engine::check_surprise();
-    GMResponse::ok_with_data(
-        id,
-        format!("party roll: {} monster roll: {} — {}", p, m, result),
-        state.mode.clone(),
-        serde_json::json!({
-            "party_roll": p,
-            "monster_roll": m,
-            "result": result.to_string(),
-        }),
-    )
+    match encounter::action_roll_surprise(state) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.api_message(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn set_helpless(
@@ -493,33 +505,8 @@ pub(super) fn kill(
 }
 
 pub(super) fn roll_reaction(id: &str, state: &GameState, char_name: &str) -> GMResponse {
-    let character = match state.party.find_member(char_name) {
-        Some(c) => c,
-        None => {
-            return GMResponse::err(
-                id,
-                format!("no party member named '{}'.", char_name),
-                state.mode.clone(),
-            )
-        }
-    };
-    let cha = character.abilities.charisma;
-    let (reaction, raw, modified) = encounter_engine::reaction_roll(cha);
-    let cha_mod = ability::cha_reaction_mod(cha);
-    GMResponse::ok_with_data(
-        id,
-        format!(
-            "{} speaks (CHA {}, modifier {:+}). reaction roll: {} {:+} = {} — {}",
-            character.name, cha, cha_mod, raw, cha_mod, modified, reaction
-        ),
-        state.mode.clone(),
-        serde_json::json!({
-            "character": character.name,
-            "charisma": cha,
-            "cha_modifier": cha_mod,
-            "raw_roll": raw,
-            "modified_roll": modified,
-            "reaction": reaction.to_string(),
-        }),
-    )
+    match encounter::action_roll_reaction(state, char_name) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.api_message(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }

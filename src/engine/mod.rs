@@ -1,5 +1,6 @@
 pub mod chargen;
 pub mod combat;
+pub mod encounter;
 pub mod encounter_engine;
 pub mod exploration;
 pub mod gm;
