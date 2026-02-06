@@ -1,48 +1,39 @@
-pub mod command;
-pub mod dice;
-pub mod engine;
-pub mod model;
-pub mod persist;
-pub mod rules;
-pub mod state;
-pub mod telemetry;
-
-use command::CommandRegistry;
-use command::combat_cmds::{
+use osr_ai_gm::command::CommandRegistry;
+use osr_ai_gm::command::combat_cmds::{
     AttackCommand, CloseCommand, CombatLogCommand, CombatStatusCommand, DeclareSpellCommand,
     EndCombatCommand, InitiativeCommand, KillCommand, MonsterAttackCommand, MoraleCommand,
     RetreatCommand, SetHelplessCommand, StartCombatCommand, TurnUndeadCommand, WithdrawalCommand,
 };
-use command::encounter_cmds::{
+use osr_ai_gm::command::encounter_cmds::{
     EncounterCommand, EvadeCommand, ReactionCommand, SpawnNpcCommand, SurpriseCommand,
 };
-use command::exploration_cmds::{
+use osr_ai_gm::command::exploration_cmds::{
     AddDoorCommand, AddRoomCommand, EnterDungeonCommand, ExplorationStatusCommand, ExploreCommand,
     ForceDoorCommand, LightCommand, ListenCommand, MoveRoomCommand, OpenCommand, RestCommand,
     SearchCommand,
 };
-use command::gm_cmds::{
+use osr_ai_gm::command::gm_cmds::{
     AddRationsCommand, AdvanceTurnCommand, AwardTreasureXpCommand, AwardXpCommand,
     BackstabCommand, DamageCommand, HealCommand, RulingCommand, SetHpCommand, SetRationsCommand,
     SpawnEncounterCommand, TrainCommand,
 };
-use command::inventory_cmds::{BuyCommand, DropCommand, EquipCommand, LootCommand};
-use command::lookup_cmds::{ItemCommand, SearchItemsCommand, SpellCommand, TreasureTypeCommand};
-use command::module_cmds::LoadModuleCommand;
-use command::party::{ChargenCommand, ClassesCommand, EligibleCommand, PartyCommand};
-use command::retainer_cmds::{
+use osr_ai_gm::command::inventory_cmds::{BuyCommand, DropCommand, EquipCommand, LootCommand};
+use osr_ai_gm::command::lookup_cmds::{ItemCommand, SearchItemsCommand, SpellCommand, TreasureTypeCommand};
+use osr_ai_gm::command::module_cmds::LoadModuleCommand;
+use osr_ai_gm::command::party::{ChargenCommand, ClassesCommand, EligibleCommand, PartyCommand};
+use osr_ai_gm::command::retainer_cmds::{
     DismissCommand, HireCommand, RetainerMoraleCommand, RetainersCommand,
 };
-use command::system::{
+use osr_ai_gm::command::system::{
     HelpCommand, LoadCommand, NoteCommand, NoteDeleteCommand, NotesCommand, QuitCommand,
     RollCommand, SaveCommand,
 };
-use command::treasure_cmds::TreasureCommand;
-use command::wilderness_cmds::{
+use osr_ai_gm::command::treasure_cmds::TreasureCommand;
+use osr_ai_gm::command::wilderness_cmds::{
     AddHexCommand, EnterWildernessCommand, ForageCommand, HuntCommand, OrientCommand,
     TravelCommand, WildernessStatusCommand,
 };
-use persist::GameState;
+use osr_ai_gm::persist::{self, GameState};
 use std::io::{self, BufRead, Write};
 
 /// Parse a command line into arguments, respecting quoted strings.

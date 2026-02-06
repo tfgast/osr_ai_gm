@@ -49,6 +49,9 @@ fn main() -> io::Result<()> {
             match update {
                 watcher::WatcherUpdate::State(state) => app.update_state(state),
                 watcher::WatcherUpdate::Image(path) => app.update_image(&path),
+                watcher::WatcherUpdate::Error(msg) => {
+                    app.status_message = Some(msg);
+                }
             }
         }
 

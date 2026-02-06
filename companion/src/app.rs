@@ -15,6 +15,7 @@ pub struct App {
     pub last_update: Option<Instant>,
     pub picker: Option<Picker>,
     pub image_state: Option<StatefulProtocol>,
+    pub status_message: Option<String>,
 }
 
 impl App {
@@ -29,6 +30,7 @@ impl App {
             last_update: None,
             picker,
             image_state: None,
+            status_message: None,
         }
     }
 

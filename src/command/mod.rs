@@ -18,6 +18,7 @@ use crate::persist::GameState;
 #[derive(Debug)]
 pub struct CommandResult {
     pub output: String,
+    pub success: bool,
     pub quit: bool,
 }
 
@@ -25,6 +26,7 @@ impl CommandResult {
     pub fn ok(output: impl Into<String>) -> Self {
         CommandResult {
             output: output.into(),
+            success: true,
             quit: false,
         }
     }
@@ -32,6 +34,7 @@ impl CommandResult {
     pub fn quit() -> Self {
         CommandResult {
             output: "Goodbye.".to_string(),
+            success: true,
             quit: true,
         }
     }
@@ -39,6 +42,7 @@ impl CommandResult {
     pub fn error(msg: impl Into<String>) -> Self {
         CommandResult {
             output: format!("Error: {}", msg.into()),
+            success: false,
             quit: false,
         }
     }
@@ -106,7 +110,7 @@ impl CommandRegistry {
             ),
         };
 
-        if result.output.starts_with("Error: ") {
+        if !result.success {
             crate::telemetry::log_failed_command(&crate::telemetry::FailedCommand {
                 timestamp: std::time::SystemTime::now()
                     .duration_since(std::time::SystemTime::UNIX_EPOCH)
@@ -169,20 +173,21 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command_has_error_prefix() {
+    fn unknown_command_is_error() {
         let reg = CommandRegistry::new();
         let mut state = GameState::new();
         let result = reg.dispatch("xyzzy", &[], &mut state);
+        assert!(!result.success);
         assert!(result.output.starts_with("Error: "));
     }
 
     #[test]
-    fn successful_command_has_no_error_prefix() {
+    fn successful_command_has_success_true() {
         let mut reg = CommandRegistry::new();
         reg.register(Box::new(TestCmd));
         let mut state = GameState::new();
         let result = reg.dispatch("test", &[], &mut state);
-        assert!(!result.output.starts_with("Error: "));
+        assert!(result.success);
     }
 
     #[test]

@@ -11,6 +11,7 @@ const MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
 pub enum WatcherUpdate {
     State(GameState),
     Image(PathBuf),
+    Error(String),
 }
 
 pub fn live_state_path() -> Result<PathBuf, String> {
@@ -65,13 +66,22 @@ pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> Result<PathBuf, String>
         let img_path = img_clone;
 
         let (notify_tx, notify_rx) = mpsc::channel();
-        let mut watcher =
-            notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        let mut watcher = match notify::recommended_watcher(
+            move |res: notify::Result<notify::Event>| {
                 if let Ok(event) = res {
                     let _ = notify_tx.send(event);
                 }
-            })
-            .expect("failed to create file watcher");
+            },
+        ) {
+            Ok(w) => w,
+            Err(e) => {
+                let _ = tx.send(WatcherUpdate::Error(format!(
+                    "failed to create file watcher: {}",
+                    e
+                )));
+                return;
+            }
+        };
 
         // Watch the .osr_data directory recursively to catch both
         // live_state.json and live/image.png.
@@ -79,9 +89,13 @@ pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> Result<PathBuf, String>
         if let Some(img_dir) = img_path.parent() {
             std::fs::create_dir_all(img_dir).ok();
         }
-        watcher
-            .watch(watch_dir.as_ref(), RecursiveMode::Recursive)
-            .expect("failed to watch directory");
+        if let Err(e) = watcher.watch(watch_dir.as_ref(), RecursiveMode::Recursive) {
+            let _ = tx.send(WatcherUpdate::Error(format!(
+                "failed to watch directory: {}",
+                e
+            )));
+            return;
+        }
 
         for event in notify_rx {
             let dominated = matches!(
