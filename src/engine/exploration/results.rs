@@ -108,15 +108,6 @@ pub struct OpenDoorResult {
     pub moved: bool,
 }
 
-/// Typed success payload for `load_module`.
-#[derive(Debug, Clone, Serialize)]
-pub struct LoadModuleResult {
-    pub message: String,
-    pub module_name: String,
-    pub level_range: (u32, u32),
-    pub room_count: usize,
-}
-
 /// Typed success payload for `exploration_status`.
 #[derive(Debug, Clone, Serialize)]
 pub struct ExplorationStatusResult {

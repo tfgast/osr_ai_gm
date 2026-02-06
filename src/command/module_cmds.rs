@@ -1,9 +1,6 @@
 use super::{Command, CommandResult};
-use crate::engine::exploration;
+use crate::engine::module as module_engine;
 use crate::persist::GameState;
-use crate::rules::module::{ModuleDef, PlacedTreasure};
-use crate::state::dungeon::{Door, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room};
-use std::collections::HashMap;
 
 /// Load a prewritten adventure module from a JSON file.
 pub struct LoadModuleCommand;
@@ -23,291 +20,34 @@ impl Command for LoadModuleCommand {
         }
 
         let path = args.join(" ");
-        match exploration::action_load_module(state, &path) {
+        match module_engine::action_load_module(state, &path) {
             Ok(result) => CommandResult::ok(result.message),
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
 
-/// Convert a ModuleDef to a DungeonState.
-///
-/// This assigns numeric IDs to string-keyed rooms, creates Room structs,
-/// and creates Door structs from exits (deduplicating bidirectional doors).
-pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
-    // Assign numeric IDs to rooms
-    let mut room_id_map: HashMap<String, u32> = HashMap::new();
-    let mut next_id: u32 = 0;
-
-    // Ensure entry_room gets ID 0
-    room_id_map.insert(module.entry_room.clone(), next_id);
-    next_id += 1;
-
-    // Assign IDs to remaining rooms (sorted for deterministic ordering)
-    let mut sorted_keys: Vec<&String> = module.rooms.keys().collect();
-    sorted_keys.sort();
-    for key in &sorted_keys {
-        if !room_id_map.contains_key(*key) {
-            room_id_map.insert((*key).clone(), next_id);
-            next_id += 1;
-        }
-    }
-
-    // Create dungeon with level from module
-    let mut dungeon = DungeonState::new(module.level_range.0);
-
-    // Create Room structs (sorted for deterministic ordering)
-    for key in &sorted_keys {
-        let module_room = &module.rooms[*key];
-        let id = *room_id_map.get(*key).unwrap();
-        let mut room = Room::new(id, &module_room.name);
-        room.description = module_room.description.clone();
-        room.trap = module_room.trap.clone();
-        room.key = Some((*key).clone());
-
-        // Convert module monsters to placed monster instances
-        for pm in &module_room.monsters {
-            room.placed_monsters.push(PlacedMonsterInstance::new(&pm.name, pm.count));
-        }
-
-        // Convert module treasure to placed treasure instances
-        for pt in &module_room.treasure {
-            let (desc, gp) = match pt {
-                PlacedTreasure::Coins { gp } => (format!("{} gold pieces", gp), *gp),
-                PlacedTreasure::Item { item } => (item.clone(), 0), // Items have no inherent gp value
-            };
-            room.placed_treasure.push(PlacedTreasureInstance::new(&desc, gp));
-        }
-
-        dungeon.add_room(room)?;
-    }
-
-    // Set entry room as current room
-    let entry_id = *room_id_map.get(&module.entry_room).unwrap();
-    dungeon.current_room = Some(entry_id);
-    dungeon.explored.insert(entry_id);
-
-    // Create doors from exits (deduplicate bidirectional, sorted for determinism)
-    let mut door_id: u32 = 0;
-    let mut created_doors: HashMap<(u32, u32), u32> = HashMap::new();
-
-    for key in &sorted_keys {
-        let module_room = &module.rooms[*key];
-        let room_a = *room_id_map.get(*key).unwrap();
-
-        for exit in &module_room.exits {
-            let room_b = *room_id_map.get(&exit.to).ok_or_else(|| {
-                format!("room '{}' has exit to unknown room '{}'", key, exit.to)
-            })?;
-
-            // Normalize the room pair to avoid duplicate doors
-            let pair = if room_a < room_b {
-                (room_a, room_b)
-            } else {
-                (room_b, room_a)
-            };
-
-            // Only create door if we haven't seen this pair
-            if let std::collections::hash_map::Entry::Vacant(e) = created_doors.entry(pair) {
-                let door = Door::new(door_id, pair.0, pair.1, exit.door)?;
-                dungeon.add_door(door)?;
-                e.insert(door_id);
-                door_id += 1;
-            }
-        }
-    }
-
-    // Log module load
-    dungeon.log(format!("Module '{}' loaded.", module.name));
-
-    Ok(dungeon)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::dungeon::DoorState;
+    use crate::state::game::GameMode;
 
-    fn sample_module() -> ModuleDef {
-        let json = r#"{
-            "name": "Test Crypt",
-            "level_range": [1, 3],
-            "entry_room": "entrance",
-            "rooms": {
-                "entrance": {
-                    "name": "Crypt Entrance",
-                    "description": "Stone steps descend into darkness.",
-                    "exits": [{"to": "guard", "door": "closed"}]
-                },
-                "guard": {
-                    "name": "Guard Chamber",
-                    "description": "Bones litter the floor.",
-                    "monsters": [{"name": "skeleton", "count": 3}],
-                    "exits": [
-                        {"to": "entrance", "door": "closed"},
-                        {"to": "vault", "door": "locked"}
-                    ]
-                },
-                "vault": {
-                    "name": "Treasure Vault",
-                    "description": "A dusty chest sits in the corner.",
-                    "treasure": [{"gp": 500}, {"item": "Potion of Healing"}],
-                    "exits": [{"to": "guard", "door": "locked"}]
-                }
-            }
-        }"#;
-        serde_json::from_str(json).unwrap()
+    #[test]
+    fn load_module_requires_path() {
+        let command = LoadModuleCommand;
+        let mut state = GameState::new();
+        let result = command.execute(&[], &mut state);
+        assert!(!result.success);
+        assert!(result.output.contains("usage: load_module <path>"));
     }
 
     #[test]
-    fn module_to_dungeon_creates_rooms() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-        assert_eq!(dungeon.rooms.len(), 3);
-    }
-
-    #[test]
-    fn module_to_dungeon_entry_room_is_current() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-
-        // Entry room should be ID 0 and current
-        assert_eq!(dungeon.current_room, Some(0));
-
-        // Entry room should be explored
-        assert!(dungeon.explored.contains(&0));
-
-        // Entry room should be named "Crypt Entrance"
-        let entry = dungeon.find_room(0).unwrap();
-        assert_eq!(entry.name, "Crypt Entrance");
-    }
-
-    #[test]
-    fn module_to_dungeon_creates_doors() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-
-        // Should have 2 doors (entrance-guard, guard-vault)
-        // Even though exits are defined bidirectionally, doors are deduplicated
-        assert_eq!(dungeon.doors.len(), 2);
-    }
-
-    #[test]
-    fn module_to_dungeon_door_states() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-
-        // Find the locked door (guard-vault)
-        let locked_door = dungeon.doors.iter()
-            .find(|d| d.state == DoorState::Locked)
-            .expect("should have a locked door");
-
-        // Verify it connects the right rooms
-        let room_ids: Vec<u32> = vec![locked_door.room_a, locked_door.room_b];
-        let guard_id = dungeon.rooms.iter()
-            .find(|r| r.name == "Guard Chamber")
-            .map(|r| r.id)
-            .unwrap();
-        let vault_id = dungeon.rooms.iter()
-            .find(|r| r.name == "Treasure Vault")
-            .map(|r| r.id)
-            .unwrap();
-
-        assert!(room_ids.contains(&guard_id));
-        assert!(room_ids.contains(&vault_id));
-    }
-
-    #[test]
-    fn module_to_dungeon_room_descriptions() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-
-        let vault = dungeon.rooms.iter()
-            .find(|r| r.name == "Treasure Vault")
-            .unwrap();
-        assert_eq!(vault.description, "A dusty chest sits in the corner.");
-    }
-
-    #[test]
-    fn module_to_dungeon_sets_level() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-        assert_eq!(dungeon.level, 1);
-    }
-
-    #[test]
-    fn module_to_dungeon_logs_load() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-        assert!(dungeon.log.iter().any(|m| m.contains("Test Crypt")));
-    }
-
-    #[test]
-    fn module_to_dungeon_loads_monsters() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-
-        // Find the guard room (has monsters)
-        let guard = dungeon.rooms.iter()
-            .find(|r| r.name == "Guard Chamber")
-            .expect("should have Guard Chamber");
-
-        assert_eq!(guard.placed_monsters.len(), 1);
-        assert_eq!(guard.placed_monsters[0].name, "skeleton");
-        assert_eq!(guard.placed_monsters[0].count, 3);
-        assert!(!guard.placed_monsters[0].spawned);
-        assert!(!guard.monsters_cleared);
-    }
-
-    #[test]
-    fn module_to_dungeon_loads_treasure() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-
-        // Find the vault (has treasure)
-        let vault = dungeon.rooms.iter()
-            .find(|r| r.name == "Treasure Vault")
-            .expect("should have Treasure Vault");
-
-        assert_eq!(vault.placed_treasure.len(), 2);
-        // First treasure: coins
-        assert!(vault.placed_treasure[0].description.contains("500"));
-        assert_eq!(vault.placed_treasure[0].gp_value, 500);
-        // Second treasure: item
-        assert_eq!(vault.placed_treasure[1].description, "Potion of Healing");
-        assert_eq!(vault.placed_treasure[1].gp_value, 0); // Items have no inherent gp value
-        assert!(!vault.treasure_looted);
-    }
-
-    #[test]
-    fn module_to_dungeon_deterministic_room_ids() {
-        // Run conversion multiple times — sorted iteration guarantees stable IDs
-        let module = sample_module();
-        let results: Vec<_> = (0..5)
-            .map(|_| {
-                let d = module_to_dungeon(&module).unwrap();
-                d.rooms.iter().map(|r| (r.id, r.name.clone())).collect::<Vec<_>>()
-            })
-            .collect();
-
-        for result in &results[1..] {
-            assert_eq!(&results[0], result, "room IDs should be deterministic across runs");
-        }
-    }
-
-    #[test]
-    fn module_to_dungeon_sets_room_keys() {
-        let module = sample_module();
-        let dungeon = module_to_dungeon(&module).unwrap();
-
-        // Entry room should have key "entrance"
-        let entry = dungeon.find_room(0).unwrap();
-        assert_eq!(entry.key, Some("entrance".to_string()));
-
-        // Guard room should have key "guard"
-        let guard = dungeon.rooms.iter()
-            .find(|r| r.name == "Guard Chamber")
-            .expect("should have Guard Chamber");
-        assert_eq!(guard.key, Some("guard".to_string()));
+    fn load_module_success() {
+        let command = LoadModuleCommand;
+        let mut state = GameState::new();
+        let result = command.execute(&["data/modules/sample_crypt/module.json"], &mut state);
+        assert!(result.success, "load_module failed: {}", result.output);
+        assert_eq!(state.mode, GameMode::Exploration);
+        assert!(state.dungeon.is_some());
     }
 }
