@@ -5,6 +5,7 @@ pub mod exploration;
 pub mod gm;
 pub mod result;
 pub mod retainer;
+pub mod retainers;
 pub mod wilderness;
 pub mod wilderness_engine;
 pub mod xp;
