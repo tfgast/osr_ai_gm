@@ -1,24 +1,24 @@
 use super::{Command, CommandResult};
 use crate::dice;
 use crate::engine::{combat, xp};
-use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
 use crate::rules::class::class_def;
-use crate::rules::{ability, equipment, spell, thief};
 use crate::rules::xp::{check_level_up, xp_for_level};
+use crate::rules::{ability, equipment, spell, thief};
 use crate::state::game::GameMode;
 
 pub struct SpawnEncounterCommand;
 impl Command for SpawnEncounterCommand {
-    fn name(&self) -> &str { "spawn_encounter" }
-    fn help(&self) -> &str { "GM: spawn monsters (spawn_encounter <name> <count> <hd> <ac> <hp> <damage> <morale> <distance>)" }
+    fn name(&self) -> &str {
+        "spawn_encounter"
+    }
+    fn help(&self) -> &str {
+        "GM: spawn monsters (spawn_encounter <name> <count> <hd> <ac> <hp> <damage> <morale> <distance>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        if state.combat.is_some() {
-            return CommandResult::error("combat already active. Use 'end_combat' first.");
-        }
         if args.len() < 8 {
             return CommandResult::error(
-                "usage: spawn_encounter <name> <count> <hd> <ac> <hp> <damage> <morale> <distance>"
+                "usage: spawn_encounter <name> <count> <hd> <ac> <hp> <damage> <morale> <distance>",
             );
         }
         let name = args[0];
@@ -45,41 +45,31 @@ impl Command for SpawnEncounterCommand {
             _ => return CommandResult::error("distance must be a non-negative integer"),
         };
 
-        let mut monsters = Vec::new();
-        for i in 0..count {
-            let monster_name = if count > 1 {
-                format!("{} {}", name, i + 1)
-            } else {
-                name.to_string()
-            };
-            let mut m = Monster::new(&monster_name, hd);
-            m.hp = hp;
-            m.max_hp = hp;
-            m.ac = ac;
-            m.damage = damage.to_string();
-            m.morale = morale;
-            m.attacks = vec!["attack".to_string()];
-            monsters.push(m);
+        match combat::action_spawn_encounter(
+            state, name, count, hd, ac, hp, damage, morale, distance, None,
+        ) {
+            Ok(result) => {
+                let mut out = format!(
+                    "Encounter spawned! {} {}(s) at {}' distance.\n\n",
+                    result.count, result.encounter_name, result.distance
+                );
+                out.push_str(&result.status);
+                out.push_str("\nUse 'initiative' to roll for the first round.");
+                CommandResult::ok(out)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
         }
-
-        let combat_state = CombatState::new(monsters, distance);
-        let status = combat::combat_status(&combat_state, &state.party.members);
-        state.combat = Some(combat_state);
-        state.pre_combat_mode = Some(state.mode.clone());
-        state.mode = GameMode::Combat;
-
-        let mut out = format!("Encounter spawned! {} {}(s) at {}' distance.\n\n",
-            count, name, distance);
-        out.push_str(&status);
-        out.push_str("\nUse 'initiative' to roll for the first round.");
-        CommandResult::ok(out)
     }
 }
 
 pub struct AdvanceTurnCommand;
 impl Command for AdvanceTurnCommand {
-    fn name(&self) -> &str { "advance_turn" }
-    fn help(&self) -> &str { "GM: advance one dungeon exploration turn" }
+    fn name(&self) -> &str {
+        "advance_turn"
+    }
+    fn help(&self) -> &str {
+        "GM: advance one dungeon exploration turn"
+    }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
         let level = state.dungeon_level;
         let time = match state.time.as_mut() {
@@ -97,8 +87,12 @@ impl Command for AdvanceTurnCommand {
 
 pub struct AwardXpCommand;
 impl Command for AwardXpCommand {
-    fn name(&self) -> &str { "award_xp" }
-    fn help(&self) -> &str { "GM: award XP (award_xp <character> <amount>)" }
+    fn name(&self) -> &str {
+        "award_xp"
+    }
+    fn help(&self) -> &str {
+        "GM: award XP (award_xp <character> <amount>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error("usage: award_xp <character_name> <amount>");
@@ -131,8 +125,12 @@ impl Command for AwardXpCommand {
 
 pub struct RulingCommand;
 impl Command for RulingCommand {
-    fn name(&self) -> &str { "ruling" }
-    fn help(&self) -> &str { "GM: record a ruling (ruling <text>)" }
+    fn name(&self) -> &str {
+        "ruling"
+    }
+    fn help(&self) -> &str {
+        "GM: record a ruling (ruling <text>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.is_empty() {
             return CommandResult::error("usage: ruling <text>");
@@ -145,8 +143,12 @@ impl Command for RulingCommand {
 
 pub struct HealCommand;
 impl Command for HealCommand {
-    fn name(&self) -> &str { "heal" }
-    fn help(&self) -> &str { "GM: heal a character (heal <character> <amount>)" }
+    fn name(&self) -> &str {
+        "heal"
+    }
+    fn help(&self) -> &str {
+        "GM: heal a character (heal <character> <amount>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error("usage: heal <character_name> <amount>");
@@ -171,8 +173,12 @@ impl Command for HealCommand {
 
 pub struct DamageCommand;
 impl Command for DamageCommand {
-    fn name(&self) -> &str { "damage" }
-    fn help(&self) -> &str { "GM: damage a character (damage <character> <amount>)" }
+    fn name(&self) -> &str {
+        "damage"
+    }
+    fn help(&self) -> &str {
+        "GM: damage a character (damage <character> <amount>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error("usage: damage <character_name> <amount>");
@@ -187,7 +193,11 @@ impl Command for DamageCommand {
         };
         let old_hp = character.hp;
         character.hp -= amount;
-        let status = if character.is_alive() { "wounded" } else { "DEAD" };
+        let status = if character.is_alive() {
+            "wounded"
+        } else {
+            "DEAD"
+        };
         CommandResult::ok(format!(
             "{} takes {} damage ({} -> {}/{}). Status: {}.",
             character.name, amount, old_hp, character.hp, character.max_hp, status
@@ -197,8 +207,12 @@ impl Command for DamageCommand {
 
 pub struct SetHpCommand;
 impl Command for SetHpCommand {
-    fn name(&self) -> &str { "set_hp" }
-    fn help(&self) -> &str { "GM: set HP (set_hp <character> <amount>)" }
+    fn name(&self) -> &str {
+        "set_hp"
+    }
+    fn help(&self) -> &str {
+        "GM: set HP (set_hp <character> <amount>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error("usage: set_hp <character_name> <amount>");
@@ -213,7 +227,11 @@ impl Command for SetHpCommand {
         };
         let old_hp = character.hp;
         character.hp = amount;
-        let status = if character.is_alive() { "alive" } else { "DEAD" };
+        let status = if character.is_alive() {
+            "alive"
+        } else {
+            "DEAD"
+        };
         CommandResult::ok(format!(
             "{} HP set to {} (was {}). Max HP: {}. Status: {}.",
             character.name, character.hp, old_hp, character.max_hp, status
@@ -223,8 +241,12 @@ impl Command for SetHpCommand {
 
 pub struct SetRationsCommand;
 impl Command for SetRationsCommand {
-    fn name(&self) -> &str { "set_rations" }
-    fn help(&self) -> &str { "GM: set party rations (set_rations <amount>)" }
+    fn name(&self) -> &str {
+        "set_rations"
+    }
+    fn help(&self) -> &str {
+        "GM: set party rations (set_rations <amount>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.is_empty() {
             return CommandResult::error("usage: set_rations <amount>");
@@ -244,8 +266,12 @@ impl Command for SetRationsCommand {
 
 pub struct AddRationsCommand;
 impl Command for AddRationsCommand {
-    fn name(&self) -> &str { "add_rations" }
-    fn help(&self) -> &str { "GM: add rations (add_rations <amount>)" }
+    fn name(&self) -> &str {
+        "add_rations"
+    }
+    fn help(&self) -> &str {
+        "GM: add rations (add_rations <amount>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.is_empty() {
             return CommandResult::error("usage: add_rations <amount>");
@@ -264,8 +290,12 @@ impl Command for AddRationsCommand {
 
 pub struct TrainCommand;
 impl Command for TrainCommand {
-    fn name(&self) -> &str { "train" }
-    fn help(&self) -> &str { "GM: train to level up (train <character>)" }
+    fn name(&self) -> &str {
+        "train"
+    }
+    fn help(&self) -> &str {
+        "GM: train to level up (train <character>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.is_empty() {
             return CommandResult::error("usage: train <character_name>");
@@ -286,12 +316,16 @@ impl Command for TrainCommand {
                 let needed = xp_for_level(cls, character.level + 1);
                 if needed == u64::MAX {
                     return CommandResult::error(format!(
-                        "{} is at maximum level ({}).", character.name, character.level
+                        "{} is at maximum level ({}).",
+                        character.name, character.level
                     ));
                 }
                 CommandResult::error(format!(
                     "{} needs {} XP for level {} (has {}).",
-                    character.name, needed, character.level + 1, character.xp
+                    character.name,
+                    needed,
+                    character.level + 1,
+                    character.xp
                 ))
             }
             Some(next_level) => {
@@ -323,9 +357,7 @@ impl Command for TrainCommand {
                     old_hp, character.max_hp, result.hp_gained
                 ));
                 if result.new_thac0 != old_thac0 {
-                    out.push_str(&format!(
-                        "  THAC0: {} -> {}\n", old_thac0, result.new_thac0
-                    ));
+                    out.push_str(&format!("  THAC0: {} -> {}\n", old_thac0, result.new_thac0));
                 }
 
                 // Report saving throw changes
@@ -334,11 +366,16 @@ impl Command for TrainCommand {
                     if old != *new {
                         out.push_str(&format!(
                             "  Saves: D{}->{} W{}->{} P{}->{} B{}->{} S{}->{}\n",
-                            old.death, new.death,
-                            old.wands, new.wands,
-                            old.paralysis, new.paralysis,
-                            old.breath, new.breath,
-                            old.spells, new.spells,
+                            old.death,
+                            new.death,
+                            old.wands,
+                            new.wands,
+                            old.paralysis,
+                            new.paralysis,
+                            old.breath,
+                            new.breath,
+                            old.spells,
+                            new.spells,
                         ));
                     }
                 }
@@ -346,11 +383,16 @@ impl Command for TrainCommand {
                 // Report spell slot changes (casters only)
                 if result.old_spell_slots != result.new_spell_slots {
                     let fmt = |slots: &[u32; 6]| -> String {
-                        slots.iter().map(|s| s.to_string()).collect::<Vec<_>>().join("/")
+                        slots
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect::<Vec<_>>()
+                            .join("/")
                     };
                     out.push_str(&format!(
                         "  Spell slots: {} -> {}\n",
-                        fmt(&result.old_spell_slots), fmt(&result.new_spell_slots)
+                        fmt(&result.old_spell_slots),
+                        fmt(&result.new_spell_slots)
                     ));
                 }
 
@@ -367,7 +409,8 @@ impl Command for TrainCommand {
                     let next_cost = (character.level + 1) * 100;
                     out.push_str(&format!(
                         "  Ready to train again! (next: level {}, cost: {}gp)",
-                        character.level + 1, next_cost
+                        character.level + 1,
+                        next_cost
                     ));
                 }
 
@@ -385,7 +428,8 @@ impl Command for TrainCommand {
                     };
                     if !list_name.is_empty() {
                         out.push_str(&format!(
-                            "  {} can now cast {} spells!\n", character.name, list_name
+                            "  {} can now cast {} spells!\n",
+                            character.name, list_name
                         ));
                     }
                 }
@@ -398,13 +442,17 @@ impl Command for TrainCommand {
 
 pub struct BackstabCommand;
 impl Command for BackstabCommand {
-    fn name(&self) -> &str { "backstab" }
-    fn help(&self) -> &str { "Thief backstab (backstab <character> <monster_idx> [weapon])" }
+    fn name(&self) -> &str {
+        "backstab"
+    }
+    fn help(&self) -> &str {
+        "Thief backstab (backstab <character> <monster_idx> [weapon])"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
             return CommandResult::error(
                 "usage: backstab <character_name> <monster_index> [weapon_name]\n  \
-                 Default weapon: sword. Only Thieves and Assassins can backstab."
+                 Default weapon: sword. Only Thieves and Assassins can backstab.",
             );
         }
         let char_name = args[0];
@@ -424,7 +472,9 @@ impl Command for BackstabCommand {
         };
         if !thief::can_backstab(character.class) {
             return CommandResult::error(format!(
-                "{} ({}) cannot backstab.", character.name, character.class.name()
+                "{} ({}) cannot backstab.",
+                character.name,
+                character.class.name()
             ));
         }
         let combat_state = match state.combat.as_mut() {
@@ -436,7 +486,8 @@ impl Command for BackstabCommand {
         }
         if !combat_state.monsters[monster_idx].is_alive() {
             return CommandResult::error(format!(
-                "{} is already dead.", combat_state.monsters[monster_idx].name
+                "{} is already dead.",
+                combat_state.monsters[monster_idx].name
             ));
         }
 
@@ -445,7 +496,8 @@ impl Command for BackstabCommand {
         let attack_bonus = thief::BACKSTAB_ATTACK_BONUS;
 
         let target_ac = combat_state.monsters[monster_idx].ac;
-        let target_number = (character.thac0 as i32 - target_ac - attack_bonus - str_mod).clamp(2, 20);
+        let target_number =
+            (character.thac0 as i32 - target_ac - attack_bonus - str_mod).clamp(2, 20);
         let attack_roll: i32 = rand::Rng::gen_range(&mut rand::thread_rng(), 1..=20);
 
         let hit = attack_roll == 20 || (attack_roll != 1 && attack_roll >= target_number);
@@ -460,8 +512,12 @@ impl Command for BackstabCommand {
             let monster_name = combat_state.monsters[monster_idx].name.clone();
             let alive = combat_state.monsters[monster_idx].is_alive();
             combat_state.log.push(format!(
-                "{} backstabs {} for {} damage (x{}){}", character.name, monster_name,
-                total_damage, multiplier, if !alive { " — KILLED!" } else { "" }
+                "{} backstabs {} for {} damage (x{}){}",
+                character.name,
+                monster_name,
+                total_damage,
+                multiplier,
+                if !alive { " — KILLED!" } else { "" }
             ));
             CommandResult::ok(format!(
                 "{} backstabs {} (+{} to hit, x{} damage)! Rolled {} vs target {}: HIT for {} damage{}.",
@@ -484,13 +540,17 @@ impl Command for BackstabCommand {
 
 pub struct AwardTreasureXpCommand;
 impl Command for AwardTreasureXpCommand {
-    fn name(&self) -> &str { "award_treasure_xp" }
-    fn help(&self) -> &str { "GM: award treasure XP (award_treasure_xp <character> <treasure_gp> <monster_xp>)" }
+    fn name(&self) -> &str {
+        "award_treasure_xp"
+    }
+    fn help(&self) -> &str {
+        "GM: award treasure XP (award_treasure_xp <character> <treasure_gp> <monster_xp>)"
+    }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 3 {
             return CommandResult::error(
                 "usage: award_treasure_xp <character_name> <treasure_gp> <monster_xp>\n  \
-                 1gp = 1xp base, with prime requisite modifier applied."
+                 1gp = 1xp base, with prime requisite modifier applied.",
             );
         }
         let treasure_gp: u64 = match args[1].parse() {
@@ -536,13 +596,15 @@ pub const GM_ONLY_COMMANDS: &[&str] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Character;
+    use crate::model::{Character, CombatState};
     use crate::rules::class::Class;
 
     #[test]
     fn spawn_encounter_basic() {
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Aldric", Class::Fighter));
+        state
+            .party
+            .add_member(Character::new("Aldric", Class::Fighter));
         let cmd = SpawnEncounterCommand;
         let result = cmd.execute(
             &["goblin", "3", "1", "6", "3", "1d6", "7", "60"],
@@ -578,7 +640,9 @@ mod tests {
     #[test]
     fn award_xp_basic() {
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Aldric", Class::Fighter));
+        state
+            .party
+            .add_member(Character::new("Aldric", Class::Fighter));
         let cmd = AwardXpCommand;
         let result = cmd.execute(&["Aldric", "500"], &mut state);
         assert!(result.output.contains("500 XP"));
@@ -597,10 +661,7 @@ mod tests {
     fn ruling_basic() {
         let mut state = GameState::new();
         let cmd = RulingCommand;
-        let result = cmd.execute(
-            &["The", "bridge", "can", "hold", "3", "people"],
-            &mut state,
-        );
+        let result = cmd.execute(&["The", "bridge", "can", "hold", "3", "people"], &mut state);
         assert!(result.output.contains("Ruling recorded"));
         assert_eq!(state.notes.len(), 1);
         assert!(state.notes[0].contains("bridge"));
@@ -823,8 +884,12 @@ mod tests {
     fn make_leveled_fighter(name: &str, xp: u64, gold: u32) -> Character {
         let mut c = Character::new(name, Class::Fighter);
         c.abilities = crate::model::AbilityScores {
-            strength: 16, intelligence: 10, wisdom: 10,
-            dexterity: 10, constitution: 14, charisma: 10,
+            strength: 16,
+            intelligence: 10,
+            wisdom: 10,
+            dexterity: 10,
+            constitution: 14,
+            charisma: 10,
         };
         c.xp = xp;
         c.gold_gp = gold;
@@ -837,10 +902,16 @@ mod tests {
     fn train_success() {
         let mut state = GameState::new();
         // Fighter needs 2000 XP for L2. Give enough XP and gold.
-        state.party.add_member(make_leveled_fighter("Aldric", 2_100, 500));
+        state
+            .party
+            .add_member(make_leveled_fighter("Aldric", 2_100, 500));
         let cmd = TrainCommand;
         let result = cmd.execute(&["Aldric"], &mut state);
-        assert!(!result.output.starts_with("Error"), "train failed: {}", result.output);
+        assert!(
+            !result.output.starts_with("Error"),
+            "train failed: {}",
+            result.output
+        );
         assert!(result.output.contains("trains to level 2"));
         assert!(result.output.contains("200gp")); // cost = 2 * 100
         let c = state.party.find_member("Aldric").unwrap();
@@ -852,7 +923,9 @@ mod tests {
     #[test]
     fn train_insufficient_xp() {
         let mut state = GameState::new();
-        state.party.add_member(make_leveled_fighter("Aldric", 100, 500));
+        state
+            .party
+            .add_member(make_leveled_fighter("Aldric", 100, 500));
         let cmd = TrainCommand;
         let result = cmd.execute(&["Aldric"], &mut state);
         assert!(result.output.starts_with("Error"));
@@ -863,7 +936,9 @@ mod tests {
     #[test]
     fn train_insufficient_gold() {
         let mut state = GameState::new();
-        state.party.add_member(make_leveled_fighter("Aldric", 2_100, 50));
+        state
+            .party
+            .add_member(make_leveled_fighter("Aldric", 2_100, 50));
         let cmd = TrainCommand;
         let result = cmd.execute(&["Aldric"], &mut state);
         assert!(result.output.starts_with("Error"));
@@ -902,7 +977,9 @@ mod tests {
     #[test]
     fn train_in_combat_blocked() {
         let mut state = GameState::new();
-        state.party.add_member(make_leveled_fighter("Aldric", 2_100, 500));
+        state
+            .party
+            .add_member(make_leveled_fighter("Aldric", 2_100, 500));
         state.mode = GameMode::Combat;
         let cmd = TrainCommand;
         let result = cmd.execute(&["Aldric"], &mut state);
@@ -922,7 +999,7 @@ mod tests {
     fn award_xp_shows_ready_to_train() {
         let mut state = GameState::new();
         // Fighter near level-up threshold
-        let mut c = make_leveled_fighter("Aldric", 1_900, 500);
+        let c = make_leveled_fighter("Aldric", 1_900, 500);
         state.party.add_member(c);
         let cmd = AwardXpCommand;
         let result = cmd.execute(&["Aldric", "100"], &mut state);
@@ -933,7 +1010,7 @@ mod tests {
     #[test]
     fn award_xp_applies_prime_req_modifier() {
         let mut state = GameState::new();
-        let mut c = make_leveled_fighter("Aldric", 0, 500);
+        let c = make_leveled_fighter("Aldric", 0, 500);
         state.party.add_member(c);
         let cmd = AwardXpCommand;
         let result = cmd.execute(&["Aldric", "1000"], &mut state);
@@ -967,7 +1044,11 @@ mod tests {
         let mut state = make_combat_state_with_thief();
         let cmd = BackstabCommand;
         let result = cmd.execute(&["Shadow", "0", "sword"], &mut state);
-        assert!(!result.output.starts_with("Error"), "backstab should succeed: {}", result.output);
+        assert!(
+            !result.output.starts_with("Error"),
+            "backstab should succeed: {}",
+            result.output
+        );
         assert!(result.output.contains("backstab"));
     }
 
@@ -976,7 +1057,11 @@ mod tests {
         let mut state = make_combat_state_with_thief();
         let cmd = BackstabCommand;
         let result = cmd.execute(&["Shadow", "0"], &mut state);
-        assert!(!result.output.starts_with("Error"), "backstab with default weapon: {}", result.output);
+        assert!(
+            !result.output.starts_with("Error"),
+            "backstab with default weapon: {}",
+            result.output
+        );
     }
 
     #[test]
@@ -1044,10 +1129,16 @@ mod tests {
     #[test]
     fn award_treasure_xp_basic() {
         let mut state = GameState::new();
-        state.party.add_member(make_leveled_fighter("Aldric", 0, 500));
+        state
+            .party
+            .add_member(make_leveled_fighter("Aldric", 0, 500));
         let cmd = AwardTreasureXpCommand;
         let result = cmd.execute(&["Aldric", "500", "100"], &mut state);
-        assert!(!result.output.starts_with("Error"), "award_treasure_xp failed: {}", result.output);
+        assert!(
+            !result.output.starts_with("Error"),
+            "award_treasure_xp failed: {}",
+            result.output
+        );
         assert!(result.output.contains("500gp treasure"));
         assert!(result.output.contains("100xp monsters"));
         assert!(result.output.contains("prime req modifier"));
@@ -1056,7 +1147,9 @@ mod tests {
     #[test]
     fn award_treasure_xp_applies_modifier() {
         let mut state = GameState::new();
-        state.party.add_member(make_leveled_fighter("Aldric", 0, 500));
+        state
+            .party
+            .add_member(make_leveled_fighter("Aldric", 0, 500));
         let cmd = AwardTreasureXpCommand;
         let result = cmd.execute(&["Aldric", "1000", "0"], &mut state);
         // STR 16 = +10% prime req
@@ -1083,7 +1176,9 @@ mod tests {
     #[test]
     fn award_treasure_xp_invalid_amount() {
         let mut state = GameState::new();
-        state.party.add_member(make_leveled_fighter("Aldric", 0, 500));
+        state
+            .party
+            .add_member(make_leveled_fighter("Aldric", 0, 500));
         let cmd = AwardTreasureXpCommand;
         let result = cmd.execute(&["Aldric", "abc", "100"], &mut state);
         assert!(result.output.starts_with("Error"));

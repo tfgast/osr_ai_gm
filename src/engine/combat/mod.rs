@@ -7,6 +7,7 @@
 //! 4. Losing side acts (same sub-phase order)
 //! 5. End-of-round bookkeeping
 
+mod actions;
 mod attack;
 mod initiative;
 mod morale;
@@ -14,15 +15,20 @@ mod movement;
 pub mod results;
 mod turn_undead;
 
+pub use actions::{
+    action_attack, action_close, action_coup_de_grace, action_declare_spell, action_end_combat,
+    action_fighting_withdrawal, action_monster_attack, action_morale, action_query_combat_log,
+    action_retreat, action_roll_initiative, action_spawn_encounter, action_turn_undead,
+};
 pub use attack::{
-    AttackResult, CoupDeGraceResult, character_melee_attack, character_melee_attack_with,
-    character_missile_attack, character_missile_attack_with, coup_de_grace,
-    monster_attack, monster_attack_with, resolve_character_attack, set_monster_helpless,
+    character_melee_attack, character_melee_attack_with, character_missile_attack,
+    character_missile_attack_with, coup_de_grace, monster_attack, monster_attack_with,
+    resolve_character_attack, set_monster_helpless, AttackResult, CoupDeGraceResult,
 };
 pub use initiative::{declare_spell, is_disrupted, roll_initiative, roll_initiative_with};
-pub use morale::{MoraleResult, check_morale, check_morale_with};
-pub use movement::{RetreatResult, close, fighting_withdrawal, retreat, retreat_with};
-pub use turn_undead::{TurnUndeadResult, resolve_turn_undead, resolve_turn_undead_with};
+pub use morale::{check_morale, check_morale_with, MoraleResult};
+pub use movement::{close, fighting_withdrawal, retreat, retreat_with, RetreatResult};
+pub use turn_undead::{resolve_turn_undead, resolve_turn_undead_with, TurnUndeadResult};
 
 use crate::model::{Character, CombatState};
 
@@ -39,7 +45,10 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
         crate::model::CombatPhase::Melee => "Melee",
         crate::model::CombatPhase::EndOfRound => "End of Round",
     };
-    out.push_str(&format!("=== Combat — Round {} ({}) ===\n", combat.round, phase_name));
+    out.push_str(&format!(
+        "=== Combat — Round {} ({}) ===\n",
+        combat.round, phase_name
+    ));
     out.push_str(&format!("Distance: {}'\n", combat.distance));
 
     if combat.round > 0 {
@@ -50,8 +59,10 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
         } else {
             "Simultaneous"
         };
-        out.push_str(&format!("Initiative: Party {} vs Monsters {} — {} acts first\n",
-            combat.party_initiative, combat.monster_initiative, winner));
+        out.push_str(&format!(
+            "Initiative: Party {} vs Monsters {} — {} acts first\n",
+            combat.party_initiative, combat.monster_initiative, winner
+        ));
     }
 
     out.push_str("\nParty:\n");
@@ -78,7 +89,10 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
         } else {
             "DEAD".to_string()
         };
-        out.push_str(&format!("  [{}] {} (HD {}) — {}\n", i, m.name, m.hit_dice, status));
+        out.push_str(&format!(
+            "  [{}] {} (HD {}) — {}\n",
+            i, m.name, m.hit_dice, status
+        ));
     }
 
     if !combat.spell_declarations.is_empty() {
@@ -123,13 +137,24 @@ mod tests {
             class: Class::Fighter,
             level: 1,
             abilities: AbilityScores {
-                strength: 16, intelligence: 10, wisdom: 10,
-                dexterity: 12, constitution: 14, charisma: 10,
+                strength: 16,
+                intelligence: 10,
+                wisdom: 10,
+                dexterity: 12,
+                constitution: 14,
+                charisma: 10,
             },
-            hp: 8, max_hp: 8, ac: 3, xp: 0,
-            inventory: vec![], spells: vec![],
-            alignment: Alignment::Neutral, gold_gp: 100,
-            saving_throws: None, thac0: 19, movement_rate: 120,
+            hp: 8,
+            max_hp: 8,
+            ac: 3,
+            xp: 0,
+            inventory: vec![],
+            spells: vec![],
+            alignment: Alignment::Neutral,
+            gold_gp: 100,
+            saving_throws: None,
+            thac0: 19,
+            movement_rate: 120,
         }
     }
 
@@ -139,13 +164,24 @@ mod tests {
             class: Class::Cleric,
             level: 3,
             abilities: AbilityScores {
-                strength: 12, intelligence: 10, wisdom: 16,
-                dexterity: 10, constitution: 13, charisma: 14,
+                strength: 12,
+                intelligence: 10,
+                wisdom: 16,
+                dexterity: 10,
+                constitution: 13,
+                charisma: 14,
             },
-            hp: 14, max_hp: 14, ac: 4, xp: 0,
-            inventory: vec![], spells: vec![],
-            alignment: Alignment::Lawful, gold_gp: 50,
-            saving_throws: None, thac0: 19, movement_rate: 120,
+            hp: 14,
+            max_hp: 14,
+            ac: 4,
+            xp: 0,
+            inventory: vec![],
+            spells: vec![],
+            alignment: Alignment::Lawful,
+            gold_gp: 50,
+            saving_throws: None,
+            thac0: 19,
+            movement_rate: 120,
         }
     }
 
@@ -155,13 +191,24 @@ mod tests {
             class: Class::MagicUser,
             level: 1,
             abilities: AbilityScores {
-                strength: 8, intelligence: 16, wisdom: 10,
-                dexterity: 14, constitution: 10, charisma: 11,
+                strength: 8,
+                intelligence: 16,
+                wisdom: 10,
+                dexterity: 14,
+                constitution: 10,
+                charisma: 11,
             },
-            hp: 3, max_hp: 3, ac: 7, xp: 0,
-            inventory: vec![], spells: vec![],
-            alignment: Alignment::Neutral, gold_gp: 40,
-            saving_throws: None, thac0: 19, movement_rate: 120,
+            hp: 3,
+            max_hp: 3,
+            ac: 7,
+            xp: 0,
+            inventory: vec![],
+            spells: vec![],
+            alignment: Alignment::Neutral,
+            gold_gp: 40,
+            saving_throws: None,
+            thac0: 19,
+            movement_rate: 120,
         }
     }
 
@@ -169,10 +216,13 @@ mod tests {
         Monster {
             name: "Goblin".to_string(),
             hit_dice: "1-1".parse().unwrap(),
-            hp: 3, max_hp: 3, ac: 6,
+            hp: 3,
+            max_hp: 3,
+            ac: 6,
             attacks: vec!["weapon".to_string()],
             damage: "1d6".to_string(),
-            morale: 7, xp_value: 5,
+            morale: 7,
+            xp_value: 5,
             turned: false,
             helpless: false,
         }
@@ -182,10 +232,13 @@ mod tests {
         Monster {
             name: "Skeleton".to_string(),
             hit_dice: "1".parse().unwrap(),
-            hp: 4, max_hp: 4, ac: 7,
+            hp: 4,
+            max_hp: 4,
+            ac: 7,
             attacks: vec!["weapon".to_string()],
             damage: "1d6".to_string(),
-            morale: 12, xp_value: 10,
+            morale: 12,
+            xp_value: 10,
             turned: false,
             helpless: false,
         }
@@ -195,10 +248,13 @@ mod tests {
         Monster {
             name: "Ogre".to_string(),
             hit_dice: "4+1".parse().unwrap(),
-            hp: 19, max_hp: 19, ac: 5,
+            hp: 19,
+            max_hp: 19,
+            ac: 5,
             attacks: vec!["club".to_string()],
             damage: "1d10".to_string(),
-            morale: 10, xp_value: 125,
+            morale: 10,
+            xp_value: 125,
             turned: false,
             helpless: false,
         }
@@ -257,9 +313,7 @@ mod tests {
         let mut combat = CombatState::new(vec![test_goblin()], 10);
         let fighter = test_fighter();
         let mut rng = test_rng();
-        let result = character_melee_attack_with(
-            &mut combat, &fighter, 0, "1d8", 2, &mut rng,
-        );
+        let result = character_melee_attack_with(&mut combat, &fighter, 0, "1d8", 2, &mut rng);
         assert_eq!(result.attacker, "Grond");
         assert_eq!(result.target, "Goblin");
         assert!(result.roll >= 1 && result.roll <= 20);
@@ -278,9 +332,7 @@ mod tests {
         // Run multiple attacks to get at least one hit
         for _ in 0..20 {
             combat.monsters[0].hp = initial_hp;
-            let result = character_melee_attack_with(
-                &mut combat, &fighter, 0, "1d8", 2, &mut rng,
-            );
+            let result = character_melee_attack_with(&mut combat, &fighter, 0, "1d8", 2, &mut rng);
             if result.hit {
                 total_damage += result.damage;
                 assert!(result.damage >= 1);
@@ -307,7 +359,10 @@ mod tests {
         let fighter = test_fighter();
         let sword = equipment::find_weapon("Sword").unwrap();
         let result = resolve_character_attack(&mut combat, &fighter, 0, &sword, 0);
-        assert!(result.is_ok(), "melee attack should succeed at 10' distance");
+        assert!(
+            result.is_ok(),
+            "melee attack should succeed at 10' distance"
+        );
     }
 
     #[test]
@@ -330,7 +385,13 @@ mod tests {
         let mut rng = test_rng();
         // Short bow range: 50/100/150
         let result = character_missile_attack_with(
-            &mut combat, &fighter, 0, "1d6", 1, (50, 100, 150), &mut rng,
+            &mut combat,
+            &fighter,
+            0,
+            "1d6",
+            1,
+            (50, 100, 150),
+            &mut rng,
         );
         assert!(result.is_ok());
     }
@@ -341,7 +402,13 @@ mod tests {
         let fighter = test_fighter();
         let mut rng = test_rng();
         let result = character_missile_attack_with(
-            &mut combat, &fighter, 0, "1d6", 1, (50, 100, 150), &mut rng,
+            &mut combat,
+            &fighter,
+            0,
+            "1d6",
+            1,
+            (50, 100, 150),
+            &mut rng,
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("out of range"));
@@ -353,10 +420,18 @@ mod tests {
         let fighter = test_fighter();
         let mut rng = test_rng();
         let result = character_missile_attack_with(
-            &mut combat, &fighter, 0, "1d6", 1, (50, 100, 150), &mut rng,
+            &mut combat,
+            &fighter,
+            0,
+            "1d6",
+            1,
+            (50, 100, 150),
+            &mut rng,
         );
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("cannot use missile weapons in melee"));
+        assert!(result
+            .unwrap_err()
+            .contains("cannot use missile weapons in melee"));
     }
 
     // --- Monster Attack ---
@@ -463,9 +538,7 @@ mod tests {
     fn turn_undead_skeleton_level_3() {
         let mut combat = CombatState::new(vec![test_skeleton()], 10);
         let cleric = test_cleric();
-        let result = resolve_turn_undead_with(
-            &mut combat, &cleric, 3, 0, &mut test_rng(),
-        );
+        let result = resolve_turn_undead_with(&mut combat, &cleric, 3, 0, &mut test_rng());
         // Level 3 vs rank 1 skeleton: diff = 2, auto turn
         assert_eq!(result.table_result, TurnResult::Turned);
         assert!(result.success);
@@ -480,9 +553,7 @@ mod tests {
         let mut combat = CombatState::new(vec![vampire], 10);
         let cleric = test_cleric();
         // Level 3 vs rank 8: diff = -5, impossible
-        let result = resolve_turn_undead_with(
-            &mut combat, &cleric, 3, 0, &mut test_rng(),
-        );
+        let result = resolve_turn_undead_with(&mut combat, &cleric, 3, 0, &mut test_rng());
         assert_eq!(result.table_result, TurnResult::Impossible);
         assert!(!result.success);
     }
@@ -534,9 +605,7 @@ mod tests {
     fn multi_round_all_phases() {
         // Full multi-round combat: Declaration -> Initiative -> Morale ->
         // Movement -> Missile -> Magic -> Melee -> EndOfRound
-        let mut combat = CombatState::new(
-            vec![test_goblin(), test_goblin(), test_goblin()], 60,
-        );
+        let mut combat = CombatState::new(vec![test_goblin(), test_goblin(), test_goblin()], 60);
         let mut fighter = test_fighter();
         let mut rng = test_rng();
 
@@ -564,7 +633,13 @@ mod tests {
         // Missile phase — shoot at goblin
         assert_eq!(combat.phase, crate::model::CombatPhase::Missile);
         let missile_result = character_missile_attack_with(
-            &mut combat, &fighter, 0, "1d6", 1, (50, 100, 150), &mut rng,
+            &mut combat,
+            &fighter,
+            0,
+            "1d6",
+            1,
+            (50, 100, 150),
+            &mut rng,
         );
         assert!(missile_result.is_ok());
         combat.advance_phase(); // -> Magic
@@ -602,17 +677,21 @@ mod tests {
         for _ in 0..10 {
             if combat.monsters[0].is_alive() {
                 combat.monsters[0].hp = combat.monsters[0].max_hp;
-                let r = character_melee_attack_with(
-                    &mut combat, &fighter, 0, "1d8", 2, &mut rng,
-                );
-                if r.target_killed { break; }
+                let r = character_melee_attack_with(&mut combat, &fighter, 0, "1d8", 2, &mut rng);
+                if r.target_killed {
+                    break;
+                }
             } else {
                 break;
             }
         }
 
         // Verify log has been growing across rounds
-        assert!(combat.log.len() >= 5, "combat log should have multiple entries: got {}", combat.log.len());
+        assert!(
+            combat.log.len() >= 5,
+            "combat log should have multiple entries: got {}",
+            combat.log.len()
+        );
     }
 
     // --- Phase advancement cycle ---
@@ -645,7 +724,8 @@ mod tests {
     #[test]
     fn morale_trigger_first_death() {
         let mut combat = CombatState::new(
-            vec![test_goblin(), test_goblin(), test_goblin(), test_goblin()], 10,
+            vec![test_goblin(), test_goblin(), test_goblin(), test_goblin()],
+            10,
         );
         assert!(!combat.should_check_morale()); // no deaths
         combat.monsters[0].hp = 0; // kill first goblin
@@ -658,7 +738,8 @@ mod tests {
     #[test]
     fn morale_trigger_half_killed() {
         let mut combat = CombatState::new(
-            vec![test_goblin(), test_goblin(), test_goblin(), test_goblin()], 10,
+            vec![test_goblin(), test_goblin(), test_goblin(), test_goblin()],
+            10,
         );
         combat.monsters[0].hp = 0; // kill first
         let _ = combat.should_check_morale(); // consume first-death trigger
@@ -693,10 +774,16 @@ mod tests {
         let mut fled_count = 0;
         for _ in 0..100 {
             let result = check_morale_with(&mut combat, 2, &mut rng);
-            if !result.passed { fled_count += 1; }
+            if !result.passed {
+                fled_count += 1;
+            }
         }
         // With morale 2, probability of fleeing = P(2d6 > 2) = 35/36 ≈ 97%
-        assert!(fled_count > 90, "morale 2 should flee almost always, fled {} of 100", fled_count);
+        assert!(
+            fled_count > 90,
+            "morale 2 should flee almost always, fled {} of 100",
+            fled_count
+        );
     }
 
     #[test]
@@ -706,7 +793,11 @@ mod tests {
         // Morale 12: max 2d6 is 12, so roll <= 12 always passes
         for _ in 0..100 {
             let result = check_morale_with(&mut combat, 12, &mut rng);
-            assert!(result.passed, "morale 12 should never flee (rolled {})", result.roll);
+            assert!(
+                result.passed,
+                "morale 12 should never flee (rolled {})",
+                result.roll
+            );
         }
     }
 
@@ -750,7 +841,10 @@ mod tests {
             combat.disrupted.clear();
             let result = monster_attack_with(&mut combat, 0, &mut fighter_as_mage, &mut rng);
             if !result.hit {
-                assert!(!is_disrupted(&combat, "Grond"), "spell should not be disrupted on a miss");
+                assert!(
+                    !is_disrupted(&combat, "Grond"),
+                    "spell should not be disrupted on a miss"
+                );
                 any_miss = true;
                 break;
             }
@@ -785,14 +879,19 @@ mod tests {
             let (p, m) = roll_initiative_with(&mut c, &mut rng);
             if p == m {
                 // Tied — log should say "Simultaneous"
-                assert!(c.log.last().unwrap().contains("Simultaneous"),
+                assert!(
+                    c.log.last().unwrap().contains("Simultaneous"),
                     "tied initiative should log 'Simultaneous', got: {}",
-                    c.log.last().unwrap());
+                    c.log.last().unwrap()
+                );
                 found_tie = true;
                 break;
             }
         }
-        assert!(found_tie, "should find at least one initiative tie in 100 rolls");
+        assert!(
+            found_tie,
+            "should find at least one initiative tie in 100 rolls"
+        );
     }
 
     #[test]
@@ -811,7 +910,9 @@ mod tests {
                 assert!(c.log.last().unwrap().contains("Monsters act first"));
                 monster_first = true;
             }
-            if party_first && monster_first { break; }
+            if party_first && monster_first {
+                break;
+            }
         }
         assert!(party_first, "should find party-first at least once");
         assert!(monster_first, "should find monster-first at least once");
@@ -827,15 +928,11 @@ mod tests {
         zombie.hit_dice = "2".parse().unwrap();
         zombie.hp = 9;
         zombie.max_hp = 9;
-        let mut combat = CombatState::new(
-            vec![test_skeleton(), test_skeleton(), zombie], 10,
-        );
+        let mut combat = CombatState::new(vec![test_skeleton(), test_skeleton(), zombie], 10);
         let cleric = test_cleric(); // level 3
 
         // Level 3 vs skeleton (rank 1): diff=2, auto turn
-        let result = resolve_turn_undead_with(
-            &mut combat, &cleric, 3, 0, &mut test_rng(),
-        );
+        let result = resolve_turn_undead_with(&mut combat, &cleric, 3, 0, &mut test_rng());
         assert!(result.success);
         assert_eq!(result.table_result, TurnResult::Turned);
         // Should have turned some monsters
@@ -849,24 +946,23 @@ mod tests {
         let mummy = Monster {
             name: "Mummy".to_string(),
             hit_dice: "5+1".parse().unwrap(),
-            hp: 24, max_hp: 24, ac: 3,
+            hp: 24,
+            max_hp: 24,
+            ac: 3,
             attacks: vec!["touch".to_string()],
             damage: "1d12".to_string(),
-            morale: 12, xp_value: 500,
+            morale: 12,
+            xp_value: 500,
             turned: false,
             helpless: false,
         };
         // Also add a weak skeleton
-        let mut combat = CombatState::new(
-            vec![test_skeleton(), mummy], 10,
-        );
+        let mut combat = CombatState::new(vec![test_skeleton(), mummy], 10);
         let cleric = test_cleric();
         // Level 3 vs skeleton (rank 1): auto turn, 2d6 HD affected
         // The skeleton is 1 HD, so it should be turned if roll >= 1
         // The mummy is 5 HD (rank 5), level 3 vs rank 5: diff = -2, need 11
-        let result = resolve_turn_undead_with(
-            &mut combat, &cleric, 3, 0, &mut test_rng(),
-        );
+        let result = resolve_turn_undead_with(&mut combat, &cleric, 3, 0, &mut test_rng());
         assert!(result.success);
         // Skeleton should be turned (1 HD, easily fits in budget)
         assert!(combat.monsters[0].turned, "skeleton should be turned");
@@ -876,16 +972,16 @@ mod tests {
     #[test]
     fn turn_undead_destroy_kills_monsters() {
         // High-level cleric vs skeletons: should destroy (HP = 0)
-        let mut combat = CombatState::new(
-            vec![test_skeleton(), test_skeleton(), test_skeleton()], 10,
-        );
+        let mut combat =
+            CombatState::new(vec![test_skeleton(), test_skeleton(), test_skeleton()], 10);
         let cleric = test_cleric();
         // Level 4+ vs skeleton (rank 1): diff >= 3, auto destroy
-        let result = resolve_turn_undead_with(
-            &mut combat, &cleric, 5, 0, &mut test_rng(),
-        );
+        let result = resolve_turn_undead_with(&mut combat, &cleric, 5, 0, &mut test_rng());
         assert!(result.success);
-        assert!(result.destroyed, "should be auto-destroy at level 5 vs rank 1");
+        assert!(
+            result.destroyed,
+            "should be auto-destroy at level 5 vs rank 1"
+        );
         // At least some skeletons should have HP = 0
         let dead = combat.monsters.iter().filter(|m| !m.is_alive()).count();
         assert!(dead > 0, "destroyed undead should have 0 HP");
@@ -893,15 +989,12 @@ mod tests {
 
     #[test]
     fn turn_undead_skips_already_turned() {
-        let mut combat = CombatState::new(
-            vec![test_skeleton(), test_skeleton(), test_skeleton()], 10,
-        );
+        let mut combat =
+            CombatState::new(vec![test_skeleton(), test_skeleton(), test_skeleton()], 10);
         // Pre-turn the first skeleton
         combat.monsters[0].turned = true;
         let cleric = test_cleric();
-        let result = resolve_turn_undead_with(
-            &mut combat, &cleric, 3, 0, &mut test_rng(),
-        );
+        let result = resolve_turn_undead_with(&mut combat, &cleric, 3, 0, &mut test_rng());
         assert!(result.success);
         // First skeleton was already turned, should be skipped
         // Second or third should be newly turned
@@ -916,7 +1009,10 @@ mod tests {
         let mut combat = CombatState::new(vec![test_goblin()], 10);
         let fighter = test_fighter();
         let msg = fighting_withdrawal(&mut combat, &fighter);
-        assert!(!msg.contains("free attack"), "fighting withdrawal should not mention free attacks");
+        assert!(
+            !msg.contains("free attack"),
+            "fighting withdrawal should not mention free attacks"
+        );
         assert!(msg.contains("fighting withdrawal"));
     }
 
@@ -926,8 +1022,15 @@ mod tests {
         let mut fighter = test_fighter();
         let result = retreat_with(&mut combat, &mut fighter, &mut test_rng());
         // The goblin should have executed a free attack
-        assert_eq!(result.free_attacks.len(), 1, "goblin should get one free attack");
-        assert_eq!(result.free_attacks[0].modifiers, 2, "free attack should be at +2");
+        assert_eq!(
+            result.free_attacks.len(),
+            1,
+            "goblin should get one free attack"
+        );
+        assert_eq!(
+            result.free_attacks[0].modifiers, 2,
+            "free attack should be at +2"
+        );
         assert_eq!(result.free_attacks[0].attacker, "Goblin");
         assert_eq!(result.free_attacks[0].target, "Grond");
     }
@@ -938,7 +1041,11 @@ mod tests {
         let mut fighter = test_fighter();
         let result = retreat_with(&mut combat, &mut fighter, &mut test_rng());
         // All 3 goblins should attack
-        assert_eq!(result.free_attacks.len(), 3, "all 3 goblins should get free attacks");
+        assert_eq!(
+            result.free_attacks.len(),
+            3,
+            "all 3 goblins should get free attacks"
+        );
         for atk in &result.free_attacks {
             assert_eq!(atk.modifiers, 2, "each free attack should be at +2");
         }
@@ -952,7 +1059,11 @@ mod tests {
         let mut fighter = test_fighter();
         let result = retreat_with(&mut combat, &mut fighter, &mut test_rng());
         // Only living goblin attacks
-        assert_eq!(result.free_attacks.len(), 1, "only living goblin should attack");
+        assert_eq!(
+            result.free_attacks.len(),
+            1,
+            "only living goblin should attack"
+        );
         assert_eq!(result.free_attacks[0].attacker, "Goblin"); // second goblin also named "Goblin"
     }
 
@@ -962,10 +1073,13 @@ mod tests {
         let ogre = Monster {
             name: "Ogre".to_string(),
             hit_dice: "4+1".parse().unwrap(),
-            hp: 20, max_hp: 20, ac: 5,
+            hp: 20,
+            max_hp: 20,
+            ac: 5,
             attacks: vec!["club".to_string()],
             damage: "1d10".to_string(),
-            morale: 10, xp_value: 125,
+            morale: 10,
+            xp_value: 125,
             turned: false,
             helpless: false,
         };
@@ -982,21 +1096,33 @@ mod tests {
         let result = retreat_with(&mut combat, &mut weakling, &mut rng);
 
         // At least one attack should happen (3 ogres)
-        assert!(!result.free_attacks.is_empty(), "at least one attack should happen");
+        assert!(
+            !result.free_attacks.is_empty(),
+            "at least one attack should happen"
+        );
 
         // If character died during retreat, attacks should stop early
         if !weakling.is_alive() {
             // Find the killing attack
-            let killing_idx = result.free_attacks.iter()
+            let killing_idx = result
+                .free_attacks
+                .iter()
                 .position(|a| a.target_killed)
                 .expect("should have a killing attack if character is dead");
             // No attacks after the killing blow
-            assert_eq!(result.free_attacks.len(), killing_idx + 1,
-                "should stop after killing character");
+            assert_eq!(
+                result.free_attacks.len(),
+                killing_idx + 1,
+                "should stop after killing character"
+            );
         }
         // Otherwise all 3 attacks should have been made
         else {
-            assert_eq!(result.free_attacks.len(), 3, "all ogres should attack if character survives");
+            assert_eq!(
+                result.free_attacks.len(),
+                3,
+                "all ogres should attack if character survives"
+            );
         }
     }
 
@@ -1128,8 +1254,10 @@ mod tests {
             combat.disrupted.clear();
             let result = monster_attack_with(&mut combat, 0, &mut mage, &mut rng);
             if result.hit {
-                assert!(is_disrupted(&combat, "Elara"),
-                    "hitting a spell-declaring caster should disrupt their spell");
+                assert!(
+                    is_disrupted(&combat, "Elara"),
+                    "hitting a spell-declaring caster should disrupt their spell"
+                );
                 disrupted = true;
                 break;
             }
@@ -1165,9 +1293,7 @@ mod tests {
         combat.monsters[0].hp = 1; // set to 1 HP for easy kill
         for _ in 0..20 {
             combat.monsters[0].hp = 1;
-            let result = character_melee_attack_with(
-                &mut combat, &fighter, 0, "1d8", 2, &mut rng,
-            );
+            let result = character_melee_attack_with(&mut combat, &fighter, 0, "1d8", 2, &mut rng);
             if result.target_killed {
                 assert_eq!(combat.living_monster_count(), 0);
                 assert!(combat.living_monsters().is_empty());
@@ -1188,9 +1314,7 @@ mod tests {
         combat.monsters[0].hp = 1;
         for _ in 0..20 {
             combat.monsters[0].hp = 1;
-            let result = character_melee_attack_with(
-                &mut combat, &fighter, 0, "1d8", 2, &mut rng,
-            );
+            let result = character_melee_attack_with(&mut combat, &fighter, 0, "1d8", 2, &mut rng);
             if result.hit {
                 // Even if damage > remaining HP, monster is dead
                 assert!(!combat.monsters[0].is_alive());
@@ -1235,7 +1359,13 @@ mod tests {
         let fighter = test_fighter();
         let mut rng = test_rng();
         let result = character_missile_attack_with(
-            &mut combat, &fighter, 0, "1d6", 1, (50, 100, 150), &mut rng,
+            &mut combat,
+            &fighter,
+            0,
+            "1d6",
+            1,
+            (50, 100, 150),
+            &mut rng,
         );
         assert!(result.is_err());
     }
@@ -1246,7 +1376,13 @@ mod tests {
         let fighter = test_fighter();
         let mut rng = test_rng();
         let result = character_missile_attack_with(
-            &mut combat, &fighter, 5, "1d6", 1, (50, 100, 150), &mut rng,
+            &mut combat,
+            &fighter,
+            5,
+            "1d6",
+            1,
+            (50, 100, 150),
+            &mut rng,
         );
         assert!(result.is_err());
     }
@@ -1276,9 +1412,7 @@ mod tests {
 
     #[test]
     fn full_combat_round_sequence() {
-        let mut combat = CombatState::new(
-            vec![test_goblin(), test_goblin(), test_goblin()], 10,
-        );
+        let mut combat = CombatState::new(vec![test_goblin(), test_goblin(), test_goblin()], 10);
         let mut fighter = test_fighter();
         let mut cleric = test_cleric();
         let mut rng = test_rng();
@@ -1288,14 +1422,10 @@ mod tests {
         assert_eq!(combat.round, 1);
 
         // 2. Fighter attacks goblin 0
-        let _r1 = character_melee_attack_with(
-            &mut combat, &fighter, 0, "1d8", 2, &mut rng,
-        );
+        let _r1 = character_melee_attack_with(&mut combat, &fighter, 0, "1d8", 2, &mut rng);
 
         // 3. Cleric attacks goblin 1
-        let _r2 = character_melee_attack_with(
-            &mut combat, &cleric, 1, "1d6", 0, &mut rng,
-        );
+        let _r2 = character_melee_attack_with(&mut combat, &cleric, 1, "1d6", 0, &mut rng);
 
         // 4. Surviving goblins attack
         if combat.monsters[0].is_alive() {
@@ -1460,8 +1590,16 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         // Should suggest using close command
-        assert!(err.contains("close Grond"), "Error should suggest close command: {}", err);
+        assert!(
+            err.contains("close Grond"),
+            "Error should suggest close command: {}",
+            err
+        );
         // Should list available missile weapons
-        assert!(err.contains("Short bow"), "Error should list missile weapons: {}", err);
+        assert!(
+            err.contains("Short bow"),
+            "Error should list missile weapons: {}",
+            err
+        );
     }
 }
