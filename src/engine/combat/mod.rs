@@ -100,6 +100,9 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
 // =============================================================================
 
 #[cfg(test)]
+mod golden_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{AbilityScores, Monster};

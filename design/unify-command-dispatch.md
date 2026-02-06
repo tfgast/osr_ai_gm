@@ -272,6 +272,33 @@ Engine action functions: `action_<command_name>` in the appropriate engine modul
 This avoids colliding with existing pure-logic function names like
 `resolve_character_attack()` which the action functions call internally.
 
+## Phase 0: Combat Command Parity Audit (2026-02-06)
+
+Audit method:
+- Executed CLI and GM API paths with identical pre-state + equivalent inputs.
+- Captured paired snapshots in `src/engine/combat/golden_tests.rs`.
+- Compared state mutation, human-readable output, and API structured data.
+
+Classification:
+- **A**: Shared behavior (same core logic + equivalent user-visible behavior).
+- **B**: Shared core logic, but adapter-level output/data post-processing differs.
+- **C**: Behavior diverges (different validation/orchestration or state effects).
+
+| CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
+|-------------|----------------|------------------------|--------------------|-------|-------|
+| `start_combat` | `SpawnEncounter` | Same combat creation + mode transition | CLI prints full status/warnings; API returns compact message + `data.status` | B | Same encounter setup semantics, different adapter formatting |
+| `initiative` | `RollInitiative` | Same round/inits mutation | API adds structured initiative fields | B | Shared `combat::roll_initiative` core |
+| `attack` | `Attack` | Divergent when target is helpless | CLI auto-kill via coup de grace; API resolves normal attack flow | C | Known divergence: helpless auto-kill |
+| `monster_attack` | `MonsterAttack` | Same successful attack mutation | Error text/validation order differ | B | Shared `combat::monster_attack` core |
+| `morale` | `CheckMorale` | Divergent morale score selection | CLI supports monster-name selector; API uses max living monster morale | C | Known divergence: monster selector |
+| `turn_undead` | `TurnUndead` | Same mutation/logging path | Equivalent message semantics | A | Near-identical adapter logic over shared engine call |
+| `close` | `Close` | Same distance mutation | API appends `data.distance` | B | Shared `combat::close` core |
+| `retreat` | `Retreat` | Same retreat/free-attack engine mutation | API returns rich free-attack payload; CLI text-only | C | Known divergence: structured data contract |
+| `withdrawal` | `FightingWithdrawal` | Same mutation path | Equivalent message semantics | A | Shared `combat::fighting_withdrawal` core |
+| `combat_log` | `QueryCombatLog` | Read-only parity | API includes `data.log`; minor message formatting differences | B | Same log source, different response envelope |
+| `declare_spell` | `DeclareSpell` | Same declaration mutation | Equivalent message semantics | A | Same `combat::declare_spell` orchestration |
+| `end_combat` | `EndCombat` | Divergent post-processing side effects | CLI reports retainer XP/loyalty text; API returns structured totals and room-clear update | C | Known divergence: retainer XP + endpoint-specific post-processing |
+
 ### Testing Strategy
 
 1. Existing tests pass unchanged (both CLI integration and API protocol tests).
