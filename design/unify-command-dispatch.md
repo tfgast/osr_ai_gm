@@ -574,6 +574,33 @@ Notes:
 Class C findings (inventory):
 - None. No follow-up Class C bug beads were filed from this audit.
 
+## Phase 0g: Lookup Command Post-Migration Review (commit `816b887`, audited 2026-02-06)
+
+Audit method:
+- Compared pre/post migration implementations (`816b887^..816b887`) for:
+  - `src/command/lookup_cmds.rs`
+  - `src/gmapi/lookup_handlers.rs`
+  - `src/gmapi/interface.rs` (`LookupSpell` dispatch migration)
+- Added parity audit tests in `src/engine/lookup/golden_tests.rs`:
+  - `lookup_happy_path_cli_api_and_state_parity`
+  - `lookup_empty_query_regressions_are_detected`
+- Executed `cargo test lookup -- --nocapture` to validate CLI parity, API typed payload shape, and state mutation invariants.
+
+Scope (5 lookup command pairs):
+- `item` / `LookupItem`
+- `search_items` / `SearchItems`
+- `treasure_type` / `LookupTreasureType`
+- `spell` / `LookupSpell`
+- `treasure` / `RollTreasure`
+
+| CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
+|-------------|----------------|------------------------|--------------------|-------|-------|
+| `item` | `LookupItem` | Read-only parity (no state mutation) | Happy-path CLI text and API payload shape preserved; empty-string input changed from success suggestion path to hard error | C | Follow-up bug: `oag-nq8vf` |
+| `search_items` | `SearchItems` | Read-only parity (no state mutation) | Happy-path CLI text and API payload shape preserved; empty-string input changed from full-catalog success to hard error | C | Follow-up bug: `oag-nq8vf` |
+| `treasure_type` | `LookupTreasureType` | Read-only parity (no state mutation) | CLI text preserved; API payload shape matches typed `LookupTreasureTypePayload` (`letter`, `category`, `average_gp`, `entries`) | B | Empty-string path now uses explicit empty-input error text, but remains error-path equivalent |
+| `spell` | `LookupSpell` | Read-only parity (no state mutation) | CLI text preserved; API payload shape matches typed `LookupSpellPayload` (`name`, `list`, `level`, `range`, `duration`, `description`) | B | Handler moved from inline interface branch into lookup handler with typed serialization |
+| `treasure` | `RollTreasure` | Read-only parity (no state mutation) | CLI roll format preserved (RNG-dependent values); API payload shape matches typed `RollTreasureResult` (`letter`, `category`, `items`, `total_gp`) | B | Randomized item values prevent byte-for-byte cross-path output comparison; contract shape validated |
+
 ### Testing Strategy
 
 1. **Golden tests (Phase 0):** Capture CLI output and API response snapshots
