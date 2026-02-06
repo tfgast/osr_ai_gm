@@ -65,6 +65,8 @@ unifying, each command must be classified into one of three categories:
 | `morale` | Accepts optional monster selector, checks specific monster (`combat_cmds.rs:246`) | No selector, uses max morale among living monsters (`combat_handlers.rs:133`) | C | Engine action takes `Option<usize>` selector. `None` = max morale (API default). CLI adapter passes parsed index. Both behaviors preserved. |
 | `end_combat` | Includes retainer XP-share and loyalty reporting (`combat_cmds.rs:468`) | Omits retainer reporting in response data (`combat_handlers.rs:294`) | B | Engine action computes retainer data. CLI adapter formats it in message. API adapter includes it in typed payload. |
 | `retreat` | Basic distance output | Returns `free_attacks` and `new_distance` in structured data (`interface.rs:838`) | B | Engine action returns typed `RetreatResult` with all fields. CLI uses message only. API serializes full struct. |
+| `enter_dungeon`, `add_room`, `add_door`, `rest` | Pre-migration CLI strings had specific casing/onboarding text | Unified action messages changed CLI text contract in `de7c964` | C | Track and restore CLI text parity in follow-up bug `oag-r428g` (API typed payload remains valid). |
+| `load_module` | Pre-migration CLI output included onboarding guidance lines | Unified action returns short API-style summary only | C | Track and restore CLI onboarding text parity in follow-up bug `oag-dqj8x`. |
 
 **Before migrating each command**, verify its parity class. Commands not listed
 above are assumed Class A until proven otherwise during implementation. Any
@@ -468,7 +470,36 @@ Notes:
 |-------------|----------------|------------------------|--------------------|-------|-------|
 | `treasure_type` | `LookupTreasureType` | Same state mutation (read-only) | Same treasure metadata with adapter-specific formatting (CLI prose vs API JSON) | B | API includes structured `entries`; CLI prints table text |
 | `treasure` | `RollTreasure` | Same state mutation (read-only) | Same roll intent with adapter-specific contracts (CLI formatted haul vs API itemized payload) | B | Random rolls differ independently between paths; parity anchors on shared type/category fields |
-| `load_module` | `LoadModule` | Same dungeon/time/mode mutation via shared action | Same message, API includes typed payload fields | B | Both adapters call `exploration::action_load_module`; API adds `module_name`, `level_range`, `room_count` |
+| `load_module` | `LoadModule` | Same dungeon/time/mode mutation via shared action | CLI onboarding text regressed vs pre-migration (guidance lines removed); API includes typed payload fields | C | Follow-up bug: `oag-dqj8x` |
+
+## Phase 0d: Exploration Command Post-Migration Review (2026-02-06)
+
+Audit method:
+- Reviewed migration diff `de7c964^..de7c964` command-by-command.
+- Verified runtime behavior with `cargo test --test gmapi_protocol_qa` and
+  `cargo test exploration_cmds::tests`.
+- Checked API `data` shape against typed structs in
+  `src/engine/exploration/results.rs`.
+
+Scope:
+- `enter_dungeon`, `advance_turn`, `add_room`, `add_door`, `move_room`,
+  `search`, `light`, `open_door`, `force_door`, `listen`, `rest`, `load_module`
+  (the exploration migration surface in `de7c964`).
+
+| CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
+|-------------|----------------|------------------------|--------------------|-------|-------|
+| `enter_dungeon` | `EnterDungeon` | Same dungeon/time/mode mutation | CLI output regressed vs pre-migration (lost onboarding guidance lines + casing drift); API now returns typed payload `{message, level, room_name}` | C | Follow-up bug: `oag-r428g` |
+| `explore` | `AdvanceTurn` | Same turn/light/dungeon mutation | CLI text behavior preserved; API now uses typed `ExplorationActionResult` (`message`, `messages`, `has_encounter`, `encounter`, `placed_monsters`, `placed_treasure`) | B | Adapter contract divergence only |
+| `add_room` | `AddRoom` | Same dungeon-room mutation | CLI success text regressed vs pre-migration (casing/punctuation); API typed payload `{message, room_id, name}` | C | Follow-up bug: `oag-r428g` |
+| `add_door` | `AddDoor` | Same dungeon-door mutation | CLI success text regressed vs pre-migration (`{:?}`-style display replaced, casing drift); API typed payload `{message, door_id, room_a, room_b, door_state}` | C | Follow-up bug: `oag-r428g` |
+| `move` | `MoveRoom` | Same movement/turn mutation | CLI text behavior preserved; API now uses typed `ExplorationActionResult` payload | B | Adapter contract divergence only |
+| `search` | `Search` | Same search/turn mutation | CLI text behavior preserved (RNG-dependent content); API now uses typed `ExplorationActionResult` payload | B | Adapter contract divergence only |
+| `listen` | `Listen` | Same listen/turn mutation | CLI text behavior preserved (RNG-dependent content); API now uses typed `ExplorationActionResult` payload | B | Adapter contract divergence only |
+| `light` | `Light` | Same light-source mutation | CLI success text preserved; API now returns typed payload `{message, source, carrier, duration_turns}` | B | Adapter contract divergence only |
+| `open` | `OpenDoor` | Same open/force/move mutation | CLI primary success path preserved; API now returns typed payload `{message, door_id, steps, forced, moved}` | B | Adapter contract divergence only |
+| `force_door` | `ForceDoor` | Same force-door mutation | CLI behavior preserved; API now returns typed payload `{message, door_id, character, forced_open}` | B | Adapter contract divergence only |
+| `rest` | `Rest` | Same rest/turn mutation | CLI success text regressed vs pre-migration (casing drift); API typed payload `{message, total_turns}` | C | Follow-up bug: `oag-r428g` |
+| `load_module` | `LoadModule` | Same dungeon/time/mode mutation | CLI onboarding text regressed vs pre-migration (guidance lines removed); API typed payload `{message, module_name, level_range, room_count}` | C | Follow-up bug: `oag-dqj8x` |
 
 ## Phase 0d: Wilderness Command Parity Audit (2026-02-06)
 
