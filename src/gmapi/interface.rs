@@ -170,43 +170,94 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 // State queries
 // =============================================================================
 
+#[derive(Serialize)]
+struct QueryPartyMemberData {
+    name: String,
+    class: String,
+    level: u32,
+    hp: i32,
+    max_hp: i32,
+    ac: i32,
+    thac0: u32,
+    xp: u64,
+    alive: bool,
+    alignment: String,
+    movement_rate: u32,
+}
+
+#[derive(Serialize)]
+struct QueryPartyData {
+    members: Vec<QueryPartyMemberData>,
+}
+
+#[derive(Serialize)]
+struct ListClassesData {
+    classes: Vec<party::results::ClassSummary>,
+}
+
+#[derive(Serialize)]
+struct EligibleAbilitiesData {
+    #[serde(rename = "STR")]
+    str_score: i32,
+    #[serde(rename = "INT")]
+    int_score: i32,
+    #[serde(rename = "WIS")]
+    wis_score: i32,
+    #[serde(rename = "DEX")]
+    dex_score: i32,
+    #[serde(rename = "CON")]
+    con_score: i32,
+    #[serde(rename = "CHA")]
+    cha_score: i32,
+}
+
+#[derive(Serialize)]
+struct EligibleClassesData {
+    abilities: EligibleAbilitiesData,
+    eligible: Vec<String>,
+    count: usize,
+}
+
+#[derive(Serialize)]
+struct CreateCharacterData {
+    character_sheet: String,
+}
+
+fn query_party_member_data(member: &party::results::PartyMemberSummary) -> QueryPartyMemberData {
+    QueryPartyMemberData {
+        name: member.name.clone(),
+        class: member.class.clone(),
+        level: member.level,
+        hp: member.hp,
+        max_hp: member.max_hp,
+        ac: member.ac,
+        thac0: member.thac0,
+        xp: member.xp,
+        alive: member.alive,
+        alignment: member.alignment.clone(),
+        movement_rate: member.movement_rate,
+    }
+}
+
 fn query_party(id: &str, state: &GameState) -> GMResponse {
     match party::action_query_party(state) {
         Ok(result) => {
-            if result.members.is_empty() {
-                return GMResponse::ok_with_data(
-                    id,
-                    "no party members.",
-                    state.mode.clone(),
-                    serde_json::json!({ "members": [] }),
-                );
-            }
-
-            let members: Vec<serde_json::Value> = result
+            let members: Vec<QueryPartyMemberData> = result
                 .members
                 .iter()
-                .map(|member| {
-                    serde_json::json!({
-                        "name": member.name,
-                        "class": member.class,
-                        "level": member.level,
-                        "hp": member.hp,
-                        "max_hp": member.max_hp,
-                        "ac": member.ac,
-                        "thac0": member.thac0,
-                        "xp": member.xp,
-                        "alive": member.alive,
-                        "alignment": member.alignment,
-                        "movement_rate": member.movement_rate,
-                    })
-                })
+                .map(query_party_member_data)
                 .collect();
 
-            GMResponse::ok_with_data(
+            let message = if members.is_empty() {
+                "no party members.".to_string()
+            } else {
+                format!("{} party members.", members.len())
+            };
+            ok_with_typed_data(
                 id,
-                format!("{} party members.", members.len()),
-                state.mode.clone(),
-                serde_json::json!({ "members": members }),
+                state,
+                message,
+                QueryPartyData { members },
             )
         }
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
@@ -215,11 +266,13 @@ fn query_party(id: &str, state: &GameState) -> GMResponse {
 
 fn list_classes(id: &str, state: &GameState) -> GMResponse {
     match party::action_list_classes() {
-        Ok(result) => GMResponse::ok_with_data(
+        Ok(result) => ok_with_typed_data(
             id,
+            state,
             format!("{} character classes available.", result.classes.len()),
-            state.mode.clone(),
-            serde_json::json!({ "classes": result.classes }),
+            ListClassesData {
+                classes: result.classes,
+            },
         ),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
@@ -227,32 +280,35 @@ fn list_classes(id: &str, state: &GameState) -> GMResponse {
 
 fn eligible_classes(id: &str, state: &GameState, abilities: &[i32; 6]) -> GMResponse {
     match party::action_eligible_classes(*abilities) {
-        Ok(result) => GMResponse::ok_with_data(
-            id,
-            format!(
-                "abilities STR {} INT {} WIS {} DEX {} CON {} CHA {}: {} eligible class(es).",
-                result.abilities[0],
-                result.abilities[1],
-                result.abilities[2],
-                result.abilities[3],
-                result.abilities[4],
-                result.abilities[5],
-                result.eligible.len()
-            ),
-            state.mode.clone(),
-            serde_json::json!({
-                "abilities": {
-                    "STR": result.abilities[0],
-                    "INT": result.abilities[1],
-                    "WIS": result.abilities[2],
-                    "DEX": result.abilities[3],
-                    "CON": result.abilities[4],
-                    "CHA": result.abilities[5],
+        Ok(result) => {
+            let eligible_count = result.eligible.len();
+            ok_with_typed_data(
+                id,
+                state,
+                format!(
+                    "abilities STR {} INT {} WIS {} DEX {} CON {} CHA {}: {} eligible class(es).",
+                    result.abilities[0],
+                    result.abilities[1],
+                    result.abilities[2],
+                    result.abilities[3],
+                    result.abilities[4],
+                    result.abilities[5],
+                    eligible_count
+                ),
+                EligibleClassesData {
+                    abilities: EligibleAbilitiesData {
+                        str_score: result.abilities[0],
+                        int_score: result.abilities[1],
+                        wis_score: result.abilities[2],
+                        dex_score: result.abilities[3],
+                        con_score: result.abilities[4],
+                        cha_score: result.abilities[5],
+                    },
+                    eligible: result.eligible,
+                    count: eligible_count,
                 },
-                "eligible": result.eligible,
-                "count": result.eligible.len(),
-            }),
-        ),
+            )
+        }
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -272,13 +328,13 @@ fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, a
                     state.mode.clone(),
                 );
             }
-            GMResponse::ok_with_data(
+            ok_with_typed_data(
                 id,
+                state,
                 format!("{} created and added to party.", name),
-                state.mode.clone(),
-                serde_json::json!({
-                    "character_sheet": result.character_sheet.unwrap_or_default(),
-                }),
+                CreateCharacterData {
+                    character_sheet: result.character_sheet.unwrap_or_default(),
+                },
             )
         }
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
