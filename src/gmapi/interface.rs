@@ -1,5 +1,5 @@
 use crate::dice;
-use crate::engine::{chargen, gm, party, retainer, system, xp};
+use crate::engine::{chargen, gm, party, retainer, retainers, system, xp};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::{self, GameState};
 use crate::rules::{class, spell_data, thief};
@@ -409,59 +409,25 @@ fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &str) -> GMR
     }
 }
 
-fn hire_retainer(id: &str, state: &GameState, employer_name: &str, ret_name: &str, ret_class: Class, ret_level: u32) -> GMResponse {
-    let employer = match state.party.find_member(employer_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", employer_name), state.mode.clone()),
-    };
-    let cha = employer.abilities.charisma;
-    let max = retainer::max_retainers(cha);
-    let base_loyalty = retainer::base_loyalty(cha);
-    let reaction = retainer::hiring_reaction(cha);
-    let wage = retainer::standard_wage(ret_level);
-
-    let hired = matches!(reaction, retainer::HireReaction::Accepts | retainer::HireReaction::Eager);
-    let bonus_loyalty = matches!(reaction, retainer::HireReaction::Eager);
-    let loyalty = if bonus_loyalty { base_loyalty + 1 } else { base_loyalty };
-
-    GMResponse::ok_with_data(
-        id,
-        format!("{} attempts to hire {} ({} L{}, {}gp/month). CHA {} (max {} retainers, loyalty {}). Reaction: {} — {}.",
-            employer.name, ret_name, ret_class.name(), ret_level, wage,
-            cha, max, base_loyalty, reaction.name(),
-            if hired { "HIRED" } else { "NOT HIRED" }),
-        state.mode.clone(),
-        serde_json::json!({
-            "employer": employer.name,
-            "retainer": ret_name,
-            "class": ret_class.name(),
-            "level": ret_level,
-            "reaction": reaction.name(),
-            "hired": hired,
-            "loyalty": loyalty,
-            "wage_gp": wage,
-            "max_retainers": max,
-        }),
-    )
+fn hire_retainer(id: &str, state: &mut GameState, employer_name: &str, ret_name: &str, ret_class: Class, ret_level: u32) -> GMResponse {
+    match retainers::action_hire_retainer(
+        state,
+        ret_name,
+        ret_class,
+        Some(employer_name),
+        ret_level,
+        retainers::results::HireRetainerMode::AssessOnly,
+    ) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 fn loyalty_check(id: &str, state: &GameState, ret_name: &str, loyalty: u32) -> GMResponse {
-    let result = retainer::loyalty_check(loyalty);
-    let result_name = match result {
-        retainer::LoyaltyResult::Loyal => "Loyal",
-        retainer::LoyaltyResult::Wavering => "Wavering",
-        retainer::LoyaltyResult::Disloyal => "Disloyal",
-    };
-    GMResponse::ok_with_data(
-        id,
-        format!("{} loyalty check (loyalty {}): {}.", ret_name, loyalty, result_name),
-        state.mode.clone(),
-        serde_json::json!({
-            "retainer": ret_name,
-            "loyalty": loyalty,
-            "result": result_name,
-        }),
-    )
+    match retainers::action_loyalty_check(ret_name, loyalty) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
@@ -604,7 +570,7 @@ fn delete_note(id: &str, state: &mut GameState, index: usize) -> GMResponse {
 }
 
 fn list_retainers(id: &str, state: &GameState) -> GMResponse {
-    match gm::action_list_retainers(state) {
+    match retainers::action_list_retainers(state) {
         Ok(result) => {
             if result.retainers.is_empty() {
                 return GMResponse::ok_with_data(
@@ -630,7 +596,7 @@ fn list_retainers(id: &str, state: &GameState) -> GMResponse {
 }
 
 fn dismiss_retainer(id: &str, state: &mut GameState, name: &str) -> GMResponse {
-    match gm::action_dismiss_retainer(state, name) {
+    match retainers::action_dismiss_retainer(state, name) {
         Ok(result) => ok_with_typed_data(
             id,
             state,
