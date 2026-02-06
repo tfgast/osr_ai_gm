@@ -5,6 +5,7 @@ pub mod encounter_engine;
 pub mod exploration;
 pub mod gm;
 pub mod inventory;
+pub mod lookup;
 pub mod module;
 pub mod party;
 pub mod result;

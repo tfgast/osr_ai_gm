@@ -1,10 +1,6 @@
 use super::{Command, CommandResult};
+use crate::engine::lookup;
 use crate::persist::GameState;
-use crate::rules::magic_item::{
-    find_magic_item, find_magic_items_partial, search_magic_items, ItemCategory,
-};
-use crate::rules::spell_data;
-use crate::rules::treasure::{find_treasure_type, TreasureItemType};
 
 /// Look up a magic item by name.
 pub struct ItemCommand;
@@ -20,64 +16,11 @@ impl Command for ItemCommand {
             return CommandResult::error("usage: item <name>");
         }
         let query = args.join(" ");
-
-        // Try exact match first
-        if let Some(item) = find_magic_item(&query) {
-            return CommandResult::ok(format_magic_item(item));
-        }
-
-        // Try partial match
-        let matches = find_magic_items_partial(&query);
-        match matches.len() {
-            0 => CommandResult::error(format!("no magic item found matching '{}'.", query)),
-            1 => CommandResult::ok(format_magic_item(matches[0])),
-            n if n <= 10 => {
-                let mut out = format!(
-                    "Multiple items match '{}'. Did you mean:\n",
-                    query
-                );
-                for item in &matches {
-                    out.push_str(&format!("  - {}\n", item.name));
-                }
-                CommandResult::ok(out)
-            }
-            n => CommandResult::ok(format!(
-                "Found {} items matching '{}'. Please be more specific.",
-                n, query
-            )),
+        match lookup::action_lookup_item(&query) {
+            Ok(result) => CommandResult::ok(result.cli_output()),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
-}
-
-/// Format a magic item for display.
-fn format_magic_item(item: &crate::rules::magic_item::MagicItemDef) -> String {
-    let mut out = format!(
-        "=== {} ===\nCategory: {}",
-        item.name,
-        item.category.name()
-    );
-
-    if item.cursed {
-        out.push_str(" [CURSED]");
-    }
-    out.push('\n');
-
-    if let Some(ref desc) = item.description {
-        out.push_str(&format!("\n{}\n", desc));
-    }
-
-    if !item.properties.is_empty() {
-        out.push_str("\nProperties:\n");
-        for prop in &item.properties {
-            if let Some(ref key) = prop.key {
-                out.push_str(&format!("  {}: {}\n", key, prop.value));
-            } else {
-                out.push_str(&format!("  - {}\n", prop.value));
-            }
-        }
-    }
-
-    out
 }
 
 /// Search magic items by keyword.
@@ -94,36 +37,9 @@ impl Command for SearchItemsCommand {
             return CommandResult::error("usage: search_items <query>");
         }
         let query = args.join(" ");
-        let results = search_magic_items(&query);
-
-        match results.len() {
-            0 => CommandResult::ok(format!("No magic items found matching '{}'.", query)),
-            n => {
-                let mut out = format!("Found {} item(s) matching '{}':\n\n", n, query);
-
-                // Group by category
-                let mut by_category: std::collections::HashMap<ItemCategory, Vec<_>> =
-                    std::collections::HashMap::new();
-                for item in results {
-                    by_category.entry(item.category).or_default().push(item);
-                }
-
-                // Sort categories for consistent output
-                let mut categories: Vec<_> = by_category.keys().copied().collect();
-                categories.sort_by_key(|c| c.name());
-
-                for category in categories {
-                    let items = &by_category[&category];
-                    out.push_str(&format!("{}:\n", category.name()));
-                    for item in items {
-                        let cursed = if item.cursed { " [CURSED]" } else { "" };
-                        out.push_str(&format!("  - {}{}\n", item.name, cursed));
-                    }
-                    out.push('\n');
-                }
-
-                CommandResult::ok(out)
-            }
+        match lookup::action_search_items(&query) {
+            Ok(result) => CommandResult::ok(result.cli_output()),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
@@ -141,79 +57,9 @@ impl Command for TreasureTypeCommand {
         if args.is_empty() {
             return CommandResult::error("usage: treasure_type <letter> (A-V)");
         }
-        let letter = args[0].to_uppercase();
-
-        match find_treasure_type(&letter) {
-            Some(tt) => {
-                let mut out = format!(
-                    "=== Treasure Type {} ===\n\
-                     Category: {}\n\
-                     Average Value: {} gp\n\n\
-                     Contents:\n",
-                    tt.letter,
-                    tt.category.name(),
-                    tt.average_gp
-                );
-
-                for entry in &tt.entries {
-                    let item_name = entry.item_type.name();
-                    let restriction = entry
-                        .restriction
-                        .as_ref()
-                        .map(|r| format!(" ({})", r))
-                        .unwrap_or_default();
-                    let note = entry
-                        .note
-                        .as_ref()
-                        .map(|n| format!(" [{}]", n))
-                        .unwrap_or_default();
-
-                    out.push_str(&format!(
-                        "  {:3}%: {} {}{}{}\n",
-                        entry.chance, entry.quantity, item_name, restriction, note
-                    ));
-                }
-
-                // Add a summary of what to expect
-                out.push_str("\nPossible contents:\n");
-                let has_coins = tt
-                    .entries
-                    .iter()
-                    .any(|e| e.item_type.is_coin());
-                let has_gems = tt
-                    .entries
-                    .iter()
-                    .any(|e| e.item_type == TreasureItemType::Gems);
-                let has_jewellery = tt
-                    .entries
-                    .iter()
-                    .any(|e| e.item_type == TreasureItemType::Jewellery);
-                let has_magic = tt
-                    .entries
-                    .iter()
-                    .any(|e| e.item_type.is_magic());
-
-                if has_coins {
-                    out.push_str("  - Coins (copper, silver, electrum, gold, platinum)\n");
-                }
-                if has_gems {
-                    out.push_str("  - Gems (10-1000 gp each, rolled on d20 table)\n");
-                }
-                if has_jewellery {
-                    out.push_str("  - Jewellery (3d6 x 100 gp each)\n");
-                }
-                if has_magic {
-                    out.push_str("  - Magic items\n");
-                }
-
-                CommandResult::ok(out)
-            }
-            None => {
-                CommandResult::error(format!(
-                    "unknown treasure type '{}'. Valid types are A-V.",
-                    letter
-                ))
-            }
+        match lookup::action_lookup_treasure_type(args[0]) {
+            Ok(result) => CommandResult::ok(result.cli_output()),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
@@ -231,13 +77,13 @@ impl Command for SpellCommand {
         if args.is_empty() {
             return CommandResult::error(
                 "usage: spell <name> [list]\n  \
-                 Lists: cleric, magicuser (or mu/mage), druid, illusionist"
+                 Lists: cleric, magicuser (or mu/mage), druid, illusionist",
             );
         }
 
         // Check if last arg is a spell list name
         let (name_args, list) = if args.len() >= 2 {
-            match parse_spell_list(args[args.len() - 1]) {
+            match lookup::parse_spell_list(args[args.len() - 1]) {
                 Some(l) => (&args[..args.len() - 1], Some(l)),
                 None => (args, None),
             }
@@ -247,38 +93,21 @@ impl Command for SpellCommand {
 
         let query = name_args.join(" ");
 
-        match spell_data::find_spell(&query, list) {
-            Some(spell) => {
-                let mut out = format!(
-                    "=== {} ===\nList: {} (Level {})\nRange: {}\nDuration: {}\n",
-                    spell.name, spell.list.name(), spell.level,
-                    spell.range, spell.duration,
-                );
-                if spell.reversible {
-                    if let Some(ref rev_name) = spell.reversed_name {
-                        out.push_str(&format!("Reversible: {}\n", rev_name));
-                    } else {
-                        out.push_str("Reversible: yes\n");
-                    }
+        match lookup::action_lookup_spell(&query, list) {
+            Ok(result) => CommandResult::ok(result.cli_output()),
+            Err(e) => {
+                if e.to_string().contains("not found") {
+                    let list_hint = list
+                        .map(|l| format!(" in {} list", l.name()))
+                        .unwrap_or_default();
+                    return CommandResult::error(format!(
+                        "spell '{}' not found{}.",
+                        query, list_hint
+                    ));
                 }
-                out.push_str(&format!("\n{}", spell.description));
-                CommandResult::ok(out)
-            }
-            None => {
-                let list_hint = list.map(|l| format!(" in {} list", l.name())).unwrap_or_default();
-                CommandResult::error(format!("spell '{}' not found{}.", query, list_hint))
+                CommandResult::error(e.to_string())
             }
         }
-    }
-}
-
-fn parse_spell_list(s: &str) -> Option<spell_data::SpellList> {
-    match s.to_lowercase().as_str() {
-        "cleric" => Some(spell_data::SpellList::Cleric),
-        "magicuser" | "magic-user" | "magic_user" | "mu" | "mage" => Some(spell_data::SpellList::MagicUser),
-        "druid" => Some(spell_data::SpellList::Druid),
-        "illusionist" => Some(spell_data::SpellList::Illusionist),
-        _ => None,
     }
 }
 
