@@ -1,10 +1,22 @@
-use crate::engine::{encounter_engine, exploration, wilderness_engine};
+use crate::engine::{encounter_engine, exploration, wilderness};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
 use crate::state::game::GameMode;
 use crate::state::time::{LightSourceKind, TimeTracker};
-use crate::state::wilderness::{HexCell, Terrain, WildernessState};
+use crate::state::wilderness::Terrain;
+use serde::Serialize;
+
+fn ok_with_typed_data<T: Serialize>(id: &str, mode: &GameMode, message: String, payload: T) -> GMResponse {
+    match serde_json::to_value(payload) {
+        Ok(data) => GMResponse::ok_with_data(id, message, mode.clone(), data),
+        Err(err) => GMResponse::err(
+            id,
+            format!("internal error: failed to serialize response: {err}"),
+            mode.clone(),
+        ),
+    }
+}
 
 pub(super) fn enter_dungeon(id: &str, state: &mut GameState, level: u32, room_name: &str) -> GMResponse {
     if level == 0 {
@@ -261,105 +273,45 @@ pub(super) fn rest(id: &str, state: &mut GameState) -> GMResponse {
 }
 
 pub(super) fn enter_wilderness(id: &str, state: &mut GameState, terrain: Terrain) -> GMResponse {
-    let mut ws = WildernessState::new();
-    ws.add_hex(HexCell::new(0, 0, terrain)).unwrap();
-    state.wilderness = Some(ws);
-    state.mode = GameMode::Wilderness;
-    GMResponse::ok(
-        id,
-        format!("entered wilderness. starting hex: (0, 0) — {}.", terrain.name()),
-        state.mode.clone(),
-    )
+    match wilderness::action_enter_wilderness(state, terrain) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn add_hex(id: &str, state: &mut GameState, x: i32, y: i32, terrain: Terrain) -> GMResponse {
-    let ws = match state.wilderness.as_mut() {
-        Some(w) => w,
-        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
-    };
-    if let Err(e) = ws.add_hex(HexCell::new(x, y, terrain)) {
-        return GMResponse::err(id, e, state.mode.clone());
+    match wilderness::action_add_hex(state, x, y, terrain) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    GMResponse::ok(id, format!("added hex ({}, {}) — {}.", x, y, terrain.name()), state.mode.clone())
 }
 
 pub(super) fn travel(id: &str, state: &mut GameState, x: i32, y: i32) -> GMResponse {
-    let party_movement = state.party.members.iter()
-        .filter(|c| c.is_alive())
-        .map(|c| c.movement_rate)
-        .min()
-        .unwrap_or(120);
-    if state.wilderness.is_none() {
-        return GMResponse::err(id, "not in wilderness mode.", state.mode.clone());
+    match wilderness::action_travel(state, x, y) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let ws = state.wilderness.as_mut().unwrap();
-    let result = wilderness_engine::travel_day(ws, &mut state.party, x, y, party_movement);
-    let has_encounter = !result.encounters.is_empty();
-    let encounters_json: Vec<serde_json::Value> = result.encounters.iter().map(|enc| {
-        serde_json::json!({
-            "name": enc.name,
-            "number": enc.number,
-        })
-    }).collect();
-    let data = serde_json::json!({
-        "messages": result.messages,
-        "lost": result.lost,
-        "has_encounter": has_encounter,
-        "encounters": encounters_json,
-        "rations_consumed": result.rations_consumed,
-        "starving": result.starving,
-        "rations_remaining": state.party.rations,
-    });
-    GMResponse::ok_with_data(id, result.to_string(), state.mode.clone(), data)
 }
 
 pub(super) fn orient(id: &str, state: &mut GameState) -> GMResponse {
-    let ws = match state.wilderness.as_mut() {
-        Some(w) => w,
-        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
-    };
-    let result = wilderness_engine::orient(ws);
-    let data = serde_json::json!({
-        "success": result.success,
-        "terrain": result.terrain.name(),
-        "lost": ws.lost,
-        "travel_day": ws.travel_day,
-    });
-    GMResponse::ok_with_data(id, result.message, state.mode.clone(), data)
+    match wilderness::action_orient(state) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn forage(id: &str, state: &mut GameState) -> GMResponse {
-    let ws = match state.wilderness.as_ref() {
-        Some(w) => w,
-        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
-    };
-    let result = wilderness_engine::forage(ws, &mut state.party);
-    GMResponse::ok_with_data(
-        id,
-        result.message,
-        state.mode.clone(),
-        serde_json::json!({
-            "success": result.success,
-            "quantity": result.quantity,
-        }),
-    )
+    match wilderness::action_forage(state) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn hunt(id: &str, state: &mut GameState) -> GMResponse {
-    let ws = match state.wilderness.as_ref() {
-        Some(w) => w,
-        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
-    };
-    let result = wilderness_engine::hunt(ws, &mut state.party);
-    GMResponse::ok_with_data(
-        id,
-        result.message,
-        state.mode.clone(),
-        serde_json::json!({
-            "success": result.success,
-            "quantity": result.quantity,
-        }),
-    )
+    match wilderness::action_hunt(state) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 pub(super) fn roll_encounter(id: &str, state: &mut GameState) -> GMResponse {
