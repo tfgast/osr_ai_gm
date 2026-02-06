@@ -1,7 +1,6 @@
 use crate::dice;
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
-use crate::rules::class::{self, Class};
 use crate::rules::magic_item::{
     find_magic_item, find_magic_items_partial, search_magic_items, ItemCategory,
 };
@@ -319,75 +318,4 @@ fn parse_quantity_with_multiplier(quantity: &str) -> Result<i32, String> {
             .parse::<i32>()
             .map_err(|_| format!("invalid quantity '{}'", quantity))
     }
-}
-
-// =============================================================================
-// Class listing
-// =============================================================================
-
-pub(super) fn list_classes(id: &str, state: &GameState) -> GMResponse {
-    let classes: Vec<serde_json::Value> = Class::ALL.iter().map(|&c| {
-        let def = class::class_def(c);
-        let reqs: Vec<serde_json::Value> = def.requirements.iter()
-            .map(|&(idx, min)| {
-                let name = ["STR", "INT", "WIS", "DEX", "CON", "CHA"][idx];
-                serde_json::json!({ "ability": name, "minimum": min })
-            })
-            .collect();
-        serde_json::json!({
-            "name": c.name(),
-            "hit_die": def.hit_die,
-            "requirements": reqs,
-            "is_demihuman": def.is_demihuman,
-        })
-    }).collect();
-
-    GMResponse::ok_with_data(
-        id,
-        format!("{} character classes available.", classes.len()),
-        state.mode.clone(),
-        serde_json::json!({ "classes": classes }),
-    )
-}
-
-// =============================================================================
-// Eligible classes
-// =============================================================================
-
-pub(super) fn eligible_classes(id: &str, state: &GameState, abilities: &[i32; 6]) -> GMResponse {
-    for &score in abilities {
-        if !(3..=18).contains(&score) {
-            return GMResponse::err(
-                id,
-                format!("ability scores must be 3-18, got {}.", score),
-                state.mode.clone(),
-            );
-        }
-    }
-
-    let eligible = class::eligible_classes(abilities);
-    let names: Vec<&str> = eligible.iter().map(|c| c.name()).collect();
-
-    GMResponse::ok_with_data(
-        id,
-        format!(
-            "abilities STR {} INT {} WIS {} DEX {} CON {} CHA {}: {} eligible class(es).",
-            abilities[0], abilities[1], abilities[2],
-            abilities[3], abilities[4], abilities[5],
-            eligible.len()
-        ),
-        state.mode.clone(),
-        serde_json::json!({
-            "abilities": {
-                "STR": abilities[0],
-                "INT": abilities[1],
-                "WIS": abilities[2],
-                "DEX": abilities[3],
-                "CON": abilities[4],
-                "CHA": abilities[5],
-            },
-            "eligible": names,
-            "count": eligible.len(),
-        }),
-    )
 }

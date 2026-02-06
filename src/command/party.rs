@@ -1,9 +1,8 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
-use crate::engine::chargen;
+use crate::engine::party;
 use crate::rules::alignment::Alignment;
-use crate::rules::class::{self, Class};
-use crate::rules::xp::{xp_for_level, check_level_up};
+use crate::rules::class::Class;
 
 pub struct ChargenCommand;
 impl Command for ChargenCommand {
@@ -39,7 +38,7 @@ impl Command for ChargenCommand {
             Alignment::default()
         };
 
-        let mut abilities = if let Some(pos) = abilities_pos {
+        let provided_abilities = if let Some(pos) = abilities_pos {
             let scores = &args[pos + 1..];
             if scores.len() != 6 {
                 return CommandResult::error(
@@ -55,41 +54,59 @@ impl Command for ChargenCommand {
                     )),
                 }
             }
-            vals
+            Some(vals)
         } else {
-            chargen::roll_abilities()
+            None
         };
-        let mut out = String::new();
-        let label = if abilities_pos.is_some() { "Provided abilities" } else { "Rolled abilities" };
-        out.push_str(&format!("{}: STR {} INT {} WIS {} DEX {} CON {} CHA {}\n", label,
-            abilities[0], abilities[1], abilities[2],
-            abilities[3], abilities[4], abilities[5]));
+        match party::action_create_character(state, name, class, alignment, provided_abilities) {
+            Ok(result) => {
+                let mut out = String::new();
+                let label = if result.used_provided_abilities {
+                    "Provided abilities"
+                } else {
+                    "Rolled abilities"
+                };
+                out.push_str(&format!(
+                    "{}: STR {} INT {} WIS {} DEX {} CON {} CHA {}\n",
+                    label,
+                    result.base_abilities[0],
+                    result.base_abilities[1],
+                    result.base_abilities[2],
+                    result.base_abilities[3],
+                    result.base_abilities[4],
+                    result.base_abilities[5]
+                ));
 
-        let def = class::class_def(class);
-        if !def.racial_modifiers.is_empty() {
-            class::apply_racial_modifiers(class, &mut abilities);
-            out.push_str(&format!(
-                "After racial modifiers: STR {} INT {} WIS {} DEX {} CON {} CHA {}\n",
-                abilities[0], abilities[1], abilities[2],
-                abilities[3], abilities[4], abilities[5]));
+                if result.applied_racial_modifiers {
+                    out.push_str(&format!(
+                        "After racial modifiers: STR {} INT {} WIS {} DEX {} CON {} CHA {}\n",
+                        result.abilities[0],
+                        result.abilities[1],
+                        result.abilities[2],
+                        result.abilities[3],
+                        result.abilities[4],
+                        result.abilities[5]
+                    ));
+                }
+
+                if !result.created {
+                    out.push_str(&format!(
+                        "\nAbilities do not meet requirements for {}.\nEligible classes: {}",
+                        result.class,
+                        result.eligible_classes.join(", ")
+                    ));
+                    return CommandResult::ok(out);
+                }
+
+                out.push('\n');
+                if let Some(sheet) = result.character_sheet {
+                    out.push_str(&sheet);
+                }
+                out.push_str(&format!("\n{} added to party.\n", result.name));
+                CommandResult::ok(out)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
         }
-
-        if !class::meets_requirements(class, &abilities) {
-            let eligible = class::eligible_classes(&abilities);
-            let names: Vec<&str> = eligible.iter().map(|c| c.name()).collect();
-            out.push_str(&format!(
-                "\nAbilities do not meet requirements for {}.\nEligible classes: {}",
-                class.name(), names.join(", ")
-            ));
-            return CommandResult::ok(out);
-        }
-
-        let c = chargen::create_character(name, class, abilities, alignment);
-        out.push('\n');
-        out.push_str(&chargen::character_sheet(&c));
-        out.push_str(&format!("\n{} added to party.\n", c.name));
-        state.party.add_member(c);
-        CommandResult::ok(out)
     }
 }
 
@@ -98,24 +115,35 @@ impl Command for ClassesCommand {
     fn name(&self) -> &str { "classes" }
     fn help(&self) -> &str { "List all character classes" }
     fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
-        let mut out = String::from("Character Classes (22):\n");
-        for &c in &Class::ALL {
-            let def = class::class_def(c);
-            let reqs: Vec<String> = def.requirements.iter()
-                .map(|&(idx, min)| {
-                    let name = ["STR", "INT", "WIS", "DEX", "CON", "CHA"][idx];
-                    format!("{} {}", name, min)
-                })
-                .collect();
-            let req_str = if reqs.is_empty() { "none".to_string() } else { reqs.join(", ") };
-            out.push_str(&format!("  {:14} HD: d{}  Req: {}",
-                c.name(), def.hit_die, req_str));
-            if def.is_demihuman {
-                out.push_str("  [demihuman]");
+        match party::action_list_classes() {
+            Ok(result) => {
+                let mut out = format!("Character Classes ({}):\n", result.classes.len());
+                for class in result.classes {
+                    let reqs: Vec<String> = class
+                        .requirements
+                        .iter()
+                        .map(|requirement| {
+                            format!("{} {}", requirement.ability, requirement.minimum)
+                        })
+                        .collect();
+                    let req_str = if reqs.is_empty() {
+                        "none".to_string()
+                    } else {
+                        reqs.join(", ")
+                    };
+                    out.push_str(&format!(
+                        "  {:14} HD: d{}  Req: {}",
+                        class.name, class.hit_die, req_str
+                    ));
+                    if class.is_demihuman {
+                        out.push_str("  [demihuman]");
+                    }
+                    out.push('\n');
+                }
+                CommandResult::ok(out)
             }
-            out.push('\n');
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        CommandResult::ok(out)
     }
 }
 
@@ -138,14 +166,20 @@ impl Command for EligibleCommand {
                 )),
             }
         }
-        let eligible = class::eligible_classes(&abilities);
-        let names: Vec<&str> = eligible.iter().map(|c| c.name()).collect();
-        CommandResult::ok(format!(
-            "Abilities: STR {} INT {} WIS {} DEX {} CON {} CHA {}\nEligible classes ({}): {}",
-            abilities[0], abilities[1], abilities[2],
-            abilities[3], abilities[4], abilities[5],
-            eligible.len(), names.join(", ")
-        ))
+        match party::action_eligible_classes(abilities) {
+            Ok(result) => CommandResult::ok(format!(
+                "Abilities: STR {} INT {} WIS {} DEX {} CON {} CHA {}\nEligible classes ({}): {}",
+                result.abilities[0],
+                result.abilities[1],
+                result.abilities[2],
+                result.abilities[3],
+                result.abilities[4],
+                result.abilities[5],
+                result.eligible.len(),
+                result.eligible.join(", ")
+            )),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -154,41 +188,52 @@ impl Command for PartyCommand {
     fn name(&self) -> &str { "party" }
     fn help(&self) -> &str { "Show party members" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        if state.party.members.is_empty() {
-            return CommandResult::ok("No party members. Use 'chargen' to create characters.");
-        }
-        let mut out = format!("Party ({} members):\n", state.party.members.len());
-        for c in &state.party.members {
-            let status = if c.is_alive() {
-                let next_level_xp = xp_for_level(c.class, c.level + 1);
-                let xp_str = if next_level_xp == u64::MAX {
-                    c.xp.to_string() // At max level, just show current XP
-                } else {
-                    format!("{}/{}", c.xp, next_level_xp)
-                };
-                let mut status_str = format!("HP {}/{}, AC {}, THAC0 {}, XP {}", c.hp, c.max_hp, c.ac, c.thac0, xp_str);
-                if check_level_up(c.class, c.level, c.xp).is_some() {
-                    status_str.push_str(" [READY TO TRAIN]");
+        match party::action_query_party(state) {
+            Ok(result) => {
+                if result.members.is_empty() {
+                    return CommandResult::ok("No party members. Use 'chargen' to create characters.");
                 }
-                status_str
-            } else {
-                "DEAD".to_string()
-            };
-            out.push_str(&format!("  {} ({} L{}) — {}\n",
-                c.name, c.class.name(), c.level, status));
-        }
-        // Show starvation status if applicable
-        if state.party.days_without_food > 0 {
-            let penalty = state.party.days_without_food.min(4) as i32;
-            out.push_str(&format!(
-                "\n[STARVING] {} days without food — -{} penalty to attacks/saves",
-                state.party.days_without_food, penalty
-            ));
-            if state.party.days_without_food >= 3 {
-                out.push_str(" — taking HP damage!");
+
+                let mut out = format!("Party ({} members):\n", result.members.len());
+                for member in &result.members {
+                    let status = if member.alive {
+                        let xp_str = match member.next_level_xp {
+                            Some(next_level_xp) => format!("{}/{}", member.xp, next_level_xp),
+                            None => member.xp.to_string(),
+                        };
+                        let mut status_str = format!(
+                            "HP {}/{}, AC {}, THAC0 {}, XP {}",
+                            member.hp, member.max_hp, member.ac, member.thac0, xp_str
+                        );
+                        if member.ready_to_train {
+                            status_str.push_str(" [READY TO TRAIN]");
+                        }
+                        status_str
+                    } else {
+                        "DEAD".to_string()
+                    };
+
+                    out.push_str(&format!(
+                        "  {} ({} L{}) — {}\n",
+                        member.name, member.class, member.level, status
+                    ));
+                }
+
+                if result.days_without_food > 0 {
+                    let penalty = result.days_without_food.min(4) as i32;
+                    out.push_str(&format!(
+                        "\n[STARVING] {} days without food — -{} penalty to attacks/saves",
+                        result.days_without_food, penalty
+                    ));
+                    if result.days_without_food >= 3 {
+                        out.push_str(" — taking HP damage!");
+                    }
+                    out.push('\n');
+                }
+
+                CommandResult::ok(out)
             }
-            out.push('\n');
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        CommandResult::ok(out)
     }
 }

@@ -1,8 +1,8 @@
 use crate::dice;
-use crate::engine::{chargen, gm, retainer, xp};
+use crate::engine::{gm, party, retainer, xp};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::{self, GameState};
-use crate::rules::{class, spell_data, thief};
+use crate::rules::{spell_data, thief};
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
 use super::{combat_handlers, exploration_handlers, inventory_handlers, lookup_handlers, query_handlers};
@@ -34,7 +34,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
             id, format!("current mode: {}", state.mode), state.mode.clone(),
             serde_json::json!({ "mode": state.mode.to_string() }),
         ),
-        GMCommand::QueryParty => query_handlers::query_party(id, state),
+        GMCommand::QueryParty => query_party(id, state),
         GMCommand::QueryCombat => query_handlers::query_combat(id, state),
         GMCommand::QueryExploration => query_handlers::query_exploration(id, state),
         GMCommand::QueryWilderness => query_handlers::query_wilderness(id, state),
@@ -156,8 +156,8 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::SearchItems { query } => lookup_handlers::search_items(id, state, query),
         GMCommand::LookupTreasureType { letter } => lookup_handlers::lookup_treasure_type(id, state, letter),
         GMCommand::RollTreasure { letter } => lookup_handlers::roll_treasure(id, state, letter),
-        GMCommand::ListClasses => lookup_handlers::list_classes(id, state),
-        GMCommand::EligibleClasses { abilities } => lookup_handlers::eligible_classes(id, state, abilities),
+        GMCommand::ListClasses => list_classes(id, state),
+        GMCommand::EligibleClasses { abilities } => eligible_classes(id, state, abilities),
 
         // -- System --
         GMCommand::Save { path } => save_game(id, state, path),
@@ -168,47 +168,122 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 }
 
 // =============================================================================
+// State queries
+// =============================================================================
+
+fn query_party(id: &str, state: &GameState) -> GMResponse {
+    match party::action_query_party(state) {
+        Ok(result) => {
+            if result.members.is_empty() {
+                return GMResponse::ok_with_data(
+                    id,
+                    "no party members.",
+                    state.mode.clone(),
+                    serde_json::json!({ "members": [] }),
+                );
+            }
+
+            let members: Vec<serde_json::Value> = result
+                .members
+                .iter()
+                .map(|member| {
+                    serde_json::json!({
+                        "name": member.name,
+                        "class": member.class,
+                        "level": member.level,
+                        "hp": member.hp,
+                        "max_hp": member.max_hp,
+                        "ac": member.ac,
+                        "thac0": member.thac0,
+                        "xp": member.xp,
+                        "alive": member.alive,
+                        "alignment": member.alignment,
+                        "movement_rate": member.movement_rate,
+                    })
+                })
+                .collect();
+
+            GMResponse::ok_with_data(
+                id,
+                format!("{} party members.", members.len()),
+                state.mode.clone(),
+                serde_json::json!({ "members": members }),
+            )
+        }
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+fn list_classes(id: &str, state: &GameState) -> GMResponse {
+    match party::action_list_classes() {
+        Ok(result) => GMResponse::ok_with_data(
+            id,
+            format!("{} character classes available.", result.classes.len()),
+            state.mode.clone(),
+            serde_json::json!({ "classes": result.classes }),
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+fn eligible_classes(id: &str, state: &GameState, abilities: &[i32; 6]) -> GMResponse {
+    match party::action_eligible_classes(*abilities) {
+        Ok(result) => GMResponse::ok_with_data(
+            id,
+            format!(
+                "abilities STR {} INT {} WIS {} DEX {} CON {} CHA {}: {} eligible class(es).",
+                result.abilities[0],
+                result.abilities[1],
+                result.abilities[2],
+                result.abilities[3],
+                result.abilities[4],
+                result.abilities[5],
+                result.eligible.len()
+            ),
+            state.mode.clone(),
+            serde_json::json!({
+                "abilities": {
+                    "STR": result.abilities[0],
+                    "INT": result.abilities[1],
+                    "WIS": result.abilities[2],
+                    "DEX": result.abilities[3],
+                    "CON": result.abilities[4],
+                    "CHA": result.abilities[5],
+                },
+                "eligible": result.eligible,
+                "count": result.eligible.len(),
+            }),
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+// =============================================================================
 // Character management
 // =============================================================================
 
 fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, alignment: Alignment, provided_abilities: Option<&[i32; 6]>) -> GMResponse {
-    // Validate provided abilities if present
-    if let Some(abs) = provided_abilities {
-        for &score in abs {
-            if !(3..=18).contains(&score) {
+    match party::action_create_character(state, name, class, alignment, provided_abilities.copied()) {
+        Ok(result) => {
+            if !result.created {
+                let source = if result.used_provided_abilities { "provided" } else { "rolled" };
                 return GMResponse::err(
                     id,
-                    format!("ability scores must be 3-18, got {}.", score),
+                    format!("{} abilities do not meet requirements for {}.", source, class.name()),
                     state.mode.clone(),
                 );
             }
+            GMResponse::ok_with_data(
+                id,
+                format!("{} created and added to party.", name),
+                state.mode.clone(),
+                serde_json::json!({
+                    "character_sheet": result.character_sheet.unwrap_or_default(),
+                }),
+            )
         }
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-
-    let mut abilities = provided_abilities.copied().unwrap_or_else(chargen::roll_abilities);
-    let def = class::class_def(class);
-    if !def.racial_modifiers.is_empty() {
-        class::apply_racial_modifiers(class, &mut abilities);
-    }
-    if !class::meets_requirements(class, &abilities) {
-        let source = if provided_abilities.is_some() { "provided" } else { "rolled" };
-        return GMResponse::err(
-            id,
-            format!("{} abilities do not meet requirements for {}.", source, class.name()),
-            state.mode.clone(),
-        );
-    }
-
-    let c = chargen::create_character(name, class, abilities, alignment);
-    let sheet = chargen::character_sheet(&c);
-    state.party.add_member(c);
-
-    GMResponse::ok_with_data(
-        id,
-        format!("{} created and added to party.", name),
-        state.mode.clone(),
-        serde_json::json!({ "character_sheet": sheet }),
-    )
 }
 
 // =============================================================================

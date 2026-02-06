@@ -3,6 +3,7 @@ pub mod combat;
 pub mod encounter_engine;
 pub mod exploration;
 pub mod gm;
+pub mod party;
 pub mod result;
 pub mod retainer;
 pub mod wilderness;
