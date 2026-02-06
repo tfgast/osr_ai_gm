@@ -46,6 +46,40 @@ monster index in range, game mode correct, etc.
 
 **~70 commands** duplicated across **~5,200 LOC** (CLI) and **~3,900 LOC** (API).
 
+## Command Parity Classification
+
+Not all commands are identically implemented across CLI and API. Before
+unifying, each command must be classified into one of three categories:
+
+| Class | Description | Migration approach |
+|-------|-------------|-------------------|
+| **A: Shared** | CLI and API have identical validation + orchestration | Single `action_*` function, both adapters call it directly |
+| **B: Shared core + adapter post-processing** | Same core logic, but one frontend adds extra output | Single `action_*` returns full result; adapter selectively uses fields |
+| **C: Intentionally divergent** | Frontends implement different semantics | Separate `action_*` variants or adapter-level branching |
+
+### Known Divergences (Class B/C)
+
+| Command | CLI behavior | API behavior | Class | Resolution |
+|---------|-------------|-------------|-------|------------|
+| `attack` | Auto-kills helpless targets before normal attack (`combat_cmds.rs:151`) | Always calls `resolve_character_attack`, no helpless check (`combat_handlers.rs:94`) | C | Unify to CLI behavior (helpless auto-kill is correct game logic). API was missing it — this is a bug fix. |
+| `morale` | Accepts optional monster selector, checks specific monster (`combat_cmds.rs:246`) | No selector, uses max morale among living monsters (`combat_handlers.rs:133`) | C | Engine action takes `Option<usize>` selector. `None` = max morale (API default). CLI adapter passes parsed index. Both behaviors preserved. |
+| `end_combat` | Includes retainer XP-share and loyalty reporting (`combat_cmds.rs:468`) | Omits retainer reporting in response data (`combat_handlers.rs:294`) | B | Engine action computes retainer data. CLI adapter formats it in message. API adapter includes it in typed payload. |
+| `retreat` | Basic distance output | Returns `free_attacks` and `new_distance` in structured data (`interface.rs:838`) | B | Engine action returns typed `RetreatResult` with all fields. CLI uses message only. API serializes full struct. |
+
+**Before migrating each command**, verify its parity class. Commands not listed
+above are assumed Class A until proven otherwise during implementation. Any
+newly discovered divergence must be classified and documented here before
+proceeding.
+
+### Parity Audit Gate
+
+Phase 2 (combat) must not begin until all combat commands have been audited
+and classified in this table. The implementer runs both CLI and API for each
+command with identical inputs and compares:
+1. State mutations (must be identical for Class A/B)
+2. Output messages (may differ for Class B/C — document why)
+3. Structured data fields (API-only — document expected shape)
+
 ## Design
 
 ### Core Idea
@@ -54,18 +88,10 @@ Introduce `EngineAction` functions in `src/engine/` that own all validation and
 orchestration. Both CLI and API become thin adapters that parse input into typed
 args, call the engine action, and format the result for their output channel.
 
-### New Type: `EngineResult`
+### New Types: `EngineResult`, Typed Payloads
 
 ```rust
 // src/engine/result.rs
-
-/// Unified result from any engine action.
-pub struct EngineResult {
-    /// Human-readable message describing what happened.
-    pub message: String,
-    /// Structured data for API consumers (optional).
-    pub data: Option<serde_json::Value>,
-}
 
 /// Unified error from any engine action.
 pub enum EngineError {
@@ -78,7 +104,66 @@ pub enum EngineError {
 }
 ```
 
-Engine actions return `Result<EngineResult, EngineError>`.
+Engine actions return typed `Result<T, EngineError>` where `T` is a
+command-specific payload struct. This keeps the engine layer free of
+transport concerns (no `serde_json::Value`) and preserves compile-time
+guarantees on payload shapes.
+
+```rust
+// src/engine/combat/results.rs
+
+/// Result of an attack action.
+pub struct AttackResult {
+    pub message: String,
+    pub hit: bool,
+    pub damage: u32,
+    pub target_killed: bool,
+}
+
+/// Result of ending combat.
+pub struct EndCombatResult {
+    pub message: String,
+    pub rounds: u32,
+    pub monsters_defeated: usize,
+    pub total_xp: u64,
+    pub party_casualties: usize,
+    pub retainer_xp_shares: Vec<RetainerXpShare>,
+}
+
+/// Result of a retreat action.
+pub struct RetreatResult {
+    pub message: String,
+    pub free_attacks: Vec<FreeAttackResult>,
+    pub new_distance: u32,
+}
+```
+
+**Serialization responsibility stays in adapters:**
+- CLI adapter: uses `result.message` (ignores structured fields).
+- API adapter: serializes the typed struct via `serde::Serialize` into
+  `GMResponse.data`. Compile-time type checking ensures the JSON shape
+  matches the struct definition — no drift possible.
+
+```rust
+// API adapter example
+GMCommand::EndCombat => {
+    match engine::combat::action_end_combat(state) {
+        Ok(r) => GMResponse::ok_with_data(id, r.message, state.mode.clone(),
+            serde_json::to_value(&r).unwrap()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+```
+
+**Why not `serde_json::Value` in the engine?** (see oag-e57i4.3)
+- Untyped JSON removes compile-time payload guarantees.
+- Engine would own wire-shape concerns that belong to the transport layer.
+- Existing API tests assert on specific keys (`free_attacks`, `new_distance`);
+  typed structs make these assertions enforceable at compile time.
+
+Each subsystem defines its result structs in a `results.rs` submodule.
+Structs derive `Serialize` so adapters can convert them, but the engine
+never constructs raw JSON.
 
 ### Engine Action Functions
 
@@ -93,7 +178,7 @@ pub fn action_attack(
     char_name: &str,
     monster_idx: usize,
     weapon_name: &str,
-) -> Result<EngineResult, EngineError> {
+) -> Result<AttackResult, EngineError> {
     // 1. Validate weapon exists
     let weapon = equipment::find_weapon(weapon_name)
         .ok_or_else(|| EngineError::InvalidInput(
@@ -110,16 +195,18 @@ pub fn action_attack(
         .ok_or_else(|| EngineError::WrongState(
             "no active combat.".into()))?;
 
-    // 4. Check helpless auto-kill
+    // 4. Check helpless auto-kill (unified — was missing from API)
     if monster_idx < combat.monsters.len()
         && combat.monsters[monster_idx].is_alive()
         && combat.monsters[monster_idx].helpless
     {
         let result = coup_de_grace(combat, &character, monster_idx)
             .map_err(|e| EngineError::InvalidInput(e))?;
-        return Ok(EngineResult {
+        return Ok(AttackResult {
             message: result.to_string(),
-            data: None,
+            hit: true,
+            damage: result.damage,
+            target_killed: true,
         });
     }
 
@@ -130,9 +217,11 @@ pub fn action_attack(
         combat, &character, monster_idx, weapon, rest_penalty,
     ).map_err(|e| EngineError::InvalidInput(e))?;
 
-    Ok(EngineResult {
+    Ok(AttackResult {
         message: result.to_string(),
-        data: None,
+        hit: result.hit,
+        damage: result.damage,
+        target_killed: !combat.monsters[monster_idx].is_alive(),
     })
 }
 ```
@@ -159,8 +248,8 @@ impl Command for AttackCommand {
                      else { "sword".to_string() };
 
         match engine::combat::action_attack(state, char_name, monster_idx, &weapon) {
-            Ok(r) => CommandResult::ok(r.message),
-            Err(e) => CommandResult::error(e.to_string()),
+            Ok(r) => CommandResult::ok(&r.message),
+            Err(e) => CommandResult::error(&e.to_string()),
         }
     }
 }
@@ -176,55 +265,101 @@ CLI responsibility shrinks to: parse `&[&str]` -> typed args, call engine, map
 
 GMCommand::Attack { character, monster_idx, weapon } => {
     match engine::combat::action_attack(state, character, *monster_idx, weapon) {
-        Ok(r) => GMResponse::ok_with_data(id, r.message, state.mode.clone(),
-            r.data.unwrap_or(serde_json::json!({}))),
+        Ok(r) => GMResponse::ok_with_data(id, r.message.clone(), state.mode.clone(),
+            serde_json::to_value(&r).unwrap()),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 ```
 
-API responsibility shrinks to: destructure `GMCommand`, call engine, map result
-to `GMResponse`.
-
-### Structured Data
-
-Some API consumers need structured data (JSON) that CLI consumers don't.
-Two options:
-
-**Option A (recommended): Engine always produces `data`.**
-Engine actions populate `EngineResult.data` with structured JSON. CLI ignores it.
-API passes it through. Simple, consistent, and forward-compatible (CLI could use
-it for TUI features later).
-
-**Option B: API adapter enriches.**
-Engine returns only a message. API adapter queries state after the call to build
-JSON. More complex, risks drift between message and data.
+API responsibility shrinks to: destructure `GMCommand`, call engine, serialize
+typed result to JSON via `serde::Serialize`.
 
 ### Migration Strategy
 
 This is a large refactor (~70 commands). Migrate incrementally by subsystem:
 
+**Phase 0: Parity audit + compatibility gates**
+- Audit all combat commands for parity class (A/B/C). Update the parity table.
+- Write golden tests for each command being migrated (see Compatibility Gates).
+- Golden tests must pass on the existing code BEFORE any migration begins.
+
 **Phase 1: Foundation**
-- Add `src/engine/result.rs` with `EngineResult` and `EngineError`.
-- Add `Display` impl for `EngineError`.
+- Add `src/engine/result.rs` with `EngineError` and `Display` impl.
+- Add `src/engine/combat/results.rs` with typed result structs (derive `Serialize`).
+- Verify golden tests still pass (no behavioral change yet).
 
 **Phase 2: Combat commands (highest duplication)**
-- Create `action_*` functions in `src/engine/combat/`.
-- Update CLI `combat_cmds.rs` to call engine actions.
-- Update API `combat_handlers.rs` to call engine actions.
-- Run tests after each command migration.
+- For each combat command, in order:
+  1. Create `action_*` function in `src/engine/combat/`.
+  2. Update CLI `combat_cmds.rs` to call engine action.
+  3. Run golden test — CLI output must match snapshot.
+  4. Update API `combat_handlers.rs` to call engine action.
+  5. Run golden test — API response must match snapshot.
+  6. Run full test suite. Commit only if all pass.
+- Class B/C commands: implement per the parity table resolution. Document
+  any intentional behavior changes as bug fixes (e.g., helpless auto-kill).
 
 **Phase 3: Exploration commands**
-- Same pattern for `exploration_cmds.rs` / `exploration_handlers.rs`.
+- Parity audit for exploration commands first.
+- Same per-command migration + golden test cycle.
 
 **Phase 4: Remaining subsystems**
 - GM fiat, inventory, party, retainers, wilderness, encounter, lookup, system,
   treasure, module commands.
+- Each subsystem gets its own `results.rs` with typed structs.
 
 **Phase 5: Cleanup**
 - Remove empty handler files once all commands migrated.
 - Consider whether `Command` trait is still needed or if CLI dispatch can
   use a simpler match.
+- Archive golden test snapshots (they become the new regression tests).
+
+### Compatibility Gates
+
+Each migrated command must pass these gates before the commit lands:
+
+**Gate 1: CLI output stability**
+Golden test captures `CommandResult.output` for a set of representative inputs
+(happy path, error cases, edge cases). Before and after migration, output must
+be byte-identical. Any intentional change (Class C bug fix) must be explicitly
+documented and the snapshot updated with a comment explaining why.
+
+```rust
+#[test]
+fn golden_attack_cli() {
+    let state = setup_combat_state();
+    let before = old_attack_execute(&["fighter", "0", "sword"], &mut state.clone());
+    let after  = new_attack_execute(&["fighter", "0", "sword"], &mut state.clone());
+    assert_eq!(before.output, after.output, "CLI output changed for attack");
+}
+```
+
+**Gate 2: API response contract**
+Golden test captures the full `GMResponse` (message + data JSON) for each
+command. Typed result structs are serialized via `serde_json::to_value()` and
+compared field-by-field against the existing handler output. Missing or renamed
+fields fail the test.
+
+```rust
+#[test]
+fn golden_end_combat_api() {
+    let state = setup_combat_state();
+    let before = old_end_combat_handler(&request, &mut state.clone());
+    let after  = new_end_combat_handler(&request, &mut state.clone());
+    assert_eq!(before.message, after.message);
+    assert_json_eq!(before.data, after.data);
+}
+```
+
+**Gate 3: State mutation equivalence**
+For each command, serialize `GameState` before/after via both old and new paths.
+Diff must be empty (same state mutations). This catches subtle ordering or
+side-effect differences.
+
+**Rollback criterion:** If a golden test cannot be made to pass without
+changing the snapshot, the command stays on the old path until the divergence
+is resolved. Never force-update a snapshot to make CI green.
 
 ### What Does NOT Change
 
@@ -246,17 +381,20 @@ This is a large refactor (~70 commands). Migrate incrementally by subsystem:
 | `gmapi/*_handlers.rs` | Full validation + engine calls | Call `engine::action_*`, map result |
 | `gmapi/interface.rs` | Delegates to handlers | Delegates to handlers (which call engine) |
 | `engine/*.rs` | Pure game logic only | Game logic + validation + orchestration |
-| New: `engine/result.rs` | N/A | `EngineResult`, `EngineError` |
+| New: `engine/result.rs` | N/A | `EngineError` |
+| New: `engine/*/results.rs` | N/A | Typed per-command result structs (derive `Serialize`) |
 
 ### Risk Assessment
 
 | Risk | Mitigation |
 |------|------------|
-| Behavioral regression | Migrate one command at a time, run full test suite after each |
-| CLI error messages change | Map `EngineError` display to match existing `CommandResult::error` format |
-| API response `data` changes | Engine produces same JSON structure, verify with `gmapi_protocol_qa` tests |
+| Behavioral regression | Golden tests (Gates 1-3) before and after each command migration |
+| CLI error messages change | Map `EngineError` display to match existing format; Gate 1 catches drift |
+| API response `data` changes | Typed result structs + `Serialize` ensure compile-time shape; Gate 2 catches field drift |
+| CLI/API parity assumptions | Parity matrix (Phase 0 audit) classifies each command before migration |
 | Large diff | Incremental phases, each phase independently shippable |
-| Helpless auto-kill in attack | Unified in engine action, not split across adapter layers |
+| Helpless auto-kill in attack | Class C divergence — unified to CLI behavior as bug fix, documented in parity table |
+| Retainer XP in end_combat | Class B — engine computes retainer data, CLI formats in message, API includes in typed payload |
 
 ### Naming Convention
 
@@ -301,11 +439,17 @@ Classification:
 
 ### Testing Strategy
 
-1. Existing tests pass unchanged (both CLI integration and API protocol tests).
-2. New unit tests for each `action_*` function test validation logic directly
+1. **Golden tests (Phase 0):** Capture CLI output and API response snapshots
+   for all commands being migrated. These run before AND after migration.
+2. **Existing tests** pass unchanged (both CLI integration and API protocol tests).
+3. **New unit tests** for each `action_*` function test validation logic directly
    against `GameState`, without going through CLI parsing or JSON serialization.
-3. The `action_*` tests replace the duplicated validation tests that currently
-   exist in both command and handler test suites.
+4. **Typed payload tests** verify that `serde_json::to_value(&result)` produces
+   the expected JSON shape (field names, types, nesting). These replace the
+   `serde_json::json!({})` assertions in current API tests with compile-time
+   struct-based guarantees.
+5. **State mutation tests** (Gate 3) serialize GameState before/after via both
+   old and new paths to verify identical side effects.
 
 ### Example: Full Before/After for `end_combat`
 
@@ -317,7 +461,7 @@ validation, state mutation, structured output formatting.
 
 **After (engine):**
 ```rust
-pub fn action_end_combat(state: &mut GameState) -> Result<EngineResult, EngineError> {
+pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, EngineError> {
     let combat_state = state.combat.take()
         .ok_or_else(|| EngineError::WrongState("no active combat.".into()))?;
 
@@ -328,6 +472,9 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EngineResult, EngineEr
     let dead_party = state.party.members.iter().filter(|c| !c.is_alive()).count();
     state.mode = state.pre_combat_mode.take().unwrap_or(GameMode::Idle);
 
+    // Compute retainer XP shares (Class B: CLI uses this, API includes in payload)
+    let retainer_xp_shares = compute_retainer_xp_shares(&state.party, total_xp);
+
     if let Some(dungeon) = state.dungeon.as_mut() {
         if let Some(room_id) = dungeon.current_room {
             if let Some(room) = dungeon.find_room_mut(room_id) {
@@ -336,26 +483,39 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EngineResult, EngineEr
         }
     }
 
-    Ok(EngineResult {
+    Ok(EndCombatResult {
         message: format!("combat ended after {} rounds. {} of {} monsters defeated.",
             combat_state.round, dead_monsters, combat_state.monsters.len()),
-        data: Some(serde_json::json!({
-            "rounds": combat_state.round,
-            "monsters_defeated": dead_monsters,
-            "total_xp": total_xp,
-            "party_casualties": dead_party,
-        })),
+        rounds: combat_state.round,
+        monsters_defeated: dead_monsters,
+        total_xp,
+        party_casualties: dead_party,
+        retainer_xp_shares,
     })
 }
 ```
 
-**After (CLI):** 3 lines - call action, map result.
-**After (API):** 3 lines - call action, map result.
+**After (CLI):** Calls action, formats `message` + retainer XP lines from typed result.
+**After (API):** Calls action, serializes `EndCombatResult` via `serde_json::to_value(&r)`.
+
+## Review Findings Addressed
+
+This design revision addresses three issues from Codex review (oag-e57i4):
+
+- **oag-e57i4.2 (P1):** Added Command Parity Classification section with
+  known divergences table and per-command audit gate before migration.
+- **oag-e57i4.3 (P1):** Replaced `EngineResult.data: Option<serde_json::Value>`
+  with typed per-command result structs. Serialization stays in API adapter.
+- **oag-e57i4.1 (P2):** Added Phase 0 (parity audit + golden tests) and
+  Compatibility Gates section with three concrete gates and rollback criterion.
 
 ## Summary
 
 - Single source of truth for validation and orchestration per command.
 - CLI and API become thin input/output adapters (~3-5 lines each).
+- Typed result structs per command — compile-time payload guarantees, no raw JSON in engine.
+- Command parity matrix classifies each command before migration begins.
+- Golden tests (CLI output, API response, state mutation) gate every migration step.
 - Incremental migration, one subsystem at a time.
 - All existing tests continue passing.
 - No protocol/wire format changes.
