@@ -1,6 +1,6 @@
 use super::{Command, CommandResult};
 use crate::dice;
-use crate::engine::{combat, xp};
+use crate::engine::{combat, gm, xp};
 use crate::persist::GameState;
 use crate::rules::class::class_def;
 use crate::rules::xp::{check_level_up, xp_for_level};
@@ -101,25 +101,27 @@ impl Command for AwardXpCommand {
             Ok(n) => n,
             _ => return CommandResult::error("amount must be a non-negative integer"),
         };
-        let character = match state.party.find_member_mut(args[0]) {
-            Some(c) => c,
-            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
-        };
-        let result = xp::award_xp(character, amount, 0);
-        let next_xp = xp_for_level(character.class, character.level + 1);
-        let xp_str = if next_xp == u64::MAX {
-            result.new_total.to_string()
-        } else {
-            format!("{}/{}", result.new_total, next_xp)
-        };
-        let mut out = format!(
-            "{} awarded {} XP ({} base, {:+}% prime req). Total: {}.",
-            character.name, result.adjusted_xp, amount, result.modifier_pct, xp_str
-        );
-        if result.ready_to_train {
-            out.push_str(" Ready to train!");
+        match gm::action_award_xp(state, args[0], amount, true) {
+            Ok(result) => {
+                let xp_str = match result.next_level_xp {
+                    Some(next_xp) => format!("{}/{}", result.total_xp, next_xp),
+                    None => result.total_xp.to_string(),
+                };
+                let mut out = format!(
+                    "{} awarded {} XP ({} base, {:+}% prime req). Total: {}.",
+                    result.character,
+                    result.adjusted_xp,
+                    result.base_xp,
+                    result.modifier_pct,
+                    xp_str
+                );
+                if result.ready_to_train {
+                    out.push_str(" Ready to train!");
+                }
+                CommandResult::ok(out)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        CommandResult::ok(out)
     }
 }
 
@@ -136,8 +138,10 @@ impl Command for RulingCommand {
             return CommandResult::error("usage: ruling <text>");
         }
         let text = args.join(" ");
-        state.notes.push(format!("[RULING] {}", text));
-        CommandResult::ok(format!("Ruling recorded: {}", text))
+        match gm::action_ruling(state, &text) {
+            Ok(result) => CommandResult::ok(format!("Ruling recorded: {}", result.text)),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -157,17 +161,13 @@ impl Command for HealCommand {
             Ok(n) if n >= 1 => n,
             _ => return CommandResult::error("amount must be a positive integer"),
         };
-        let character = match state.party.find_member_mut(args[0]) {
-            Some(c) => c,
-            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
-        };
-        let old_hp = character.hp;
-        character.hp = (character.hp + amount).min(character.max_hp);
-        let healed = character.hp - old_hp;
-        CommandResult::ok(format!(
-            "{} healed {} HP ({} -> {}/{}).",
-            character.name, healed, old_hp, character.hp, character.max_hp
-        ))
+        match gm::action_heal(state, args[0], amount) {
+            Ok(result) => CommandResult::ok(format!(
+                "{} healed {} HP ({} -> {}/{}).",
+                result.character, result.healed, result.old_hp, result.hp, result.max_hp
+            )),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -187,21 +187,18 @@ impl Command for DamageCommand {
             Ok(n) if n >= 1 => n,
             _ => return CommandResult::error("amount must be a positive integer"),
         };
-        let character = match state.party.find_member_mut(args[0]) {
-            Some(c) => c,
-            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
-        };
-        let old_hp = character.hp;
-        character.hp -= amount;
-        let status = if character.is_alive() {
-            "wounded"
-        } else {
-            "DEAD"
-        };
-        CommandResult::ok(format!(
-            "{} takes {} damage ({} -> {}/{}). Status: {}.",
-            character.name, amount, old_hp, character.hp, character.max_hp, status
-        ))
+        match gm::action_damage(state, args[0], amount) {
+            Ok(result) => CommandResult::ok(format!(
+                "{} takes {} damage ({} -> {}/{}). Status: {}.",
+                result.character,
+                result.damage,
+                result.old_hp,
+                result.hp,
+                result.max_hp,
+                result.status
+            )),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -221,21 +218,13 @@ impl Command for SetHpCommand {
             Ok(n) => n,
             _ => return CommandResult::error("amount must be an integer"),
         };
-        let character = match state.party.find_member_mut(args[0]) {
-            Some(c) => c,
-            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
-        };
-        let old_hp = character.hp;
-        character.hp = amount;
-        let status = if character.is_alive() {
-            "alive"
-        } else {
-            "DEAD"
-        };
-        CommandResult::ok(format!(
-            "{} HP set to {} (was {}). Max HP: {}. Status: {}.",
-            character.name, character.hp, old_hp, character.max_hp, status
-        ))
+        match gm::action_set_hp(state, args[0], amount) {
+            Ok(result) => CommandResult::ok(format!(
+                "{} HP set to {} (was {}). Max HP: {}. Status: {}.",
+                result.character, result.hp, result.old_hp, result.max_hp, result.status
+            )),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -255,12 +244,13 @@ impl Command for SetRationsCommand {
             Ok(n) => n,
             _ => return CommandResult::error("amount must be a non-negative integer"),
         };
-        let old = state.party.rations;
-        state.party.rations = amount;
-        CommandResult::ok(format!(
-            "Rations set to {} person-days (was {}).",
-            amount, old
-        ))
+        match gm::action_set_rations(state, amount) {
+            Ok(result) => CommandResult::ok(format!(
+                "Rations set to {} person-days (was {}).",
+                result.rations, result.old_rations
+            )),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -280,11 +270,13 @@ impl Command for AddRationsCommand {
             Ok(n) if n >= 1 => n,
             _ => return CommandResult::error("amount must be a positive integer"),
         };
-        state.party.rations += amount;
-        CommandResult::ok(format!(
-            "Added {} rations. Total: {} person-days.",
-            amount, state.party.rations
-        ))
+        match gm::action_add_rations(state, amount) {
+            Ok(result) => CommandResult::ok(format!(
+                "Added {} rations. Total: {} person-days.",
+                result.added, result.rations
+            )),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 

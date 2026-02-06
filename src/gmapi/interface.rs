@@ -1,11 +1,28 @@
 use crate::dice;
-use crate::engine::{chargen, retainer, xp};
+use crate::engine::{chargen, gm, retainer, xp};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::{self, GameState};
 use crate::rules::{class, spell_data, thief};
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
 use super::{combat_handlers, exploration_handlers, inventory_handlers, lookup_handlers, query_handlers};
+use serde::Serialize;
+
+fn ok_with_typed_data<T: Serialize>(
+    id: &str,
+    state: &GameState,
+    message: String,
+    payload: T,
+) -> GMResponse {
+    match serde_json::to_value(payload) {
+        Ok(data) => GMResponse::ok_with_data(id, message, state.mode.clone(), data),
+        Err(err) => GMResponse::err(
+            id,
+            format!("internal error: failed to serialize response: {err}"),
+            state.mode.clone(),
+        ),
+    }
+}
 
 /// Process a GMRequest against the current GameState and return a GMResponse.
 pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
@@ -199,21 +216,19 @@ fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, a
 // =============================================================================
 
 fn award_xp(id: &str, state: &mut GameState, char_name: &str, xp_amount: u64) -> GMResponse {
-    let character = match state.party.find_member_mut(char_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
-    };
-    character.xp += xp_amount;
-    GMResponse::ok_with_data(
-        id,
-        format!("{} awarded {} XP (total: {}).", character.name, xp_amount, character.xp),
-        state.mode.clone(),
-        serde_json::json!({
-            "character": character.name,
-            "xp_awarded": xp_amount,
-            "total_xp": character.xp,
-        }),
-    )
+    match gm::action_award_xp(state, char_name, xp_amount, false) {
+        Ok(result) => GMResponse::ok_with_data(
+            id,
+            format!("{} awarded {} XP (total: {}).", result.character, result.base_xp, result.total_xp),
+            state.mode.clone(),
+            serde_json::json!({
+                "character": result.character,
+                "xp_awarded": result.base_xp,
+                "total_xp": result.total_xp,
+            }),
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 fn award_treasure_xp(id: &str, state: &mut GameState, char_name: &str, treasure_gp: u64, monster_xp: u64) -> GMResponse {
@@ -410,200 +425,144 @@ fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
 }
 
 fn heal(id: &str, state: &mut GameState, char_name: &str, amount: i32) -> GMResponse {
-    if amount < 1 {
-        return GMResponse::err(id, "amount must be a positive integer.", state.mode.clone());
+    match gm::action_heal(state, char_name, amount) {
+        Ok(result) => ok_with_typed_data(
+            id,
+            state,
+            format!("{} healed {} HP ({} -> {}/{}).", result.character, result.healed, result.old_hp, result.hp, result.max_hp),
+            result,
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let character = match state.party.find_member_mut(char_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
-    };
-    let old_hp = character.hp;
-    character.hp = (character.hp + amount).min(character.max_hp);
-    let healed = character.hp - old_hp;
-    GMResponse::ok_with_data(
-        id,
-        format!("{} healed {} HP ({} -> {}/{}).", character.name, healed, old_hp, character.hp, character.max_hp),
-        state.mode.clone(),
-        serde_json::json!({
-            "character": character.name,
-            "healed": healed,
-            "old_hp": old_hp,
-            "hp": character.hp,
-            "max_hp": character.max_hp,
-        }),
-    )
 }
 
 fn damage(id: &str, state: &mut GameState, char_name: &str, amount: i32) -> GMResponse {
-    if amount < 1 {
-        return GMResponse::err(id, "amount must be a positive integer.", state.mode.clone());
+    match gm::action_damage(state, char_name, amount) {
+        Ok(result) => ok_with_typed_data(
+            id,
+            state,
+            format!("{} takes {} damage ({} -> {}/{}). Status: {}.", result.character, result.damage, result.old_hp, result.hp, result.max_hp, result.status),
+            result,
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let character = match state.party.find_member_mut(char_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
-    };
-    let old_hp = character.hp;
-    character.hp -= amount;
-    let status = if character.is_alive() { "wounded" } else { "DEAD" };
-    GMResponse::ok_with_data(
-        id,
-        format!("{} takes {} damage ({} -> {}/{}). Status: {}.", character.name, amount, old_hp, character.hp, character.max_hp, status),
-        state.mode.clone(),
-        serde_json::json!({
-            "character": character.name,
-            "damage": amount,
-            "old_hp": old_hp,
-            "hp": character.hp,
-            "max_hp": character.max_hp,
-            "alive": character.is_alive(),
-        }),
-    )
 }
 
 fn set_hp(id: &str, state: &mut GameState, char_name: &str, hp: i32) -> GMResponse {
-    let character = match state.party.find_member_mut(char_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
-    };
-    let old_hp = character.hp;
-    character.hp = hp;
-    let status = if character.is_alive() { "alive" } else { "DEAD" };
-    GMResponse::ok_with_data(
-        id,
-        format!("{} HP set to {} (was {}). Max HP: {}. Status: {}.", character.name, character.hp, old_hp, character.max_hp, status),
-        state.mode.clone(),
-        serde_json::json!({
-            "character": character.name,
-            "old_hp": old_hp,
-            "hp": character.hp,
-            "max_hp": character.max_hp,
-            "alive": character.is_alive(),
-        }),
-    )
+    match gm::action_set_hp(state, char_name, hp) {
+        Ok(result) => ok_with_typed_data(
+            id,
+            state,
+            format!("{} HP set to {} (was {}). Max HP: {}. Status: {}.", result.character, result.hp, result.old_hp, result.max_hp, result.status),
+            result,
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 fn set_rations(id: &str, state: &mut GameState, amount: u32) -> GMResponse {
-    let old = state.party.rations;
-    state.party.rations = amount;
-    GMResponse::ok_with_data(
-        id,
-        format!("rations set to {} person-days (was {}).", amount, old),
-        state.mode.clone(),
-        serde_json::json!({
-            "old_rations": old,
-            "rations": amount,
-        }),
-    )
+    match gm::action_set_rations(state, amount) {
+        Ok(result) => ok_with_typed_data(
+            id,
+            state,
+            format!("rations set to {} person-days (was {}).", result.rations, result.old_rations),
+            result,
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 fn add_rations(id: &str, state: &mut GameState, amount: u32) -> GMResponse {
-    if amount < 1 {
-        return GMResponse::err(id, "amount must be a positive integer.", state.mode.clone());
+    match gm::action_add_rations(state, amount) {
+        Ok(result) => ok_with_typed_data(
+            id,
+            state,
+            format!("added {} rations. Total: {} person-days.", result.added, result.rations),
+            result,
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    state.party.rations += amount;
-    GMResponse::ok_with_data(
-        id,
-        format!("added {} rations. Total: {} person-days.", amount, state.party.rations),
-        state.mode.clone(),
-        serde_json::json!({
-            "added": amount,
-            "rations": state.party.rations,
-        }),
-    )
 }
 
 fn ruling(id: &str, state: &mut GameState, text: &str) -> GMResponse {
-    state.notes.push(format!("[RULING] {}", text));
-    GMResponse::ok(
-        id,
-        format!("ruling recorded: {}", text),
-        state.mode.clone(),
-    )
+    match gm::action_ruling(state, text) {
+        Ok(result) => GMResponse::ok(
+            id,
+            format!("ruling recorded: {}", result.text),
+            state.mode.clone(),
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
 
 fn list_notes(id: &str, state: &GameState) -> GMResponse {
-    if state.notes.is_empty() {
-        return GMResponse::ok_with_data(
-            id, "no notes yet.", state.mode.clone(),
-            serde_json::json!({ "notes": [] }),
-        );
+    match gm::action_list_notes(state) {
+        Ok(result) => {
+            if result.notes.is_empty() {
+                return GMResponse::ok_with_data(
+                    id, "no notes yet.", state.mode.clone(),
+                    serde_json::json!({ "notes": [] }),
+                );
+            }
+
+            let mut msg = String::from("Session notes:\n");
+            for note in &result.notes {
+                msg.push_str(&format!("  [{}] {}\n", note.index, note.text));
+            }
+
+            ok_with_typed_data(id, state, msg, result)
+        }
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let mut msg = String::from("Session notes:\n");
-    let notes_data: Vec<serde_json::Value> = state.notes.iter().enumerate().map(|(i, note)| {
-        msg.push_str(&format!("  [{}] {}\n", i + 1, note));
-        serde_json::json!({ "index": i + 1, "text": note })
-    }).collect();
-    GMResponse::ok_with_data(id, msg, state.mode.clone(), serde_json::json!({ "notes": notes_data }))
 }
 
 fn delete_note(id: &str, state: &mut GameState, index: usize) -> GMResponse {
-    if state.notes.is_empty() {
-        return GMResponse::err(id, "no notes to delete.", state.mode.clone());
-    }
-    if index < 1 || index > state.notes.len() {
-        return GMResponse::err(
+    match gm::action_delete_note(state, index) {
+        Ok(result) => ok_with_typed_data(
             id,
-            format!("index {} out of range; have {} note{}.",
-                index, state.notes.len(), if state.notes.len() == 1 { "" } else { "s" }),
-            state.mode.clone(),
-        );
+            state,
+            format!("deleted note [{}]: {}", result.index, result.deleted),
+            result,
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let removed = state.notes.remove(index - 1);
-    GMResponse::ok_with_data(
-        id,
-        format!("deleted note [{}]: {}", index, removed),
-        state.mode.clone(),
-        serde_json::json!({ "index": index, "deleted": removed }),
-    )
 }
 
 fn list_retainers(id: &str, state: &GameState) -> GMResponse {
-    if state.retainers.is_empty() {
-        return GMResponse::ok_with_data(
-            id, "no retainers.", state.mode.clone(),
-            serde_json::json!({ "retainers": [] }),
-        );
+    match gm::action_list_retainers(state) {
+        Ok(result) => {
+            if result.retainers.is_empty() {
+                return GMResponse::ok_with_data(
+                    id, "no retainers.", state.mode.clone(),
+                    serde_json::json!({ "retainers": [] }),
+                );
+            }
+
+            let mut msg = format!("Retainers ({}):\n", result.retainers.len());
+            for r in &result.retainers {
+                let status = if r.alive {
+                    format!("HP {}/{}, Loyalty {}, Wage {} gp/mo", r.hp, r.max_hp, r.loyalty, r.wage_gp)
+                } else {
+                    "DEAD".to_string()
+                };
+                msg.push_str(&format!("  {} ({} L{}) — {}\n", r.name, r.class, r.level, status));
+            }
+
+            ok_with_typed_data(id, state, msg, result)
+        }
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let mut msg = format!("Retainers ({}):\n", state.retainers.len());
-    let retainers_data: Vec<serde_json::Value> = state.retainers.iter().map(|r| {
-        let status = if r.is_alive() {
-            format!("HP {}/{}, Loyalty {}, Wage {} gp/mo", r.hp, r.max_hp, r.loyalty, r.wage_gp)
-        } else {
-            "DEAD".to_string()
-        };
-        msg.push_str(&format!("  {} ({} L{}) — {}\n", r.name, r.class, r.level, status));
-        serde_json::json!({
-            "name": r.name,
-            "class": r.class,
-            "level": r.level,
-            "hp": r.hp,
-            "max_hp": r.max_hp,
-            "loyalty": r.loyalty,
-            "wage_gp": r.wage_gp,
-            "alive": r.is_alive(),
-        })
-    }).collect();
-    GMResponse::ok_with_data(id, msg, state.mode.clone(), serde_json::json!({ "retainers": retainers_data }))
 }
 
 fn dismiss_retainer(id: &str, state: &mut GameState, name: &str) -> GMResponse {
-    let idx = state.retainers.iter()
-        .position(|r| r.name.eq_ignore_ascii_case(name));
-    match idx {
-        Some(i) => {
-            let removed = state.retainers.remove(i);
-            GMResponse::ok_with_data(
-                id,
-                format!("{} ({}) dismissed from service.", removed.name, removed.class),
-                state.mode.clone(),
-                serde_json::json!({ "name": removed.name, "class": removed.class }),
-            )
-        }
-        None => GMResponse::err(
+    match gm::action_dismiss_retainer(state, name) {
+        Ok(result) => ok_with_typed_data(
             id,
-            format!("no retainer named '{}'.", name),
-            state.mode.clone(),
+            state,
+            format!("{} ({}) dismissed from service.", result.name, result.class),
+            result,
         ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 

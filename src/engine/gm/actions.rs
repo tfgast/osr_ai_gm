@@ -1,0 +1,257 @@
+use crate::engine::result::EngineError;
+use crate::engine::xp;
+use crate::persist::GameState;
+use crate::rules::xp::{check_level_up, xp_for_level};
+
+use super::results::{
+    AddRationsResult, AwardXpResult, DamageResult, DeleteNoteResult, DismissRetainerResult,
+    HealResult, ListNotesResult, ListRetainersResult, NoteEntry, RetainerSummary, RulingResult,
+    SetHpResult, SetRationsResult,
+};
+
+fn no_party_member_err(char_name: &str) -> EngineError {
+    EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
+}
+
+pub fn action_award_xp(
+    state: &mut GameState,
+    char_name: &str,
+    amount: u64,
+    apply_prime_req_modifier: bool,
+) -> Result<AwardXpResult, EngineError> {
+    let character = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+
+    let (adjusted_xp, modifier_pct, total_xp, ready_to_train) = if apply_prime_req_modifier {
+        let result = xp::award_xp(character, amount, 0);
+        (
+            result.adjusted_xp,
+            result.modifier_pct,
+            result.new_total,
+            result.ready_to_train,
+        )
+    } else {
+        character.xp = character.xp.saturating_add(amount);
+        let ready = check_level_up(character.class, character.level, character.xp).is_some();
+        (amount, 0, character.xp, ready)
+    };
+
+    let next_xp = xp_for_level(character.class, character.level + 1);
+    let next_level_xp = if next_xp == u64::MAX {
+        None
+    } else {
+        Some(next_xp)
+    };
+
+    Ok(AwardXpResult {
+        character: character.name.clone(),
+        base_xp: amount,
+        adjusted_xp,
+        modifier_pct,
+        total_xp,
+        next_level_xp,
+        ready_to_train,
+    })
+}
+
+pub fn action_ruling(state: &mut GameState, text: &str) -> Result<RulingResult, EngineError> {
+    let note = format!("[RULING] {}", text);
+    state.notes.push(note.clone());
+    Ok(RulingResult {
+        text: text.to_string(),
+        note,
+    })
+}
+
+pub fn action_list_notes(state: &GameState) -> Result<ListNotesResult, EngineError> {
+    let notes = state
+        .notes
+        .iter()
+        .enumerate()
+        .map(|(i, note)| NoteEntry {
+            index: i + 1,
+            text: note.clone(),
+        })
+        .collect();
+    Ok(ListNotesResult { notes })
+}
+
+pub fn action_delete_note(
+    state: &mut GameState,
+    index: usize,
+) -> Result<DeleteNoteResult, EngineError> {
+    if state.notes.is_empty() {
+        return Err(EngineError::InvalidInput("no notes to delete.".to_string()));
+    }
+    if index < 1 || index > state.notes.len() {
+        return Err(EngineError::InvalidInput(format!(
+            "index {} out of range; have {} note{}.",
+            index,
+            state.notes.len(),
+            if state.notes.len() == 1 { "" } else { "s" }
+        )));
+    }
+
+    let deleted = state.notes.remove(index - 1);
+    Ok(DeleteNoteResult { index, deleted })
+}
+
+pub fn action_list_retainers(state: &GameState) -> Result<ListRetainersResult, EngineError> {
+    let retainers = state
+        .retainers
+        .iter()
+        .map(|r| RetainerSummary {
+            name: r.name.clone(),
+            class: r.class.clone(),
+            level: r.level,
+            hp: r.hp,
+            max_hp: r.max_hp,
+            loyalty: r.loyalty,
+            wage_gp: r.wage_gp,
+            alive: r.is_alive(),
+        })
+        .collect();
+
+    Ok(ListRetainersResult { retainers })
+}
+
+pub fn action_dismiss_retainer(
+    state: &mut GameState,
+    name: &str,
+) -> Result<DismissRetainerResult, EngineError> {
+    let idx = state
+        .retainers
+        .iter()
+        .position(|r| r.name.eq_ignore_ascii_case(name));
+
+    match idx {
+        Some(i) => {
+            let removed = state.retainers.remove(i);
+            Ok(DismissRetainerResult {
+                name: removed.name,
+                class: removed.class,
+            })
+        }
+        None => Err(EngineError::InvalidInput(format!(
+            "no retainer named '{}'.",
+            name
+        ))),
+    }
+}
+
+pub fn action_heal(
+    state: &mut GameState,
+    char_name: &str,
+    amount: i32,
+) -> Result<HealResult, EngineError> {
+    if amount < 1 {
+        return Err(EngineError::InvalidInput(
+            "amount must be a positive integer".to_string(),
+        ));
+    }
+
+    let character = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+
+    let old_hp = character.hp;
+    character.hp = (character.hp + amount).min(character.max_hp);
+    let healed = character.hp - old_hp;
+
+    Ok(HealResult {
+        character: character.name.clone(),
+        healed,
+        old_hp,
+        hp: character.hp,
+        max_hp: character.max_hp,
+    })
+}
+
+pub fn action_damage(
+    state: &mut GameState,
+    char_name: &str,
+    amount: i32,
+) -> Result<DamageResult, EngineError> {
+    if amount < 1 {
+        return Err(EngineError::InvalidInput(
+            "amount must be a positive integer".to_string(),
+        ));
+    }
+
+    let character = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+
+    let old_hp = character.hp;
+    character.hp -= amount;
+    let alive = character.is_alive();
+    let status = if alive { "wounded" } else { "DEAD" }.to_string();
+
+    Ok(DamageResult {
+        character: character.name.clone(),
+        damage: amount,
+        old_hp,
+        hp: character.hp,
+        max_hp: character.max_hp,
+        alive,
+        status,
+    })
+}
+
+pub fn action_set_hp(
+    state: &mut GameState,
+    char_name: &str,
+    hp: i32,
+) -> Result<SetHpResult, EngineError> {
+    let character = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+
+    let old_hp = character.hp;
+    character.hp = hp;
+    let alive = character.is_alive();
+    let status = if alive { "alive" } else { "DEAD" }.to_string();
+
+    Ok(SetHpResult {
+        character: character.name.clone(),
+        old_hp,
+        hp: character.hp,
+        max_hp: character.max_hp,
+        alive,
+        status,
+    })
+}
+
+pub fn action_set_rations(
+    state: &mut GameState,
+    amount: u32,
+) -> Result<SetRationsResult, EngineError> {
+    let old_rations = state.party.rations;
+    state.party.rations = amount;
+    Ok(SetRationsResult {
+        old_rations,
+        rations: amount,
+    })
+}
+
+pub fn action_add_rations(
+    state: &mut GameState,
+    amount: u32,
+) -> Result<AddRationsResult, EngineError> {
+    if amount < 1 {
+        return Err(EngineError::InvalidInput(
+            "amount must be a positive integer".to_string(),
+        ));
+    }
+
+    state.party.rations = state.party.rations.saturating_add(amount);
+    Ok(AddRationsResult {
+        added: amount,
+        rations: state.party.rations,
+    })
+}
