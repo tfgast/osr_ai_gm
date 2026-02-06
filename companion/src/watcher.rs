@@ -13,17 +13,17 @@ pub enum WatcherUpdate {
     Image(PathBuf),
 }
 
-pub fn live_state_path() -> PathBuf {
-    let home = std::env::var("HOME").expect("HOME not set");
-    PathBuf::from(home).join(".osr_data").join("live_state.json")
+pub fn live_state_path() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
+    Ok(PathBuf::from(home).join(".osr_data").join("live_state.json"))
 }
 
-pub fn image_path() -> PathBuf {
-    let home = std::env::var("HOME").expect("HOME not set");
-    PathBuf::from(home)
+pub fn image_path() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
+    Ok(PathBuf::from(home)
         .join(".osr_data")
         .join("live")
-        .join("image.png")
+        .join("image.png"))
 }
 
 fn try_read_state(path: &PathBuf) -> Option<GameState> {
@@ -37,12 +37,12 @@ fn image_size_ok(path: &PathBuf) -> bool {
         .unwrap_or(false)
 }
 
-pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> PathBuf {
-    let state_path = live_state_path();
-    let img_path = image_path();
+pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> Result<PathBuf, String> {
+    let state_path = live_state_path()?;
+    let img_path = image_path()?;
     let watch_dir = state_path
         .parent()
-        .expect("live_state.json has no parent dir")
+        .ok_or_else(|| "live_state.json has no parent dir".to_string())?
         .to_path_buf();
 
     // Send initial state if file already exists.
@@ -112,5 +112,5 @@ pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> PathBuf {
         }
     });
 
-    state_path
+    Ok(state_path)
 }

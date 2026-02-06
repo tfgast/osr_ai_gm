@@ -14,6 +14,16 @@ use crossterm::ExecutableCommand;
 use ratatui::prelude::*;
 use ratatui_image::picker::Picker;
 
+/// Guard that restores the terminal on drop, even if the event loop exits via `?`.
+struct TerminalGuard;
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+        let _ = io::stdout().execute(LeaveAlternateScreen);
+    }
+}
+
 fn main() -> io::Result<()> {
     // Query terminal for graphics protocol before entering alt screen.
     let picker = Picker::from_query_stdio().ok();
@@ -21,12 +31,14 @@ fn main() -> io::Result<()> {
     // Set up terminal
     enable_raw_mode()?;
     io::stdout().execute(EnterAlternateScreen)?;
+    let _guard = TerminalGuard;
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
     // Spawn file watcher
     let (tx, rx) = mpsc::channel();
-    let _watch_path = watcher::spawn_watcher(tx);
+    let _watch_path = watcher::spawn_watcher(tx)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
     let mut app = app::App::new(picker);
 
@@ -74,8 +86,7 @@ fn main() -> io::Result<()> {
         }
     }
 
-    // Restore terminal
-    disable_raw_mode()?;
-    io::stdout().execute(LeaveAlternateScreen)?;
+    // _guard's Drop handles terminal restore, but do it explicitly too for clarity.
+    drop(_guard);
     Ok(())
 }

@@ -251,7 +251,8 @@ mod tests {
 
         // Temporarily set HOME for this test.
         let orig_home = std::env::var("HOME").unwrap();
-        std::env::set_var("HOME", &dir);
+        // SAFETY: This test is not run in parallel with other tests that read HOME.
+        unsafe { std::env::set_var("HOME", &dir) };
 
         let mut state = GameState::new();
         state.party.add_member(Character::new("Tharos", Class::MagicUser));
@@ -270,7 +271,8 @@ mod tests {
         assert_eq!(loaded.notes[0], "Found the amulet.");
 
         // Restore HOME and clean up.
-        std::env::set_var("HOME", orig_home);
+        // SAFETY: Restoring the original value; no concurrent readers.
+        unsafe { std::env::set_var("HOME", orig_home) };
         let _ = fs::remove_dir_all(&dir);
     }
 
