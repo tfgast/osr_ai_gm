@@ -6,6 +6,7 @@ pub mod gm;
 pub mod party;
 pub mod result;
 pub mod retainer;
+pub mod system;
 pub mod wilderness;
 pub mod wilderness_engine;
 pub mod xp;
