@@ -552,6 +552,28 @@ Audit method:
 | `retainers` | `ListRetainers` | Same read-only behavior | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
 | `dismiss` | `DismissRetainer` | Same retainer removal semantics | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
 
+## Phase 0f: Inventory Command Parity Audit (2026-02-06)
+
+Audit method:
+- Compared pre-migration (`873093c`) and migrated (`cf83f74`) command/handler code for all four inventory commands.
+- Executed parity snapshots in `src/engine/inventory/golden_tests.rs` to run CLI and GM API with identical pre-state and equivalent inputs.
+- Verified API payload keys match typed structs in `src/engine/inventory/results.rs` through adapter serialization (`ok_with_typed_data`).
+
+Notes:
+- CLI output for `buy`, `drop`, `equip`, and `loot` remains byte-identical to pre-migration success messages.
+- All four API commands now serialize typed result structs; `data` includes `message` plus command-specific fields from the typed payload.
+- No inventory command showed divergent state mutation between CLI and API under equivalent inputs.
+
+| CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
+|-------------|----------------|------------------------|--------------------|-------|-------|
+| `buy` | `Buy` | Same gold deduction + inventory insert via shared `inventory::action_buy` | CLI success text unchanged; API emits typed `BuyResult` payload (`message`, `character`, `item`, `cost_gp`, `gold_remaining`) | B | Shared orchestration; adapter contracts differ (text-only vs structured data) |
+| `drop` | `Drop` | Same inventory removal via shared `inventory::action_drop` | CLI success text unchanged; API emits typed `DropResult` payload (`message`, `character`, `item`) | B | Shared orchestration; API keeps structured fields |
+| `equip` | `Equip` | Same equipped toggle + AC recalculation via shared `inventory::action_equip` | CLI success text unchanged; API emits typed `EquipResult` payload (`message`, `character`, `item`, `action`, `ac`) | B | Shared orchestration; API exposes AC/action fields structurally |
+| `loot` | `Loot` | Same room treasure `taken` mutation and inventory insert via shared `inventory::action_loot` | CLI success text unchanged; API emits typed `LootResult` payload (`message`, `character`, `item`, `value_gp`) | B | Shared orchestration; API exposes loot value field structurally |
+
+Class C findings (inventory):
+- None. No follow-up Class C bug beads were filed from this audit.
+
 ### Testing Strategy
 
 1. **Golden tests (Phase 0):** Capture CLI output and API response snapshots
