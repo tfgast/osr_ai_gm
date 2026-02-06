@@ -1,8 +1,7 @@
-use crate::dice;
-use crate::engine::{chargen, gm, party, retainer, retainers, system, xp};
+use crate::engine::{gm, party, retainers, system, xp};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
-use crate::persist::{self, GameState};
-use crate::rules::{class, spell_data, thief};
+use crate::persist::GameState;
+use crate::rules::thief;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
 use super::{combat_handlers, exploration_handlers, inventory_handlers, lookup_handlers, query_handlers};
@@ -118,7 +117,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::SpawnNpcParty { party_type, distance } => {
             combat_handlers::spawn_npc_party(id, state, party_type, *distance)
         }
-        GMCommand::LookupSpell { name, list } => lookup_spell(id, state, name, list),
+        GMCommand::LookupSpell { name, list } => lookup_handlers::lookup_spell(id, state, name, list),
         GMCommand::HireRetainer { employer, retainer_name, retainer_class, retainer_level } => {
             hire_retainer(id, state, employer, retainer_name, *retainer_class, *retainer_level)
         }
@@ -375,38 +374,6 @@ fn thief_skill_check(id: &str, state: &GameState, char_name: &str, skill_name: &
             "success": result.success,
         }),
     )
-}
-
-fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &str) -> GMResponse {
-    let list = if list_name.is_empty() {
-        None
-    } else {
-        match list_name.to_lowercase().as_str() {
-            "cleric" => Some(spell_data::SpellList::Cleric),
-            "magicuser" | "magic-user" | "magic_user" | "mu" | "mage" => Some(spell_data::SpellList::MagicUser),
-            "druid" => Some(spell_data::SpellList::Druid),
-            "illusionist" => Some(spell_data::SpellList::Illusionist),
-            _ => return GMResponse::err(id, format!("unknown spell list '{}'.", list_name), state.mode.clone()),
-        }
-    };
-    match spell_data::find_spell(name, list) {
-        Some(spell) => GMResponse::ok_with_data(
-            id,
-            format!("{} ({}L{}) — Range: {}, Duration: {}: {}",
-                spell.name, spell.list.name(), spell.level,
-                spell.range, spell.duration, spell.description),
-            state.mode.clone(),
-            serde_json::json!({
-                "name": spell.name,
-                "list": spell.list.name(),
-                "level": spell.level,
-                "range": spell.range,
-                "duration": spell.duration,
-                "description": spell.description,
-            }),
-        ),
-        None => GMResponse::err(id, format!("spell '{}' not found.", name), state.mode.clone()),
-    }
 }
 
 fn hire_retainer(id: &str, state: &mut GameState, employer_name: &str, ret_name: &str, ret_class: Class, ret_level: u32) -> GMResponse {
