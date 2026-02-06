@@ -11,6 +11,7 @@ mod attack;
 mod initiative;
 mod morale;
 mod movement;
+pub mod results;
 mod turn_undead;
 
 pub use attack::{
