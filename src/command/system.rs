@@ -148,6 +148,52 @@ mod tests {
     use super::*;
 
     #[test]
+    fn roll_invalid_notation_errors() {
+        let mut state = GameState::new();
+        let cmd = RollCommand;
+        let result = cmd.execute(&["not_a_roll"], &mut state);
+        assert!(!result.success);
+        assert!(result.output.contains("invalid dice format"));
+    }
+
+    #[test]
+    fn save_invalid_path_errors() {
+        let mut state = GameState::new();
+        let cmd = SaveCommand;
+        let result = cmd.execute(&["bad/path"], &mut state);
+        assert!(!result.success);
+        assert!(result.output.contains("save failed"));
+    }
+
+    #[test]
+    fn load_invalid_path_errors() {
+        let mut state = GameState::new();
+        let cmd = LoadCommand;
+        let result = cmd.execute(&["bad/path"], &mut state);
+        assert!(!result.success);
+        assert!(result.output.contains("load failed"));
+    }
+
+    #[test]
+    fn help_lists_header() {
+        let mut state = GameState::new();
+        let cmd = HelpCommand;
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.success);
+        assert_eq!(result.output, "Available commands:\n");
+    }
+
+    #[test]
+    fn quit_sets_quit_flag() {
+        let mut state = GameState::new();
+        let cmd = QuitCommand;
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.success);
+        assert!(result.quit);
+        assert_eq!(result.output, "Goodbye.");
+    }
+
+    #[test]
     fn note_add() {
         let mut state = GameState::new();
         let cmd = NoteCommand;
