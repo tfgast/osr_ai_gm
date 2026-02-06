@@ -92,11 +92,11 @@ impl CommandRegistry {
 
     pub fn dispatch(&self, name: &str, args: &[&str], state: &mut GameState) -> CommandResult {
         if name == "help" {
-            let mut out = String::from("Available commands:\n");
-            for (cmd_name, help) in self.commands() {
-                out.push_str(&format!("  {:18} {}\n", cmd_name, help));
-            }
-            return CommandResult::ok(out);
+            let commands = self.commands();
+            return match crate::engine::system::action_help(&commands) {
+                Ok(result) => CommandResult::ok(result.output),
+                Err(e) => CommandResult::error(e.to_string()),
+            };
         }
         let name = resolve_alias(name);
         let (result, category) = match self.commands.get(name) {

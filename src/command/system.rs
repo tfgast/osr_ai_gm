@@ -1,6 +1,6 @@
 use super::{Command, CommandResult};
+use crate::engine::system;
 use crate::persist::GameState;
-use crate::{dice, persist};
 
 pub struct RollCommand;
 impl Command for RollCommand {
@@ -11,8 +11,8 @@ impl Command for RollCommand {
             return CommandResult::error("usage: roll <dice expression>");
         }
         let notation = args.join("");
-        match dice::roll_str(&notation) {
-            Ok(result) => CommandResult::ok(result.to_string()),
+        match system::action_roll_dice(&notation) {
+            Ok(result) => CommandResult::ok(result.rendered),
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
@@ -24,12 +24,8 @@ impl Command for SaveCommand {
     fn help(&self) -> &str { "Save game state (e.g., save mycamp)" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         let filename = args.first().copied().unwrap_or("save");
-        let path = match persist::safe_save_path(filename) {
-            Ok(p) => p,
-            Err(e) => return CommandResult::error(format!("save failed: {}", e)),
-        };
-        match persist::save(state, &path) {
-            Ok(()) => CommandResult::ok(format!("Game saved to {}", path.display())),
+        match system::action_save_game(state, filename) {
+            Ok(result) => CommandResult::ok(format!("Game saved to {}", result.path.display())),
             Err(e) => CommandResult::error(format!("save failed: {}", e)),
         }
     }
@@ -41,18 +37,19 @@ impl Command for LoadCommand {
     fn help(&self) -> &str { "Load game state (e.g., load mycamp)" }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         let filename = args.first().copied().unwrap_or("save");
-        let path = match persist::safe_save_path(filename) {
-            Ok(p) => p,
-            Err(e) => return CommandResult::error(format!("load failed: {}", e)),
-        };
-        match persist::load(&path) {
-            Ok(loaded) => {
+        match system::action_load_game(state, filename) {
+            Ok(result) => {
                 let msg = format!(
                     "Loaded: turn {}, dungeon level {}, {} party members{}",
-                    loaded.turn(), loaded.dungeon_level, loaded.party.members.len(),
-                    if loaded.combat.is_some() { ", combat active" } else { "" }
+                    result.turn,
+                    result.dungeon_level,
+                    result.party_members,
+                    if result.combat_active {
+                        ", combat active"
+                    } else {
+                        ""
+                    }
                 );
-                *state = loaded;
                 CommandResult::ok(msg)
             }
             Err(e) => CommandResult::error(format!("load failed: {}", e)),
@@ -66,10 +63,10 @@ impl Command for HelpCommand {
     fn name(&self) -> &str { "help" }
     fn help(&self) -> &str { "Show available commands" }
     fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
-        // Help is handled by CommandRegistry::dispatch() which has access to
-        // the full command list. This execute() is only reached if the command
-        // is invoked outside the registry (which shouldn't happen in practice).
-        CommandResult::ok("Type 'help' for available commands.")
+        match system::action_help(&[]) {
+            Ok(result) => CommandResult::ok(result.output),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -139,7 +136,10 @@ impl Command for QuitCommand {
     fn name(&self) -> &str { "quit" }
     fn help(&self) -> &str { "Exit the game" }
     fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
-        CommandResult::quit()
+        match system::action_quit() {
+            Ok(_) => CommandResult::quit(),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
