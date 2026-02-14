@@ -531,6 +531,341 @@ mod tests {
         let result = action_add_rations(&mut state, 0);
         assert!(result.is_err());
     }
+
+    // --- action_add_note (oag-mol-jqd) ---
+
+    #[test]
+    fn add_note_basic() {
+        let mut state = GameState::new();
+        let result = action_add_note(&mut state, "Found a secret door").unwrap();
+        assert_eq!(result.text, "Found a secret door");
+        assert_eq!(state.notes.len(), 1);
+        assert_eq!(state.notes[0], "Found a secret door");
+    }
+
+    #[test]
+    fn add_note_empty_rejected() {
+        let mut state = GameState::new();
+        let result = action_add_note(&mut state, "");
+        assert!(result.is_err());
+        assert!(state.notes.is_empty());
+    }
+
+    #[test]
+    fn add_note_multiple() {
+        let mut state = GameState::new();
+        action_add_note(&mut state, "Note one").unwrap();
+        action_add_note(&mut state, "Note two").unwrap();
+        assert_eq!(state.notes.len(), 2);
+        assert_eq!(state.notes[0], "Note one");
+        assert_eq!(state.notes[1], "Note two");
+    }
+
+    // --- action_award_treasure_xp (oag-mol-jqd) ---
+
+    fn make_fighter_with_abilities(name: &str, xp: u64, gold: u32) -> Character {
+        let mut c = Character::new(name, Class::Fighter);
+        c.abilities = crate::model::AbilityScores {
+            strength: 16,
+            intelligence: 10,
+            wisdom: 10,
+            dexterity: 10,
+            constitution: 14,
+            charisma: 10,
+        };
+        c.xp = xp;
+        c.gold_gp = gold;
+        c.hp = 8;
+        c.max_hp = 8;
+        c
+    }
+
+    #[test]
+    fn award_treasure_xp_basic() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", 0, 500));
+        let result = action_award_treasure_xp(&mut state, "Aldric", 500, 100).unwrap();
+        assert_eq!(result.character, "Aldric");
+        assert_eq!(result.treasure_gp, 500);
+        assert_eq!(result.monster_xp, 100);
+        // base_xp = treasure_gp + monster_xp = 600
+        assert_eq!(result.base_xp, 600);
+        // STR 16 = +10%, so adjusted = 660
+        assert_eq!(result.modifier_pct, 10);
+        assert_eq!(result.adjusted_xp, 660);
+        assert_eq!(result.total_xp, 660);
+        assert_eq!(state.party.find_member("Aldric").unwrap().xp, 660);
+    }
+
+    #[test]
+    fn award_treasure_xp_no_character() {
+        let mut state = GameState::new();
+        let result = action_award_treasure_xp(&mut state, "Nobody", 100, 50);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn award_treasure_xp_zero_amounts() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", 100, 500));
+        let result = action_award_treasure_xp(&mut state, "Aldric", 0, 0).unwrap();
+        assert_eq!(result.base_xp, 0);
+        assert_eq!(result.adjusted_xp, 0);
+        assert_eq!(result.total_xp, 100); // unchanged
+    }
+
+    #[test]
+    fn award_treasure_xp_ready_to_train() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", 1_500, 500));
+        // Need 2000 for L2. 1500 + (500 * 1.10) = 2050
+        let result = action_award_treasure_xp(&mut state, "Aldric", 500, 0).unwrap();
+        assert!(result.ready_to_train);
+    }
+
+    // --- action_level_up (oag-mol-jqd) ---
+
+    #[test]
+    fn level_up_no_gold_cost() {
+        let mut state = GameState::new();
+        let mut c = make_fighter_with_abilities("Aldric", 2_100, 50);
+        c.hp = 8;
+        c.max_hp = 8;
+        state.party.add_member(c);
+        let result = action_level_up(&mut state, "Aldric").unwrap();
+        assert_eq!(result.new_level, 2);
+        assert_eq!(result.cost_gp, 0); // no gold cost for level_up
+        // Gold should be unchanged
+        assert_eq!(result.gold_remaining, 50);
+        assert_eq!(state.party.find_member("Aldric").unwrap().gold_gp, 50);
+        assert_eq!(state.party.find_member("Aldric").unwrap().level, 2);
+    }
+
+    #[test]
+    fn level_up_insufficient_xp() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", 100, 500));
+        let result = action_level_up(&mut state, "Aldric");
+        assert!(result.is_err());
+        assert_eq!(state.party.find_member("Aldric").unwrap().level, 1);
+    }
+
+    #[test]
+    fn level_up_no_character() {
+        let mut state = GameState::new();
+        let result = action_level_up(&mut state, "Nobody");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn level_up_max_level() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Bilbo", Class::Halfling);
+        c.level = 8; // Halfling max
+        c.xp = 999_999;
+        c.gold_gp = 9999;
+        state.party.add_member(c);
+        let result = action_level_up(&mut state, "Bilbo");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn level_up_hp_increases() {
+        let mut state = GameState::new();
+        let c = make_fighter_with_abilities("Aldric", 2_100, 50);
+        state.party.add_member(c);
+        let result = action_level_up(&mut state, "Aldric").unwrap();
+        assert!(result.hp_gained >= 1, "should gain at least 1 HP");
+        assert!(result.new_hp > result.old_hp, "max HP should increase");
+    }
+
+    // --- action_train (oag-mol-jqd) ---
+
+    #[test]
+    fn train_deducts_gold() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", 2_100, 500));
+        let result = action_train(&mut state, "Aldric").unwrap();
+        assert_eq!(result.new_level, 2);
+        assert_eq!(result.cost_gp, 200); // level 2 * 100
+        assert_eq!(result.gold_remaining, 300); // 500 - 200
+        assert_eq!(state.party.find_member("Aldric").unwrap().gold_gp, 300);
+    }
+
+    #[test]
+    fn train_insufficient_gold() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", 2_100, 50));
+        let result = action_train(&mut state, "Aldric");
+        assert!(result.is_err());
+        // Gold and level unchanged
+        assert_eq!(state.party.find_member("Aldric").unwrap().gold_gp, 50);
+        assert_eq!(state.party.find_member("Aldric").unwrap().level, 1);
+    }
+
+    #[test]
+    fn train_insufficient_xp() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", 100, 500));
+        let result = action_train(&mut state, "Aldric");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn train_dead_character() {
+        let mut state = GameState::new();
+        let mut c = make_fighter_with_abilities("Aldric", 2_100, 500);
+        c.hp = 0;
+        state.party.add_member(c);
+        let result = action_train(&mut state, "Aldric");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn train_in_combat_blocked() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", 2_100, 500));
+        state.mode = GameMode::Combat;
+        let result = action_train(&mut state, "Aldric");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn train_no_character() {
+        let mut state = GameState::new();
+        let result = action_train(&mut state, "Nobody");
+        assert!(result.is_err());
+    }
+
+    /// Verify level_up (no cost) vs train (gold cost) semantic distinction.
+    #[test]
+    fn level_up_vs_train_cost_distinction() {
+        // Both should produce the same level outcome but differ on gold
+        let base_xp = 2_100u64;
+        let base_gold = 500u32;
+
+        // level_up path (API fiat)
+        let mut state_lu = GameState::new();
+        state_lu
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", base_xp, base_gold));
+        let lu_result = action_level_up(&mut state_lu, "Aldric").unwrap();
+
+        // train path (CLI gold cost)
+        let mut state_tr = GameState::new();
+        state_tr
+            .party
+            .add_member(make_fighter_with_abilities("Aldric", base_xp, base_gold));
+        let tr_result = action_train(&mut state_tr, "Aldric").unwrap();
+
+        // Both reach level 2
+        assert_eq!(lu_result.new_level, 2);
+        assert_eq!(tr_result.new_level, 2);
+
+        // level_up costs nothing
+        assert_eq!(lu_result.cost_gp, 0);
+        assert_eq!(lu_result.gold_remaining, base_gold);
+
+        // train costs 200gp
+        assert_eq!(tr_result.cost_gp, 200);
+        assert_eq!(tr_result.gold_remaining, base_gold - 200);
+
+        // Both characters are at level 2
+        assert_eq!(state_lu.party.find_member("Aldric").unwrap().level, 2);
+        assert_eq!(state_tr.party.find_member("Aldric").unwrap().level, 2);
+
+        // Gold diverges
+        assert_eq!(state_lu.party.find_member("Aldric").unwrap().gold_gp, 500);
+        assert_eq!(state_tr.party.find_member("Aldric").unwrap().gold_gp, 300);
+    }
+
+    // --- action_list_notes / action_delete_note (oag-mol-jqd) ---
+
+    #[test]
+    fn list_notes_empty() {
+        let state = GameState::new();
+        let result = action_list_notes(&state).unwrap();
+        assert!(result.notes.is_empty());
+    }
+
+    #[test]
+    fn list_notes_returns_indexed() {
+        let mut state = GameState::new();
+        state.notes.push("Alpha".to_string());
+        state.notes.push("Beta".to_string());
+        let result = action_list_notes(&state).unwrap();
+        assert_eq!(result.notes.len(), 2);
+        assert_eq!(result.notes[0].index, 1);
+        assert_eq!(result.notes[0].text, "Alpha");
+        assert_eq!(result.notes[1].index, 2);
+        assert_eq!(result.notes[1].text, "Beta");
+    }
+
+    #[test]
+    fn delete_note_basic() {
+        let mut state = GameState::new();
+        state.notes.push("Keep".to_string());
+        state.notes.push("Remove".to_string());
+        state.notes.push("Also keep".to_string());
+        let result = action_delete_note(&mut state, 2).unwrap();
+        assert_eq!(result.index, 2);
+        assert_eq!(result.deleted, "Remove");
+        assert_eq!(state.notes.len(), 2);
+        assert_eq!(state.notes[0], "Keep");
+        assert_eq!(state.notes[1], "Also keep");
+    }
+
+    #[test]
+    fn delete_note_out_of_range() {
+        let mut state = GameState::new();
+        state.notes.push("Only note".to_string());
+        let result = action_delete_note(&mut state, 5);
+        assert!(result.is_err());
+        assert_eq!(state.notes.len(), 1);
+    }
+
+    #[test]
+    fn delete_note_zero_rejected() {
+        let mut state = GameState::new();
+        state.notes.push("Note".to_string());
+        let result = action_delete_note(&mut state, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn delete_note_empty_list() {
+        let mut state = GameState::new();
+        let result = action_delete_note(&mut state, 1);
+        assert!(result.is_err());
+    }
+
+    // --- action_ruling (oag-mol-jqd) ---
+
+    #[test]
+    fn ruling_adds_prefixed_note() {
+        let mut state = GameState::new();
+        let result = action_ruling(&mut state, "The bridge can hold 3 people").unwrap();
+        assert_eq!(result.text, "The bridge can hold 3 people");
+        assert_eq!(result.note, "[RULING] The bridge can hold 3 people");
+        assert_eq!(state.notes.len(), 1);
+        assert!(state.notes[0].starts_with("[RULING]"));
+    }
 }
 
 pub fn action_thief_skill_check(

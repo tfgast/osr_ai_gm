@@ -668,3 +668,113 @@ pub fn action_coup_de_grace(
         coup_de_grace(combat, &character, monster_idx).map_err(EngineError::InvalidInput)?;
     Ok(AttackResult::from(result))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Character, CombatState, Monster};
+    use crate::rules::class::Class;
+    use crate::state::game::GameMode;
+
+    fn test_fighter() -> Character {
+        let mut c = Character::new("Grond", Class::Fighter);
+        c.hp = 12;
+        c.max_hp = 12;
+        c.ac = 4;
+        c.level = 2;
+        c.abilities.strength = 16;
+        c
+    }
+
+    fn mk_monster(name: &str, hd: &str, hp: i32, ac: i32, morale: u32) -> Monster {
+        let mut monster = Monster::new(name, hd.parse().unwrap());
+        monster.hp = hp;
+        monster.max_hp = hp;
+        monster.ac = ac;
+        monster.damage = "1d6".to_string();
+        monster.morale = morale;
+        monster.xp_value = 5;
+        monster.attacks = vec!["weapon".to_string()];
+        monster
+    }
+
+    fn state_with_combat() -> GameState {
+        let mut state = GameState::new();
+        let fighter = test_fighter();
+        state.party.add_member(fighter);
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![
+                mk_monster("Goblin 1", "1", 4, 6, 7),
+                mk_monster("Goblin 2", "1", 4, 6, 7),
+            ],
+            60,
+        ));
+        state
+    }
+
+    // --- action_combat_status (oag-mol-jqd) ---
+
+    #[test]
+    fn combat_status_returns_status_string() {
+        let state = state_with_combat();
+        let result = action_combat_status(&state).unwrap();
+        assert!(!result.status.is_empty());
+        assert!(result.status.contains("Goblin 1"));
+        assert!(result.status.contains("Goblin 2"));
+        assert!(result.status.contains("Grond"));
+        assert!(result.status.contains("60'")); // distance
+    }
+
+    #[test]
+    fn combat_status_no_combat_error() {
+        let state = GameState::new();
+        let result = action_combat_status(&state);
+        assert!(result.is_err());
+    }
+
+    // --- action_set_helpless (oag-mol-jqd) ---
+
+    #[test]
+    fn set_helpless_marks_monster() {
+        let mut state = state_with_combat();
+        let result = action_set_helpless(&mut state, 0, true).unwrap();
+        assert!(result.helpless);
+        assert_eq!(result.monster_idx, 0);
+        assert!(result.message.contains("helpless"));
+        assert!(state.combat.as_ref().unwrap().monsters[0].helpless);
+    }
+
+    #[test]
+    fn set_helpless_unmarks_monster() {
+        let mut state = state_with_combat();
+        state.combat.as_mut().unwrap().monsters[0].helpless = true;
+        let result = action_set_helpless(&mut state, 0, false).unwrap();
+        assert!(!result.helpless);
+        assert!(result.message.contains("no longer helpless"));
+        assert!(!state.combat.as_ref().unwrap().monsters[0].helpless);
+    }
+
+    #[test]
+    fn set_helpless_no_combat_error() {
+        let mut state = GameState::new();
+        let result = action_set_helpless(&mut state, 0, true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn set_helpless_dead_monster_error() {
+        let mut state = state_with_combat();
+        state.combat.as_mut().unwrap().monsters[0].hp = 0;
+        let result = action_set_helpless(&mut state, 0, true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn set_helpless_out_of_range_error() {
+        let mut state = state_with_combat();
+        let result = action_set_helpless(&mut state, 99, true);
+        assert!(result.is_err());
+    }
+}
