@@ -14,6 +14,12 @@ pub enum EffectDuration {
     Concentration,
 }
 
+impl EffectDuration {
+    pub fn is_expired(&self) -> bool {
+        matches!(self, EffectDuration::Rounds(0) | EffectDuration::Turns(0))
+    }
+}
+
 impl fmt::Display for EffectDuration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -40,11 +46,11 @@ pub enum ModifierStat {
 impl fmt::Display for ModifierStat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ModifierStat::AttackRoll => write!(f, "attack roll"),
-            ModifierStat::DamageRoll => write!(f, "damage roll"),
+            ModifierStat::AttackRoll => write!(f, "atk"),
+            ModifierStat::DamageRoll => write!(f, "dmg"),
             ModifierStat::ArmorClass => write!(f, "AC"),
-            ModifierStat::SavingThrows => write!(f, "saving throws"),
-            ModifierStat::MovementRate => write!(f, "movement rate"),
+            ModifierStat::SavingThrows => write!(f, "saves"),
+            ModifierStat::MovementRate => write!(f, "mv"),
             ModifierStat::Morale => write!(f, "morale"),
             ModifierStat::Custom(s) => write!(f, "{}", s),
         }
@@ -60,25 +66,10 @@ pub struct Modifier {
 
 impl fmt::Display for Modifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sign = if self.value >= 0 { "+" } else { "" };
-        write!(f, "{}{} {}", sign, self.value, self.stat)
-    }
-}
-
-/// Who or what the effect targets.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EffectTarget {
-    Character(String),
-    Monster(usize),
-    Global,
-}
-
-impl fmt::Display for EffectTarget {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EffectTarget::Character(name) => write!(f, "{}", name),
-            EffectTarget::Monster(idx) => write!(f, "monster[{}]", idx),
-            EffectTarget::Global => write!(f, "global"),
+        if self.value >= 0 {
+            write!(f, "+{} {}", self.value, self.stat)
+        } else {
+            write!(f, "{} {}", self.value, self.stat)
         }
     }
 }
@@ -118,6 +109,31 @@ impl ActiveEffect {
             return *n == 0;
         }
         false
+    }
+
+    /// Format as a one-line summary: `[1] Bless (4 rounds, +1 atk, +1 dmg)`
+    pub fn summary_line(&self) -> String {
+        let mut parts = vec![format!("{}", self.duration)];
+        for m in &self.modifiers {
+            parts.push(format!("{}", m));
+        }
+        format!("[{}] {} ({})", self.id, self.name, parts.join(", "))
+    }
+
+    /// Format as multi-line detail for QueryParty display.
+    pub fn detail_lines(&self) -> String {
+        let mut out = format!(
+            "[{}] {} ({}, source: {})",
+            self.id, self.name, self.duration, self.source
+        );
+        if !self.modifiers.is_empty() {
+            let mods: Vec<String> = self.modifiers.iter().map(|m| format!("{}", m)).collect();
+            out.push_str(&format!("\n    {}", mods.join(", ")));
+        }
+        if !self.notes.is_empty() {
+            out.push_str(&format!("\n    Note: {}", self.notes));
+        }
+        out
     }
 }
 
@@ -315,7 +331,7 @@ mod tests {
         let display = format!("{}", effect);
         assert!(display.contains("Bless"));
         assert!(display.contains("6 rounds"));
-        assert!(display.contains("+1 attack roll"));
+        assert!(display.contains("+1 atk"));
         assert!(display.contains("Allies only"));
     }
 
@@ -327,6 +343,60 @@ mod tests {
         assert_eq!(format!("{}", EffectDuration::Turns(10)), "10 turns");
         assert_eq!(format!("{}", EffectDuration::Permanent), "permanent");
         assert_eq!(format!("{}", EffectDuration::Concentration), "concentration");
+    }
+
+    #[test]
+    fn duration_expired() {
+        assert!(EffectDuration::Rounds(0).is_expired());
+        assert!(EffectDuration::Turns(0).is_expired());
+        assert!(!EffectDuration::Rounds(1).is_expired());
+        assert!(!EffectDuration::Turns(1).is_expired());
+        assert!(!EffectDuration::Permanent.is_expired());
+        assert!(!EffectDuration::Concentration.is_expired());
+    }
+
+    #[test]
+    fn modifier_display() {
+        let m = Modifier { stat: ModifierStat::AttackRoll, value: 1 };
+        assert_eq!(m.to_string(), "+1 atk");
+        let m = Modifier { stat: ModifierStat::ArmorClass, value: -2 };
+        assert_eq!(m.to_string(), "-2 AC");
+    }
+
+    // --- summary_line / detail_lines ---
+
+    #[test]
+    fn effect_summary_line() {
+        let e = ActiveEffect {
+            id: 1,
+            name: "Bless".into(),
+            source: "Brin".into(),
+            duration: EffectDuration::Rounds(4),
+            modifiers: vec![
+                Modifier { stat: ModifierStat::AttackRoll, value: 1 },
+                Modifier { stat: ModifierStat::DamageRoll, value: 1 },
+            ],
+            notes: String::new(),
+        };
+        assert_eq!(e.summary_line(), "[1] Bless (4 rounds, +1 atk, +1 dmg)");
+    }
+
+    #[test]
+    fn effect_detail_lines() {
+        let e = ActiveEffect {
+            id: 1,
+            name: "Protection from Evil".into(),
+            source: "Brin".into(),
+            duration: EffectDuration::Turns(8),
+            modifiers: vec![
+                Modifier { stat: ModifierStat::SavingThrows, value: 1 },
+            ],
+            notes: "Enchanted/summoned creatures cannot melee; broken if caster initiates melee.".into(),
+        };
+        let detail = e.detail_lines();
+        assert!(detail.contains("[1] Protection from Evil (8 turns, source: Brin)"));
+        assert!(detail.contains("+1 saves"));
+        assert!(detail.contains("Note: Enchanted/summoned"));
     }
 
     // --- next_effect_id ---

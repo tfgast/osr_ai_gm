@@ -4,6 +4,7 @@ use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
 use crate::rules::encumbrance;
+use crate::state::effect::ActiveEffect;
 use super::ok_with_typed_data;
 use serde::Serialize;
 
@@ -21,30 +22,99 @@ pub(super) fn query_state(id: &str, state: &GameState) -> GMResponse {
     GMResponse::ok_with_data(id, "game state summary", state.mode, data)
 }
 
+/// Serialize an ActiveEffect to a JSON value for structured data payloads.
+fn effect_to_json(e: &ActiveEffect) -> serde_json::Value {
+    serde_json::json!({
+        "id": e.id,
+        "name": e.name,
+        "source": e.source,
+        "duration": format!("{}", e.duration),
+        "modifiers": e.modifiers.iter().map(|m| serde_json::json!({
+            "stat": format!("{}", m.stat),
+            "value": m.value,
+        })).collect::<Vec<_>>(),
+        "notes": e.notes,
+    })
+}
+
 pub(super) fn query_combat(id: &str, state: &GameState) -> GMResponse {
     match &state.combat {
         Some(combat_state) => {
-            let status = combat::combat_status(combat_state, &state.party.members);
+            let mut status = combat::combat_status(combat_state, &state.party.members);
             let monsters: Vec<serde_json::Value> = combat_state.monsters.iter().enumerate().map(|(i, m)| {
-                serde_json::json!({
+                let mut val = serde_json::json!({
                     "index": i,
                     "name": m.name,
                     "hp": m.hp,
                     "max_hp": m.max_hp,
                     "ac": m.ac,
                     "alive": m.is_alive(),
-                })
+                });
+                if !m.effects.is_empty() {
+                    val["effects"] = serde_json::json!(
+                        m.effects.iter().map(effect_to_json).collect::<Vec<_>>()
+                    );
+                }
+                val
             }).collect();
-            GMResponse::ok_with_data(
-                id, status, state.mode,
-                serde_json::json!({
-                    "round": combat_state.round,
-                    "distance": combat_state.distance,
-                    "party_initiative": combat_state.party_initiative,
-                    "monster_initiative": combat_state.monster_initiative,
-                    "monsters": monsters,
-                }),
-            )
+
+            // Build party effects for data
+            let party_effects: Vec<serde_json::Value> = state.party.members.iter().filter_map(|c| {
+                if c.effects.is_empty() {
+                    None
+                } else {
+                    Some(serde_json::json!({
+                        "character": c.name,
+                        "effects": c.effects.iter().map(effect_to_json).collect::<Vec<_>>(),
+                    }))
+                }
+            }).collect();
+
+            // Build area/global effects
+            let global_effects: Vec<serde_json::Value> = state.effects.iter().map(effect_to_json).collect();
+
+            // Append effects to status message
+            let has_any_effects = !party_effects.is_empty()
+                || combat_state.monsters.iter().any(|m| !m.effects.is_empty())
+                || !state.effects.is_empty();
+            if has_any_effects {
+                status.push_str("\n-- Effects --");
+                for c in &state.party.members {
+                    if !c.effects.is_empty() {
+                        let summaries: Vec<String> = c.effects.iter().map(|e| e.summary_line()).collect();
+                        status.push_str(&format!("\n  {}: {}", c.name, summaries.join(", ")));
+                    }
+                }
+                for (i, m) in combat_state.monsters.iter().enumerate() {
+                    if !m.effects.is_empty() {
+                        let helpless_tag = if m.is_helpless() { " [HELPLESS]" } else { "" };
+                        let summaries: Vec<String> = m.effects.iter().map(|e| e.summary_line()).collect();
+                        status.push_str(&format!("\n  {} #{}: {}{}", m.name, i, summaries.join(", "), helpless_tag));
+                    }
+                }
+                if !state.effects.is_empty() {
+                    status.push_str("\n-- Area Effects --");
+                    for e in &state.effects {
+                        status.push_str(&format!("\n  {} (source: {})", e.summary_line(), e.source));
+                    }
+                }
+            }
+
+            let mut data = serde_json::json!({
+                "round": combat_state.round,
+                "distance": combat_state.distance,
+                "party_initiative": combat_state.party_initiative,
+                "monster_initiative": combat_state.monster_initiative,
+                "monsters": monsters,
+            });
+            if !party_effects.is_empty() {
+                data["party_effects"] = serde_json::json!(party_effects);
+            }
+            if !global_effects.is_empty() {
+                data["area_effects"] = serde_json::json!(global_effects);
+            }
+
+            GMResponse::ok_with_data(id, status, state.mode, data)
         }
         None => GMResponse::err(id, "no active combat.", state.mode),
     }
@@ -59,16 +129,37 @@ pub(super) fn query_exploration(id: &str, state: &GameState) -> GMResponse {
         Some(d) => d,
         None => return GMResponse::err(id, "no dungeon state.", state.mode),
     };
-    let status = exploration::exploration_status(time, dungeon);
-    GMResponse::ok_with_data(
-        id, status, state.mode,
-        serde_json::json!({
-            "dungeon_level": dungeon.level,
-            "current_room": dungeon.current_room,
-            "total_turns": time.total_turns,
-            "has_light": time.has_light(),
-        }),
-    )
+    let mut status = exploration::exploration_status(time, dungeon);
+
+    // Brief summary of active effects (turn-based are most relevant in exploration)
+    let mut active: Vec<String> = Vec::new();
+    for c in &state.party.members {
+        for e in &c.effects {
+            active.push(format!("{} on {} ({})", e.name, c.name, e.duration));
+        }
+    }
+    for e in &state.effects {
+        active.push(format!("{} ({})", e.name, e.duration));
+    }
+    if !active.is_empty() {
+        status.push_str(&format!("\nEffects: {}", active.join(", ")));
+    }
+
+    let mut data = serde_json::json!({
+        "dungeon_level": dungeon.level,
+        "current_room": dungeon.current_room,
+        "total_turns": time.total_turns,
+        "has_light": time.has_light(),
+    });
+    let all_effects: Vec<serde_json::Value> = state.party.members.iter()
+        .flat_map(|c| c.effects.iter().map(effect_to_json))
+        .chain(state.effects.iter().map(effect_to_json))
+        .collect();
+    if !all_effects.is_empty() {
+        data["effects"] = serde_json::json!(all_effects);
+    }
+
+    GMResponse::ok_with_data(id, status, state.mode, data)
 }
 
 pub(super) fn query_wilderness(id: &str, state: &GameState) -> GMResponse {
@@ -124,6 +215,23 @@ pub(super) fn query_encumbrance(id: &str, state: &GameState, char_name: &str) ->
 // =============================================================================
 
 #[derive(Serialize)]
+struct EffectData {
+    id: u32,
+    name: String,
+    source: String,
+    duration: String,
+    modifiers: Vec<ModifierData>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    notes: String,
+}
+
+#[derive(Serialize)]
+struct ModifierData {
+    stat: String,
+    value: i32,
+}
+
+#[derive(Serialize)]
 struct QueryPartyMemberData {
     name: String,
     class: Class,
@@ -136,6 +244,8 @@ struct QueryPartyMemberData {
     alive: bool,
     alignment: Alignment,
     movement_rate: u32,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    effects: Vec<EffectData>,
 }
 
 #[derive(Serialize)]
@@ -143,7 +253,21 @@ struct QueryPartyData {
     members: Vec<QueryPartyMemberData>,
 }
 
-fn query_party_member_data(member: &party::results::PartyMemberSummary) -> QueryPartyMemberData {
+fn effect_to_typed(e: &ActiveEffect) -> EffectData {
+    EffectData {
+        id: e.id,
+        name: e.name.clone(),
+        source: e.source.clone(),
+        duration: format!("{}", e.duration),
+        modifiers: e.modifiers.iter().map(|m| ModifierData {
+            stat: format!("{}", m.stat),
+            value: m.value,
+        }).collect(),
+        notes: e.notes.clone(),
+    }
+}
+
+fn query_party_member_data(member: &party::results::PartyMemberSummary, effects: &[ActiveEffect]) -> QueryPartyMemberData {
     QueryPartyMemberData {
         name: member.name.clone(),
         class: member.class,
@@ -156,6 +280,7 @@ fn query_party_member_data(member: &party::results::PartyMemberSummary) -> Query
         alive: member.alive,
         alignment: member.alignment,
         movement_rate: member.movement_rate,
+        effects: effects.iter().map(|e| effect_to_typed(e)).collect(),
     }
 }
 
@@ -165,14 +290,34 @@ pub(super) fn query_party(id: &str, state: &GameState) -> GMResponse {
             let members: Vec<QueryPartyMemberData> = result
                 .members
                 .iter()
-                .map(query_party_member_data)
+                .map(|m| {
+                    let effects = state.party.find_member(&m.name)
+                        .map(|c| c.effects.as_slice())
+                        .unwrap_or(&[]);
+                    query_party_member_data(m, effects)
+                })
                 .collect();
 
-            let message = if members.is_empty() {
+            // Build message with effects
+            let mut message = if members.is_empty() {
                 "no party members.".to_string()
             } else {
                 format!("{} party members.", members.len())
             };
+
+            // Append active effects detail per character
+            for m in &result.members {
+                let effs = state.party.find_member(&m.name)
+                    .map(|c| &c.effects)
+                    .filter(|e| !e.is_empty());
+                if let Some(effects) = effs {
+                    message.push_str(&format!("\n  {} — Active Effects:", m.name));
+                    for e in effects {
+                        message.push_str(&format!("\n    {}", e.detail_lines().replace('\n', "\n    ")));
+                    }
+                }
+            }
+
             ok_with_typed_data(
                 id,
                 state,
