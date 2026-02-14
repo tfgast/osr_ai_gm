@@ -142,7 +142,7 @@ pub fn action_hire_retainer(
 
                     let retainer = Retainer::new(
                         &final_name,
-                        retainer_class.name(),
+                        retainer_class,
                         level,
                         rolled_hp,
                         loyalty,
@@ -179,7 +179,7 @@ pub fn action_hire_retainer(
         message,
         employer: employer.name,
         retainer: final_name,
-        class: retainer_class.name().to_string(),
+        class: retainer_class,
         level,
         reaction: reaction.name().to_string(),
         hired,
@@ -215,7 +215,7 @@ pub fn action_list_retainers(state: &GameState) -> Result<ListRetainersResult, E
         .iter()
         .map(|r| RetainerSummary {
             name: r.name.clone(),
-            class: r.class.clone(),
+            class: r.class,
             level: r.level,
             hp: r.hp,
             max_hp: r.max_hp,
@@ -340,9 +340,9 @@ mod tests {
     #[test]
     fn unique_name_multiple_conflicts() {
         let existing = vec![
-            Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25),
-            Retainer::new("Torchbearer 2", "Fighter", 0, 4, 7, 25),
-            Retainer::new("Torchbearer 3", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer", Class::Fighter, 0, 4, 7, 25),
+            Retainer::new("Torchbearer 2", Class::Fighter, 0, 4, 7, 25),
+            Retainer::new("Torchbearer 3", Class::Fighter, 0, 4, 7, 25),
         ];
         assert_eq!(
             unique_retainer_name("Torchbearer", &existing),
@@ -355,7 +355,7 @@ mod tests {
         let mut state = GameState::new();
         state
             .retainers
-            .push(Retainer::new("Hrothgar", "Fighter", 1, 6, 7, 25));
+            .push(Retainer::new("Hrothgar", Class::Fighter, 1, 6, 7, 25));
         let result = action_dismiss_retainer(&mut state, "hrothgar").unwrap();
         assert_eq!(result.name, "Hrothgar");
         assert!(state.retainers.is_empty());
@@ -381,7 +381,7 @@ mod tests {
         for i in 0..5 {
             state
                 .retainers
-                .push(Retainer::new(&format!("R{}", i), "Fighter", 1, 4, 7, 25));
+                .push(Retainer::new(&format!("R{}", i), Class::Fighter, 1, 4, 7, 25));
         }
 
         let result = action_hire_retainer(

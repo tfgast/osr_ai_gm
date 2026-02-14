@@ -1,6 +1,8 @@
 use crate::engine::{combat, exploration, lookup, party, wilderness_engine};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
+use crate::rules::alignment::Alignment;
+use crate::rules::class::Class;
 use crate::rules::encumbrance;
 use serde::Serialize;
 
@@ -139,7 +141,7 @@ pub(super) fn query_encumbrance(id: &str, state: &GameState, char_name: &str) ->
 #[derive(Serialize)]
 struct QueryPartyMemberData {
     name: String,
-    class: String,
+    class: Class,
     level: u32,
     hp: i32,
     max_hp: i32,
@@ -147,7 +149,7 @@ struct QueryPartyMemberData {
     thac0: u32,
     xp: u64,
     alive: bool,
-    alignment: String,
+    alignment: Alignment,
     movement_rate: u32,
 }
 
@@ -159,7 +161,7 @@ struct QueryPartyData {
 fn query_party_member_data(member: &party::results::PartyMemberSummary) -> QueryPartyMemberData {
     QueryPartyMemberData {
         name: member.name.clone(),
-        class: member.class.clone(),
+        class: member.class,
         level: member.level,
         hp: member.hp,
         max_hp: member.max_hp,
@@ -167,7 +169,7 @@ fn query_party_member_data(member: &party::results::PartyMemberSummary) -> Query
         thac0: member.thac0,
         xp: member.xp,
         alive: member.alive,
-        alignment: member.alignment.clone(),
+        alignment: member.alignment,
         movement_rate: member.movement_rate,
     }
 }
@@ -225,7 +227,7 @@ struct EligibleAbilitiesData {
 #[derive(Serialize)]
 struct EligibleClassesData {
     abilities: EligibleAbilitiesData,
-    eligible: Vec<String>,
+    eligible: Vec<Class>,
     count: usize,
 }
 

@@ -1,5 +1,9 @@
 use serde::Serialize;
 
+use crate::rules::alignment::Alignment;
+use crate::rules::class::Class;
+use crate::state::wilderness::Terrain;
+
 /// Typed success payload for `encounter` / `RollEncounter`.
 #[derive(Debug, Clone, Serialize)]
 pub struct RollEncounterResult {
@@ -9,7 +13,7 @@ pub struct RollEncounterResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub level: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub terrain: Option<String>,
+    pub terrain: Option<Terrain>,
     pub table_roll: u32,
     pub monster_name: String,
     pub number_notation: String,
@@ -102,9 +106,9 @@ pub struct EvadeResult {
 /// Structured NPC member details returned by `spawn_npc_party`.
 #[derive(Debug, Clone, Serialize)]
 pub struct SpawnNpcPartyMemberInfo {
-    pub class: String,
+    pub class: Class,
     pub level: u32,
-    pub alignment: String,
+    pub alignment: Alignment,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
 }

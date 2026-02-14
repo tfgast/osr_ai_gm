@@ -93,7 +93,7 @@ impl Command for ChargenCommand {
                     out.push_str(&format!(
                         "\nAbilities do not meet requirements for {}.\nEligible classes: {}",
                         result.class,
-                        result.eligible_classes.join(", ")
+                        result.eligible_classes.iter().map(|c| c.name()).collect::<Vec<_>>().join(", ")
                     ));
                     return CommandResult::ok(out);
                 }
@@ -176,7 +176,7 @@ impl Command for EligibleCommand {
                 result.abilities[4],
                 result.abilities[5],
                 result.eligible.len(),
-                result.eligible.join(", ")
+                result.eligible.iter().map(|c| c.name()).collect::<Vec<_>>().join(", ")
             )),
             Err(e) => CommandResult::error(e.to_string()),
         }

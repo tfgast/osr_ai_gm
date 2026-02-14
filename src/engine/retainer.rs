@@ -4,12 +4,13 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use crate::rules::ability::{cha_max_retainers, cha_loyalty, cha_reaction_mod};
+use crate::rules::class::Class;
 
 /// A retainer (hired NPC follower).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Retainer {
     pub name: String,
-    pub class: String,
+    pub class: Class,
     pub level: u32,
     pub hp: i32,
     pub max_hp: i32,
@@ -18,10 +19,10 @@ pub struct Retainer {
 }
 
 impl Retainer {
-    pub fn new(name: &str, class: &str, level: u32, hp: i32, loyalty: u32, wage_gp: u32) -> Self {
+    pub fn new(name: &str, class: Class, level: u32, hp: i32, loyalty: u32, wage_gp: u32) -> Self {
         Retainer {
             name: name.to_string(),
-            class: class.to_string(),
+            class,
             level,
             hp,
             max_hp: hp,
@@ -147,7 +148,7 @@ mod tests {
 
     #[test]
     fn retainer_creation() {
-        let r = Retainer::new("Hrothgar", "Fighter", 1, 6, 7, 25);
+        let r = Retainer::new("Hrothgar", Class::Fighter, 1, 6, 7, 25);
         assert_eq!(r.name, "Hrothgar");
         assert!(r.is_alive());
         assert_eq!(r.loyalty, 7);

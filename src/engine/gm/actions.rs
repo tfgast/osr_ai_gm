@@ -105,7 +105,7 @@ pub fn action_list_retainers(state: &GameState) -> Result<ListRetainersResult, E
         .iter()
         .map(|r| RetainerSummary {
             name: r.name.clone(),
-            class: r.class.clone(),
+            class: r.class,
             level: r.level,
             hp: r.hp,
             max_hp: r.max_hp,

@@ -233,7 +233,7 @@ fn state_for_end_combat() -> GameState {
         combat.monsters[1].hp = 2;
         combat.monsters[1].xp_value = 25;
     }
-    state.retainers.push(Retainer::new("Hob", "Fighter", 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Hob", Class::Fighter, 1, 6, 7, 25));
     state
 }
 
