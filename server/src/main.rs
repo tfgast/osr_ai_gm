@@ -102,6 +102,14 @@ async fn gm_endpoint(
         return error_response(StatusCode::UNAUTHORIZED, "invalid API token");
     }
 
+    // Validate Content-Type header: require application/json.
+    if !is_json_content_type(&headers) {
+        return error_response(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "Content-Type must be application/json",
+        );
+    }
+
     // Parse the GM request.
     let req = match protocol::parse_request(&body) {
         Ok(r) => r,
@@ -133,6 +141,20 @@ fn extract_bearer_token(headers: &HeaderMap) -> Option<&str> {
         return None;
     }
     Some(stripped)
+}
+
+fn is_json_content_type(headers: &HeaderMap) -> bool {
+    match headers.get(header::CONTENT_TYPE) {
+        Some(val) => match val.to_str() {
+            Ok(s) => {
+                let lower = s.to_ascii_lowercase();
+                let media = lower.split(';').next().unwrap_or("").trim();
+                media == "application/json"
+            }
+            Err(_) => false,
+        },
+        None => false,
+    }
 }
 
 fn json_response(status: StatusCode, body: String) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
@@ -425,5 +447,52 @@ mod tests {
             PortConfig::Fixed(p) => format!("Fixed({})", p),
             PortConfig::Auto => "Auto".to_string(),
         }
+    }
+
+    #[test]
+    fn json_content_type_valid() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        assert!(is_json_content_type(&headers));
+    }
+
+    #[test]
+    fn json_content_type_with_charset() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json; charset=utf-8"),
+        );
+        assert!(is_json_content_type(&headers));
+    }
+
+    #[test]
+    fn json_content_type_case_insensitive() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("Application/JSON"));
+        assert!(is_json_content_type(&headers));
+    }
+
+    #[test]
+    fn json_content_type_missing() {
+        let headers = HeaderMap::new();
+        assert!(!is_json_content_type(&headers));
+    }
+
+    #[test]
+    fn json_content_type_text_plain() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+        assert!(!is_json_content_type(&headers));
+    }
+
+    #[test]
+    fn json_content_type_form_encoded() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
+        assert!(!is_json_content_type(&headers));
     }
 }
