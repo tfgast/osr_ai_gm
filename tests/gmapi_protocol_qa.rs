@@ -4489,3 +4489,46 @@ fn roll_encounter_json_parse() {
     assert_eq!(parsed.id, "rep1");
     assert!(matches!(parsed.command, GMCommand::RollEncounter));
 }
+
+// ===========================================================================
+// SpawnNpcParty — combat already active rejection
+// ===========================================================================
+
+#[test]
+fn spawn_npc_party_rejects_during_combat() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    let resp = handle_request(&req("snp1", GMCommand::SpawnNpcParty {
+        party_type: "basic".to_string(),
+        distance: 100,
+    }), &mut state);
+    assert_response_format(&resp, "snp1");
+    assert!(!resp.success);
+    assert!(resp.error.as_ref().unwrap().contains("already active"));
+    // Original combat state must be preserved
+    assert!(state.combat.is_some());
+    assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
+}
+
+// ===========================================================================
+// SpawnMonster — combat already active rejection
+// ===========================================================================
+
+#[test]
+fn spawn_monster_rejects_during_combat() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    let resp = handle_request(&req("sm1", GMCommand::SpawnMonster {
+        name: "Orc".to_string(),
+        count: 2,
+        distance: 60,
+    }), &mut state);
+    assert_response_format(&resp, "sm1");
+    assert!(!resp.success);
+    assert!(resp.error.as_ref().unwrap().contains("already active"));
+    // Original combat state must be preserved
+    assert!(state.combat.is_some());
+    assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
+}
