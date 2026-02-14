@@ -23,8 +23,9 @@ pub struct TokenStore {
 impl TokenStore {
     /// Default path for the token store file.
     pub fn default_path() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(home).join(".osr_data").join("api_tokens.json")
+        crate::persist::data_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("api_tokens.json")
     }
 
     /// Load tokens from a file, returning an empty store if the file doesn't exist.
@@ -188,5 +189,19 @@ mod tests {
     fn token_store_load_missing_file() {
         let store = TokenStore::load(Path::new("/tmp/nonexistent_osr_tokens.json")).unwrap();
         assert!(store.tokens.is_empty());
+    }
+
+    #[test]
+    fn default_path_respects_osr_data_dir() {
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
+
+        let path = TokenStore::default_path();
+        assert_eq!(path, PathBuf::from("/tmp/custom_osr/api_tokens.json"));
+
+        match orig {
+            Some(v) => unsafe { std::env::set_var("OSR_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("OSR_DATA_DIR") },
+        }
     }
 }

@@ -141,11 +141,22 @@ impl Default for GameState {
     }
 }
 
-/// Return the saves directory (`~/.osr_data/saves/`).
-pub fn saves_dir() -> io::Result<PathBuf> {
+/// Return the base data directory.
+///
+/// Checks `OSR_DATA_DIR` first; falls back to `~/.osr_data/`.
+/// This allows per-instance isolation when multiple processes run concurrently.
+pub fn data_dir() -> io::Result<PathBuf> {
+    if let Ok(dir) = std::env::var("OSR_DATA_DIR") {
+        return Ok(PathBuf::from(dir));
+    }
     let home = std::env::var("HOME")
         .map_err(|_| io::Error::new(io::ErrorKind::NotFound, "HOME not set"))?;
-    Ok(PathBuf::from(home).join(".osr_data").join("saves"))
+    Ok(PathBuf::from(home).join(".osr_data"))
+}
+
+/// Return the saves directory (`<data_dir>/saves/`).
+pub fn saves_dir() -> io::Result<PathBuf> {
+    Ok(data_dir()?.join("saves"))
 }
 
 /// Resolve a user-provided filename to a safe path inside the saves directory.
@@ -222,13 +233,11 @@ pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Return the live-state export path (`~/.osr_data/live_state.json`).
+/// Return the live-state export path (`<data_dir>/live_state.json`).
 ///
 /// The companion TUI watches this file for real-time state updates.
 pub fn live_state_path() -> io::Result<PathBuf> {
-    let home = std::env::var("HOME")
-        .map_err(|_| io::Error::new(io::ErrorKind::NotFound, "HOME not set"))?;
-    Ok(PathBuf::from(home).join(".osr_data").join("live_state.json"))
+    Ok(data_dir()?.join("live_state.json"))
 }
 
 /// Export the current game state to the live-state file.
@@ -391,16 +400,13 @@ mod tests {
 
     #[test]
     fn export_live_state_roundtrip() {
-        // Override HOME so we write to a temp directory, not the real home.
+        // Use OSR_DATA_DIR to isolate this test from the real home directory.
         let dir = std::env::temp_dir().join("osr_live_state_test");
         let _ = fs::remove_dir_all(&dir);
-        let osr_data = dir.join(".osr_data");
-        fs::create_dir_all(&osr_data).unwrap();
+        fs::create_dir_all(&dir).unwrap();
 
-        // Temporarily set HOME for this test.
-        let orig_home = std::env::var("HOME").unwrap();
-        // SAFETY: This test is not run in parallel with other tests that read HOME.
-        unsafe { std::env::set_var("HOME", &dir) };
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::set_var("OSR_DATA_DIR", &dir) };
 
         let mut state = GameState::new();
         state.party.add_member(Character::new("Tharos", Class::MagicUser));
@@ -418,9 +424,11 @@ mod tests {
         assert_eq!(loaded.dungeon_level, 5);
         assert_eq!(loaded.notes[0], "Found the amulet.");
 
-        // Restore HOME and clean up.
-        // SAFETY: Restoring the original value; no concurrent readers.
-        unsafe { std::env::set_var("HOME", orig_home) };
+        // Restore and clean up.
+        match orig {
+            Some(v) => unsafe { std::env::set_var("OSR_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("OSR_DATA_DIR") },
+        }
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -553,5 +561,63 @@ mod tests {
         let mut state = GameState::new();
         state.mode = GameMode::Wilderness;
         state.assert_mode_invariants();
+    }
+
+    // ── data_dir / OSR_DATA_DIR tests ───────────────────────────
+
+    #[test]
+    fn data_dir_uses_osr_data_dir_when_set() {
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
+
+        let dir = data_dir().unwrap();
+        assert_eq!(dir, PathBuf::from("/tmp/custom_osr"));
+
+        match orig {
+            Some(v) => unsafe { std::env::set_var("OSR_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("OSR_DATA_DIR") },
+        }
+    }
+
+    #[test]
+    fn data_dir_falls_back_to_home() {
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::remove_var("OSR_DATA_DIR") };
+
+        let dir = data_dir().unwrap();
+        let home = std::env::var("HOME").unwrap();
+        assert_eq!(dir, PathBuf::from(home).join(".osr_data"));
+
+        if let Some(v) = orig {
+            unsafe { std::env::set_var("OSR_DATA_DIR", v) };
+        }
+    }
+
+    #[test]
+    fn saves_dir_respects_osr_data_dir() {
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
+
+        let dir = saves_dir().unwrap();
+        assert_eq!(dir, PathBuf::from("/tmp/custom_osr/saves"));
+
+        match orig {
+            Some(v) => unsafe { std::env::set_var("OSR_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("OSR_DATA_DIR") },
+        }
+    }
+
+    #[test]
+    fn live_state_path_respects_osr_data_dir() {
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
+
+        let path = live_state_path().unwrap();
+        assert_eq!(path, PathBuf::from("/tmp/custom_osr/live_state.json"));
+
+        match orig {
+            Some(v) => unsafe { std::env::set_var("OSR_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("OSR_DATA_DIR") },
+        }
     }
 }
