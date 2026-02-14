@@ -126,3 +126,90 @@ pub fn spawn_watcher(tx: mpsc::Sender<WatcherUpdate>) -> Result<PathBuf, String>
 
     Ok(state_path)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn try_read_state_valid_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        let state = GameState::new();
+        let json = serde_json::to_string(&state).unwrap();
+        std::fs::write(&path, &json).unwrap();
+
+        let result = try_read_state(&path);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn try_read_state_invalid_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        std::fs::write(&path, "not valid json {{{").unwrap();
+
+        let result = try_read_state(&path);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn try_read_state_missing_file() {
+        let path = Path::new("/tmp/nonexistent_osr_test_state.json");
+        let result = try_read_state(path);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn image_size_ok_small_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("small.png");
+        std::fs::write(&path, b"tiny").unwrap();
+        assert!(image_size_ok(&path));
+    }
+
+    #[test]
+    fn image_size_ok_at_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("limit.png");
+        let mut f = std::fs::File::create(&path).unwrap();
+        // Write exactly MAX_IMAGE_SIZE bytes
+        let buf = vec![0u8; MAX_IMAGE_SIZE as usize];
+        f.write_all(&buf).unwrap();
+        assert!(image_size_ok(&path));
+    }
+
+    #[test]
+    fn image_size_ok_over_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("big.png");
+        let mut f = std::fs::File::create(&path).unwrap();
+        let buf = vec![0u8; (MAX_IMAGE_SIZE + 1) as usize];
+        f.write_all(&buf).unwrap();
+        assert!(!image_size_ok(&path));
+    }
+
+    #[test]
+    fn image_size_ok_missing_file() {
+        let path = Path::new("/tmp/nonexistent_osr_test_image.png");
+        assert!(!image_size_ok(path));
+    }
+
+    #[test]
+    fn live_state_path_returns_expected() {
+        // This test relies on HOME being set, which is true in normal environments
+        let result = live_state_path();
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.ends_with(".osr_data/live_state.json"));
+    }
+
+    #[test]
+    fn image_path_returns_expected() {
+        let result = image_path();
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.ends_with(".osr_data/live/image.png"));
+    }
+}
