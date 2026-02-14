@@ -220,7 +220,7 @@ fn load_module_key_fields_equal(snapshot: &CommandParitySnapshot) -> bool {
         None => return false,
     };
 
-    snapshot.cli.output == snapshot.api.message
+    snapshot.cli.output.starts_with(&snapshot.api.message)
         && snapshot.cli.output.contains(module_name)
         && snapshot.cli.output.contains(&format!("{room_count} rooms"))
 }
@@ -299,9 +299,9 @@ fn treasure_module_command_parity_golden_scaffold_captures_snapshots() {
             cli_command: "load_module",
             gm_api_command: "LoadModule",
             state_mutation_parity: "Same dungeon/time/mode mutation via shared engine action",
-            output_data_parity: "Same message, with API exposing additional typed fields (`module_name`, `level_range`, `room_count`).",
+            output_data_parity: "CLI prepends API message then appends onboarding hints; API exposes additional typed fields (`module_name`, `level_range`, `room_count`).",
             class: "B",
-            notes: "Both adapters call `exploration::action_load_module`; API adds structured response data.",
+            notes: "Both adapters call `exploration::action_load_module`; CLI adds onboarding guidance lines, API adds structured response data.",
             state_equal: load_module_state_equal,
             output_key_fields_equal: load_module_output_key_fields_equal,
             snapshot: load_module_snapshot,

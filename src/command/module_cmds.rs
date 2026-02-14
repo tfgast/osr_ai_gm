@@ -21,7 +21,12 @@ impl Command for LoadModuleCommand {
 
         let path = args.join(" ");
         match module_engine::action_load_module(state, &path) {
-            Ok(result) => CommandResult::ok(result.message),
+            Ok(result) => CommandResult::ok(format!(
+                "{}\n\
+                 Use 'light torch <carrier>' or 'light lantern <carrier>' to light the way.\n\
+                 Use 'exploration_status' to see current position.",
+                result.message
+            )),
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
@@ -49,5 +54,21 @@ mod tests {
         assert!(result.success, "load_module failed: {}", result.output);
         assert_eq!(state.mode, GameMode::Exploration);
         assert!(state.dungeon.is_some());
+    }
+
+    #[test]
+    fn load_module_includes_onboarding_text() {
+        let command = LoadModuleCommand;
+        let mut state = GameState::new();
+        let result = command.execute(&["data/modules/sample_crypt/module.json"], &mut state);
+        assert!(result.success, "load_module failed: {}", result.output);
+        assert!(
+            result.output.contains("light torch"),
+            "missing torch onboarding hint"
+        );
+        assert!(
+            result.output.contains("exploration_status"),
+            "missing exploration_status onboarding hint"
+        );
     }
 }
