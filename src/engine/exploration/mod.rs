@@ -481,8 +481,9 @@ pub fn move_through_door_with<R: Rng>(
 
     dungeon.move_to(dest).map_err(|e| e.to_string())?;
 
-    // Per OSE, doors close automatically after passing through (unless spiked)
-    if door.state == DoorState::Open {
+    // Per OSE, doors close automatically after passing through (unless spiked
+    // or permanently open per module definition)
+    if door.state == DoorState::Open && !door.module_open {
         if let Some(d) = dungeon.find_door_mut(door_id) {
             d.state = DoorState::Closed;
         }
@@ -915,7 +916,7 @@ mod tests {
         let mut dungeon = test_dungeon();
         time.light(LightSourceKind::Lantern, "Test");
 
-        // Open door 0 and move through it
+        // Open door 0 (not module_open) and move through it
         dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
         let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
         assert!(result.is_ok());
@@ -925,6 +926,29 @@ mod tests {
             dungeon.doors.iter().find(|d| d.id == 0).unwrap().state,
             DoorState::Closed,
             "door should auto-close after passing through per OSE rules"
+        );
+    }
+
+    #[test]
+    fn module_open_door_does_not_auto_close() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Mark door 0 as module_open (permanent passage from module definition)
+        let door = dungeon.find_door_mut(0).unwrap();
+        door.state = DoorState::Open;
+        door.module_open = true;
+
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        assert_eq!(dungeon.current_room, Some(1));
+        // Module-open doors should NOT auto-close
+        assert_eq!(
+            dungeon.doors.iter().find(|d| d.id == 0).unwrap().state,
+            DoorState::Open,
+            "module-open door should remain open after passing through"
         );
     }
 
