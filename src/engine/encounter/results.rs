@@ -101,6 +101,12 @@ pub struct EvadeResult {
     pub party_movement: u32,
     pub monster_count: u32,
     pub monster_movement: u32,
+    /// d100 roll (null if auto-escape due to faster movement).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roll: Option<i32>,
+    /// Percentage chance needed to escape (null if auto-escape).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chance: Option<i32>,
 }
 
 /// Structured NPC member details returned by `spawn_npc_party`.

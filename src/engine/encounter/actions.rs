@@ -188,18 +188,19 @@ pub fn action_evade(
         monster_count,
         monster_movement,
     );
-    let escaped = matches!(result, encounter_engine::EvasionResult::Escaped);
 
     Ok(EvadeResult {
         message: format!(
             "Party ({} members, {}' movement) vs {} monsters ({}' movement)\n{}",
             party_size, party_movement, monster_count, monster_movement, result
         ),
-        escaped,
+        escaped: result.escaped,
         party_size,
         party_movement,
         monster_count,
         monster_movement,
+        roll: result.roll,
+        chance: result.chance,
     })
 }
 

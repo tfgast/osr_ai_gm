@@ -216,11 +216,13 @@ fn encounter_command_parity_compatibility_gates() {
     assert_eq!(
         evade.api.data_keys,
         vec![
+            "chance",
             "escaped",
             "monster_count",
             "monster_movement",
             "party_movement",
             "party_size",
+            "roll",
         ]
     );
 
