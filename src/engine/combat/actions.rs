@@ -587,7 +587,7 @@ pub fn action_backstab(
             Ok(r) => r.total.max(1),
             Err(_) => 1,
         };
-        let total_damage = (base_damage + str_mod).max(1) * multiplier as i32;
+        let total_damage = (base_damage.saturating_add(str_mod)).max(1).saturating_mul(multiplier as i32);
         combat.monsters[monster_idx].hp -= total_damage;
         let monster_name = combat.monsters[monster_idx].name.clone();
         let alive = combat.monsters[monster_idx].is_alive();

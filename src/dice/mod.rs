@@ -142,8 +142,8 @@ pub fn roll_with<R: Rng>(expr: &DiceExpr, rng: &mut R) -> RollResult {
             let rolls: Vec<u32> = (0..*count)
                 .map(|_| rng.gen_range(1..=*sides))
                 .collect();
-            let sum: u32 = rolls.iter().sum();
-            let total = sum as i32 + modifier;
+            let sum: u32 = rolls.iter().copied().fold(0u32, u32::saturating_add);
+            let total = (sum.min(i32::MAX as u32) as i32).saturating_add(*modifier);
             RollResult {
                 expr: expr.clone(),
                 rolls,

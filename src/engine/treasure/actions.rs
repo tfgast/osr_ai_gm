@@ -42,7 +42,7 @@ fn parse_quantity_with_multiplier(quantity: &str) -> Result<i32, String> {
             .parse()
             .map_err(|_| format!("invalid multiplier '{}'", multiplier_part))?;
 
-        Ok(base * multiplier)
+        Ok(base.saturating_mul(multiplier))
     } else if normalized.contains('d') || normalized.contains('D') {
         dice::roll_str(&normalized)
             .map(|r| r.total)
@@ -264,8 +264,8 @@ fn format_treasure_haul(treasure_type: &TreasureTypeDef, results: &[TreasureRoll
     }
 
     out.push_str("─────────────────────────────────\n");
-    let gems_gp: u32 = gem_results.iter().map(|r| r.total_gp).sum();
-    let jewellery_gp: u32 = jewellery_results.iter().map(|r| r.total_gp).sum();
+    let gems_gp: u32 = gem_results.iter().map(|r| r.total_gp).fold(0u32, u32::saturating_add);
+    let jewellery_gp: u32 = jewellery_results.iter().map(|r| r.total_gp).fold(0u32, u32::saturating_add);
     let total_gp = coins_total_gp + gems_gp as f64 + jewellery_gp as f64;
     out.push_str(&format!("TOTAL VALUE: {:.0} gp\n", total_gp));
     if coins_total_gp > 0.0 {
