@@ -311,12 +311,13 @@ fn damage(id: &str, state: &mut GameState, char_name: &str, amount: i32) -> GMRe
 
 fn set_hp(id: &str, state: &mut GameState, char_name: &str, hp: i32) -> GMResponse {
     match gm::action_set_hp(state, char_name, hp) {
-        Ok(result) => ok_with_typed_data(
-            id,
-            state,
-            format!("{} HP set to {} (was {}). Max HP: {}. Status: {}.", result.character, result.hp, result.old_hp, result.max_hp, result.status),
-            result,
-        ),
+        Ok(result) => {
+            let mut msg = format!("{} HP set to {} (was {}). Max HP: {}. Status: {}.", result.character, result.hp, result.old_hp, result.max_hp, result.status);
+            if let Some(warning) = &result.warning {
+                msg.push_str(&format!(" WARNING: {}", warning));
+            }
+            ok_with_typed_data(id, state, msg, result)
+        }
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }

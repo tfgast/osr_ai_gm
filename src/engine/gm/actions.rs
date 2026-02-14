@@ -233,7 +233,17 @@ pub fn action_set_hp(
         .ok_or_else(|| no_party_member_err(char_name))?;
 
     let old_hp = character.hp;
-    character.hp = hp;
+    let warning = if hp > character.max_hp {
+        let msg = format!(
+            "Requested HP {} exceeds max_hp {}; clamped to max_hp.",
+            hp, character.max_hp
+        );
+        character.hp = character.max_hp;
+        Some(msg)
+    } else {
+        character.hp = hp;
+        None
+    };
     let alive = character.is_alive();
     let status = if alive { "alive" } else { "DEAD" }.to_string();
 
@@ -244,6 +254,7 @@ pub fn action_set_hp(
         max_hp: character.max_hp,
         alive,
         status,
+        warning,
     })
 }
 

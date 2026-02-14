@@ -3414,6 +3414,24 @@ fn set_hp_no_character() {
     assert!(resp.error.unwrap().contains("no party member"));
 }
 
+#[test]
+fn set_hp_above_max_clamps_and_warns() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    // make_fighter gives hp=8, max_hp=8
+
+    let resp = handle_request(&req("shp4", GMCommand::SetHp {
+        character: "Aldric".to_string(), hp: 9999,
+    }), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert_eq!(data["hp"], 8); // clamped to max_hp
+    assert_eq!(data["max_hp"], 8);
+    assert!(data["warning"].as_str().unwrap().contains("clamped"));
+    assert!(resp.message.contains("WARNING"));
+    assert_eq!(state.party.find_member("Aldric").unwrap().hp, 8);
+}
+
 // ===========================================================================
 // GM Fiat: SetHelpless
 // ===========================================================================
