@@ -553,6 +553,14 @@ pub fn action_declare_spell(
     }
 
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
+
+    if combat.spell_declarations.iter().any(|n| n.eq_ignore_ascii_case(char_name)) {
+        return Err(EngineError::InvalidInput(format!(
+            "{} has already declared a spell this round.",
+            char_name
+        )));
+    }
+
     declare_spell(combat, char_name, spell_name);
 
     Ok(DeclareSpellResult {
@@ -1093,5 +1101,78 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("already acted"), "expected acted guard, got: {}", err);
+    }
+
+    // --- duplicate spell declaration guard (oag-upoq4) ---
+
+    fn state_with_caster_combat() -> GameState {
+        let mut state = GameState::new();
+        let mut caster = Character::new("Zara", Class::MagicUser);
+        caster.hp = 6;
+        caster.max_hp = 6;
+        caster.level = 3;
+        state.party.add_member(caster);
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin 1", "1", 4, 6, 7)],
+            60,
+        ));
+        state
+    }
+
+    #[test]
+    fn same_character_cannot_declare_spell_twice_per_round() {
+        let mut state = state_with_caster_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        // First declaration succeeds
+        let result = action_declare_spell(&mut state, "Zara", "Sleep");
+        assert!(result.is_ok(), "first declaration should succeed: {:?}", result.err());
+
+        // Second declaration in same round is rejected
+        let result = action_declare_spell(&mut state, "Zara", "Magic Missile");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("already declared a spell this round"),
+            "expected spell guard, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn spell_declaration_guard_is_case_insensitive() {
+        let mut state = state_with_caster_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        let result = action_declare_spell(&mut state, "Zara", "Sleep");
+        assert!(result.is_ok());
+
+        // Differently-cased name should still be rejected
+        let result = action_declare_spell(&mut state, "zara", "Magic Missile");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("already declared a spell this round"),
+            "expected spell guard, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn spell_declaration_allowed_after_new_round() {
+        let mut state = state_with_caster_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        let result = action_declare_spell(&mut state, "Zara", "Sleep");
+        assert!(result.is_ok());
+
+        // New round clears spell declarations
+        let _ = action_roll_initiative(&mut state);
+
+        // Should be allowed again
+        let result = action_declare_spell(&mut state, "Zara", "Magic Missile");
+        assert!(result.is_ok(), "declaration in new round should succeed: {:?}", result.err());
     }
 }
