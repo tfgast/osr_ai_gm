@@ -230,12 +230,12 @@ fn full_dungeon_session() {
     let data = resp.data.unwrap();
     let total_xp = data["total_xp"].as_u64().unwrap();
 
-    // -- STEP 13: Award XP from treasure + monsters --
-    // Award treasure XP to the fighter (1gp = 1xp)
+    // -- STEP 13: Award XP from treasure --
+    // Monster XP was auto-distributed by end_combat, so only award treasure here
     let resp = handle_request(&req("30", GMCommand::AwardTreasureXp {
         character: "Aldric".to_string(),
         treasure_gp: 500,
-        monster_xp: total_xp,
+        monster_xp: 0,
     }), &mut state);
     assert!(resp.success, "award treasure xp failed: {}", resp.message);
     let data = resp.data.unwrap();
@@ -248,7 +248,7 @@ fn full_dungeon_session() {
     let resp = handle_request(&req("31", GMCommand::AwardTreasureXp {
         character: "Shade".to_string(),
         treasure_gp: 500,
-        monster_xp: total_xp,
+        monster_xp: 0,
     }), &mut state);
     assert!(resp.success, "award thief xp failed: {}", resp.message);
     assert!(state.party.find_member("Shade").unwrap().xp > 0, "Shade should have XP after award");
@@ -705,16 +705,15 @@ fn complete_ose_session() {
     let monster_xp = data["total_xp"].as_u64().unwrap();
 
     // === LOOT & XP ===
-    // Party finds 300gp treasure (1gp = 1xp)
+    // Monster XP was auto-distributed by end_combat, so only award treasure here
     let treasure_gp = 300u64;
     let per_member_treasure = treasure_gp / 3;
-    let per_member_monster_xp = monster_xp / 3;
 
     for name in &["Sir Aldric", "Nyx the Shadow", "Brother Tomas"] {
         let resp = handle_request(&req("x1", GMCommand::AwardTreasureXp {
             character: name.to_string(),
             treasure_gp: per_member_treasure,
-            monster_xp: per_member_monster_xp,
+            monster_xp: 0,
         }), &mut state);
         assert!(resp.success, "award xp to {} failed: {}", name, resp.message);
     }
@@ -1638,28 +1637,30 @@ fn session_a_dungeon_crawl() {
     assert!(resp.success);
     assert!(!resp.message.is_empty(), "morale check should have result");
 
-    // End combat — restores Exploration mode
+    // End combat — restores Exploration mode and auto-distributes monster XP
     let resp = handle_request(&req("a29", GMCommand::EndCombat), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Exploration);
     let combat_data = resp.data.unwrap();
     let monster_xp = combat_data["total_xp"].as_u64().unwrap();
     // monster_xp may be 0 if no goblins were killed (attack rolls are random)
+    // Monster XP is now auto-distributed by end_combat to surviving party members
+    let xp_per_survivor = combat_data["xp_per_survivor"].as_u64().unwrap();
+    assert_eq!(xp_per_survivor, monster_xp / 4); // 4 survivors
 
     // === STEP 5: Loot treasure and award XP ===
+    // Monster XP was already auto-distributed by end_combat, so only award treasure here
     let treasure_gp = 2000u64; // big haul to trigger level-up
     let share = treasure_gp / 4;
-    let monster_share = monster_xp / 4;
 
-    // Track pre-XP state
+    // Track pre-XP state (may already have combat XP from auto-distribution)
     let pre_fighter_xp = state.party.find_member("Aldric the Bold").unwrap().xp;
-    assert_eq!(pre_fighter_xp, 0);
 
     for name in &["Aldric the Bold", "Vex", "Sister Mira", "Zanthus"] {
         let resp = handle_request(&req("a30", GMCommand::AwardTreasureXp {
             character: name.to_string(),
             treasure_gp: share,
-            monster_xp: monster_share,
+            monster_xp: 0,
         }), &mut state);
         assert!(resp.success, "award xp to {} failed: {}", name, resp.message);
     }
@@ -2285,12 +2286,12 @@ fn character_progression_multi_level() {
     assert!(resp.success);
     let combat1_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
 
-    // Award combat 1 XP + small treasure
+    // Award combat 1 treasure (monster XP was auto-distributed by end_combat)
     for name in &["Bjorn", "Nyx", "Amara", "Elara"] {
         let resp = handle_request(&req("p6", GMCommand::AwardTreasureXp {
             character: name.to_string(),
             treasure_gp: 50,
-            monster_xp: combat1_xp / 4,
+            monster_xp: 0,
         }), &mut state);
         assert!(resp.success);
     }
@@ -2311,12 +2312,12 @@ fn character_progression_multi_level() {
     let resp = handle_request(&req("p13", GMCommand::EndCombat), &mut state);
     let combat2_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
 
-    // Award combat 2 XP + bigger treasure
+    // Award combat 2 treasure (monster XP was auto-distributed by end_combat)
     for name in &["Bjorn", "Nyx", "Amara", "Elara"] {
         handle_request(&req("p14", GMCommand::AwardTreasureXp {
             character: name.to_string(),
             treasure_gp: 200,
-            monster_xp: combat2_xp / 4,
+            monster_xp: 0,
         }), &mut state);
     }
 

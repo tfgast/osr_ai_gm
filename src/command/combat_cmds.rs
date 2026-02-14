@@ -418,6 +418,39 @@ impl Command for EndCombatCommand {
                         "\nTotal XP from defeated monsters: {}",
                         result.total_xp
                     ));
+                    if !result.xp_awards.is_empty() {
+                        out.push_str(&format!(
+                            "\nXP per survivor: {} (split among {})",
+                            result.xp_per_survivor,
+                            result.xp_awards.len()
+                        ));
+                        for award in &result.xp_awards {
+                            let train_note = if award.ready_to_train {
+                                " ★ READY TO TRAIN"
+                            } else {
+                                ""
+                            };
+                            if award.modifier_pct != 0 {
+                                out.push_str(&format!(
+                                    "\n  {} — {} XP ({:+}% prime req → {} adjusted, total: {}){}",
+                                    award.character,
+                                    award.base_xp,
+                                    award.modifier_pct,
+                                    award.adjusted_xp,
+                                    award.total_xp,
+                                    train_note
+                                ));
+                            } else {
+                                out.push_str(&format!(
+                                    "\n  {} — {} XP (total: {}){}",
+                                    award.character,
+                                    award.adjusted_xp,
+                                    award.total_xp,
+                                    train_note
+                                ));
+                            }
+                        }
+                    }
                     if let Some(xp_each) = result.retainer_xp_each {
                         if !result.retainer_xp_recipients.is_empty() {
                             out.push_str(&format!(

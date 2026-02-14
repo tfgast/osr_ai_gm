@@ -330,6 +330,17 @@ pub struct SetHelplessResult {
     pub helpless: bool,
 }
 
+/// Per-character XP award from combat.
+#[derive(Debug, Clone, Serialize)]
+pub struct CombatXpAward {
+    pub character: String,
+    pub base_xp: u64,
+    pub modifier_pct: i32,
+    pub adjusted_xp: u64,
+    pub total_xp: u64,
+    pub ready_to_train: bool,
+}
+
 /// Typed success payload for `end_combat`.
 #[derive(Debug, Clone, Serialize)]
 pub struct EndCombatResult {
@@ -338,6 +349,8 @@ pub struct EndCombatResult {
     pub monsters_defeated: usize,
     pub total_monsters: usize,
     pub total_xp: u64,
+    pub xp_per_survivor: u64,
+    pub xp_awards: Vec<CombatXpAward>,
     pub party_casualties: usize,
     pub mode_after: GameMode,
     pub retainer_xp_each: Option<u64>,
