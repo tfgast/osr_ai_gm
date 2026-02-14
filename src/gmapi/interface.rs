@@ -144,6 +144,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::AddRations { amount } => add_rations(id, state, *amount),
 
         // -- Inventory --
+        GMCommand::ListEquipment { category } => exploration_handlers::list_equipment(id, state, category),
         GMCommand::Buy { character, item_name } => exploration_handlers::buy(id, state, character, item_name),
         GMCommand::Drop { character, item_name } => exploration_handlers::drop(id, state, character, item_name),
         GMCommand::Equip { character, item_name } => exploration_handlers::equip(id, state, character, item_name),
@@ -1202,5 +1203,44 @@ mod tests {
 
         // HP should be unchanged
         assert_eq!(state.party.find_member("Shadow").unwrap().hp, -1);
+    }
+
+    #[test]
+    fn list_equipment_all() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::ListEquipment {
+            category: None,
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        assert!(data["total"].as_u64().unwrap() > 0);
+        assert!(!data["weapons"].as_array().unwrap().is_empty());
+        assert!(!data["armour"].as_array().unwrap().is_empty());
+        assert!(!data["gear"].as_array().unwrap().is_empty());
+        assert!(!data["ammunition"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn list_equipment_weapons_only() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::ListEquipment {
+            category: Some("weapons".to_string()),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        assert!(!data["weapons"].as_array().unwrap().is_empty());
+        assert!(data["armour"].as_array().unwrap().is_empty());
+        assert!(data["gear"].as_array().unwrap().is_empty());
+        assert!(data["ammunition"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn list_equipment_invalid_category() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::ListEquipment {
+            category: Some("potions".to_string()),
+        }), &mut state);
+        assert!(!resp.success);
+        assert!(resp.message.contains("unknown category"));
     }
 }

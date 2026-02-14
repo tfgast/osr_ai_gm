@@ -36,3 +36,20 @@ pub struct LootResult {
     pub item: String,
     pub value_gp: u32,
 }
+
+/// An item entry in the equipment listing.
+#[derive(Debug, Clone, Serialize)]
+pub struct EquipmentEntry {
+    pub name: String,
+    pub cost_gp: u32,
+    pub category: String,
+}
+
+/// Typed success payload for `list_equipment` / `action_list_equipment`.
+#[derive(Debug, Clone, Serialize)]
+pub struct ListEquipmentResult {
+    pub weapons: Vec<EquipmentEntry>,
+    pub armour: Vec<EquipmentEntry>,
+    pub gear: Vec<EquipmentEntry>,
+    pub ammunition: Vec<EquipmentEntry>,
+}

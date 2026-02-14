@@ -181,6 +181,46 @@ pub(super) fn equip(id: &str, state: &mut GameState, character: &str, item_name:
     }
 }
 
+pub(super) fn list_equipment(id: &str, state: &GameState, category: &Option<String>) -> GMResponse {
+    let result = crate::engine::inventory::action_list_equipment();
+
+    let filter = category.as_deref().map(|c| c.to_lowercase());
+
+    let (weapons, armour, gear, ammunition) = match filter.as_deref() {
+        Some("weapons" | "weapon") => (result.weapons, vec![], vec![], vec![]),
+        Some("armour" | "armor") => (vec![], result.armour, vec![], vec![]),
+        Some("gear" | "adventuring gear") => (vec![], vec![], result.gear, vec![]),
+        Some("ammunition" | "ammo") => (vec![], vec![], vec![], result.ammunition),
+        Some(unknown) => {
+            return GMResponse::err(
+                id,
+                format!(
+                    "unknown category '{}'. Valid categories: weapons, armour, gear, ammunition",
+                    unknown
+                ),
+                state.mode.clone(),
+            );
+        }
+        None => (result.weapons, result.armour, result.gear, result.ammunition),
+    };
+
+    let total = weapons.len() + armour.len() + gear.len() + ammunition.len();
+    let message = format!("{} items available for purchase.", total);
+
+    ok_with_typed_data(
+        id,
+        state,
+        message,
+        serde_json::json!({
+            "weapons": weapons,
+            "armour": armour,
+            "gear": gear,
+            "ammunition": ammunition,
+            "total": total,
+        }),
+    )
+}
+
 pub(super) fn loot(id: &str, state: &mut GameState, character: &str, item_name: &str, explicit_gp: Option<u32>) -> GMResponse {
     match crate::engine::inventory::action_loot(state, character, item_name, explicit_gp) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
