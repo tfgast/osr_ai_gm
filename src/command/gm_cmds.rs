@@ -152,10 +152,16 @@ impl Command for SetHpCommand {
             _ => return CommandResult::error("amount must be an integer"),
         };
         match gm::action_set_hp(state, args[0], amount) {
-            Ok(result) => CommandResult::ok(format!(
-                "{} HP set to {} (was {}). Max HP: {}. Status: {}.",
-                result.character, result.hp, result.old_hp, result.max_hp, result.status
-            )),
+            Ok(result) => {
+                let mut msg = format!(
+                    "{} HP set to {} (was {}). Max HP: {}. Status: {}.",
+                    result.character, result.hp, result.old_hp, result.max_hp, result.status
+                );
+                if let Some(warning) = &result.warning {
+                    msg.push_str(&format!(" WARNING: {}", warning));
+                }
+                CommandResult::ok(msg)
+            }
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
@@ -597,6 +603,21 @@ mod tests {
         let cmd = SetHpCommand;
         let result = cmd.execute(&["Aldric"], &mut state);
         assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn set_hp_above_max_clamps_and_warns() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Grond", Class::Fighter);
+        c.hp = 5;
+        c.max_hp = 7;
+        state.party.add_member(c);
+        let cmd = SetHpCommand;
+        let result = cmd.execute(&["Grond", "9999"], &mut state);
+        assert!(result.output.contains("HP set to 7"));
+        assert!(result.output.contains("WARNING"));
+        assert!(result.output.contains("clamped"));
+        assert_eq!(state.party.find_member("Grond").unwrap().hp, 7);
     }
 
     #[test]
