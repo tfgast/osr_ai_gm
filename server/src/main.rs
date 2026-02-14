@@ -8,7 +8,7 @@ use axum::{
 use osr_ai_gm::auth::TokenStore;
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::gmapi::protocol::{self, GMResponse};
-use osr_ai_gm::persist::GameState;
+use osr_ai_gm::persist::{self, GameState};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -122,7 +122,10 @@ async fn gm_endpoint(
             // Poisoned mutex — recover by taking the inner value.
             e.into_inner()
         });
-        handle_request(&req, &mut game)
+        let resp = handle_request(&req, &mut game);
+        // Export live state for the companion TUI (best-effort, ignore errors).
+        let _ = persist::export_live_state(&game);
+        resp
     };
 
     let json = protocol::serialize_response(&response);
