@@ -4741,3 +4741,74 @@ fn spawn_monster_rejects_during_combat() {
     assert!(state.combat.is_some());
     assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
 }
+
+// ===========================================================================
+// LeaveWilderness
+// ===========================================================================
+
+#[test]
+fn leave_wilderness_happy_path() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+    assert_eq!(state.mode, GameMode::Wilderness);
+    assert!(state.wilderness.is_some());
+
+    let resp = handle_request(&req("lw1", GMCommand::LeaveWilderness), &mut state);
+    assert_response_format(&resp, "lw1");
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Idle);
+    assert!(state.wilderness.is_none());
+    assert_eq!(resp.mode, GameMode::Idle);
+}
+
+#[test]
+fn leave_wilderness_not_in_wilderness() {
+    let mut state = GameState::new();
+    assert_eq!(state.mode, GameMode::Idle);
+
+    let resp = handle_request(&req("lw2", GMCommand::LeaveWilderness), &mut state);
+    assert_response_format(&resp, "lw2");
+    assert!(!resp.success);
+    assert!(resp.error.as_ref().unwrap().contains("not in wilderness mode"));
+    assert_eq!(state.mode, GameMode::Idle);
+}
+
+#[test]
+fn leave_wilderness_during_exploration() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    let resp = handle_request(&req("lw3", GMCommand::LeaveWilderness), &mut state);
+    assert_response_format(&resp, "lw3");
+    assert!(!resp.success);
+    assert_eq!(state.mode, GameMode::Exploration);
+}
+
+#[test]
+fn leave_wilderness_then_enter_dungeon() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    // Leave wilderness
+    let resp = handle_request(&req("lw4", GMCommand::LeaveWilderness), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Idle);
+
+    // Now enter dungeon should work
+    let resp = handle_request(&req("ed1", GMCommand::EnterDungeon {
+        level: 1,
+        room_name: "Cave Entrance".to_string(),
+    }), &mut state);
+    assert!(resp.success, "EnterDungeon after LeaveWilderness should succeed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Exploration);
+}
+
+#[test]
+fn leave_wilderness_parses_from_json() {
+    let json = r#"{"id":"lw5","command":{"type":"LeaveWilderness"}}"#;
+    let req = parse_request(json).unwrap();
+    assert_eq!(req.id, "lw5");
+    assert!(matches!(req.command, GMCommand::LeaveWilderness));
+}

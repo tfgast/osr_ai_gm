@@ -1,7 +1,7 @@
 use crate::engine::result::EngineError;
 use crate::engine::wilderness::results::{
-    AddHexResult, EnterWildernessResult, ForageResult, HuntResult, OrientResult, TravelResult,
-    WildernessStatusResult,
+    AddHexResult, EnterWildernessResult, ForageResult, HuntResult, LeaveWildernessResult,
+    OrientResult, TravelResult, WildernessStatusResult,
 };
 use crate::engine::wilderness_engine;
 use crate::persist::GameState;
@@ -152,6 +152,17 @@ pub fn action_hunt(state: &mut GameState) -> Result<HuntResult, EngineError> {
         starving: core.overhead.starving,
         starvation_damage: core.overhead.starvation_damage,
         travel_day: wilderness.travel_day,
+    })
+}
+
+pub fn action_leave_wilderness(
+    state: &mut GameState,
+) -> Result<LeaveWildernessResult, EngineError> {
+    require_wilderness_mode(state)?;
+    state.exit_wilderness();
+
+    Ok(LeaveWildernessResult {
+        message: "left wilderness mode.".to_string(),
     })
 }
 

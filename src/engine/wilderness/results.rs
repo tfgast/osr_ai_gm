@@ -92,3 +92,8 @@ pub struct WildernessStatusResult {
     pub message: String,
     pub movement_rate: u32,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LeaveWildernessResult {
+    pub message: String,
+}

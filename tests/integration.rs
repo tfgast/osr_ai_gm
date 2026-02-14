@@ -2765,9 +2765,8 @@ fn playtest2c_enter_wilderness_while_in_wilderness() {
     assert_eq!(state.mode, GameMode::Wilderness);
 }
 
-/// oag-exmb2: EnterDungeon from wilderness currently rejects.
-/// The error says "Use LeaveWilderness first" but no LeaveWilderness command exists yet.
-/// This documents the current behavior and is a known gap.
+/// oag-exmb2: EnterDungeon from wilderness rejects.
+/// The error says "Use LeaveWilderness first" — user must leave wilderness before entering dungeon.
 #[test]
 fn playtest2c_enter_dungeon_from_wilderness_blocked() {
     let mut state = GameState::new();

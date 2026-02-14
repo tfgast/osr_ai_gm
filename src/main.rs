@@ -32,8 +32,8 @@ use osr_ai_gm::command::system::{
 };
 use osr_ai_gm::command::treasure_cmds::TreasureCommand;
 use osr_ai_gm::command::wilderness_cmds::{
-    AddHexCommand, EnterWildernessCommand, ForageCommand, HuntCommand, OrientCommand,
-    TravelCommand, WildernessStatusCommand,
+    AddHexCommand, EnterWildernessCommand, ForageCommand, HuntCommand, LeaveWildernessCommand,
+    OrientCommand, TravelCommand, WildernessStatusCommand,
 };
 use osr_ai_gm::command::CommandRegistry;
 use osr_ai_gm::persist::{self, GameState};
@@ -147,6 +147,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(TreasureCommand));
     // Wilderness
     registry.register(Box::new(EnterWildernessCommand));
+    registry.register(Box::new(LeaveWildernessCommand));
     registry.register(Box::new(AddHexCommand));
     registry.register(Box::new(TravelCommand));
     registry.register(Box::new(ForageCommand));

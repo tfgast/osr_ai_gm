@@ -111,6 +111,16 @@ impl GameState {
         self.mode = GameMode::Wilderness;
     }
 
+    /// Leave Wilderness mode, returning to Idle.
+    ///
+    /// Clears the wilderness state. No-op if not in wilderness mode.
+    pub fn exit_wilderness(&mut self) {
+        if self.mode == GameMode::Wilderness {
+            self.wilderness = None;
+            self.mode = GameMode::Idle;
+        }
+    }
+
     /// Assert that mode and associated sub-state are consistent.
     ///
     /// This is a debug-only check; it compiles to nothing in release builds.
@@ -545,6 +555,26 @@ mod tests {
         state.enter_wilderness(ws);
         assert_eq!(state.mode, GameMode::Wilderness);
         assert!(state.wilderness.is_some());
+    }
+
+    #[test]
+    fn exit_wilderness_clears_state() {
+        let mut state = GameState::new();
+        state.enter_wilderness(WildernessState::new());
+        assert_eq!(state.mode, GameMode::Wilderness);
+        state.exit_wilderness();
+        assert_eq!(state.mode, GameMode::Idle);
+        assert!(state.wilderness.is_none());
+    }
+
+    #[test]
+    fn exit_wilderness_noop_when_not_in_wilderness() {
+        let mut state = GameState::new();
+        let dungeon = DungeonState::new(1);
+        state.enter_exploration(dungeon, 1);
+        assert_eq!(state.mode, GameMode::Exploration);
+        state.exit_wilderness();
+        assert_eq!(state.mode, GameMode::Exploration, "exit_wilderness should be a no-op when not in wilderness");
     }
 
     #[test]
