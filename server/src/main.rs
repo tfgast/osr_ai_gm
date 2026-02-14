@@ -93,13 +93,14 @@ async fn gm_endpoint(
         None => {
             return error_response(
                 StatusCode::UNAUTHORIZED,
+                "",
                 "missing or malformed Authorization header; expected: Bearer <token>",
             );
         }
     };
 
     if !state.tokens.validate(token) {
-        return error_response(StatusCode::UNAUTHORIZED, "invalid API token");
+        return error_response(StatusCode::UNAUTHORIZED, "", "invalid API token");
     }
 
     // Validate Content-Type header: require application/json.
@@ -114,7 +115,8 @@ async fn gm_endpoint(
     let req = match protocol::parse_request(&body) {
         Ok(r) => r,
         Err(e) => {
-            return error_response(StatusCode::BAD_REQUEST, &e);
+            let id = protocol::extract_request_id(&body);
+            return error_response(StatusCode::BAD_REQUEST, &id, &e);
         }
     };
 
@@ -161,8 +163,8 @@ fn json_response(status: StatusCode, body: String) -> (StatusCode, [(header::Hea
     (status, [(header::CONTENT_TYPE, "application/json")], body)
 }
 
-fn error_response(status: StatusCode, msg: &str) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
-    let resp = GMResponse::err("", msg, osr_ai_gm::state::game::GameMode::Idle);
+fn error_response(status: StatusCode, id: &str, msg: &str) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
+    let resp = GMResponse::err(id, msg, osr_ai_gm::state::game::GameMode::Idle);
     json_response(status, protocol::serialize_response(&resp))
 }
 
