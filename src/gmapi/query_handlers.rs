@@ -1,7 +1,24 @@
-use crate::engine::{combat, exploration, wilderness_engine};
+use crate::engine::{combat, exploration, lookup, party, wilderness_engine};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
 use crate::rules::encumbrance;
+use serde::Serialize;
+
+fn ok_with_typed_data<T: Serialize>(
+    id: &str,
+    state: &GameState,
+    message: String,
+    payload: T,
+) -> GMResponse {
+    match serde_json::to_value(payload) {
+        Ok(data) => GMResponse::ok_with_data(id, message, state.mode.clone(), data),
+        Err(err) => GMResponse::err(
+            id,
+            format!("internal error: failed to serialize response: {err}"),
+            state.mode.clone(),
+        ),
+    }
+}
 
 pub(super) fn query_state(id: &str, state: &GameState) -> GMResponse {
     let data = serde_json::json!({
@@ -113,4 +130,204 @@ pub(super) fn query_encumbrance(id: &str, state: &GameState, char_name: &str) ->
             "max_capacity": encumbrance::MAX_CAPACITY_CN,
         }),
     )
+}
+
+// =============================================================================
+// Party queries
+// =============================================================================
+
+#[derive(Serialize)]
+struct QueryPartyMemberData {
+    name: String,
+    class: String,
+    level: u32,
+    hp: i32,
+    max_hp: i32,
+    ac: i32,
+    thac0: u32,
+    xp: u64,
+    alive: bool,
+    alignment: String,
+    movement_rate: u32,
+}
+
+#[derive(Serialize)]
+struct QueryPartyData {
+    members: Vec<QueryPartyMemberData>,
+}
+
+fn query_party_member_data(member: &party::results::PartyMemberSummary) -> QueryPartyMemberData {
+    QueryPartyMemberData {
+        name: member.name.clone(),
+        class: member.class.clone(),
+        level: member.level,
+        hp: member.hp,
+        max_hp: member.max_hp,
+        ac: member.ac,
+        thac0: member.thac0,
+        xp: member.xp,
+        alive: member.alive,
+        alignment: member.alignment.clone(),
+        movement_rate: member.movement_rate,
+    }
+}
+
+pub(super) fn query_party(id: &str, state: &GameState) -> GMResponse {
+    match party::action_query_party(state) {
+        Ok(result) => {
+            let members: Vec<QueryPartyMemberData> = result
+                .members
+                .iter()
+                .map(query_party_member_data)
+                .collect();
+
+            let message = if members.is_empty() {
+                "no party members.".to_string()
+            } else {
+                format!("{} party members.", members.len())
+            };
+            ok_with_typed_data(
+                id,
+                state,
+                message,
+                QueryPartyData { members },
+            )
+        }
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+// =============================================================================
+// Class queries
+// =============================================================================
+
+#[derive(Serialize)]
+struct ListClassesData {
+    classes: Vec<party::results::ClassSummary>,
+}
+
+#[derive(Serialize)]
+struct EligibleAbilitiesData {
+    #[serde(rename = "STR")]
+    str_score: i32,
+    #[serde(rename = "INT")]
+    int_score: i32,
+    #[serde(rename = "WIS")]
+    wis_score: i32,
+    #[serde(rename = "DEX")]
+    dex_score: i32,
+    #[serde(rename = "CON")]
+    con_score: i32,
+    #[serde(rename = "CHA")]
+    cha_score: i32,
+}
+
+#[derive(Serialize)]
+struct EligibleClassesData {
+    abilities: EligibleAbilitiesData,
+    eligible: Vec<String>,
+    count: usize,
+}
+
+pub(super) fn list_classes(id: &str, state: &GameState) -> GMResponse {
+    match party::action_list_classes() {
+        Ok(result) => ok_with_typed_data(
+            id,
+            state,
+            format!("{} character classes available.", result.classes.len()),
+            ListClassesData {
+                classes: result.classes,
+            },
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+pub(super) fn eligible_classes(id: &str, state: &GameState, abilities: &[i32; 6]) -> GMResponse {
+    match party::action_eligible_classes(*abilities) {
+        Ok(result) => {
+            let eligible_count = result.eligible.len();
+            ok_with_typed_data(
+                id,
+                state,
+                format!(
+                    "abilities STR {} INT {} WIS {} DEX {} CON {} CHA {}: {} eligible class(es).",
+                    result.abilities[0],
+                    result.abilities[1],
+                    result.abilities[2],
+                    result.abilities[3],
+                    result.abilities[4],
+                    result.abilities[5],
+                    eligible_count
+                ),
+                EligibleClassesData {
+                    abilities: EligibleAbilitiesData {
+                        str_score: result.abilities[0],
+                        int_score: result.abilities[1],
+                        wis_score: result.abilities[2],
+                        dex_score: result.abilities[3],
+                        con_score: result.abilities[4],
+                        cha_score: result.abilities[5],
+                    },
+                    eligible: result.eligible,
+                    count: eligible_count,
+                },
+            )
+        }
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+// =============================================================================
+// Lookup & reference
+// =============================================================================
+
+pub(super) fn lookup_item(id: &str, state: &GameState, name: &str) -> GMResponse {
+    match lookup::action_lookup_item(name) {
+        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+pub(super) fn search_items(id: &str, state: &GameState, query: &str) -> GMResponse {
+    match lookup::action_search_items(query) {
+        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+pub(super) fn lookup_treasure_type(id: &str, state: &GameState, letter: &str) -> GMResponse {
+    match lookup::action_lookup_treasure_type(letter) {
+        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+pub(super) fn roll_treasure(id: &str, state: &GameState, letter: &str) -> GMResponse {
+    match lookup::action_roll_treasure(letter) {
+        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+pub(super) fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &str) -> GMResponse {
+    let list = if list_name.is_empty() {
+        None
+    } else {
+        match lookup::parse_spell_list(list_name) {
+            Some(list) => Some(list),
+            None => {
+                return GMResponse::err(
+                    id,
+                    format!("unknown spell list '{}'.", list_name),
+                    state.mode.clone(),
+                )
+            }
+        }
+    };
+
+    match lookup::action_lookup_spell(name, list) {
+        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
 }
