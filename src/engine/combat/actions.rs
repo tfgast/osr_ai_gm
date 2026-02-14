@@ -1,16 +1,17 @@
+use crate::dice;
 use crate::engine::result::EngineError;
 use crate::engine::retainer::{self, LoyaltyResult};
 use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
 use crate::rules::class::Class;
-use crate::rules::{equipment, monster as monster_db};
+use crate::rules::{ability, equipment, monster as monster_db, thief};
 use crate::state::game::GameMode;
 
 use super::results::{
-    AttackResult, CloseResult, CombatLogResult, DeclareSpellResult, EndCombatResult,
-    FightingWithdrawalResult, InitiativeResult, InitiativeWinner, MonsterAttackResult,
-    MoraleResult, RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome, RetreatResult,
-    SpawnEncounterResult, TurnUndeadResult,
+    AttackResult, BackstabResult, CloseResult, CombatLogResult, DeclareSpellResult,
+    EndCombatResult, FightingWithdrawalResult, InitiativeResult, InitiativeWinner,
+    MonsterAttackResult, MoraleResult, RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome,
+    RetreatResult, SpawnEncounterResult, TurnUndeadResult,
 };
 use super::{
     check_morale, close, combat_status, coup_de_grace, declare_spell, fighting_withdrawal,
@@ -445,6 +446,107 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
         retainer_xp_recipients,
         retainer_loyalty_checks,
     })
+}
+
+pub fn action_backstab(
+    state: &mut GameState,
+    char_name: &str,
+    monster_idx: usize,
+    weapon_name: &str,
+) -> Result<BackstabResult, EngineError> {
+    let weapon = equipment::find_weapon(weapon_name).ok_or_else(|| {
+        EngineError::InvalidInput(format!("unknown weapon '{}'.", weapon_name))
+    })?;
+
+    let character = state.party.find_member(char_name).cloned().ok_or_else(|| {
+        EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
+    })?;
+
+    if !thief::can_backstab(character.class) {
+        return Err(EngineError::InvalidInput(format!(
+            "{} ({}) cannot backstab.",
+            character.name,
+            character.class.name()
+        )));
+    }
+
+    let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
+
+    if monster_idx >= combat.monsters.len() {
+        return Err(EngineError::InvalidInput(format!(
+            "monster index {} out of range.",
+            monster_idx
+        )));
+    }
+    if !combat.monsters[monster_idx].is_alive() {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is already dead.",
+            combat.monsters[monster_idx].name
+        )));
+    }
+
+    let multiplier = thief::backstab_multiplier(character.level);
+    let str_mod = ability::str_melee_mod(character.abilities.strength);
+    let attack_bonus = thief::BACKSTAB_ATTACK_BONUS;
+
+    let target_ac = combat.monsters[monster_idx].ac;
+    let target_number =
+        (character.thac0 as i32 - target_ac - attack_bonus - str_mod).clamp(2, 20);
+    let attack_roll: i32 = rand::Rng::gen_range(&mut rand::thread_rng(), 1..=20);
+
+    let hit = attack_roll == 20 || (attack_roll != 1 && attack_roll >= target_number);
+
+    if hit {
+        let base_damage = match dice::roll_str(weapon.damage_dice()) {
+            Ok(r) => r.total.max(1),
+            Err(_) => 1,
+        };
+        let total_damage = (base_damage + str_mod).max(1) * multiplier as i32;
+        combat.monsters[monster_idx].hp -= total_damage;
+        let monster_name = combat.monsters[monster_idx].name.clone();
+        let alive = combat.monsters[monster_idx].is_alive();
+        combat.log.push(format!(
+            "{} backstabs {} for {} damage (x{}){}",
+            character.name,
+            monster_name,
+            total_damage,
+            multiplier,
+            if !alive { " — KILLED!" } else { "" }
+        ));
+        Ok(BackstabResult {
+            message: format!(
+                "{} backstabs {} (+{} to hit, x{} damage)! Rolled {} vs target {}: HIT for {} damage{}.",
+                character.name, monster_name, attack_bonus, multiplier,
+                attack_roll, target_number, total_damage,
+                if !alive { " — KILLED!" } else { "" }
+            ),
+            hit: true,
+            attack_roll,
+            target_number,
+            attack_bonus,
+            multiplier,
+            damage: Some(total_damage),
+            monster_alive: Some(alive),
+        })
+    } else {
+        combat.log.push(format!(
+            "{} backstab attempt on {} missed",
+            character.name, combat.monsters[monster_idx].name
+        ));
+        Ok(BackstabResult {
+            message: format!(
+                "{} backstab attempt: rolled {} vs target {} — MISS.",
+                character.name, attack_roll, target_number
+            ),
+            hit: false,
+            attack_roll,
+            target_number,
+            attack_bonus,
+            multiplier,
+            damage: None,
+            monster_alive: None,
+        })
+    }
 }
 
 pub fn action_coup_de_grace(

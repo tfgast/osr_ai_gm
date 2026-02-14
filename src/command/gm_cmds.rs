@@ -1,10 +1,9 @@
 use super::{Command, CommandResult};
-use crate::dice;
 use crate::engine::{combat, gm, xp};
 use crate::persist::GameState;
 use crate::rules::class::class_def;
 use crate::rules::xp::{check_level_up, xp_for_level};
-use crate::rules::{ability, equipment, spell, thief};
+use crate::rules::{spell, thief};
 use crate::state::game::GameMode;
 
 pub struct SpawnEncounterCommand;
@@ -454,78 +453,9 @@ impl Command for BackstabCommand {
         };
         let weapon_name = if args.len() >= 3 { args[2] } else { "sword" };
 
-        let weapon = match equipment::find_weapon(weapon_name) {
-            Some(w) => w,
-            None => return CommandResult::error(format!("unknown weapon '{}'.", weapon_name)),
-        };
-        let character = match state.party.find_member(char_name) {
-            Some(c) => c.clone(),
-            None => return CommandResult::error(format!("no party member named '{}'.", char_name)),
-        };
-        if !thief::can_backstab(character.class) {
-            return CommandResult::error(format!(
-                "{} ({}) cannot backstab.",
-                character.name,
-                character.class.name()
-            ));
-        }
-        let combat_state = match state.combat.as_mut() {
-            Some(c) => c,
-            None => return CommandResult::error("no active combat."),
-        };
-        if monster_idx >= combat_state.monsters.len() {
-            return CommandResult::error(format!("monster index {} out of range.", monster_idx));
-        }
-        if !combat_state.monsters[monster_idx].is_alive() {
-            return CommandResult::error(format!(
-                "{} is already dead.",
-                combat_state.monsters[monster_idx].name
-            ));
-        }
-
-        let multiplier = thief::backstab_multiplier(character.level);
-        let str_mod = ability::str_melee_mod(character.abilities.strength);
-        let attack_bonus = thief::BACKSTAB_ATTACK_BONUS;
-
-        let target_ac = combat_state.monsters[monster_idx].ac;
-        let target_number =
-            (character.thac0 as i32 - target_ac - attack_bonus - str_mod).clamp(2, 20);
-        let attack_roll: i32 = rand::Rng::gen_range(&mut rand::thread_rng(), 1..=20);
-
-        let hit = attack_roll == 20 || (attack_roll != 1 && attack_roll >= target_number);
-
-        if hit {
-            let base_damage = match dice::roll_str(weapon.damage_dice()) {
-                Ok(r) => r.total.max(1),
-                Err(_) => 1,
-            };
-            let total_damage = (base_damage + str_mod).max(1) * multiplier as i32;
-            combat_state.monsters[monster_idx].hp -= total_damage;
-            let monster_name = combat_state.monsters[monster_idx].name.clone();
-            let alive = combat_state.monsters[monster_idx].is_alive();
-            combat_state.log.push(format!(
-                "{} backstabs {} for {} damage (x{}){}",
-                character.name,
-                monster_name,
-                total_damage,
-                multiplier,
-                if !alive { " — KILLED!" } else { "" }
-            ));
-            CommandResult::ok(format!(
-                "{} backstabs {} (+{} to hit, x{} damage)! Rolled {} vs target {}: HIT for {} damage{}.",
-                character.name, monster_name, attack_bonus, multiplier,
-                attack_roll, target_number, total_damage,
-                if !alive { " — KILLED!" } else { "" }
-            ))
-        } else {
-            combat_state.log.push(format!(
-                "{} backstab attempt on {} missed",
-                character.name, combat_state.monsters[monster_idx].name
-            ));
-            CommandResult::ok(format!(
-                "{} backstab attempt: rolled {} vs target {} — MISS.",
-                character.name, attack_roll, target_number
-            ))
+        match combat::action_backstab(state, char_name, monster_idx, weapon_name) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
