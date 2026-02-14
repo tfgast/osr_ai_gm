@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "companion"]
+members = [".", "companion", "server"]
 default-members = ["."]
 
 [package]
