@@ -2,24 +2,7 @@ use crate::engine::combat::{self, SpawnEncounterParams};
 use crate::engine::encounter;
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
-use crate::state::game::GameMode;
-use serde::Serialize;
-
-fn ok_with_typed_data<T: Serialize>(
-    id: &str,
-    mode: &GameMode,
-    message: String,
-    payload: T,
-) -> GMResponse {
-    match serde_json::to_value(payload) {
-        Ok(data) => GMResponse::ok_with_data(id, message, mode.clone(), data),
-        Err(err) => GMResponse::err(
-            id,
-            format!("internal error: failed to serialize response: {err}"),
-            mode.clone(),
-        ),
-    }
-}
+use super::ok_with_typed_data;
 
 pub(super) fn spawn_encounter(
     id: &str,
@@ -40,7 +23,7 @@ pub(super) fn spawn_encounter(
             xp_value: params.xp_value,
         },
     ) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -64,14 +47,14 @@ pub(super) fn add_monster(
             xp_value: params.xp_value,
         },
     ) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn roll_initiative(id: &str, state: &mut GameState) -> GMResponse {
     match combat::action_roll_initiative(state) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -84,7 +67,7 @@ pub(super) fn attack(
     weapon_name: &str,
 ) -> GMResponse {
     match combat::action_attack(state, char_name, monster_idx, weapon_name) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -96,14 +79,14 @@ pub(super) fn monster_attack(
     char_name: &str,
 ) -> GMResponse {
     match combat::action_monster_attack(state, monster_idx, char_name) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn check_morale(id: &str, state: &mut GameState) -> GMResponse {
     match combat::action_morale(state, None) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -115,7 +98,7 @@ pub(super) fn turn_undead(
     monster_idx: usize,
 ) -> GMResponse {
     match combat::action_turn_undead(state, char_name, monster_idx) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -127,28 +110,28 @@ pub(super) fn close(
     feet: Option<u32>,
 ) -> GMResponse {
     match combat::action_close(state, char_name, feet) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn retreat(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
     match combat::action_retreat(state, char_name) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn fighting_withdrawal(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
     match combat::action_fighting_withdrawal(state, char_name) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn query_combat_log(id: &str, state: &GameState) -> GMResponse {
     match combat::action_query_combat_log(state) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -160,21 +143,21 @@ pub(super) fn declare_spell(
     spell_name: &str,
 ) -> GMResponse {
     match combat::action_declare_spell(state, char_name, spell_name) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn cast_spell(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
     match combat::action_cast_spell(state, char_name) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn end_combat(id: &str, state: &mut GameState) -> GMResponse {
     match combat::action_end_combat(state) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -187,7 +170,7 @@ pub(super) fn backstab(
     weapon_name: &str,
 ) -> GMResponse {
     match combat::action_backstab(state, char_name, monster_idx, weapon_name) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -200,7 +183,7 @@ pub(super) fn spawn_monster(
     distance: u32,
 ) -> GMResponse {
     match combat::action_spawn_monster(state, name, count, distance) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -212,14 +195,14 @@ pub(super) fn spawn_npc_party(
     distance: u32,
 ) -> GMResponse {
     match encounter::action_spawn_npc_party(state, party_type, distance) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn roll_encounter(id: &str, state: &mut GameState) -> GMResponse {
     match encounter::action_roll_encounter(state) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -231,14 +214,14 @@ pub(super) fn evade(
     monster_movement: u32,
 ) -> GMResponse {
     match encounter::action_evade(state, monster_count, monster_movement) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn roll_surprise(id: &str, state: &GameState) -> GMResponse {
     match encounter::action_roll_surprise(state) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.api_message(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -250,7 +233,7 @@ pub(super) fn set_helpless(
     helpless: bool,
 ) -> GMResponse {
     match combat::action_set_helpless(state, monster_idx, helpless) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
@@ -262,14 +245,14 @@ pub(super) fn kill(
     monster_idx: usize,
 ) -> GMResponse {
     match combat::action_coup_de_grace(state, char_name, monster_idx) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
 pub(super) fn roll_reaction(id: &str, state: &GameState, char_name: &str) -> GMResponse {
     match encounter::action_roll_reaction(state, char_name) {
-        Ok(result) => ok_with_typed_data(id, &state.mode, result.api_message(), result),
+        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
