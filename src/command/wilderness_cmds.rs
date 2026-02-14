@@ -33,6 +33,22 @@ impl Command for EnterWildernessCommand {
     }
 }
 
+pub struct LeaveWildernessCommand;
+impl Command for LeaveWildernessCommand {
+    fn name(&self) -> &str {
+        "leave_wilderness"
+    }
+    fn help(&self) -> &str {
+        "Leave wilderness travel mode (return to idle)"
+    }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        match wilderness::action_leave_wilderness(state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 pub struct AddHexCommand;
 impl Command for AddHexCommand {
     fn name(&self) -> &str {

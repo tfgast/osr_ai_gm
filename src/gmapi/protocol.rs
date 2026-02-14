@@ -175,6 +175,8 @@ pub enum GMCommand {
         #[serde(default)]
         terrain: Terrain,
     },
+    /// Leave wilderness travel mode (return to idle).
+    LeaveWilderness,
     /// Add a hex to the wilderness map.
     AddHex {
         x: i32,

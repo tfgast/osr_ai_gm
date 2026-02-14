@@ -145,6 +145,13 @@ pub(super) fn enter_wilderness(id: &str, state: &mut GameState, terrain: Terrain
     }
 }
 
+pub(super) fn leave_wilderness(id: &str, state: &mut GameState) -> GMResponse {
+    match wilderness::action_leave_wilderness(state) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
 pub(super) fn add_hex(id: &str, state: &mut GameState, x: i32, y: i32, terrain: Terrain) -> GMResponse {
     match wilderness::action_add_hex(state, x, y, terrain) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),

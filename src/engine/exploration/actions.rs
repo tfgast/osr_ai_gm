@@ -172,24 +172,6 @@ pub fn action_enter_dungeon(
             "level must be a positive integer.".to_string(),
         ));
     }
-    match state.mode {
-        GameMode::Combat => {
-            return Err(EngineError::WrongState(
-                "cannot enter dungeon during combat. Use 'end_combat' first.".to_string(),
-            ));
-        }
-        GameMode::Wilderness => {
-            return Err(EngineError::WrongState(
-                "cannot enter dungeon while in wilderness mode. Leave wilderness first.".to_string(),
-            ));
-        }
-        GameMode::Exploration => {
-            return Err(EngineError::WrongState(
-                "already in exploration mode. Leave dungeon first.".to_string(),
-            ));
-        }
-        _ => {}
-    }
 
     let mut dungeon = DungeonState::new(level);
     dungeon

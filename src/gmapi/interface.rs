@@ -89,6 +89,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 
         // -- Wilderness --
         GMCommand::EnterWilderness { terrain } => exploration_handlers::enter_wilderness(id, state, *terrain),
+        GMCommand::LeaveWilderness => exploration_handlers::leave_wilderness(id, state),
         GMCommand::AddHex { x, y, terrain } => exploration_handlers::add_hex(id, state, *x, *y, *terrain),
         GMCommand::Travel { x, y } => exploration_handlers::travel(id, state, *x, *y),
         GMCommand::Orient => exploration_handlers::orient(id, state),
