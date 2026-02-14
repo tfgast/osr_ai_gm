@@ -153,20 +153,37 @@ pub fn reaction_roll_with<R: Rng>(rng: &mut R, cha_score: i32) -> (Reaction, i32
 
 /// Evasion attempt result.
 #[derive(Debug, Clone, PartialEq)]
-pub enum EvasionResult {
-    /// Party successfully evades.
-    Escaped,
-    /// Evasion fails, encounter proceeds.
-    Caught,
+pub struct EvasionResult {
+    pub escaped: bool,
+    /// d100 roll (None if auto-escape due to faster movement).
+    pub roll: Option<i32>,
+    /// Percentage chance needed to escape (None if auto-escape).
+    pub chance: Option<i32>,
+}
+
+impl EvasionResult {
+    fn auto_escape() -> Self {
+        Self { escaped: true, roll: None, chance: None }
+    }
+
+    fn from_roll(roll: i32, chance: i32) -> Self {
+        Self { escaped: roll <= chance, roll: Some(roll), chance: Some(chance) }
+    }
 }
 
 impl fmt::Display for EvasionResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EvasionResult::Escaped => write!(f, "The party successfully evades the encounter!"),
-            EvasionResult::Caught => {
-                write!(f, "Evasion fails! The monsters catch up to the party.")
+        match (self.escaped, self.roll, self.chance) {
+            (true, None, _) => {
+                write!(f, "The party successfully evades the encounter! (party faster — automatic escape)")
             }
+            (true, Some(roll), Some(chance)) => {
+                write!(f, "The party successfully evades the encounter! (rolled {} vs {}%)", roll, chance)
+            }
+            (false, Some(roll), Some(chance)) => {
+                write!(f, "Evasion fails! The monsters catch up to the party. (rolled {} vs {}%)", roll, chance)
+            }
+            _ => write!(f, "Evasion result: escaped={}", self.escaped),
         }
     }
 }
@@ -204,7 +221,7 @@ pub fn attempt_evasion_with<R: Rng>(
 ) -> EvasionResult {
     // Per OSE: if party is faster, evasion automatically succeeds
     if party_movement > monster_movement {
-        return EvasionResult::Escaped;
+        return EvasionResult::auto_escape();
     }
 
     // OSE evasion table: chance depends on party size and relative numbers
@@ -217,11 +234,7 @@ pub fn attempt_evasion_with<R: Rng>(
     };
 
     let roll: i32 = rng.gen_range(1..=100);
-    if roll <= chance {
-        EvasionResult::Escaped
-    } else {
-        EvasionResult::Caught
-    }
+    EvasionResult::from_roll(roll, chance)
 }
 
 /// Full encounter sequence result.
@@ -411,7 +424,9 @@ mod tests {
         for seed in 0..50 {
             let mut rng = StdRng::seed_from_u64(seed);
             let result = attempt_evasion_with(&mut rng, 4, 120, 6, 90);
-            assert_eq!(result, EvasionResult::Escaped, "faster party should always escape");
+            assert!(result.escaped, "faster party should always escape");
+            assert!(result.roll.is_none(), "auto-escape should have no roll");
+            assert!(result.chance.is_none(), "auto-escape should have no chance");
         }
     }
 
@@ -422,7 +437,9 @@ mod tests {
         for seed in 0..200 {
             let mut rng = StdRng::seed_from_u64(seed);
             let result = attempt_evasion_with(&mut rng, 4, 90, 6, 120);
-            if result == EvasionResult::Escaped {
+            assert_eq!(result.chance, Some(50), "should be 50% chance");
+            assert!(result.roll.is_some(), "non-auto should have a roll");
+            if result.escaped {
                 escaped += 1;
             }
         }
@@ -437,7 +454,8 @@ mod tests {
         for seed in 0..200 {
             let mut rng = StdRng::seed_from_u64(seed);
             let result = attempt_evasion_with(&mut rng, 4, 90, 2, 120);
-            if result == EvasionResult::Escaped {
+            assert_eq!(result.chance, Some(70), "should be 70% chance");
+            if result.escaped {
                 escaped += 1;
             }
         }
@@ -451,7 +469,8 @@ mod tests {
         for seed in 0..1000 {
             let mut rng = StdRng::seed_from_u64(seed);
             let result = attempt_evasion_with(&mut rng, 30, 60, 50, 120);
-            if result == EvasionResult::Escaped {
+            assert_eq!(result.chance, Some(10), "should be 10% chance");
+            if result.escaped {
                 escaped += 1;
             }
         }
@@ -490,7 +509,16 @@ mod tests {
 
     #[test]
     fn evasion_display() {
-        let s = EvasionResult::Escaped.to_string();
-        assert!(s.contains("evades"));
+        let auto = EvasionResult::auto_escape();
+        assert!(auto.to_string().contains("evades"));
+        assert!(auto.to_string().contains("automatic escape"));
+
+        let rolled_ok = EvasionResult::from_roll(30, 50);
+        assert!(rolled_ok.to_string().contains("evades"));
+        assert!(rolled_ok.to_string().contains("rolled 30 vs 50%"));
+
+        let rolled_fail = EvasionResult::from_roll(80, 50);
+        assert!(rolled_fail.to_string().contains("fails"));
+        assert!(rolled_fail.to_string().contains("rolled 80 vs 50%"));
     }
 }
