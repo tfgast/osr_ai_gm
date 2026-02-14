@@ -212,12 +212,9 @@ pub fn search_room_with<R: Rng>(
                 .cloned()
                 .collect();
             if !loot.is_empty() {
-                // Mark treasure as taken and looted
+                // Mark treasure as discovered (but not taken — loot command handles pickup)
                 if let Some(room_mut) = dungeon.find_room_mut(current) {
                     room_mut.treasure_looted = true;
-                    for t in &mut room_mut.placed_treasure {
-                        t.taken = true;
-                    }
                 }
                 // Report treasure found
                 for t in &loot {
@@ -1224,10 +1221,10 @@ mod tests {
         assert_eq!(treasure[1].description, "Potion of Healing");
         assert_eq!(treasure[1].gp_value, 50);
 
-        // Verify treasure is marked as taken
+        // Verify treasure is discovered but NOT taken (loot command handles pickup)
         let room = dungeon.find_room(0).unwrap();
-        assert!(room.treasure_looted, "room should be marked as looted");
-        assert!(room.placed_treasure.iter().all(|t| t.taken), "all treasure should be marked taken");
+        assert!(room.treasure_looted, "room should be marked as discovered");
+        assert!(room.placed_treasure.iter().all(|t| !t.taken), "treasure should not be marked taken until looted");
     }
 
     #[test]
