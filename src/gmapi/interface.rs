@@ -1,4 +1,4 @@
-use crate::engine::{gm, party, retainers, system, xp};
+use crate::engine::{gm, party, retainers, system};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
@@ -221,30 +221,20 @@ fn award_xp(id: &str, state: &mut GameState, char_name: &str, xp_amount: u64) ->
 }
 
 fn award_treasure_xp(id: &str, state: &mut GameState, char_name: &str, treasure_gp: u64, monster_xp: u64) -> GMResponse {
-    let character = match state.party.find_member_mut(char_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
-    };
-    let result = xp::award_xp(character, treasure_gp, monster_xp);
-    let mut msg = format!(
-        "{}: base {}xp ({}gp treasure + {}xp monsters), {:+}% prime req modifier = {} adjusted XP. Total: {}.",
-        character.name, result.base_xp, treasure_gp, monster_xp,
-        result.modifier_pct, result.adjusted_xp, result.new_total,
-    );
-    if result.ready_to_train {
-        msg.push_str(" Ready to train!");
+    match gm::action_award_treasure_xp(state, char_name, treasure_gp, monster_xp) {
+        Ok(result) => {
+            let mut msg = format!(
+                "{}: base {}xp ({}gp treasure + {}xp monsters), {:+}% prime req modifier = {} adjusted XP. Total: {}.",
+                result.character, result.base_xp, result.treasure_gp, result.monster_xp,
+                result.modifier_pct, result.adjusted_xp, result.total_xp,
+            );
+            if result.ready_to_train {
+                msg.push_str(" Ready to train!");
+            }
+            ok_with_typed_data(id, state, msg, result)
+        }
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    GMResponse::ok_with_data(
-        id, msg, state.mode.clone(),
-        serde_json::json!({
-            "character": character.name,
-            "base_xp": result.base_xp,
-            "modifier_pct": result.modifier_pct,
-            "adjusted_xp": result.adjusted_xp,
-            "total_xp": result.new_total,
-            "ready_to_train": result.ready_to_train,
-        }),
-    )
 }
 
 fn thief_skill_check(id: &str, state: &GameState, char_name: &str, skill_name: &str) -> GMResponse {
@@ -276,37 +266,16 @@ fn loyalty_check(id: &str, state: &GameState, ret_name: &str, loyalty: u32) -> G
 }
 
 fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
-    let character = match state.party.find_member_mut(char_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
-    };
-    let cls = character.class;
-    match crate::rules::xp::check_level_up(cls, character.level, character.xp) {
-        Some(_next_level) => {
-            let result = xp::apply_level_up(character);
-            GMResponse::ok_with_data(
-                id,
-                format!("{} leveled up to {}! Gained {} HP. HP: {}/{}.",
-                    character.name, result.new_level, result.hp_gained,
-                    character.hp, character.max_hp),
-                state.mode.clone(),
-                serde_json::json!({
-                    "character": character.name,
-                    "new_level": result.new_level,
-                    "hp_gained": result.hp_gained,
-                    "hp": character.hp,
-                    "max_hp": character.max_hp,
-                }),
-            )
-        }
-        None => {
-            let needed = crate::rules::xp::xp_for_level(cls, character.level + 1);
-            if needed == u64::MAX {
-                GMResponse::err(id, format!("{} is at maximum level ({}).", character.name, character.level), state.mode.clone())
-            } else {
-                GMResponse::err(id, format!("{} needs {} XP for level {} (has {}).", character.name, needed, character.level + 1, character.xp), state.mode.clone())
-            }
-        }
+    match gm::action_level_up(state, char_name) {
+        Ok(result) => ok_with_typed_data(
+            id,
+            state,
+            format!("{} leveled up to {}! Gained {} HP. HP: {}/{}.",
+                result.character, result.new_level, result.hp_gained,
+                result.new_hp, result.new_hp),
+            result,
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 

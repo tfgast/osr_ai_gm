@@ -1,13 +1,17 @@
 use crate::engine::result::EngineError;
 use crate::engine::xp;
 use crate::persist::GameState;
+use crate::rules::class::class_def;
 use crate::rules::thief;
 use crate::rules::xp::{check_level_up, xp_for_level};
+use crate::rules::spell;
+use crate::state::game::GameMode;
 
 use super::results::{
-    AddRationsResult, AwardXpResult, DamageResult, DeleteNoteResult, DismissRetainerResult,
-    HealResult, ListNotesResult, ListRetainersResult, NoteEntry, RetainerSummary, RulingResult,
-    SetHpResult, SetRationsResult, ThiefSkillCheckResult,
+    AddNoteResult, AddRationsResult, AwardTreasureXpResult, AwardXpResult, DamageResult,
+    DeleteNoteResult, DismissRetainerResult, HealResult, ListNotesResult, ListRetainersResult,
+    NoteEntry, RetainerSummary, RulingResult, SetHpResult, SetRationsResult, ThiefSkillCheckResult,
+    TrainResult,
 };
 
 fn no_party_member_err(char_name: &str) -> EngineError {
@@ -254,6 +258,213 @@ pub fn action_add_rations(
     Ok(AddRationsResult {
         added: amount,
         rations: state.party.rations,
+    })
+}
+
+pub fn action_add_note(state: &mut GameState, text: &str) -> Result<AddNoteResult, EngineError> {
+    if text.is_empty() {
+        return Err(EngineError::InvalidInput("note text cannot be empty.".to_string()));
+    }
+    state.notes.push(text.to_string());
+    Ok(AddNoteResult {
+        text: text.to_string(),
+    })
+}
+
+pub fn action_award_treasure_xp(
+    state: &mut GameState,
+    char_name: &str,
+    treasure_gp: u64,
+    monster_xp: u64,
+) -> Result<AwardTreasureXpResult, EngineError> {
+    let character = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+    let result = xp::award_xp(character, treasure_gp, monster_xp);
+    Ok(AwardTreasureXpResult {
+        character: character.name.clone(),
+        treasure_gp,
+        monster_xp,
+        base_xp: result.base_xp,
+        modifier_pct: result.modifier_pct,
+        adjusted_xp: result.adjusted_xp,
+        total_xp: result.new_total,
+        ready_to_train: result.ready_to_train,
+    })
+}
+
+/// Level up without gold cost (GM fiat). Used by the API `LevelUp` command.
+pub fn action_level_up(state: &mut GameState, char_name: &str) -> Result<TrainResult, EngineError> {
+    let character = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+    let cls = character.class;
+    let _next_level = check_level_up(cls, character.level, character.xp).ok_or_else(|| {
+        let needed = xp_for_level(cls, character.level + 1);
+        if needed == u64::MAX {
+            EngineError::InvalidInput(format!(
+                "{} is at maximum level ({}).",
+                character.name, character.level
+            ))
+        } else {
+            EngineError::InvalidInput(format!(
+                "{} needs {} XP for level {} (has {}).",
+                character.name,
+                needed,
+                character.level + 1,
+                character.xp
+            ))
+        }
+    })?;
+
+    let old_saves = character.saving_throws;
+    let old_thac0 = character.thac0;
+    let old_hp = character.max_hp;
+    let def = class_def(cls);
+
+    let lu = xp::apply_level_up(character);
+
+    let has_thief_skills = thief::has_thief_skills(cls);
+    let spell_list_name = match def.spell_list {
+        spell::SpellListType::Cleric => "cleric",
+        spell::SpellListType::Druid => "druid",
+        spell::SpellListType::MagicUser => "magic-user",
+        spell::SpellListType::Illusionist => "illusionist",
+        spell::SpellListType::DrowArcaneAndDivine => "drow",
+        spell::SpellListType::None => "",
+    }
+    .to_string();
+
+    let gained_first_spells = lu.old_spell_slots.iter().all(|&s| s == 0)
+        && lu.new_spell_slots.iter().any(|&s| s > 0);
+
+    let ready_for_next = check_level_up(cls, character.level, character.xp).is_some();
+    let next_cost = if ready_for_next {
+        Some((character.level + 1) * 100)
+    } else {
+        None
+    };
+
+    Ok(TrainResult {
+        character: character.name.clone(),
+        new_level: lu.new_level,
+        cost_gp: 0,
+        gold_remaining: character.gold_gp,
+        hp_gained: lu.hp_gained,
+        old_hp,
+        new_hp: character.max_hp,
+        old_thac0,
+        new_thac0: lu.new_thac0,
+        old_saves,
+        new_saves: lu.new_saves,
+        old_spell_slots: lu.old_spell_slots,
+        new_spell_slots: lu.new_spell_slots,
+        has_thief_skills,
+        spell_list_name,
+        gained_first_spells,
+        ready_for_next,
+        next_cost,
+    })
+}
+
+/// Train (level up with gold cost). Used by the CLI `train` command.
+pub fn action_train(state: &mut GameState, char_name: &str) -> Result<TrainResult, EngineError> {
+    if state.mode == GameMode::Combat {
+        return Err(EngineError::WrongState(
+            "cannot train during combat.".to_string(),
+        ));
+    }
+    let character = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+    if !character.is_alive() {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is dead.",
+            character.name
+        )));
+    }
+    let cls = character.class;
+    let next_level = match check_level_up(cls, character.level, character.xp) {
+        None => {
+            let needed = xp_for_level(cls, character.level + 1);
+            if needed == u64::MAX {
+                return Err(EngineError::InvalidInput(format!(
+                    "{} is at maximum level ({}).",
+                    character.name, character.level
+                )));
+            }
+            return Err(EngineError::InvalidInput(format!(
+                "{} needs {} XP for level {} (has {}).",
+                character.name,
+                needed,
+                character.level + 1,
+                character.xp
+            )));
+        }
+        Some(nl) => nl,
+    };
+
+    let cost = next_level * 100;
+    if character.gold_gp < cost {
+        return Err(EngineError::InvalidInput(format!(
+            "{} needs {}gp to train for level {} (has {}gp).",
+            character.name, cost, next_level, character.gold_gp
+        )));
+    }
+
+    // Capture old state for report
+    let old_saves = character.saving_throws;
+    let old_thac0 = character.thac0;
+    let old_hp = character.max_hp;
+    let def = class_def(cls);
+
+    // Deduct gold and apply level-up
+    character.gold_gp -= cost;
+    let lu = xp::apply_level_up(character);
+
+    let has_thief_skills = thief::has_thief_skills(cls);
+    let spell_list_name = match def.spell_list {
+        spell::SpellListType::Cleric => "cleric",
+        spell::SpellListType::Druid => "druid",
+        spell::SpellListType::MagicUser => "magic-user",
+        spell::SpellListType::Illusionist => "illusionist",
+        spell::SpellListType::DrowArcaneAndDivine => "drow",
+        spell::SpellListType::None => "",
+    }
+    .to_string();
+
+    let gained_first_spells = lu.old_spell_slots.iter().all(|&s| s == 0)
+        && lu.new_spell_slots.iter().any(|&s| s > 0);
+
+    let ready_for_next = check_level_up(cls, character.level, character.xp).is_some();
+    let next_cost = if ready_for_next {
+        Some((character.level + 1) * 100)
+    } else {
+        None
+    };
+
+    Ok(TrainResult {
+        character: character.name.clone(),
+        new_level: lu.new_level,
+        cost_gp: cost,
+        gold_remaining: character.gold_gp,
+        hp_gained: lu.hp_gained,
+        old_hp,
+        new_hp: character.max_hp,
+        old_thac0,
+        new_thac0: lu.new_thac0,
+        old_saves,
+        new_saves: lu.new_saves,
+        old_spell_slots: lu.old_spell_slots,
+        new_spell_slots: lu.new_spell_slots,
+        has_thief_skills,
+        spell_list_name,
+        gained_first_spells,
+        ready_for_next,
+        next_cost,
     })
 }
 
