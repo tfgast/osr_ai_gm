@@ -9,8 +9,8 @@ use osr_ai_gm::command::encounter_cmds::{
 };
 use osr_ai_gm::command::exploration_cmds::{
     AddDoorCommand, AddRoomCommand, EnterDungeonCommand, ExplorationStatusCommand, ExploreCommand,
-    ForceDoorCommand, LightCommand, ListenCommand, MoveRoomCommand, OpenCommand, RestCommand,
-    SearchCommand,
+    ForceDoorCommand, LightCommand, ListenCommand, MoveRoomCommand, OpenCommand, PickLockCommand,
+    RestCommand, SearchCommand,
 };
 use osr_ai_gm::command::gm_cmds::{
     AddRationsCommand, AdvanceTurnCommand, AwardTreasureXpCommand, AwardXpCommand, BackstabCommand,
@@ -129,6 +129,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(SearchCommand));
     registry.register(Box::new(ListenCommand));
     registry.register(Box::new(ForceDoorCommand));
+    registry.register(Box::new(PickLockCommand));
     registry.register(Box::new(AddRoomCommand));
     registry.register(Box::new(AddDoorCommand));
     registry.register(Box::new(MoveRoomCommand));
