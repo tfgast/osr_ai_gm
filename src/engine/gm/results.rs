@@ -116,6 +116,15 @@ pub struct AddRationsResult {
     pub rations: u32,
 }
 
+/// Result payload for adding gold to a character.
+#[derive(Debug, Clone, Serialize)]
+pub struct AddGoldResult {
+    pub character: String,
+    pub added: u32,
+    pub old_gold_gp: u32,
+    pub gold_gp: u32,
+}
+
 /// Result payload for adding a note.
 #[derive(Debug, Clone, Serialize)]
 pub struct AddNoteResult {

@@ -134,6 +134,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         }
         GMCommand::SetRations { amount } => set_rations(id, state, *amount),
         GMCommand::AddRations { amount } => add_rations(id, state, *amount),
+        GMCommand::AddGold { character, amount } => add_gold(id, state, character, *amount),
 
         // -- Inventory --
         GMCommand::ListEquipment { category } => exploration_handlers::list_equipment(id, state, category),
@@ -333,6 +334,18 @@ fn add_rations(id: &str, state: &mut GameState, amount: u32) -> GMResponse {
             id,
             state,
             format!("added {} rations. Total: {} person-days.", result.added, result.rations),
+            result,
+        ),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
+    }
+}
+
+fn add_gold(id: &str, state: &mut GameState, char_name: &str, amount: u32) -> GMResponse {
+    match gm::action_add_gold(state, char_name, amount) {
+        Ok(result) => ok_with_typed_data(
+            id,
+            state,
+            format!("{} gained {}gp ({} → {}).", result.character, result.added, result.old_gold_gp, result.gold_gp),
             result,
         ),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode),
