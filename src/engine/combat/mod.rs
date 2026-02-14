@@ -16,9 +16,10 @@ pub mod results;
 mod turn_undead;
 
 pub use actions::{
-    action_attack, action_close, action_coup_de_grace, action_declare_spell, action_end_combat,
-    action_fighting_withdrawal, action_monster_attack, action_morale, action_query_combat_log,
-    action_retreat, action_roll_initiative, action_spawn_encounter, action_spawn_monster,
+    action_attack, action_backstab, action_close, action_coup_de_grace, action_declare_spell,
+    action_end_combat, action_fighting_withdrawal, action_monster_attack, action_morale,
+    action_query_combat_log, action_retreat, action_roll_initiative, action_spawn_encounter,
+    action_spawn_monster,
     action_turn_undead,
 };
 pub use attack::{

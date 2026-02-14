@@ -250,6 +250,20 @@ pub struct CombatLogResult {
     pub log: Vec<String>,
 }
 
+/// Typed success payload for `backstab`.
+#[derive(Debug, Clone, Serialize)]
+pub struct BackstabResult {
+    #[serde(skip_serializing)]
+    pub message: String,
+    pub hit: bool,
+    pub attack_roll: i32,
+    pub target_number: i32,
+    pub attack_bonus: i32,
+    pub multiplier: u32,
+    pub damage: Option<i32>,
+    pub monster_alive: Option<bool>,
+}
+
 /// Typed success payload for `declare_spell`.
 #[derive(Debug, Clone, Serialize)]
 pub struct DeclareSpellResult {
