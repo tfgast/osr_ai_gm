@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize, Deserializer, Serializer};
 /// - `"1-1"` — less than 1 HD (attacks as Normal Human)
 /// - `"3*"` — 3 HD with one special ability (affects XP)
 /// - `"6**"` — 6 HD with two special abilities
-/// - `"1/2"` — half a hit die
+/// - `"1/2"` or `"0.5"` — half a hit die
 /// - `"7-9**"` — HD range (e.g., vampire), with special abilities
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HitDice {
@@ -102,8 +102,8 @@ impl FromStr for HitDice {
             return Ok(HitDice { base, modifier: 0, specials, fractional: false, range_end: Some(end) });
         }
 
-        // Handle fractional HD like "1/2" or "½"
-        if s.contains('/') || s.starts_with('½') {
+        // Handle fractional HD like "1/2", "½", or "0.5"
+        if s.contains('/') || s.starts_with('½') || s.starts_with("0.5") {
             let specials = s.chars().rev().take_while(|c| *c == '*').count() as u8;
             return Ok(HitDice {
                 base: 1,
@@ -499,6 +499,23 @@ mod tests {
         assert!(hd.fractional);
         assert_eq!(hd.combat_hd(), 1);
         assert_eq!(hd.to_string(), "1/2");
+    }
+
+    #[test]
+    fn hit_dice_fractional_decimal() {
+        let hd: HitDice = "0.5".parse().unwrap();
+        assert!(hd.fractional);
+        assert_eq!(hd.combat_hd(), 1);
+        assert_eq!(hd.hp_dice_count(), 0);
+        assert_eq!(hd.to_string(), "1/2");
+    }
+
+    #[test]
+    fn hit_dice_fractional_decimal_with_special() {
+        let hd: HitDice = "0.5*".parse().unwrap();
+        assert!(hd.fractional);
+        assert_eq!(hd.specials, 1);
+        assert_eq!(hd.to_string(), "1/2*");
     }
 
     #[test]
