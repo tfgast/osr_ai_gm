@@ -2812,9 +2812,45 @@ fn open_door_closed_attempts_force() {
 
     let resp = handle_request(&req("od4", GMCommand::OpenDoor { door_id: 0 }), &mut state);
     assert_response_format(&resp, "od4");
-    assert!(resp.success);
     // Should mention Aldric (the forcer) in output
     assert!(resp.message.contains("Aldric"));
+    // success must match whether the party actually moved through
+    let data = resp.data.as_ref().expect("open_door should include data");
+    let moved = data["moved"].as_bool().expect("data.moved should be bool");
+    assert_eq!(resp.success, moved, "success must be true only when party moved through the door");
+}
+
+#[test]
+fn open_door_force_fail_returns_success_false() {
+    // Run multiple times to ensure we hit at least one force failure.
+    // Force chance is 2-in-6, so failure (~67%) is very likely within 20 tries.
+    let mut saw_failure = false;
+    for _ in 0..20 {
+        let mut state = GameState::new();
+        setup_exploration(&mut state);
+        handle_request(&req("s", GMCommand::Light {
+            source: LightSourceKind::Torch,
+            carrier: "Aldric".to_string(),
+        }), &mut state);
+        handle_request(&req("s", GMCommand::AddRoom { id: 1, name: "Hall".to_string() }), &mut state);
+        handle_request(&req("s", GMCommand::AddDoor {
+            id: 0, room_a: 0, room_b: 1, state: DoorState::Closed,
+        }), &mut state);
+
+        let resp = handle_request(&req("od", GMCommand::OpenDoor { door_id: 0 }), &mut state);
+        let data = resp.data.as_ref().expect("open_door should include data");
+        let moved = data["moved"].as_bool().expect("data.moved should be bool");
+        assert_eq!(resp.success, moved, "success must match moved");
+
+        if !moved {
+            saw_failure = true;
+            assert!(!resp.success, "failed force must return success=false");
+            assert!(resp.data.is_some(), "failed force should still include data payload");
+            // Party should NOT have moved
+            assert_eq!(state.dungeon.as_ref().unwrap().current_room, Some(0));
+        }
+    }
+    assert!(saw_failure, "expected at least one force failure in 20 tries");
 }
 
 #[test]
