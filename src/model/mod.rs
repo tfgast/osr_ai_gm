@@ -6,6 +6,7 @@ use crate::rules::alignment::Alignment;
 use crate::rules::attack::HitDice;
 use crate::rules::class::Class;
 use crate::rules::save::SavingThrows;
+use crate::state::effect::ActiveEffect;
 
 /// Character ability scores.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -60,6 +61,9 @@ pub struct Character {
     /// Spell slots used since last rest (index 0 = 1st level, etc.). Resets on rest.
     #[serde(default)]
     pub spell_slots_used: [u32; 6],
+    /// Active effects on this character.
+    #[serde(default)]
+    pub effects: Vec<ActiveEffect>,
 }
 
 impl Character {
@@ -81,6 +85,7 @@ impl Character {
             thac0: 19,
             movement_rate: 120,
             spell_slots_used: [0; 6],
+            effects: Vec::new(),
         }
     }
 
@@ -111,6 +116,9 @@ pub struct Monster {
     /// Whether this monster is undead (eligible for turn undead).
     #[serde(default)]
     pub undead: bool,
+    /// Active effects on this monster.
+    #[serde(default)]
+    pub effects: Vec<ActiveEffect>,
 }
 
 impl Monster {
@@ -128,6 +136,7 @@ impl Monster {
             turned: false,
             helpless: false,
             undead: false,
+            effects: Vec::new(),
         }
     }
 

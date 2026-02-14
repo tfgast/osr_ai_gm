@@ -7,6 +7,7 @@ use crate::engine::retainer::Retainer;
 use crate::model::{Party, CombatState};
 use crate::pathutil::normalize_path;
 use crate::state::dungeon::DungeonState;
+use crate::state::effect::ActiveEffect;
 use crate::state::game::GameMode;
 use crate::state::time::TimeTracker;
 use crate::state::wilderness::WildernessState;
@@ -39,6 +40,9 @@ pub struct GameState {
     /// Hired retainers (NPC followers).
     #[serde(default)]
     pub retainers: Vec<Retainer>,
+    /// Global effects not tied to a specific character or monster.
+    #[serde(default)]
+    pub effects: Vec<ActiveEffect>,
     /// Global monotonic counter for log entry sequencing.
     ///
     /// Subsystem log entries carry a `seq` from this counter so the
@@ -63,6 +67,7 @@ impl GameState {
             mode: GameMode::default(),
             pre_combat_mode: None,
             retainers: Vec::new(),
+            effects: Vec::new(),
             log_seq: 0,
         }
     }
