@@ -274,6 +274,9 @@ pub struct CombatState {
     /// Monsters that have already attacked this round (by index).
     #[serde(default)]
     pub monsters_attacked_this_round: HashSet<usize>,
+    /// Characters who have already acted (attacked/backstabbed) this round.
+    #[serde(default)]
+    pub characters_acted: Vec<String>,
 }
 
 impl CombatState {
@@ -294,6 +297,7 @@ impl CombatState {
             initial_monster_count: initial_count,
             log_len_at_initiative: 0,
             monsters_attacked_this_round: HashSet::new(),
+            characters_acted: Vec::new(),
         }
     }
 

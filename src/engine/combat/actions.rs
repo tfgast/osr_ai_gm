@@ -244,17 +244,26 @@ pub fn action_attack(
     let rest_penalty = state.time.as_ref().map(|t| t.rest_penalty()).unwrap_or(0);
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
 
+    if combat.characters_acted.iter().any(|n| n.eq_ignore_ascii_case(char_name)) {
+        return Err(EngineError::InvalidInput(format!(
+            "{} has already acted this round.",
+            char_name
+        )));
+    }
+
     if monster_idx < combat.monsters.len()
         && combat.monsters[monster_idx].is_alive()
         && combat.monsters[monster_idx].helpless
     {
         let result =
             coup_de_grace(combat, &character, monster_idx).map_err(EngineError::InvalidInput)?;
+        combat.characters_acted.push(char_name.to_string());
         return Ok(AttackResult::from(result));
     }
 
     let result = resolve_character_attack(combat, &character, monster_idx, weapon, rest_penalty)
         .map_err(EngineError::InvalidInput)?;
+    combat.characters_acted.push(char_name.to_string());
     Ok(AttackResult::from(result))
 }
 
@@ -578,6 +587,13 @@ pub fn action_backstab(
 
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
 
+    if combat.characters_acted.iter().any(|n| n.eq_ignore_ascii_case(char_name)) {
+        return Err(EngineError::InvalidInput(format!(
+            "{} has already acted this round.",
+            char_name
+        )));
+    }
+
     if monster_idx >= combat.monsters.len() {
         return Err(EngineError::InvalidInput(format!(
             "monster index {} out of range.",
@@ -601,6 +617,8 @@ pub fn action_backstab(
     let attack_roll: i32 = rand::Rng::gen_range(&mut rand::thread_rng(), 1..=20);
 
     let hit = attack_roll == 20 || (attack_roll != 1 && attack_roll >= target_number);
+
+    combat.characters_acted.push(char_name.to_string());
 
     if hit {
         let base_damage = match dice::roll_str(weapon.damage_dice()) {
@@ -934,5 +952,65 @@ mod tests {
         let result = action_roll_initiative(&mut state);
         assert!(result.is_ok());
         assert_eq!(state.combat.as_ref().unwrap().round, 2);
+    }
+
+    // --- duplicate character attack guard (oag-456xr) ---
+
+    #[test]
+    fn same_character_cannot_attack_twice_per_round() {
+        let mut state = state_with_melee_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        // First attack succeeds
+        let result = action_attack(&mut state, "Grond", 0, "Sword");
+        assert!(result.is_ok(), "first attack should succeed: {:?}", result.err());
+
+        // Second attack in same round is rejected
+        let result = action_attack(&mut state, "Grond", 0, "Sword");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("already acted"), "expected acted guard, got: {}", err);
+    }
+
+    #[test]
+    fn character_can_attack_again_after_new_round() {
+        let mut state = GameState::new();
+        let fighter = test_fighter();
+        state.party.add_member(fighter);
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        // Use a tough monster so it survives round 1
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Ogre", "4", 40, 5, 9)],
+            5,
+        ));
+
+        let _ = action_roll_initiative(&mut state);
+
+        // Attack in round 1
+        let result = action_attack(&mut state, "Grond", 0, "Sword");
+        assert!(result.is_ok());
+
+        // New round clears the acted list
+        let _ = action_roll_initiative(&mut state);
+
+        // Attack in round 2 should succeed
+        let result = action_attack(&mut state, "Grond", 0, "Sword");
+        assert!(result.is_ok(), "attack in new round should succeed: {:?}", result.err());
+    }
+
+    #[test]
+    fn attack_guard_is_case_insensitive() {
+        let mut state = state_with_melee_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        let result = action_attack(&mut state, "Grond", 0, "Sword");
+        assert!(result.is_ok());
+
+        // Differently-cased name should still be rejected
+        let result = action_attack(&mut state, "grond", 0, "Sword");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("already acted"), "expected acted guard, got: {}", err);
     }
 }

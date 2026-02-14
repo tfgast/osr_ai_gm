@@ -19,6 +19,7 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
     combat.spell_declarations.clear();
     combat.disrupted.clear();
     combat.monsters_attacked_this_round.clear();
+    combat.characters_acted.clear();
     combat.phase = crate::model::CombatPhase::Morale;
 
     let winner = if party > monsters {

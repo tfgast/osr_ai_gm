@@ -201,6 +201,8 @@ fn full_dungeon_session() {
     let mut backstab_hit = false;
     for i in 0..100 {
         state.combat.as_mut().unwrap().monsters[1].hp = saved_hp_1;
+        // Clear per-round action tracking so retry is allowed
+        state.combat.as_mut().unwrap().characters_acted.clear();
         let resp = handle_request(&req(&format!("23_{}", i), GMCommand::Backstab {
             character: "Shade".to_string(),
             monster_idx: 1,
@@ -649,6 +651,8 @@ fn complete_ose_session() {
     let mut backstab_hit = false;
     for i in 0..100 {
         state.combat.as_mut().unwrap().monsters[1].hp = saved_hp_1;
+        // Clear per-round action tracking so retry is allowed
+        state.combat.as_mut().unwrap().characters_acted.clear();
         let resp = handle_request(&req(&format!("c5_{}", i), GMCommand::Backstab {
             character: "Nyx the Shadow".to_string(),
             monster_idx: 1,
@@ -823,6 +827,8 @@ fn backstab_multiplier_level_1_x2() {
     let mut hit_verified = false;
     for i in 0..100 {
         state.combat.as_mut().unwrap().monsters[0].hp = saved_hp;
+        // Clear per-round action tracking so retry is allowed
+        state.combat.as_mut().unwrap().characters_acted.clear();
         let resp = handle_request(&req(&format!("2_{}", i), GMCommand::Backstab {
             character: "Dagger Dan".to_string(),
             monster_idx: 0,
@@ -857,6 +863,8 @@ fn backstab_multiplier_level_5_x3() {
     let mut hit_verified = false;
     for i in 0..100 {
         state.combat.as_mut().unwrap().monsters[0].hp = saved_hp;
+        // Clear per-round action tracking so retry is allowed
+        state.combat.as_mut().unwrap().characters_acted.clear();
         let resp = handle_request(&req(&format!("2_{}", i), GMCommand::Backstab {
             character: "Shadow Blade".to_string(),
             monster_idx: 0,
@@ -890,6 +898,8 @@ fn backstab_multiplier_level_9_x4() {
     let mut hit_verified = false;
     for i in 0..100 {
         state.combat.as_mut().unwrap().monsters[0].hp = saved_hp;
+        // Clear per-round action tracking so retry is allowed
+        state.combat.as_mut().unwrap().characters_acted.clear();
         let resp = handle_request(&req(&format!("2_{}", i), GMCommand::Backstab {
             character: "Master Thief".to_string(),
             monster_idx: 0,
@@ -1547,6 +1557,8 @@ fn session_a_dungeon_crawl() {
     let mut backstab_hit = false;
     for i in 0..100 {
         state.combat.as_mut().unwrap().monsters[1].hp = saved_g1_hp;
+        // Clear per-round action tracking so retry is allowed
+        state.combat.as_mut().unwrap().characters_acted.clear();
         let resp = handle_request(&req(&format!("a24_{}", i), GMCommand::Backstab {
             character: "Vex".to_string(),
             monster_idx: 1,
