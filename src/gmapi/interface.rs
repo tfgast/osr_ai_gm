@@ -44,6 +44,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 
         // -- Combat --
         GMCommand::SpawnEncounter(params) => combat_handlers::spawn_encounter(id, state, params),
+        GMCommand::AddMonster(params) => combat_handlers::add_monster(id, state, params),
         GMCommand::RollInitiative => combat_handlers::roll_initiative(id, state),
         GMCommand::Attack { character, monster_idx, weapon } => {
             combat_handlers::attack(id, state, character, *monster_idx, weapon)
@@ -1214,6 +1215,105 @@ mod tests {
             state.dungeon.as_ref().unwrap().find_room(0).unwrap().monsters_cleared,
             "monsters_cleared should be true after EndCombat"
         );
+    }
+
+    #[test]
+    fn add_monster_to_active_combat() {
+        let mut state = GameState::new();
+        // Spawn initial encounter
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
+            name: "goblin".to_string(),
+            count: 3,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 60,
+            xp_value: None,
+        })), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
+
+        // Add more monsters
+        let resp = handle_request(&make_req("2", GMCommand::AddMonster(EncounterParams {
+            name: "orc".to_string(),
+            count: 2,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 4,
+            damage: "1d6".to_string(),
+            morale: 8,
+            distance: 30, // ignored for AddMonster (distance is per-combat)
+            xp_value: Some(10),
+        })), &mut state);
+        assert!(resp.success, "add_monster should succeed: {:?}", resp.error);
+        assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 5);
+
+        // Verify the new monsters are at indices 3 and 4
+        let combat = state.combat.as_ref().unwrap();
+        assert_eq!(combat.monsters[3].name, "orc 1");
+        assert_eq!(combat.monsters[4].name, "orc 2");
+        assert_eq!(combat.monsters[3].hp, 4);
+        assert_eq!(combat.monsters[3].ac, 6);
+        assert_eq!(combat.monsters[3].xp_value, 10);
+
+        // Verify response data
+        let data = resp.data.unwrap();
+        assert_eq!(data["count"], 2);
+        assert_eq!(data["total_monsters"], 5);
+    }
+
+    #[test]
+    fn add_monster_no_combat_error() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::AddMonster(EncounterParams {
+            name: "orc".to_string(),
+            count: 1,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 4,
+            damage: "1d6".to_string(),
+            morale: 8,
+            distance: 30,
+            xp_value: None,
+        })), &mut state);
+        assert!(!resp.success);
+        assert!(resp.error.unwrap().contains("no active combat"));
+    }
+
+    #[test]
+    fn add_monster_single_named_correctly() {
+        let mut state = GameState::new();
+        // Start combat
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
+            name: "goblin".to_string(),
+            count: 1,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 60,
+            xp_value: None,
+        })), &mut state);
+        assert!(resp.success);
+
+        // Add a single monster — should not get a number suffix
+        let resp = handle_request(&make_req("2", GMCommand::AddMonster(EncounterParams {
+            name: "ogre".to_string(),
+            count: 1,
+            hit_dice: "4+1".parse().unwrap(),
+            ac: 5,
+            hp: 19,
+            damage: "1d10".to_string(),
+            morale: 10,
+            distance: 30,
+            xp_value: Some(125),
+        })), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 2);
+        assert_eq!(state.combat.as_ref().unwrap().monsters[1].name, "ogre");
     }
 
     #[test]

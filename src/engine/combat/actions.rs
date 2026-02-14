@@ -7,11 +7,11 @@ use crate::rules::class::Class;
 use crate::rules::{ability, equipment, monster as monster_db, thief};
 
 use super::results::{
-    AttackResult, BackstabResult, CloseResult, CombatLogResult, CombatStatusResult,
-    DeclareSpellResult, EndCombatResult, FightingWithdrawalResult, InitiativeResult,
-    InitiativeWinner, MonsterAttackResult, MoraleResult, RetainerLoyaltyCheckResult,
-    RetainerLoyaltyOutcome, RetreatResult, SetHelplessResult, SpawnEncounterResult,
-    SpawnMonsterResult, TurnUndeadResult,
+    AddMonsterResult, AttackResult, BackstabResult, CloseResult, CombatLogResult,
+    CombatStatusResult, DeclareSpellResult, EndCombatResult, FightingWithdrawalResult,
+    InitiativeResult, InitiativeWinner, MonsterAttackResult, MoraleResult,
+    RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome, RetreatResult, SetHelplessResult,
+    SpawnEncounterResult, SpawnMonsterResult, TurnUndeadResult,
 };
 use super::{
     check_morale, close, combat_status, coup_de_grace, declare_spell, fighting_withdrawal,
@@ -182,6 +182,87 @@ pub fn action_spawn_monster(
         distance,
         xp_per_monster: def.xp(),
         special,
+        status,
+    })
+}
+
+pub fn action_add_monster(
+    state: &mut GameState,
+    params: &SpawnEncounterParams<'_>,
+) -> Result<AddMonsterResult, EngineError> {
+    if state.combat.is_none() {
+        return Err(no_active_combat());
+    }
+    if params.name.trim().is_empty() {
+        return Err(EngineError::InvalidInput(
+            "monster name must not be empty.".to_string(),
+        ));
+    }
+    if params.count == 0 {
+        return Err(EngineError::InvalidInput(
+            "count must be a positive integer".to_string(),
+        ));
+    }
+    if params.hp < 1 {
+        return Err(EngineError::InvalidInput(
+            "hp must be a positive integer".to_string(),
+        ));
+    }
+    if !(2..=12).contains(&params.morale) {
+        return Err(EngineError::InvalidInput("morale must be 2-12".to_string()));
+    }
+
+    let xp_per_monster = params.xp_value.unwrap_or_else(|| {
+        monster_db::find_monster(params.name)
+            .map(|m| m.xp())
+            .unwrap_or(0)
+    });
+
+    let combat = state.combat.as_mut().unwrap();
+    let existing_count = combat.monsters.len();
+
+    for i in 0..params.count {
+        let monster_name = if params.count > 1 {
+            format!("{} {}", params.name, i + 1)
+        } else {
+            params.name.to_string()
+        };
+        let mut monster = Monster::new(&monster_name, params.hit_dice.clone());
+        monster.hp = params.hp;
+        monster.max_hp = params.hp;
+        monster.ac = params.ac;
+        monster.damage = params.damage.to_string();
+        monster.morale = params.morale;
+        monster.xp_value = xp_per_monster;
+        monster.attacks = vec!["attack".to_string()];
+        combat.monsters.push(monster);
+    }
+
+    let total_monsters = combat.monsters.len();
+    let status = combat_status(combat, &state.party.members);
+
+    combat.log.push(format!(
+        "{} {}(s) added to combat (indices {}-{}).",
+        params.count,
+        params.name,
+        existing_count,
+        total_monsters - 1,
+    ));
+
+    Ok(AddMonsterResult {
+        message: format!(
+            "{} {}(s) added to combat. Total monsters: {}.",
+            params.count, params.name, total_monsters
+        ),
+        monster_name: params.name.to_string(),
+        count: params.count,
+        hit_dice: params.hit_dice.clone(),
+        ac: params.ac,
+        hp: params.hp,
+        damage: params.damage.to_string(),
+        morale: params.morale,
+        xp_per_monster,
+        total_monsters,
         status,
     })
 }

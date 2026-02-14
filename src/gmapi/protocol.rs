@@ -71,6 +71,8 @@ pub enum GMCommand {
     // -- GM-only: encounter & combat --
     /// Spawn an encounter with monsters.
     SpawnEncounter(EncounterParams),
+    /// Add monsters to an existing combat encounter.
+    AddMonster(EncounterParams),
     /// Roll initiative for the current combat round.
     RollInitiative,
     /// Perform a character attack.
@@ -472,7 +474,7 @@ impl GMCommand {
     fn validate(&self) -> Result<(), String> {
         match self {
             GMCommand::CreateCharacter { name, .. } => check_len("name", name, 128),
-            GMCommand::SpawnEncounter(p) => {
+            GMCommand::SpawnEncounter(p) | GMCommand::AddMonster(p) => {
                 check_len("name", &p.name, 128)?;
                 check_len("damage", &p.damage, 128)?;
                 check_count("count", p.count, 100)
@@ -826,6 +828,39 @@ mod tests {
                 assert_eq!(*amount, 10);
             }
             _ => panic!("expected AddRations"),
+        }
+    }
+
+    #[test]
+    fn parse_add_monster() {
+        let json = r#"{
+            "id": "am1",
+            "command": {
+                "type": "AddMonster",
+                "params": {
+                    "name": "orc",
+                    "count": 2,
+                    "hit_dice": "1",
+                    "ac": 6,
+                    "hp": 4,
+                    "damage": "1d6",
+                    "morale": 8,
+                    "distance": 30,
+                    "xp_value": 10
+                }
+            }
+        }"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "am1");
+        match &req.command {
+            GMCommand::AddMonster(params) => {
+                assert_eq!(params.name, "orc");
+                assert_eq!(params.count, 2);
+                assert_eq!(params.ac, 6);
+                assert_eq!(params.hp, 4);
+                assert_eq!(params.xp_value, Some(10));
+            }
+            _ => panic!("expected AddMonster"),
         }
     }
 

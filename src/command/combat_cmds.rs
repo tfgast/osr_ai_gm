@@ -84,6 +84,78 @@ impl Command for StartCombatCommand {
     }
 }
 
+pub struct AddMonsterCommand;
+impl Command for AddMonsterCommand {
+    fn name(&self) -> &str {
+        "add_monster"
+    }
+    fn help(&self) -> &str {
+        "Add monsters to active combat (add_monster <name> <count> <hd> <ac> <hp> <damage> <morale> [xp])"
+    }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 7 {
+            return CommandResult::error(
+                "usage: add_monster <name> <count> <hd> <ac> <hp> <damage> <morale> [xp]\n  \
+                 example: add_monster orc 2 1 6 4 1d6 8\n  \
+                 Adds monsters to an existing combat encounter.\n  \
+                 XP is auto-looked up from monster database if available, or specify manually."
+            );
+        }
+        let name = args[0];
+        let count: u32 = match args[1].parse() {
+            Ok(n) if n >= 1 => n,
+            _ => return CommandResult::error("count must be a positive integer"),
+        };
+        let hd: HitDice = match args[2].parse() {
+            Ok(h) => h,
+            Err(e) => return CommandResult::error(format!("invalid hit dice '{}': {}", args[2], e)),
+        };
+        let ac: i32 = match args[3].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("ac must be an integer"),
+        };
+        let hp: i32 = match args[4].parse() {
+            Ok(n) if n >= 1 => n,
+            _ => return CommandResult::error("hp must be a positive integer"),
+        };
+        let damage = args[5];
+        let morale: u32 = match args[6].parse() {
+            Ok(n) if (2..=12).contains(&n) => n,
+            _ => return CommandResult::error("morale must be 2-12"),
+        };
+
+        let xp_value = if args.len() >= 8 {
+            match args[7].parse() {
+                Ok(n) => Some(n),
+                _ => return CommandResult::error("xp must be a non-negative integer"),
+            }
+        } else {
+            None
+        };
+
+        match combat::action_add_monster(
+            state,
+            &SpawnEncounterParams {
+                name, count, hit_dice: &hd, ac, hp, damage, morale, distance: 0, xp_value,
+            },
+        ) {
+            Ok(result) => {
+                let mut out = format!(
+                    "{} {}(s) added to combat. Total monsters: {}\n",
+                    result.count, result.monster_name, result.total_monsters
+                );
+                if result.xp_per_monster > 0 {
+                    out.push_str(&format!("XP per monster: {}\n", result.xp_per_monster));
+                }
+                out.push('\n');
+                out.push_str(&result.status);
+                CommandResult::ok(out)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 pub struct InitiativeCommand;
 impl Command for InitiativeCommand {
     fn name(&self) -> &str {

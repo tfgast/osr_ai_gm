@@ -45,6 +45,30 @@ pub(super) fn spawn_encounter(
     }
 }
 
+pub(super) fn add_monster(
+    id: &str,
+    state: &mut GameState,
+    params: &crate::gmapi::protocol::EncounterParams,
+) -> GMResponse {
+    match combat::action_add_monster(
+        state,
+        &SpawnEncounterParams {
+            name: &params.name,
+            count: params.count,
+            hit_dice: &params.hit_dice,
+            ac: params.ac,
+            hp: params.hp,
+            damage: &params.damage,
+            morale: params.morale,
+            distance: params.distance,
+            xp_value: params.xp_value,
+        },
+    ) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
 pub(super) fn roll_initiative(id: &str, state: &mut GameState) -> GMResponse {
     match combat::action_roll_initiative(state) {
         Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
