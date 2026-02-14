@@ -1089,6 +1089,8 @@ fn end_combat_happy_path() {
     assert!(data["rounds"].as_u64().is_some());
     assert!(data["monsters_defeated"].as_u64().is_some());
     assert!(data["total_xp"].as_u64().is_some());
+    assert!(data["xp_per_survivor"].as_u64().is_some());
+    assert!(data["xp_awards"].as_array().is_some());
     assert!(data["party_casualties"].as_u64().is_some());
 }
 

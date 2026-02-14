@@ -8,10 +8,10 @@ use crate::rules::{ability, equipment, monster as monster_db, spell, spell_data,
 
 use super::results::{
     AddMonsterResult, AttackResult, BackstabResult, CastSpellResult, CloseResult, CombatLogResult,
-    CombatStatusResult, DeclareSpellResult, EndCombatResult, FightingWithdrawalResult,
-    InitiativeResult, InitiativeWinner, MonsterAttackResult, MoraleResult,
-    RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome, RetreatResult, SetHelplessResult,
-    SpawnEncounterResult, SpawnMonsterResult, TurnUndeadResult,
+    CombatStatusResult, CombatXpAward, DeclareSpellResult, EndCombatResult,
+    FightingWithdrawalResult, InitiativeResult, InitiativeWinner, MonsterAttackResult,
+    MoraleResult, RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome, RetreatResult,
+    SetHelplessResult, SpawnEncounterResult, SpawnMonsterResult, TurnUndeadResult,
 };
 use super::{
     check_morale, close, combat_status, coup_de_grace, declare_spell, fighting_withdrawal,
@@ -712,7 +712,7 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
     let rounds = combat.round;
     let monsters_defeated = combat.monsters.iter().filter(|m| !m.is_alive()).count();
     let total_monsters = combat.monsters.len();
-    let total_xp = combat
+    let total_xp: u64 = combat
         .monsters
         .iter()
         .filter(|m| !m.is_alive())
@@ -725,6 +725,38 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
             if let Some(room) = dungeon.find_room_mut(room_id) {
                 room.monsters_cleared = true;
             }
+        }
+    }
+
+    // Auto-distribute monster XP equally among surviving party members (B/X rules).
+    let survivors: Vec<usize> = state
+        .party
+        .members
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.is_alive())
+        .map(|(i, _)| i)
+        .collect();
+    let survivor_count = survivors.len() as u64;
+    let xp_per_survivor = if total_xp > 0 && survivor_count > 0 {
+        total_xp / survivor_count
+    } else {
+        0
+    };
+
+    let mut xp_awards = Vec::new();
+    if xp_per_survivor > 0 {
+        for &idx in &survivors {
+            let character = &mut state.party.members[idx];
+            let result = crate::engine::xp::award_xp(character, 0, xp_per_survivor);
+            xp_awards.push(CombatXpAward {
+                character: character.name.clone(),
+                base_xp: result.base_xp,
+                modifier_pct: result.modifier_pct,
+                adjusted_xp: result.adjusted_xp,
+                total_xp: result.new_total,
+                ready_to_train: result.ready_to_train,
+            });
         }
     }
 
@@ -774,6 +806,8 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
         monsters_defeated,
         total_monsters,
         total_xp,
+        xp_per_survivor,
+        xp_awards,
         party_casualties,
         mode_after: state.mode.clone(),
         retainer_xp_each,
@@ -1732,5 +1766,103 @@ mod tests {
         let _ = action_roll_initiative(&mut state);
         let result = action_declare_spell(&mut state, "Zara", "Sleep");
         assert!(result.is_err(), "should have no slots after disrupted cast");
+    }
+
+    // --- end_combat auto-distributes monster XP (oag-f5d2j) ---
+
+    #[test]
+    fn end_combat_distributes_xp_to_survivors() {
+        let mut state = GameState::new();
+        let mut fighter = test_fighter();
+        fighter.abilities.strength = 10; // no prime req bonus
+        state.party.add_member(fighter);
+        let mut cleric = Character::new("Mira", Class::Cleric);
+        cleric.hp = 8;
+        cleric.max_hp = 8;
+        cleric.level = 1;
+        cleric.abilities.wisdom = 10;
+        state.party.add_member(cleric);
+
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        let mut m1 = mk_monster("Goblin 1", "1", 4, 6, 7);
+        m1.xp_value = 10;
+        m1.hp = 0; // dead
+        let mut m2 = mk_monster("Goblin 2", "1", 4, 6, 7);
+        m2.xp_value = 10;
+        m2.hp = 0; // dead
+        state.combat = Some(CombatState::new(vec![m1, m2], 5));
+
+        let result = action_end_combat(&mut state).unwrap();
+        assert_eq!(result.total_xp, 20);
+        assert_eq!(result.xp_per_survivor, 10); // 20 / 2 survivors
+        assert_eq!(result.xp_awards.len(), 2);
+        assert_eq!(result.xp_awards[0].character, "Grond");
+        assert_eq!(result.xp_awards[0].base_xp, 10);
+        assert_eq!(result.xp_awards[1].character, "Mira");
+        assert_eq!(result.xp_awards[1].base_xp, 10);
+
+        // Verify XP was actually awarded to characters
+        assert_eq!(state.party.find_member("Grond").unwrap().xp, 10);
+        assert_eq!(state.party.find_member("Mira").unwrap().xp, 10);
+    }
+
+    #[test]
+    fn end_combat_xp_excludes_dead_party_members() {
+        let mut state = GameState::new();
+        let mut alive = test_fighter();
+        alive.abilities.strength = 10;
+        state.party.add_member(alive);
+        let mut dead = Character::new("Fallen", Class::Fighter);
+        dead.hp = 0;
+        dead.max_hp = 8;
+        dead.level = 1;
+        state.party.add_member(dead);
+
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        let mut m = mk_monster("Orc", "1", 4, 6, 7);
+        m.xp_value = 30;
+        m.hp = 0;
+        state.combat = Some(CombatState::new(vec![m], 5));
+
+        let result = action_end_combat(&mut state).unwrap();
+        assert_eq!(result.total_xp, 30);
+        assert_eq!(result.xp_per_survivor, 30); // only 1 survivor
+        assert_eq!(result.xp_awards.len(), 1);
+        assert_eq!(result.xp_awards[0].character, "Grond");
+        assert_eq!(state.party.find_member("Grond").unwrap().xp, 30);
+        assert_eq!(state.party.find_member("Fallen").unwrap().xp, 0);
+    }
+
+    #[test]
+    fn end_combat_no_xp_when_no_kills() {
+        let mut state = state_with_combat(); // 2 goblins alive, xp_value=5 each
+        let result = action_end_combat(&mut state).unwrap();
+        assert_eq!(result.total_xp, 0);
+        assert_eq!(result.xp_per_survivor, 0);
+        assert!(result.xp_awards.is_empty());
+        assert_eq!(state.party.find_member("Grond").unwrap().xp, 0);
+    }
+
+    #[test]
+    fn end_combat_xp_applies_prime_req_modifier() {
+        let mut state = GameState::new();
+        let fighter = test_fighter(); // STR 16 = +10% for Fighter
+        state.party.add_member(fighter);
+
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        let mut m = mk_monster("Orc", "1", 4, 6, 7);
+        m.xp_value = 100;
+        m.hp = 0;
+        state.combat = Some(CombatState::new(vec![m], 5));
+
+        let result = action_end_combat(&mut state).unwrap();
+        assert_eq!(result.xp_per_survivor, 100);
+        assert_eq!(result.xp_awards.len(), 1);
+        assert_eq!(result.xp_awards[0].modifier_pct, 10);
+        assert_eq!(result.xp_awards[0].adjusted_xp, 110); // 100 + 10%
+        assert_eq!(state.party.find_member("Grond").unwrap().xp, 110);
     }
 }
