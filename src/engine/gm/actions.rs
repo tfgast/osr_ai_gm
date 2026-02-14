@@ -34,7 +34,7 @@ pub fn action_award_xp(
             result.ready_to_train,
         )
     } else {
-        character.xp = character.xp.saturating_add(amount);
+        character.xp += amount;
         let ready = check_level_up(character.class, character.level, character.xp).is_some();
         (amount, 0, character.xp, ready)
     };
@@ -250,11 +250,74 @@ pub fn action_add_rations(
         ));
     }
 
-    state.party.rations = state.party.rations.saturating_add(amount);
+    state.party.rations += amount;
     Ok(AddRationsResult {
         added: amount,
         rations: state.party.rations,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Character;
+    use crate::rules::class::Class;
+
+    fn make_character_with_xp(name: &str, xp: u64) -> Character {
+        let mut c = Character::new(name, Class::Fighter);
+        c.xp = xp;
+        c
+    }
+
+    // --- action_award_xp overflow parity (oag-gyymh.1) ---
+
+    #[test]
+    fn award_xp_normal_addition() {
+        let mut state = GameState::new();
+        state.party.add_member(make_character_with_xp("Aldric", 100));
+        let result = action_award_xp(&mut state, "Aldric", 50, false).unwrap();
+        assert_eq!(result.total_xp, 150);
+        assert_eq!(state.party.find_member("Aldric").unwrap().xp, 150);
+    }
+
+    #[test]
+    fn award_xp_near_max_no_overflow() {
+        let mut state = GameState::new();
+        state
+            .party
+            .add_member(make_character_with_xp("Aldric", u64::MAX - 10));
+        let result = action_award_xp(&mut state, "Aldric", 10, false).unwrap();
+        assert_eq!(result.total_xp, u64::MAX);
+        assert_eq!(state.party.find_member("Aldric").unwrap().xp, u64::MAX);
+    }
+
+    // --- action_add_rations overflow parity (oag-gyymh.1) ---
+
+    #[test]
+    fn add_rations_normal_addition() {
+        let mut state = GameState::new();
+        state.party.rations = 5;
+        let result = action_add_rations(&mut state, 3).unwrap();
+        assert_eq!(result.rations, 8);
+        assert_eq!(state.party.rations, 8);
+    }
+
+    #[test]
+    fn add_rations_near_max_no_overflow() {
+        let mut state = GameState::new();
+        state.party.rations = u32::MAX - 10;
+        let result = action_add_rations(&mut state, 10).unwrap();
+        assert_eq!(result.rations, u32::MAX);
+        assert_eq!(state.party.rations, u32::MAX);
+    }
+
+    #[test]
+    fn add_rations_zero_rejected() {
+        let mut state = GameState::new();
+        state.party.rations = 5;
+        let result = action_add_rations(&mut state, 0);
+        assert!(result.is_err());
+    }
 }
 
 pub fn action_thief_skill_check(

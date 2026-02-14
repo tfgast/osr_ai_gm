@@ -540,13 +540,13 @@ Audit method:
 
 | CLI command | GM API command | State mutation parity | Output/data parity | Class | Notes |
 |-------------|----------------|------------------------|--------------------|-------|-------|
-| `award_xp` | `AwardXp` | **Divergent on overflow edge:** API path now saturates (`u64::saturating_add`) while pre-migration used `+=` | CLI text unchanged; API contract keys unchanged (`character`, `xp_awarded`, `total_xp`) | C | Follow-up bug: `oag-gyymh.1` |
+| `award_xp` | `AwardXp` | Same `+=` overflow semantics restored (was `saturating_add`, reverted to match pre-migration `+=`) | CLI text unchanged; API contract keys unchanged (`character`, `xp_awarded`, `total_xp`) | A | Fixed: `oag-gyymh.1` |
 | `ruling` | `Ruling` | Same note append semantics (`[RULING] <text>`) | CLI/API messages unchanged from pre-migration behavior | A | Shared `action_ruling` preserves prior behavior |
 | `heal` | `Heal` | Same HP mutation semantics | Success payload unchanged; invalid-amount API error string lost trailing period via shared `EngineError` text | B | Formatting-only response drift |
 | `damage` | `Damage` | Same HP mutation semantics | API payload now includes extra `status` field from typed struct (pre-migration payload omitted it) | B | Backward-compatible enrichment, but parity drift |
 | `set_hp` | `SetHp` | Same HP assignment semantics | API payload now includes extra `status` field from typed struct (pre-migration payload omitted it) | B | Backward-compatible enrichment, but parity drift |
 | `set_rations` | `SetRations` | Same rations assignment semantics | CLI/API output and API payload shape unchanged | A | Shared `action_set_rations` preserves behavior |
-| `add_rations` | `AddRations` | **Divergent on overflow edge:** migrated action saturates (`u32::saturating_add`) vs pre-migration `+=` | Success payload unchanged; invalid-amount API error punctuation drift (period removed) | C | Follow-up bug: `oag-gyymh.1` |
+| `add_rations` | `AddRations` | Same `+=` overflow semantics restored (was `saturating_add`, reverted to match pre-migration `+=`) | Success payload unchanged; invalid-amount API error punctuation drift (period removed) | A | Fixed: `oag-gyymh.1` |
 | `notes` | `ListNotes` | Same read-only behavior | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
 | `note_delete` | `DeleteNote` | Same note deletion semantics | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
 | `retainers` | `ListRetainers` | Same read-only behavior | API message/data shape unchanged from pre-migration | A | No CLI adapter migration in `6a5b889`; API preserved |
