@@ -111,7 +111,7 @@ pub fn action_spawn_monster(
 ) -> Result<SpawnMonsterResult, EngineError> {
     if state.combat.is_some() {
         return Err(EngineError::WrongState(
-            "combat already active.".to_string(),
+            "combat already active. Use 'end_combat' first.".to_string(),
         ));
     }
 
