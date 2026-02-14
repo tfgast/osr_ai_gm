@@ -119,6 +119,31 @@ pub fn action_enter_dungeon(
     level: u32,
     room_name: &str,
 ) -> Result<EnterDungeonResult, EngineError> {
+    match state.mode {
+        GameMode::Idle | GameMode::Downtime => {}
+        GameMode::Wilderness => {
+            return Err(EngineError::WrongState(
+                "cannot enter dungeon while in wilderness mode. Use LeaveWilderness first."
+                    .to_string(),
+            ));
+        }
+        GameMode::Combat => {
+            return Err(EngineError::WrongState(
+                "cannot enter dungeon during combat. Use EndCombat first.".to_string(),
+            ));
+        }
+        GameMode::Exploration => {
+            return Err(EngineError::WrongState(
+                "already in exploration mode. Use LeaveDungeon first.".to_string(),
+            ));
+        }
+        GameMode::CharGen => {
+            return Err(EngineError::WrongState(
+                "cannot enter dungeon during character generation.".to_string(),
+            ));
+        }
+    }
+
     if level == 0 {
         return Err(EngineError::InvalidInput(
             "level must be a positive integer.".to_string(),
