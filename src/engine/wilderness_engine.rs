@@ -76,6 +76,21 @@ pub fn travel_day_with<R: Rng>(
         .map(|h| h.terrain)
         .unwrap_or(Terrain::Clear);
 
+    // Early range check: reject travel to out-of-range destinations before
+    // consuming any resources (rations, day counter, etc.)
+    let hexes = WildernessState::hexes_per_day(movement_rate, terrain);
+    let dx = (dest_x - wilderness.current_x).unsigned_abs();
+    let dy = (dest_y - wilderness.current_y).unsigned_abs();
+    let distance = dx.max(dy);
+    if distance > hexes {
+        result.msg(format!(
+            "Destination ({}, {}) is {} hexes away — exceeds travel range of {} hexes/day \
+             (movement rate {}', {} terrain). No travel attempted.",
+            dest_x, dest_y, distance, hexes, movement_rate, terrain.name()
+        ));
+        return result;
+    }
+
     result.msg(format!(
         "Day {}: Travelling through {} terrain.",
         wilderness.travel_day, terrain.name()
@@ -187,34 +202,22 @@ pub fn travel_day_with<R: Rng>(
         }
     } else {
         wilderness.lost = false;
-        // Travel speed
-        let hexes = WildernessState::hexes_per_day(movement_rate, terrain);
+        // Travel speed (range already validated at top of function)
         result.msg(format!(
             "Travel speed: {} hexes/day (movement rate {}').",
             hexes, movement_rate
         ));
 
-        // Enforce travel range — destination must be within hexes_per_day distance
-        let dx = (dest_x - wilderness.current_x).unsigned_abs();
-        let dy = (dest_y - wilderness.current_y).unsigned_abs();
-        let distance = dx.max(dy);
-        if distance > hexes {
-            result.msg(format!(
-                "Destination ({}, {}) is {} hexes away — exceeds travel range of {} hexes/day.",
-                dest_x, dest_y, distance, hexes
-            ));
-        } else {
-            // Attempt to move to destination
-            match wilderness.move_to(dest_x, dest_y) {
-                Ok(()) => {
-                    result.msg(format!(
-                        "Arrived at ({}, {}).",
-                        dest_x, dest_y
-                    ));
-                }
-                Err(e) => {
-                    result.msg(format!("Cannot travel there: {}", e));
-                }
+        // Attempt to move to destination
+        match wilderness.move_to(dest_x, dest_y) {
+            Ok(()) => {
+                result.msg(format!(
+                    "Arrived at ({}, {}).",
+                    dest_x, dest_y
+                ));
+            }
+            Err(e) => {
+                result.msg(format!("Cannot travel there: {}", e));
             }
         }
     }
@@ -634,13 +637,11 @@ mod tests {
         let mut ws = test_wilderness();
         let mut party = test_party();
         let result = travel_day_with(&mut rng, &mut ws, &mut party, 99, 99, 120);
-        // Should get a message about not being able to travel there
-        // (unless lost, in which case travel doesn't attempt the move)
-        if !result.lost {
-            assert!(result.messages.iter().any(|m|
-                m.contains("exceeds travel range") || m.contains("Cannot travel")
-            ));
-        }
+        // Out-of-range destinations are rejected early, before lost check
+        assert!(result.messages.iter().any(|m|
+            m.contains("exceeds travel range") || m.contains("Cannot travel")
+        ));
+        assert!(!result.lost, "out-of-range travel should not trigger lost check");
     }
 
     // =========================================================================
@@ -707,15 +708,14 @@ mod tests {
         let hexes = WildernessState::hexes_per_day(120, Terrain::Clear);
         assert_eq!(hexes, 4);
 
-        // Trying to travel 5 hexes away should be blocked
+        // Trying to travel 5 hexes away should be rejected with no side effects
         let mut rng = test_rng();
         let result = travel_day_with(&mut rng, &mut ws, &mut party, 5, 0, 120);
-        if !result.lost {
-            assert!(
-                result.messages.iter().any(|m| m.contains("exceeds travel range")),
-                "should not allow travel beyond daily movement range"
-            );
-        }
+        assert!(
+            result.messages.iter().any(|m| m.contains("exceeds travel range")),
+            "should not allow travel beyond daily movement range"
+        );
+        assert!(!result.lost, "out-of-range travel should not trigger lost check");
     }
 
     #[test]
@@ -1199,5 +1199,97 @@ mod tests {
         ws.lost = true;
         orient_with(&mut test_rng(), &mut ws);
         assert!(!ws.log.is_empty(), "orient should add to the log");
+    }
+
+    // =========================================================================
+    // Bug fix: out-of-range travel must not consume rations or advance day
+    // =========================================================================
+
+    #[test]
+    fn out_of_range_travel_no_rations_consumed() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 10;
+        let initial_rations = party.rations;
+
+        // (5,5) is 5 hexes away from (0,0), well beyond 4 hexes/day in clear
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 5, 5, 120);
+
+        assert!(
+            result.messages.iter().any(|m| m.contains("exceeds travel range")),
+            "should report destination out of range"
+        );
+        assert_eq!(party.rations, initial_rations, "rations must not be consumed for out-of-range travel");
+        assert_eq!(result.rations_consumed, 0, "no rations should be consumed");
+        assert!(!result.starving, "should not trigger starvation");
+    }
+
+    #[test]
+    fn out_of_range_travel_no_day_advance() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        let initial_day = ws.travel_day;
+
+        // 5 hexes away, max 4/day in clear terrain
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 5, 5, 120);
+
+        assert!(
+            result.messages.iter().any(|m| m.contains("exceeds travel range")),
+            "should report destination out of range"
+        );
+        assert_eq!(ws.travel_day, initial_day, "day counter must not advance for out-of-range travel");
+    }
+
+    #[test]
+    fn out_of_range_travel_no_position_change() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 5, 5, 120);
+
+        assert!(
+            result.messages.iter().any(|m| m.contains("exceeds travel range")),
+            "should report destination out of range"
+        );
+        assert_eq!((ws.current_x, ws.current_y), (0, 0), "position must not change");
+    }
+
+    #[test]
+    fn out_of_range_travel_no_encounters() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 5, 5, 120);
+
+        assert!(result.encounters.is_empty(), "no encounters should occur for out-of-range travel");
+    }
+
+    #[test]
+    fn out_of_range_in_mountains_no_side_effects() {
+        // Mountains: 1 hex/day at 120'. Destination 2 hexes away should be rejected.
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 10;
+        // Move step-by-step to mountains at (2,0): (0,0) -> (1,0) -> (2,0)
+        ws.move_to(1, 0).unwrap();
+        ws.move_to(2, 0).unwrap();
+        let initial_rations = party.rations;
+        let initial_day = ws.travel_day;
+
+        // From (2,0) mountains, try to reach (0,0) which is 2 hexes away
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 0, 0, 120);
+
+        assert!(
+            result.messages.iter().any(|m| m.contains("exceeds travel range")),
+            "2-hex travel in mountains should exceed 1 hex/day range"
+        );
+        assert_eq!(party.rations, initial_rations, "rations must not be consumed");
+        assert_eq!(ws.travel_day, initial_day, "day must not advance");
+        assert_eq!((ws.current_x, ws.current_y), (2, 0), "position must not change");
     }
 }
