@@ -29,6 +29,13 @@ pub fn action_award_xp(
         .find_member_mut(char_name)
         .ok_or_else(|| no_party_member_err(char_name))?;
 
+    if !character.is_alive() {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is dead and cannot receive XP.",
+            character.name
+        )));
+    }
+
     let (adjusted_xp, modifier_pct, total_xp, ready_to_train) = if apply_prime_req_modifier {
         let result = xp::award_xp(character, amount, 0);
         (
@@ -289,6 +296,14 @@ pub fn action_award_treasure_xp(
         .party
         .find_member_mut(char_name)
         .ok_or_else(|| no_party_member_err(char_name))?;
+
+    if !character.is_alive() {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is dead and cannot receive XP.",
+            character.name
+        )));
+    }
+
     let result = xp::award_xp(character, treasure_gp, monster_xp);
     Ok(AwardTreasureXpResult {
         character: character.name.clone(),

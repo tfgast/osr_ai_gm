@@ -804,6 +804,18 @@ mod tests {
         assert!(result.output.contains("1100 XP")); // 1000 * 1.10
     }
 
+    #[test]
+    fn award_xp_dead_character() {
+        let mut state = GameState::new();
+        let mut c = make_leveled_fighter("Aldric", 0, 500);
+        c.hp = 0;
+        state.party.add_member(c);
+        let cmd = AwardXpCommand;
+        let result = cmd.execute(&["Aldric", "100"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("dead"));
+    }
+
     // === BackstabCommand tests ===
 
     fn make_combat_state_with_thief() -> GameState {
@@ -980,6 +992,18 @@ mod tests {
         let cmd = AwardTreasureXpCommand;
         let result = cmd.execute(&["Aldric", "abc", "100"], &mut state);
         assert!(result.output.starts_with("Error"));
+    }
+
+    #[test]
+    fn award_treasure_xp_dead_character() {
+        let mut state = GameState::new();
+        let mut c = make_leveled_fighter("Aldric", 0, 500);
+        c.hp = 0;
+        state.party.add_member(c);
+        let cmd = AwardTreasureXpCommand;
+        let result = cmd.execute(&["Aldric", "500", "100"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("dead"));
     }
 
     #[test]
