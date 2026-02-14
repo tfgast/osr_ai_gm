@@ -3910,7 +3910,7 @@ fn equip_happy_path() {
 }
 
 #[test]
-fn equip_unequip_toggles() {
+fn unequip_via_unequip_command() {
     let mut state = GameState::new();
     let mut c = make_fighter("Aldric");
     c.abilities.dexterity = 10;
@@ -3920,7 +3920,7 @@ fn equip_unequip_toggles() {
     c.ac = 7;
     state.party.add_member(c);
 
-    let resp = handle_request(&req("eq2", GMCommand::Equip {
+    let resp = handle_request(&req("eq2", GMCommand::Unequip {
         character: "Aldric".to_string(),
         item_name: "Leather".to_string(),
     }), &mut state);
@@ -3931,6 +3931,43 @@ fn equip_unequip_toggles() {
     let data = resp.data.unwrap();
     assert_eq!(data["action"], "unequips");
     assert_eq!(data["ac"], 9); // back to unarmoured
+}
+
+#[test]
+fn equip_already_equipped_errors() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.abilities.dexterity = 10;
+    let mut item = Item::new("Leather", 150.0, 20);
+    item.equipped = true;
+    c.inventory.push(item);
+    c.ac = 7;
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("eq2b", GMCommand::Equip {
+        character: "Aldric".to_string(),
+        item_name: "Leather".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "eq2b");
+    assert!(!resp.success);
+    assert!(resp.message.contains("already has Leather equipped"));
+}
+
+#[test]
+fn unequip_not_equipped_errors() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Aldric");
+    c.abilities.dexterity = 10;
+    c.inventory.push(Item::new("Leather", 150.0, 20));
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("eq2c", GMCommand::Unequip {
+        character: "Aldric".to_string(),
+        item_name: "Leather".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "eq2c");
+    assert!(!resp.success);
+    assert!(resp.message.contains("does not have Leather equipped"));
 }
 
 #[test]

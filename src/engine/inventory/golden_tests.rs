@@ -345,7 +345,7 @@ fn inventory_command_parity_golden_scaffold_captures_snapshots() {
         build_gate(
             "equip",
             "Equip",
-            "Shared equip toggle + AC recalculation; API includes typed `EquipResult` data.",
+            "Shared equip + AC recalculation; API includes typed `EquipResult` data.",
             equip_expected,
             equip_snapshot.clone(),
             equip_payload_matches(equip_snapshot.api.data.as_ref(), equip_expected),

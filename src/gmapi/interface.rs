@@ -140,6 +140,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::Buy { character, item_name } => exploration_handlers::buy(id, state, character, item_name),
         GMCommand::Drop { character, item_name } => exploration_handlers::drop(id, state, character, item_name),
         GMCommand::Equip { character, item_name } => exploration_handlers::equip(id, state, character, item_name),
+        GMCommand::Unequip { character, item_name } => exploration_handlers::unequip(id, state, character, item_name),
         GMCommand::Loot { character, item_name, value_gp } => exploration_handlers::loot(id, state, character, item_name, *value_gp),
 
         // -- Lookup & reference --

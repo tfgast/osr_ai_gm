@@ -323,12 +323,75 @@ pub fn action_equip(
         EngineError::InvalidInput(format!("{} does not have '{}'.", character.name, item_name))
     })?;
 
-    let was_equipped = character.inventory[idx].equipped;
-    character.inventory[idx].equipped = !was_equipped;
+    if character.inventory[idx].equipped {
+        return Err(EngineError::InvalidInput(format!(
+            "{} already has {} equipped. Use 'unequip' to remove it.",
+            character.name, character.inventory[idx].name
+        )));
+    }
 
-    let action = if was_equipped { "unequips" } else { "equips" };
+    character.inventory[idx].equipped = true;
     let item_display = character.inventory[idx].name.clone();
 
+    let ac = recalculate_ac(character);
+
+    Ok(EquipResult {
+        message: format!(
+            "{} equips {}. (AC {})",
+            character.name, item_display, character.ac
+        ),
+        character: character.name.clone(),
+        item: item_display,
+        action: "equips".to_string(),
+        ac,
+    })
+}
+
+pub fn action_unequip(
+    state: &mut GameState,
+    char_name: &str,
+    item_name: &str,
+) -> Result<EquipResult, EngineError> {
+    let character = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+
+    let idx = character
+        .inventory
+        .iter()
+        .position(|i| i.name.eq_ignore_ascii_case(item_name));
+
+    let idx = idx.ok_or_else(|| {
+        EngineError::InvalidInput(format!("{} does not have '{}'.", character.name, item_name))
+    })?;
+
+    if !character.inventory[idx].equipped {
+        return Err(EngineError::InvalidInput(format!(
+            "{} does not have {} equipped.",
+            character.name, character.inventory[idx].name
+        )));
+    }
+
+    character.inventory[idx].equipped = false;
+    let item_display = character.inventory[idx].name.clone();
+
+    let ac = recalculate_ac(character);
+
+    Ok(EquipResult {
+        message: format!(
+            "{} unequips {}. (AC {})",
+            character.name, item_display, character.ac
+        ),
+        character: character.name.clone(),
+        item: item_display,
+        action: "unequips".to_string(),
+        ac,
+    })
+}
+
+/// Recalculate AC from equipped items and set it on the character. Returns the new AC.
+fn recalculate_ac(character: &mut crate::model::Character) -> i32 {
     let armour_ac = character
         .inventory
         .iter()
@@ -348,17 +411,7 @@ pub fn action_equip(
 
     let dex_mod = ability::dex_ac_mod(character.abilities.dexterity);
     character.ac = equipment::calculate_ac(armour_ac, has_shield, dex_mod);
-
-    Ok(EquipResult {
-        message: format!(
-            "{} {} {}. (AC {})",
-            character.name, action, item_display, character.ac
-        ),
-        character: character.name.clone(),
-        item: item_display,
-        action: action.to_string(),
-        ac: character.ac,
-    })
+    character.ac
 }
 
 pub fn action_loot(

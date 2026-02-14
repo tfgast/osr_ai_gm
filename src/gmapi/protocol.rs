@@ -305,8 +305,13 @@ pub enum GMCommand {
         character: String,
         item_name: String,
     },
-    /// Equip or unequip an item (toggles equipped state, recalculates AC).
+    /// Equip an item (recalculates AC).
     Equip {
+        character: String,
+        item_name: String,
+    },
+    /// Unequip an item (recalculates AC).
+    Unequip {
         character: String,
         item_name: String,
     },
