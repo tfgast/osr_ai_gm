@@ -5,6 +5,7 @@ use crate::engine::result::EngineError;
 use crate::model::Item;
 use crate::persist::GameState;
 use crate::rules::{ability, equipment};
+use crate::state::dungeon::PlacedTreasureInstance;
 
 fn no_party_member_err(char_name: &str) -> EngineError {
     EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
@@ -17,6 +18,97 @@ fn normalize_for_matching(s: &str) -> String {
         .filter(|c| c.is_alphanumeric())
         .flat_map(|c| c.to_lowercase())
         .collect()
+}
+
+/// Find a placed treasure by fuzzy matching against its description.
+///
+/// Matching strategy (first pass that produces results wins):
+/// 1. Exact case-insensitive match
+/// 2. Normalized equality (strip non-alphanumeric, compare)
+/// 3. Case-insensitive substring (query contained in description)
+/// 4. Normalized substring (normalized query contained in normalized description)
+///
+/// Returns `Ok(Some(index))` for a unique match, `Ok(None)` for no match,
+/// or `Err(descriptions)` if the query is ambiguous (multiple matches).
+fn find_placed_treasure(
+    treasures: &[PlacedTreasureInstance],
+    query: &str,
+) -> Result<Option<usize>, Vec<String>> {
+    let available: Vec<(usize, &PlacedTreasureInstance)> = treasures
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| !t.taken)
+        .collect();
+
+    if available.is_empty() {
+        return Ok(None);
+    }
+
+    // Pass 1: Exact case-insensitive match
+    let exact: Vec<usize> = available
+        .iter()
+        .filter(|(_, t)| t.description.eq_ignore_ascii_case(query))
+        .map(|(i, _)| *i)
+        .collect();
+    if exact.len() == 1 {
+        return Ok(Some(exact[0]));
+    }
+
+    // Pass 2: Normalized equality
+    let query_norm = normalize_for_matching(query);
+    if !query_norm.is_empty() {
+        let normalized: Vec<usize> = available
+            .iter()
+            .filter(|(_, t)| normalize_for_matching(&t.description) == query_norm)
+            .map(|(i, _)| *i)
+            .collect();
+        if normalized.len() == 1 {
+            return Ok(Some(normalized[0]));
+        }
+        if normalized.len() > 1 {
+            return Err(normalized
+                .iter()
+                .map(|&i| treasures[i].description.clone())
+                .collect());
+        }
+    }
+
+    // Pass 3: Case-insensitive substring (query in description)
+    let query_lower = query.to_lowercase();
+    let substring: Vec<usize> = available
+        .iter()
+        .filter(|(_, t)| t.description.to_lowercase().contains(&query_lower))
+        .map(|(i, _)| *i)
+        .collect();
+    if substring.len() == 1 {
+        return Ok(Some(substring[0]));
+    }
+    if substring.len() > 1 {
+        return Err(substring
+            .iter()
+            .map(|&i| treasures[i].description.clone())
+            .collect());
+    }
+
+    // Pass 4: Normalized substring (normalized query in normalized description)
+    if !query_norm.is_empty() {
+        let norm_sub: Vec<usize> = available
+            .iter()
+            .filter(|(_, t)| normalize_for_matching(&t.description).contains(&query_norm))
+            .map(|(i, _)| *i)
+            .collect();
+        if norm_sub.len() == 1 {
+            return Ok(Some(norm_sub[0]));
+        }
+        if norm_sub.len() > 1 {
+            return Err(norm_sub
+                .iter()
+                .map(|&i| treasures[i].description.clone())
+                .collect());
+        }
+    }
+
+    Ok(None)
 }
 
 /// Look up an item across all equipment tables.
@@ -275,33 +367,44 @@ pub fn action_loot(
     item_name: &str,
     explicit_gp: Option<u32>,
 ) -> Result<LootResult, EngineError> {
-    let room_gp = if let Some(dungeon) = &mut state.dungeon {
+    // Step 1: Try fuzzy matching against placed treasure in the current room
+    let treasure_match = if let Some(dungeon) = &state.dungeon {
         if let Some(current) = dungeon.current_room {
-            if let Some(room) = dungeon.find_room_mut(current) {
-                let idx = room
-                    .placed_treasure
-                    .iter()
-                    .position(|t| !t.taken && t.description.eq_ignore_ascii_case(item_name));
-
-                match idx {
-                    Some(i) => {
-                        let gp = room.placed_treasure[i].gp_value;
-                        room.placed_treasure[i].taken = true;
-                        Some(gp)
-                    }
-                    None => None, // not in room treasure → ad-hoc item
-                }
+            if let Some(room) = dungeon.find_room(current) {
+                find_placed_treasure(&room.placed_treasure, item_name)
             } else {
-                None
+                Ok(None)
             }
         } else {
-            None
+            Ok(None)
         }
     } else {
-        None
+        Ok(None)
+    };
+
+    // Step 2: Handle ambiguous matches
+    let treasure_match = treasure_match.map_err(|matches| {
+        EngineError::InvalidInput(format!(
+            "ambiguous item '{}'. Matches: {}",
+            item_name,
+            matches.join(", ")
+        ))
+    })?;
+
+    // Step 3: If matched, mark taken and get canonical values
+    let (room_gp, canonical_name) = if let Some(idx) = treasure_match {
+        let dungeon = state.dungeon.as_mut().unwrap();
+        let room = dungeon.find_room_mut(dungeon.current_room.unwrap()).unwrap();
+        let gp = room.placed_treasure[idx].gp_value;
+        let name = room.placed_treasure[idx].description.clone();
+        room.placed_treasure[idx].taken = true;
+        (Some(gp), Some(name))
+    } else {
+        (None, None)
     };
 
     let value_gp = explicit_gp.unwrap_or(room_gp.unwrap_or(0) as u32);
+    let display_name = canonical_name.as_deref().unwrap_or(item_name);
 
     let character = state
         .party
@@ -310,9 +413,9 @@ pub fn action_loot(
 
     character
         .inventory
-        .push(Item::new(item_name, 0.0, value_gp));
+        .push(Item::new(display_name, 0.0, value_gp));
 
-    let mut message = format!("{} picks up {}.", character.name, item_name);
+    let mut message = format!("{} picks up {}.", character.name, display_name);
     if value_gp > 0 {
         message.push_str(&format!(" (worth {} gp)", value_gp));
     }
@@ -320,7 +423,7 @@ pub fn action_loot(
     Ok(LootResult {
         message,
         character: character.name.clone(),
-        item: item_name.to_string(),
+        item: display_name.to_string(),
         value_gp,
     })
 }
@@ -596,5 +699,119 @@ mod tests {
         for a in &result.armour {
             assert!(a.cost_gp > 0, "armour {} should have cost > 0", a.name);
         }
+    }
+
+    // ---- Fuzzy loot matching tests (oag-3r4po) ----
+
+    fn state_with_module_treasure() -> GameState {
+        use crate::state::dungeon::{DungeonState, PlacedTreasureInstance, Room};
+
+        let mut state = state_with_fighter();
+        let mut dungeon = DungeonState::new(1);
+        let room = Room::new(0, "Princess's Bedchamber").with_placed_treasure(vec![
+            PlacedTreasureInstance::new("Sapphire platinum brooch (1,000gp)", 1000),
+            PlacedTreasureInstance::new("Silver dagger", 30),
+            PlacedTreasureInstance::new("Gold coins", 200),
+        ]);
+        dungeon.add_room(room).unwrap();
+        dungeon.current_room = Some(0);
+        dungeon.explored.insert(0);
+        state.dungeon = Some(dungeon);
+        state
+    }
+
+    #[test]
+    fn loot_substring_match_finds_brooch() {
+        let mut state = state_with_module_treasure();
+        let result = action_loot(&mut state, "Aldric", "brooch", None)
+            .expect("substring should match");
+        assert_eq!(result.value_gp, 1000);
+        assert!(result.item.contains("Sapphire platinum brooch"));
+    }
+
+    #[test]
+    fn loot_case_insensitive_substring() {
+        let mut state = state_with_module_treasure();
+        let result = action_loot(&mut state, "Aldric", "SILVER DAGGER", None)
+            .expect("case-insensitive exact should match");
+        assert_eq!(result.value_gp, 30);
+        assert_eq!(result.item, "Silver dagger");
+    }
+
+    #[test]
+    fn loot_substring_match_uses_canonical_name() {
+        let mut state = state_with_module_treasure();
+        let result = action_loot(&mut state, "Aldric", "sapphire", None)
+            .expect("substring should match");
+        assert_eq!(result.item, "Sapphire platinum brooch (1,000gp)");
+        let c = state.party.find_member("Aldric").unwrap();
+        assert_eq!(c.inventory[0].name, "Sapphire platinum brooch (1,000gp)");
+    }
+
+    #[test]
+    fn loot_ambiguous_match_returns_error() {
+        use crate::state::dungeon::{DungeonState, PlacedTreasureInstance, Room};
+
+        let mut state = state_with_fighter();
+        let mut dungeon = DungeonState::new(1);
+        let room = Room::new(0, "Treasury").with_placed_treasure(vec![
+            PlacedTreasureInstance::new("Silver ring", 50),
+            PlacedTreasureInstance::new("Silver necklace", 100),
+        ]);
+        dungeon.add_room(room).unwrap();
+        dungeon.current_room = Some(0);
+        dungeon.explored.insert(0);
+        state.dungeon = Some(dungeon);
+
+        let err = action_loot(&mut state, "Aldric", "silver", None)
+            .expect_err("ambiguous match should error");
+        let msg = err.to_string();
+        assert!(msg.contains("ambiguous"), "error should mention ambiguous: {}", msg);
+        assert!(msg.contains("Silver ring"), "should list ring: {}", msg);
+        assert!(msg.contains("Silver necklace"), "should list necklace: {}", msg);
+    }
+
+    #[test]
+    fn loot_normalized_match_strips_punctuation() {
+        use crate::state::dungeon::{DungeonState, PlacedTreasureInstance, Room};
+
+        let mut state = state_with_fighter();
+        let mut dungeon = DungeonState::new(1);
+        let room = Room::new(0, "Vault").with_placed_treasure(vec![
+            PlacedTreasureInstance::new("Knight's shield", 75),
+        ]);
+        dungeon.add_room(room).unwrap();
+        dungeon.current_room = Some(0);
+        dungeon.explored.insert(0);
+        state.dungeon = Some(dungeon);
+
+        let result = action_loot(&mut state, "Aldric", "knights shield", None)
+            .expect("normalized should match without apostrophe");
+        assert_eq!(result.item, "Knight's shield");
+        assert_eq!(result.value_gp, 75);
+    }
+
+    #[test]
+    fn loot_no_match_still_creates_adhoc() {
+        let mut state = state_with_module_treasure();
+        let result = action_loot(&mut state, "Aldric", "mysterious orb", Some(50))
+            .expect("ad-hoc loot should succeed");
+        assert_eq!(result.item, "mysterious orb");
+        assert_eq!(result.value_gp, 50);
+        // Room treasures should all still be untaken
+        let room = state.dungeon.as_ref().unwrap().find_room(0).unwrap();
+        assert!(room.placed_treasure.iter().all(|t| !t.taken));
+    }
+
+    #[test]
+    fn loot_taken_items_not_matched() {
+        let mut state = state_with_dungeon_treasure();
+        // Loot the ruby gem first
+        action_loot(&mut state, "Aldric", "ruby", None).expect("first loot should succeed");
+        // Second attempt should not find it
+        let result = action_loot(&mut state, "Aldric", "ruby", Some(0))
+            .expect("ad-hoc should succeed when treasure taken");
+        assert_eq!(result.item, "ruby");
+        assert_eq!(result.value_gp, 0);
     }
 }
