@@ -8,6 +8,7 @@ pub mod equipment;
 pub mod magic_item;
 pub mod module;
 pub mod monster;
+pub mod rumor;
 pub mod npc_party;
 pub mod save;
 pub mod spell;

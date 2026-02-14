@@ -23,6 +23,7 @@ use osr_ai_gm::command::lookup_cmds::{
 };
 use osr_ai_gm::command::module_cmds::LoadModuleCommand;
 use osr_ai_gm::command::party::{ChargenCommand, ClassesCommand, EligibleCommand, PartyCommand};
+use osr_ai_gm::command::rumor_cmds::RumorCommand;
 use osr_ai_gm::command::retainer_cmds::{
     DismissCommand, HireCommand, RetainerMoraleCommand, RetainersCommand,
 };
@@ -146,6 +147,8 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(SpawnNpcCommand));
     // Treasure
     registry.register(Box::new(TreasureCommand));
+    // Rumors
+    registry.register(Box::new(RumorCommand));
     // Wilderness
     registry.register(Box::new(EnterWildernessCommand));
     registry.register(Box::new(LeaveWildernessCommand));

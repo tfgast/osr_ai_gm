@@ -1,0 +1,53 @@
+{
+  "source": "OSR AI GM rumor tables",
+  "tables": [
+    {
+      "name": "tavern",
+      "description": "Rumors overheard in a tavern or inn",
+      "entries": [
+        { "text": "A band of goblins has been raiding caravans on the old trade road.", "true_rumor": true, "tags": ["monster", "road"] },
+        { "text": "The old crypt north of town is haunted by restless dead.", "true_rumor": true, "tags": ["undead", "dungeon"] },
+        { "text": "A dragon's hoard lies beneath the ruined tower on the hill.", "true_rumor": false, "tags": ["treasure", "dragon"] },
+        { "text": "The merchant guild is secretly smuggling cursed artifacts.", "true_rumor": false, "tags": ["intrigue", "cursed"] },
+        { "text": "Healing herbs grow in abundance near the Forest Shrine.", "true_rumor": true, "tags": ["healing", "wilderness"] },
+        { "text": "The blacksmith's son went missing exploring the old mines.", "true_rumor": true, "tags": ["dungeon", "npc"] },
+        { "text": "A wandering wizard offers powerful enchantments for a price.", "true_rumor": true, "tags": ["magic", "npc"] },
+        { "text": "Underground tunnels connect the tavern cellar to the castle.", "true_rumor": false, "tags": ["dungeon", "intrigue"] },
+        { "text": "Wolves in the northern forest are led by a massive dire wolf.", "true_rumor": true, "tags": ["monster", "wilderness"] },
+        { "text": "The river troll demands a toll of 10 gold pieces to cross the bridge.", "true_rumor": true, "tags": ["monster", "road"] },
+        { "text": "Treasure hunters found a sealed vault beneath the old temple.", "true_rumor": true, "tags": ["treasure", "dungeon"] },
+        { "text": "The king's tax collector is actually a shapeshifting doppelganger.", "true_rumor": false, "tags": ["intrigue", "monster"] }
+      ]
+    },
+    {
+      "name": "market",
+      "description": "Gossip heard while shopping at the market square",
+      "entries": [
+        { "text": "Bandits ambushed a merchant caravan last week — the road south is dangerous.", "true_rumor": true, "tags": ["road", "danger"] },
+        { "text": "A rare gemstone was found in the creek bed near the old mill.", "true_rumor": true, "tags": ["treasure", "wilderness"] },
+        { "text": "The apothecary sells potions that can cure any disease.", "true_rumor": false, "tags": ["magic", "npc"] },
+        { "text": "Strange lights have been seen in the swamp at night.", "true_rumor": true, "tags": ["mystery", "wilderness"] },
+        { "text": "The baron is offering a bounty on giant spider pelts.", "true_rumor": true, "tags": ["monster", "quest"] },
+        { "text": "A hermit in the hills knows the location of a lost dwarven mine.", "true_rumor": true, "tags": ["dungeon", "npc"] },
+        { "text": "The old lighthouse keeper went mad after finding something in the caves below.", "true_rumor": true, "tags": ["dungeon", "npc"] },
+        { "text": "Drinking from the fountain in the town square grants good luck.", "true_rumor": false, "tags": ["magic", "town"] },
+        { "text": "Orcs have been spotted massing in the foothills to the east.", "true_rumor": true, "tags": ["monster", "wilderness"] },
+        { "text": "The old bridge is actually built on a buried giant's bones.", "true_rumor": false, "tags": ["mystery", "road"] }
+      ]
+    },
+    {
+      "name": "docks",
+      "description": "Tales told by sailors and dockworkers",
+      "entries": [
+        { "text": "A ghost ship appears on foggy nights near the rocky shoals.", "true_rumor": true, "tags": ["undead", "sea"] },
+        { "text": "Smugglers use the sea caves for storing contraband.", "true_rumor": true, "tags": ["intrigue", "dungeon"] },
+        { "text": "A sea serpent destroyed a fishing boat last month.", "true_rumor": true, "tags": ["monster", "sea"] },
+        { "text": "The sunken temple offshore contains ancient treasure.", "true_rumor": true, "tags": ["treasure", "dungeon"] },
+        { "text": "Merfolk trade with the fishermen at the hidden cove.", "true_rumor": false, "tags": ["npc", "sea"] },
+        { "text": "Pirates buried gold on the island across the bay.", "true_rumor": true, "tags": ["treasure", "sea"] },
+        { "text": "The harbor master takes bribes to look the other way.", "true_rumor": true, "tags": ["intrigue", "npc"] },
+        { "text": "A kraken sleeps in the deep trench south of the harbor.", "true_rumor": false, "tags": ["monster", "sea"] }
+      ]
+    }
+  ]
+}

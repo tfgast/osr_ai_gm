@@ -1,4 +1,4 @@
-use crate::engine::{combat, exploration, lookup, party, wilderness_engine};
+use crate::engine::{combat, exploration, lookup, party, rumor, wilderness_engine};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
@@ -308,6 +308,34 @@ pub(super) fn lookup_treasure_type(id: &str, state: &GameState, letter: &str) ->
 pub(super) fn roll_treasure(id: &str, state: &GameState, letter: &str) -> GMResponse {
     match lookup::action_roll_treasure(letter) {
         Ok(result) => ok_with_typed_data(id, state, result.api_message(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+// =============================================================================
+// Rumors
+// =============================================================================
+
+pub(super) fn roll_rumor(id: &str, state: &GameState, table: &str) -> GMResponse {
+    match rumor::action_roll_rumor(table) {
+        Ok(result) => ok_with_typed_data(id, state, result.message, result.data),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+pub(super) fn lookup_rumor_table(id: &str, state: &GameState, table: &str) -> GMResponse {
+    match rumor::action_lookup_rumor_table(table) {
+        Ok(result) => ok_with_typed_data(id, state, result.message, result.data),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+pub(super) fn list_rumor_tables(id: &str, state: &GameState) -> GMResponse {
+    match rumor::action_list_rumor_tables() {
+        Ok(result) => {
+            let msg = format!("{} rumor tables available.", result.tables.len());
+            ok_with_typed_data(id, state, msg, result)
+        }
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
