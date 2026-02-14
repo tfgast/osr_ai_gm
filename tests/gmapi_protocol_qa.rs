@@ -4991,3 +4991,279 @@ fn list_rumor_tables_parses_from_json() {
     assert_eq!(req.id, "lt2");
     assert!(matches!(req.command, GMCommand::ListRumorTables));
 }
+
+// ===========================================================================
+// Effect display in state queries
+// ===========================================================================
+
+use osr_ai_gm::state::effect::{EffectDuration, EffectTarget, Modifier, ModifierStat};
+
+#[test]
+fn query_party_without_effects_omits_effects_field() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("eff1", GMCommand::QueryParty), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let aldric = &data["members"][0];
+    // When no effects, the effects field should be absent (skip_serializing_if = empty)
+    assert!(aldric.get("effects").is_none() || aldric["effects"].as_array().unwrap().is_empty(),
+        "effects field should be absent or empty when no effects");
+}
+
+#[test]
+fn query_party_with_effects_shows_in_data() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    state.party.add_member(make_cleric("Brin"));
+
+    state.effects.add(
+        "Protection from Evil".into(),
+        "Brin".into(),
+        EffectTarget::Character("Aldric".into()),
+        EffectDuration::Turns(8),
+        vec![Modifier { stat: ModifierStat::SavingThrows, value: 1 }],
+        "Enchanted creatures cannot melee.".into(),
+    );
+
+    let resp = handle_request(&req("eff2", GMCommand::QueryParty), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let aldric = &data["members"][0];
+    let effects = aldric["effects"].as_array().unwrap();
+    assert_eq!(effects.len(), 1);
+    assert_eq!(effects[0]["name"], "Protection from Evil");
+    assert_eq!(effects[0]["source"], "Brin");
+    assert_eq!(effects[0]["duration"], "8 turns");
+    assert_eq!(effects[0]["id"], 1);
+
+    let mods = effects[0]["modifiers"].as_array().unwrap();
+    assert_eq!(mods.len(), 1);
+    assert_eq!(mods[0]["stat"], "saves");
+    assert_eq!(mods[0]["value"], 1);
+
+    // Brin has no effects — should have no effects field
+    let brin = &data["members"][1];
+    assert!(brin.get("effects").is_none() || brin["effects"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn query_party_effects_show_in_message() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    state.effects.add(
+        "Bless".into(),
+        "Brin".into(),
+        EffectTarget::Character("Aldric".into()),
+        EffectDuration::Rounds(4),
+        vec![
+            Modifier { stat: ModifierStat::AttackRoll, value: 1 },
+            Modifier { stat: ModifierStat::DamageRoll, value: 1 },
+        ],
+        String::new(),
+    );
+
+    let resp = handle_request(&req("eff3", GMCommand::QueryParty), &mut state);
+    assert!(resp.success);
+    assert!(resp.message.contains("Aldric"), "message should mention character name");
+    assert!(resp.message.contains("Active Effects"), "message should have Active Effects section");
+    assert!(resp.message.contains("Bless"), "message should mention effect name");
+}
+
+#[test]
+fn query_combat_with_effects_on_characters_and_monsters() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    // Effect on party member
+    state.effects.add(
+        "Bless".into(),
+        "Cleric".into(),
+        EffectTarget::Character("Aldric".into()),
+        EffectDuration::Rounds(4),
+        vec![
+            Modifier { stat: ModifierStat::AttackRoll, value: 1 },
+            Modifier { stat: ModifierStat::DamageRoll, value: 1 },
+        ],
+        String::new(),
+    );
+
+    // Effect on a monster
+    state.effects.add(
+        "Faerie Fire".into(),
+        "Elf".into(),
+        EffectTarget::Monster(0),
+        EffectDuration::Rounds(6),
+        vec![Modifier { stat: ModifierStat::ArmorClass, value: -2 }],
+        String::new(),
+    );
+
+    let resp = handle_request(&req("eff4", GMCommand::QueryCombat), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+
+    // Monster 0 should have effects in data
+    let m0 = &data["monsters"][0];
+    let m0_effects = m0["effects"].as_array().unwrap();
+    assert_eq!(m0_effects.len(), 1);
+    assert_eq!(m0_effects[0]["name"], "Faerie Fire");
+
+    // Monster 1 should not have effects
+    let m1 = &data["monsters"][1];
+    assert!(m1.get("effects").is_none());
+
+    // Party effects should be in data
+    let party_effects = data["party_effects"].as_array().unwrap();
+    assert_eq!(party_effects.len(), 1);
+    assert_eq!(party_effects[0]["character"], "Aldric");
+
+    // Message should mention effects
+    assert!(resp.message.contains("Effects"), "message should include effects section");
+    assert!(resp.message.contains("Bless"), "message should mention Bless");
+    assert!(resp.message.contains("Faerie Fire"), "message should mention Faerie Fire");
+}
+
+#[test]
+fn query_combat_with_global_area_effects() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    state.effects.add(
+        "Silence 15ft Radius".into(),
+        "Brin".into(),
+        EffectTarget::Global,
+        EffectDuration::Turns(3),
+        vec![],
+        "Centered on doorway.".into(),
+    );
+
+    let resp = handle_request(&req("eff5", GMCommand::QueryCombat), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+
+    let area_effects = data["area_effects"].as_array().unwrap();
+    assert_eq!(area_effects.len(), 1);
+    assert_eq!(area_effects[0]["name"], "Silence 15ft Radius");
+
+    assert!(resp.message.contains("Area Effects"), "message should have Area Effects section");
+    assert!(resp.message.contains("Silence 15ft Radius"));
+}
+
+#[test]
+fn query_combat_no_effects_omits_effect_fields() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+
+    let resp = handle_request(&req("eff6", GMCommand::QueryCombat), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+
+    // No party_effects or area_effects keys
+    assert!(data.get("party_effects").is_none(), "no party_effects when no effects");
+    assert!(data.get("area_effects").is_none(), "no area_effects when no effects");
+
+    // Monsters should not have effects key
+    for m in data["monsters"].as_array().unwrap() {
+        assert!(m.get("effects").is_none(), "no effects on monsters when no effects");
+    }
+
+    // Message should not mention effects
+    assert!(!resp.message.contains("Effects"), "message should not mention effects when none active");
+}
+
+#[test]
+fn query_exploration_with_effects_shows_summary() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    state.effects.add(
+        "Protection from Evil".into(),
+        "Brin".into(),
+        EffectTarget::Character("Aldric".into()),
+        EffectDuration::Turns(8),
+        vec![],
+        String::new(),
+    );
+    state.effects.add(
+        "Light".into(),
+        "Brin".into(),
+        EffectTarget::Character("Brin".into()),
+        EffectDuration::Turns(10),
+        vec![],
+        String::new(),
+    );
+
+    let resp = handle_request(&req("eff7", GMCommand::QueryExploration), &mut state);
+    assert!(resp.success);
+
+    // Message should contain brief effects summary
+    assert!(resp.message.contains("Effects:"), "message should have Effects summary");
+    assert!(resp.message.contains("Protection from Evil on Aldric"));
+    assert!(resp.message.contains("Light on Brin"));
+
+    // Data should include effects array
+    let data = resp.data.unwrap();
+    let effects = data["effects"].as_array().unwrap();
+    assert_eq!(effects.len(), 2);
+}
+
+#[test]
+fn query_exploration_no_effects_omits_section() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    let resp = handle_request(&req("eff8", GMCommand::QueryExploration), &mut state);
+    assert!(resp.success);
+
+    // No effects mention in message
+    assert!(!resp.message.contains("Effects:"), "message should not mention effects when none active");
+
+    // No effects key in data
+    let data = resp.data.unwrap();
+    assert!(data.get("effects").is_none(), "no effects key when no effects");
+}
+
+#[test]
+fn query_combat_monster_effect_with_helpless_tag() {
+    let mut state = GameState::new();
+    setup_combat(&mut state);
+    state.combat.as_mut().unwrap().monsters[0].helpless = true;
+
+    state.effects.add(
+        "Hold Person".into(),
+        "Cleric".into(),
+        EffectTarget::Monster(0),
+        EffectDuration::Turns(4),
+        vec![],
+        String::new(),
+    );
+
+    let resp = handle_request(&req("eff9", GMCommand::QueryCombat), &mut state);
+    assert!(resp.success);
+    assert!(resp.message.contains("[HELPLESS]"), "message should show HELPLESS tag for helpless monster with effect");
+}
+
+#[test]
+fn modifier_formatting_in_party_query() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    state.effects.add(
+        "Shield".into(),
+        "Mira".into(),
+        EffectTarget::Character("Aldric".into()),
+        EffectDuration::Turns(2),
+        vec![Modifier { stat: ModifierStat::ArmorClass, value: -2 }],
+        String::new(),
+    );
+
+    let resp = handle_request(&req("eff10", GMCommand::QueryParty), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let effects = data["members"][0]["effects"].as_array().unwrap();
+    let mods = effects[0]["modifiers"].as_array().unwrap();
+    assert_eq!(mods[0]["stat"], "AC");
+    assert_eq!(mods[0]["value"], -2);
+}
