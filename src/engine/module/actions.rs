@@ -4,8 +4,6 @@ use crate::rules::module::{self as module_rules, ModuleDef, PlacedTreasure};
 use crate::state::dungeon::{
     Door, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room,
 };
-use crate::state::game::GameMode;
-use crate::state::time::TimeTracker;
 use std::collections::HashMap;
 
 use super::results::LoadModuleResult;
@@ -107,10 +105,7 @@ pub fn action_load_module(
     let level_range = module_def.level_range;
     let room_count = dungeon.rooms.len();
 
-    state.dungeon = Some(dungeon);
-    state.time = Some(TimeTracker::new());
-    state.dungeon_level = level_range.0;
-    state.mode = GameMode::Exploration;
+    state.enter_exploration(dungeon, level_range.0);
 
     Ok(LoadModuleResult {
         message: format!(

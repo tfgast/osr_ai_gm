@@ -64,6 +64,75 @@ impl GameState {
     pub fn turn(&self) -> u32 {
         self.time.as_ref().map(|t| t.total_turns).unwrap_or(0)
     }
+
+    // ── Mode transition methods ─────────────────────────────────────
+    //
+    // GameMode is **canonical**: it is the single source of truth for
+    // which game phase is active. These methods enforce the invariant
+    // that mode and associated sub-state (combat, dungeon, wilderness)
+    // are always consistent.
+
+    /// Transition into Combat mode.
+    ///
+    /// Saves the current mode so it can be restored when combat ends.
+    /// Panics (debug) if combat state is already present.
+    pub fn enter_combat(&mut self, combat: CombatState) {
+        debug_assert!(self.combat.is_none(), "enter_combat called with combat already active");
+        self.pre_combat_mode = Some(self.mode.clone());
+        self.combat = Some(combat);
+        self.mode = GameMode::Combat;
+    }
+
+    /// Leave Combat mode, restoring the mode that was active before combat.
+    ///
+    /// Returns the `CombatState` so callers can extract results.
+    /// Falls back to `Idle` if `pre_combat_mode` was not set.
+    pub fn exit_combat(&mut self) -> Option<CombatState> {
+        let combat = self.combat.take();
+        self.mode = self.pre_combat_mode.take().unwrap_or(GameMode::Idle);
+        combat
+    }
+
+    /// Transition into Exploration mode with a freshly-initialised dungeon.
+    pub fn enter_exploration(&mut self, dungeon: DungeonState, level: u32) {
+        debug_assert!(level > 0, "enter_exploration called with level 0");
+        self.dungeon = Some(dungeon);
+        self.time = Some(TimeTracker::new());
+        self.dungeon_level = level;
+        self.mode = GameMode::Exploration;
+    }
+
+    /// Transition into Wilderness mode.
+    pub fn enter_wilderness(&mut self, wilderness: WildernessState) {
+        self.wilderness = Some(wilderness);
+        self.mode = GameMode::Wilderness;
+    }
+
+    /// Assert that mode and associated sub-state are consistent.
+    ///
+    /// This is a debug-only check; it compiles to nothing in release builds.
+    /// Call it at API boundaries (after load, after each command) to catch
+    /// state corruption early.
+    #[cfg(debug_assertions)]
+    pub fn assert_mode_invariants(&self) {
+        match self.mode {
+            GameMode::Combat => {
+                assert!(self.combat.is_some(), "mode is Combat but combat state is None");
+            }
+            GameMode::Exploration => {
+                assert!(self.dungeon.is_some(), "mode is Exploration but dungeon state is None");
+                assert!(self.dungeon_level > 0, "mode is Exploration but dungeon_level is 0");
+            }
+            GameMode::Wilderness => {
+                assert!(self.wilderness.is_some(), "mode is Wilderness but wilderness state is None");
+            }
+            _ => {}
+        }
+    }
+
+    /// No-op in release builds.
+    #[cfg(not(debug_assertions))]
+    pub fn assert_mode_invariants(&self) {}
 }
 
 impl Default for GameState {
@@ -372,5 +441,117 @@ mod tests {
         assert!(!tmp_path.exists(), "temp file should be cleaned up after rename failure");
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    // ── Mode transition tests ───────────────────────────────────
+
+    #[test]
+    fn enter_combat_sets_mode_and_saves_pre_combat() {
+        let mut state = GameState::new();
+        assert_eq!(state.mode, GameMode::Idle);
+        let combat = CombatState::new(vec![], 60);
+        state.enter_combat(combat);
+        assert_eq!(state.mode, GameMode::Combat);
+        assert_eq!(state.pre_combat_mode, Some(GameMode::Idle));
+        assert!(state.combat.is_some());
+    }
+
+    #[test]
+    fn exit_combat_restores_pre_combat_mode() {
+        let mut state = GameState::new();
+        let dungeon = DungeonState::new(1);
+        state.enter_exploration(dungeon, 1);
+        assert_eq!(state.mode, GameMode::Exploration);
+
+        state.enter_combat(CombatState::new(vec![], 30));
+        assert_eq!(state.mode, GameMode::Combat);
+
+        let combat = state.exit_combat();
+        assert!(combat.is_some());
+        assert_eq!(state.mode, GameMode::Exploration);
+        assert!(state.combat.is_none());
+        assert!(state.pre_combat_mode.is_none());
+    }
+
+    #[test]
+    fn exit_combat_falls_back_to_idle() {
+        let mut state = GameState::new();
+        state.combat = Some(CombatState::new(vec![], 30));
+        state.mode = GameMode::Combat;
+        // pre_combat_mode not set
+        let _ = state.exit_combat();
+        assert_eq!(state.mode, GameMode::Idle);
+    }
+
+    #[test]
+    fn enter_exploration_sets_all_state() {
+        let mut state = GameState::new();
+        let dungeon = DungeonState::new(3);
+        state.enter_exploration(dungeon, 3);
+        assert_eq!(state.mode, GameMode::Exploration);
+        assert_eq!(state.dungeon_level, 3);
+        assert!(state.dungeon.is_some());
+        assert!(state.time.is_some());
+    }
+
+    #[test]
+    fn enter_wilderness_sets_state() {
+        let mut state = GameState::new();
+        let ws = WildernessState::new();
+        state.enter_wilderness(ws);
+        assert_eq!(state.mode, GameMode::Wilderness);
+        assert!(state.wilderness.is_some());
+    }
+
+    #[test]
+    fn assert_mode_invariants_passes_for_idle() {
+        let state = GameState::new();
+        state.assert_mode_invariants(); // should not panic
+    }
+
+    #[test]
+    fn assert_mode_invariants_passes_for_exploration() {
+        let mut state = GameState::new();
+        state.enter_exploration(DungeonState::new(1), 1);
+        state.assert_mode_invariants();
+    }
+
+    #[test]
+    fn assert_mode_invariants_passes_for_combat() {
+        let mut state = GameState::new();
+        state.enter_combat(CombatState::new(vec![], 30));
+        state.assert_mode_invariants();
+    }
+
+    #[test]
+    fn assert_mode_invariants_passes_for_wilderness() {
+        let mut state = GameState::new();
+        state.enter_wilderness(WildernessState::new());
+        state.assert_mode_invariants();
+    }
+
+    #[test]
+    #[should_panic(expected = "mode is Combat but combat state is None")]
+    fn assert_mode_invariants_catches_combat_without_state() {
+        let mut state = GameState::new();
+        state.mode = GameMode::Combat;
+        state.assert_mode_invariants();
+    }
+
+    #[test]
+    #[should_panic(expected = "mode is Exploration but dungeon state is None")]
+    fn assert_mode_invariants_catches_exploration_without_dungeon() {
+        let mut state = GameState::new();
+        state.mode = GameMode::Exploration;
+        state.dungeon_level = 1;
+        state.assert_mode_invariants();
+    }
+
+    #[test]
+    #[should_panic(expected = "mode is Wilderness but wilderness state is None")]
+    fn assert_mode_invariants_catches_wilderness_without_state() {
+        let mut state = GameState::new();
+        state.mode = GameMode::Wilderness;
+        state.assert_mode_invariants();
     }
 }

@@ -5,7 +5,6 @@ use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
 use crate::rules::class::Class;
 use crate::rules::{ability, equipment, monster as monster_db, thief};
-use crate::state::game::GameMode;
 
 use super::results::{
     AttackResult, BackstabResult, CloseResult, CombatLogResult, DeclareSpellResult,
@@ -83,9 +82,7 @@ pub fn action_spawn_encounter(
 
     let combat = CombatState::new(monsters, params.distance);
     let status = combat_status(&combat, &state.party.members);
-    state.combat = Some(combat);
-    state.pre_combat_mode = Some(state.mode.clone());
-    state.mode = GameMode::Combat;
+    state.enter_combat(combat);
 
     Ok(SpawnEncounterResult {
         message: format!(
@@ -156,9 +153,7 @@ pub fn action_spawn_monster(
 
     let combat_state = CombatState::new(monsters, distance);
     let status = combat_status(&combat_state, &state.party.members);
-    state.combat = Some(combat_state);
-    state.pre_combat_mode = Some(state.mode.clone());
-    state.mode = GameMode::Combat;
+    state.enter_combat(combat_state);
 
     let special = def.special();
     let mut msg = format!(
@@ -458,7 +453,7 @@ pub fn action_declare_spell(
 }
 
 pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, EngineError> {
-    let combat = state.combat.take().ok_or_else(no_active_combat)?;
+    let combat = state.exit_combat().ok_or_else(no_active_combat)?;
 
     let rounds = combat.round;
     let monsters_defeated = combat.monsters.iter().filter(|m| !m.is_alive()).count();
@@ -470,7 +465,6 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
         .map(|m| m.xp_value)
         .sum();
     let party_casualties = state.party.members.iter().filter(|c| !c.is_alive()).count();
-    state.mode = state.pre_combat_mode.take().unwrap_or(GameMode::Idle);
 
     if let Some(dungeon) = state.dungeon.as_mut() {
         if let Some(room_id) = dungeon.current_room {

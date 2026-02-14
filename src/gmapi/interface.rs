@@ -28,7 +28,7 @@ fn ok_with_typed_data<T: Serialize>(
 /// Process a GMRequest against the current GameState and return a GMResponse.
 pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
     let id = &req.id;
-    match &req.command {
+    let response = match &req.command {
         // -- State queries --
         GMCommand::QueryState => query_handlers::query_state(id, state),
         GMCommand::QueryMode => GMResponse::ok_with_data(
@@ -165,7 +165,9 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::Load { path } => load_game(id, state, path),
         GMCommand::Roll { notation } => roll_dice(id, state, notation),
         GMCommand::Quit => quit_session(id, state),
-    }
+    };
+    state.assert_mode_invariants();
+    response
 }
 
 fn enter_dungeon(id: &str, state: &mut GameState, level: u32, room_name: &str) -> GMResponse {
@@ -1515,7 +1517,6 @@ mod tests {
     #[test]
     fn end_combat_marks_room_monsters_cleared() {
         use crate::state::dungeon::{DungeonState, Room, PlacedMonsterInstance};
-        use crate::state::time::TimeTracker;
 
         let mut state = GameState::new();
 
@@ -1524,9 +1525,7 @@ mod tests {
         let monster_room = Room::new(0, "Monster Lair")
             .with_placed_monsters(vec![PlacedMonsterInstance::new("skeleton", 3)]);
         dungeon.add_room(monster_room).unwrap();
-        state.dungeon = Some(dungeon);
-        state.time = Some(TimeTracker::new());
-        state.mode = GameMode::Exploration;
+        state.enter_exploration(dungeon, 1);
 
         // Verify monsters_cleared starts as false
         assert!(
