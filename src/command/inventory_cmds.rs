@@ -152,7 +152,7 @@ impl Command for EquipCommand {
         "equip"
     }
     fn help(&self) -> &str {
-        "Equip or unequip an item (equip <character> <item_name>)"
+        "Equip an item (equip <character> <item_name>)"
     }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 2 {
@@ -163,6 +163,29 @@ impl Command for EquipCommand {
         let item_name = args[1..].join(" ");
 
         match inventory::action_equip(state, char_name, &item_name) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
+pub struct UnequipCommand;
+impl Command for UnequipCommand {
+    fn name(&self) -> &str {
+        "unequip"
+    }
+    fn help(&self) -> &str {
+        "Unequip an item (unequip <character> <item_name>)"
+    }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: unequip <character_name> <item_name>");
+        }
+
+        let char_name = args[0];
+        let item_name = args[1..].join(" ");
+
+        match inventory::action_unequip(state, char_name, &item_name) {
             Ok(result) => CommandResult::ok(result.message),
             Err(e) => CommandResult::error(e.to_string()),
         }
@@ -306,13 +329,38 @@ mod tests {
     #[test]
     fn unequip_armour_resets_ac() {
         let equip = EquipCommand;
+        let unequip = UnequipCommand;
+        let buy = BuyCommand;
+        let mut state = state_with_fighter();
+        buy.execute(&["Aldric", "Leather"], &mut state);
+        equip.execute(&["Aldric", "Leather"], &mut state);
+        let result = unequip.execute(&["Aldric", "Leather"], &mut state);
+        assert!(result.output.contains("unequips Leather"));
+        assert!(result.output.contains("AC 9"));
+    }
+
+    #[test]
+    fn equip_already_equipped_shows_error() {
+        let equip = EquipCommand;
         let buy = BuyCommand;
         let mut state = state_with_fighter();
         buy.execute(&["Aldric", "Leather"], &mut state);
         equip.execute(&["Aldric", "Leather"], &mut state);
         let result = equip.execute(&["Aldric", "Leather"], &mut state);
-        assert!(result.output.contains("unequips Leather"));
-        assert!(result.output.contains("AC 9"));
+        assert!(!result.success);
+        assert!(result.output.contains("already has Leather equipped"));
+        assert!(result.output.contains("unequip"));
+    }
+
+    #[test]
+    fn unequip_not_equipped_shows_error() {
+        let unequip = UnequipCommand;
+        let buy = BuyCommand;
+        let mut state = state_with_fighter();
+        buy.execute(&["Aldric", "Leather"], &mut state);
+        let result = unequip.execute(&["Aldric", "Leather"], &mut state);
+        assert!(!result.success);
+        assert!(result.output.contains("does not have Leather equipped"));
     }
 
     #[test]

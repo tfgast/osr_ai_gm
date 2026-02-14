@@ -219,6 +219,13 @@ pub(super) fn equip(id: &str, state: &mut GameState, character: &str, item_name:
     }
 }
 
+pub(super) fn unequip(id: &str, state: &mut GameState, character: &str, item_name: &str) -> GMResponse {
+    match crate::engine::inventory::action_unequip(state, character, item_name) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
 pub(super) fn list_equipment(id: &str, state: &GameState, category: &Option<String>) -> GMResponse {
     let result = crate::engine::inventory::action_list_equipment();
 
