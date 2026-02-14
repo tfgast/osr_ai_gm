@@ -22,6 +22,22 @@ fn ok_with_typed_data<T: Serialize>(
     }
 }
 
+fn fail_with_typed_data<T: Serialize>(
+    id: &str,
+    state: &GameState,
+    message: String,
+    payload: T,
+) -> GMResponse {
+    match serde_json::to_value(payload) {
+        Ok(data) => GMResponse::fail_with_data(id, message, state.mode.clone(), data),
+        Err(err) => GMResponse::err(
+            id,
+            format!("internal error: failed to serialize response: {err}"),
+            state.mode.clone(),
+        ),
+    }
+}
+
 // =============================================================================
 // Dungeon exploration
 // =============================================================================
@@ -84,7 +100,8 @@ pub(super) fn load_module(id: &str, state: &mut GameState, path: &str) -> GMResp
 
 pub(super) fn open_door(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
     match exploration::action_open_door(state, door_id) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Ok(result) if result.moved => ok_with_typed_data(id, state, result.message.clone(), result),
+        Ok(result) => fail_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }

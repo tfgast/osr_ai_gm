@@ -403,6 +403,18 @@ impl GMResponse {
         }
     }
 
+    pub fn fail_with_data(id: &str, message: impl Into<String>, mode: GameMode, data: serde_json::Value) -> Self {
+        let msg = message.into();
+        GMResponse {
+            id: id.to_string(),
+            success: false,
+            error: Some(msg.clone()),
+            message: msg,
+            mode,
+            data: Some(data),
+        }
+    }
+
     pub fn err(id: &str, error: impl Into<String>, mode: GameMode) -> Self {
         let error_msg = error.into();
         GMResponse {
