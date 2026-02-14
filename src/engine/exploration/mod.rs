@@ -6,12 +6,13 @@ pub mod results;
 pub use actions::{
     action_add_door, action_add_room, action_advance_dungeon_turn, action_enter_dungeon,
     action_exploration_status, action_force_door, action_light, action_listen_at_door,
-    action_move_through_door, action_open_door, action_rest, action_search_room,
+    action_move_through_door, action_open_door, action_pick_lock, action_rest, action_search_room,
 };
 
 use crate::model::Character;
 use crate::rules::ability;
 use crate::rules::encounter;
+use crate::rules::thief;
 use crate::state::dungeon::{DoorState, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, TrapTrigger};
 use crate::state::time::TimeTracker;
 
@@ -344,6 +345,84 @@ pub fn force_door_with<R: Rng>(
             "{} fails to force door {}. (rolled {} vs {})",
             character.name, door_id, roll, threshold
         )
+    }
+}
+
+/// Result of a pick lock attempt.
+#[derive(Debug)]
+pub struct PickLockResult {
+    pub success: bool,
+    pub message: String,
+}
+
+/// Attempt to pick a locked door using thief open_locks skill.
+/// On success, door state changes from Locked to Closed.
+pub fn pick_lock(
+    dungeon: &mut DungeonState,
+    door_id: u32,
+    character: &Character,
+) -> PickLockResult {
+    pick_lock_with(&mut rand::thread_rng(), dungeon, door_id, character)
+}
+
+/// Testable version.
+pub fn pick_lock_with<R: Rng>(
+    rng: &mut R,
+    dungeon: &mut DungeonState,
+    door_id: u32,
+    character: &Character,
+) -> PickLockResult {
+    let door = match dungeon.find_door_mut(door_id) {
+        Some(d) => d,
+        None => return PickLockResult {
+            success: false,
+            message: format!("Door {} not found.", door_id),
+        },
+    };
+
+    if door.state != DoorState::Locked {
+        return PickLockResult {
+            success: false,
+            message: format!("Door {} is not locked.", door_id),
+        };
+    }
+
+    if !thief::has_thief_skills(character.class) {
+        return PickLockResult {
+            success: false,
+            message: format!("{} does not have lockpicking skills.", character.name),
+        };
+    }
+
+    if !character.is_alive() {
+        return PickLockResult {
+            success: false,
+            message: format!("{} is dead.", character.name),
+        };
+    }
+
+    let roll: u32 = rng.gen_range(1..=100);
+    let check = thief::check_skill(thief::ThiefSkill::OpenLocks, character.level, roll);
+
+    if check.success {
+        let door = dungeon.find_door_mut(door_id)
+            .expect("door verified to exist above");
+        door.state = DoorState::Closed;
+        PickLockResult {
+            success: true,
+            message: format!(
+                "{} picks the lock on door {}! (rolled {} vs {}%) The door is now unlocked.",
+                character.name, door_id, roll, check.target
+            ),
+        }
+    } else {
+        PickLockResult {
+            success: false,
+            message: format!(
+                "{} fails to pick the lock on door {}. (rolled {} vs {}%)",
+                character.name, door_id, roll, check.target
+            ),
+        }
     }
 }
 
@@ -733,6 +812,87 @@ mod tests {
 
         let result = force_door_with(&mut rng, &mut dungeon, 3, &character);
         assert!(result.contains("locked"));
+    }
+
+    fn test_thief() -> Character {
+        let mut c = Character::new("Shadow", Class::Thief);
+        c.level = 3; // OpenLocks at level 3 = 25%
+        c
+    }
+
+    #[test]
+    fn pick_lock_success() {
+        let mut success = false;
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut dungeon = test_dungeon();
+            dungeon.add_door(Door::new(3, 0, 3, DoorState::Locked).unwrap()).unwrap();
+            let thief = test_thief();
+
+            let result = pick_lock_with(&mut rng, &mut dungeon, 3, &thief);
+            if result.success {
+                assert!(result.message.contains("picks the lock"));
+                assert_eq!(dungeon.find_door_mut(3).unwrap().state, DoorState::Closed);
+                success = true;
+                break;
+            }
+        }
+        assert!(success, "thief should eventually pick the lock");
+    }
+
+    #[test]
+    fn pick_lock_failure() {
+        let mut failure = false;
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut dungeon = test_dungeon();
+            dungeon.add_door(Door::new(3, 0, 3, DoorState::Locked).unwrap()).unwrap();
+            let thief = test_thief();
+
+            let result = pick_lock_with(&mut rng, &mut dungeon, 3, &thief);
+            if !result.success {
+                assert!(result.message.contains("fails to pick"));
+                assert_eq!(dungeon.find_door_mut(3).unwrap().state, DoorState::Locked);
+                failure = true;
+                break;
+            }
+        }
+        assert!(failure, "thief should sometimes fail");
+    }
+
+    #[test]
+    fn pick_lock_non_thief_rejected() {
+        let mut rng = test_rng();
+        let mut dungeon = test_dungeon();
+        dungeon.add_door(Door::new(3, 0, 3, DoorState::Locked).unwrap()).unwrap();
+        let fighter = test_character(); // Fighter, no thief skills
+
+        let result = pick_lock_with(&mut rng, &mut dungeon, 3, &fighter);
+        assert!(!result.success);
+        assert!(result.message.contains("does not have lockpicking"));
+    }
+
+    #[test]
+    fn pick_lock_not_locked_rejected() {
+        let mut rng = test_rng();
+        let mut dungeon = test_dungeon();
+        let thief = test_thief();
+
+        // Door 0 is Closed, not Locked
+        let result = pick_lock_with(&mut rng, &mut dungeon, 0, &thief);
+        assert!(!result.success);
+        assert!(result.message.contains("not locked"));
+    }
+
+    #[test]
+    fn pick_lock_door_not_found() {
+        let mut rng = test_rng();
+        let mut dungeon = test_dungeon();
+        let thief = test_thief();
+
+        let result = pick_lock_with(&mut rng, &mut dungeon, 99, &thief);
+        assert!(!result.success);
+        assert!(result.message.contains("not found"));
     }
 
     #[test]

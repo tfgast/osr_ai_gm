@@ -58,6 +58,9 @@ pub struct OrientResult {
     pub terrain: Terrain,
     pub lost: bool,
     pub travel_day: u32,
+    pub rations_consumed: u32,
+    pub starving: bool,
+    pub starvation_damage: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,6 +69,10 @@ pub struct ForageResult {
     pub quantity: u32,
     pub success: bool,
     pub rations_remaining: u32,
+    pub rations_consumed: u32,
+    pub starving: bool,
+    pub starvation_damage: u32,
+    pub travel_day: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -74,6 +81,10 @@ pub struct HuntResult {
     pub quantity: u32,
     pub success: bool,
     pub rations_remaining: u32,
+    pub rations_consumed: u32,
+    pub starving: bool,
+    pub starvation_damage: u32,
+    pub travel_day: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]

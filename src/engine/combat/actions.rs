@@ -793,6 +793,26 @@ pub fn action_backstab(
         )));
     }
 
+    // Backstab is a melee attack — enforce melee distance check
+    let qualities = weapon.weapon_qualities();
+    if !qualities.missile || qualities.melee {
+        // Pure melee or versatile weapons require melee range for backstab
+        if combat.distance > 10 {
+            return Err(EngineError::InvalidInput(format!(
+                "{} is a melee weapon but monsters are {}' away. \
+                Use \"close {}\" to move into melee range.",
+                weapon.name, combat.distance, character.name
+            )));
+        }
+    } else {
+        // Pure missile weapons cannot be used for backstab
+        return Err(EngineError::InvalidInput(format!(
+            "{} is a missile weapon and cannot be used for backstab. \
+            Backstab requires a melee weapon.",
+            weapon.name
+        )));
+    }
+
     let multiplier = thief::backstab_multiplier(character.level);
     let str_mod = ability::str_melee_mod(character.abilities.strength);
     let attack_bonus = thief::BACKSTAB_ATTACK_BONUS;
@@ -1461,5 +1481,92 @@ mod tests {
                     "backstab damage {} below minimum 5 (1*2 + 3)", dmg);
             }
         }
+    }
+
+    // --- backstab melee distance check (oag-mxw8t) ---
+
+    #[test]
+    fn backstab_rejected_at_ranged_distance_with_melee_weapon() {
+        let mut state = GameState::new();
+        state.party.add_member(test_thief("Stabby", 10));
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin", "1", 4, 6, 7)],
+            20, // out of melee range
+        ));
+
+        let result = action_backstab(&mut state, "Stabby", 0, "Short sword");
+        assert!(result.is_err(), "backstab should fail at 20' distance with melee weapon");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("melee weapon"), "expected melee weapon error, got: {}", err);
+        assert!(err.contains("20'"), "expected distance in error, got: {}", err);
+    }
+
+    #[test]
+    fn backstab_succeeds_at_melee_distance() {
+        let mut state = GameState::new();
+        state.party.add_member(test_thief("Stabby", 10));
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin", "1", 999, 6, 7)],
+            5, // melee range
+        ));
+
+        // Should succeed (at least not fail due to distance)
+        let result = action_backstab(&mut state, "Stabby", 0, "Short sword");
+        assert!(result.is_ok(), "backstab should succeed at 5' distance: {:?}", result.err());
+    }
+
+    #[test]
+    fn backstab_rejected_with_pure_missile_weapon() {
+        let mut state = GameState::new();
+        state.party.add_member(test_thief("Stabby", 10));
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin", "1", 4, 6, 7)],
+            5,
+        ));
+
+        let result = action_backstab(&mut state, "Stabby", 0, "Short bow");
+        assert!(result.is_err(), "backstab should fail with missile weapon");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("missile weapon"), "expected missile weapon error, got: {}", err);
+    }
+
+    #[test]
+    fn backstab_with_dagger_at_melee_range_succeeds() {
+        // Dagger is versatile (melee+missile) — should work at melee range
+        let mut state = GameState::new();
+        state.party.add_member(test_thief("Stabby", 10));
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin", "1", 999, 6, 7)],
+            5,
+        ));
+
+        let result = action_backstab(&mut state, "Stabby", 0, "Dagger");
+        assert!(result.is_ok(), "backstab with dagger at melee range should work: {:?}", result.err());
+    }
+
+    #[test]
+    fn backstab_with_dagger_at_ranged_distance_rejected() {
+        // Dagger is versatile but backstab requires melee range
+        let mut state = GameState::new();
+        state.party.add_member(test_thief("Stabby", 10));
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin", "1", 4, 6, 7)],
+            20,
+        ));
+
+        let result = action_backstab(&mut state, "Stabby", 0, "Dagger");
+        assert!(result.is_err(), "backstab with dagger at 20' should fail");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("melee weapon"), "expected melee weapon error, got: {}", err);
     }
 }

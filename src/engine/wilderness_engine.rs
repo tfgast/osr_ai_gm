@@ -96,73 +96,13 @@ pub fn travel_day_with<R: Rng>(
         wilderness.travel_day, terrain.name()
     ));
 
-    // Consume rations: 1 person-day per living party member
-    let party_size = party.members.iter().filter(|c| c.is_alive()).count() as u32;
-    if party_size > 0 {
-        if party.rations >= party_size {
-            party.rations -= party_size;
-            result.rations_consumed = party_size;
-            result.msg(format!(
-                "Consumed {} rations ({} remaining).",
-                party_size, party.rations
-            ));
-        } else if party.rations > 0 {
-            // Partial rations
-            result.rations_consumed = party.rations;
-            party.rations = 0;
-            result.starving = true;
-            result.msg(format!(
-                "Only {} rations available for {} party members. The party is STARVING!",
-                result.rations_consumed, party_size
-            ));
-        } else {
-            // No rations at all
-            result.rations_consumed = 0;
-            result.starving = true;
-            result.msg("No rations! The party is STARVING!");
-        }
-    }
-
-    // Update starvation tracking and apply effects
-    if result.starving {
-        party.days_without_food += 1;
-        let days = party.days_without_food;
-
-        // Per OSE rules: penalties accumulate with each day without food
-        // Day 1+: -1 to attack rolls and saving throws per day
-        let penalty = days.min(4) as i32; // Cap at -4 per typical OSE
-        result.msg(format!(
-            "Starvation day {}: -{} penalty to attack rolls and saving throws.",
-            days, penalty
-        ));
-
-        // After 3+ days without food: 1d4 HP damage per day
-        if days >= 3 {
-            let hp_damage: u32 = rng.gen_range(1..=4);
-            result.starvation_damage = hp_damage;
-            result.msg(format!(
-                "Severe starvation! Each party member takes {} HP damage.",
-                hp_damage
-            ));
-            // Apply damage to all living party members
-            for member in party.members.iter_mut().filter(|c| c.is_alive()) {
-                member.hp = (member.hp - hp_damage as i32).max(0);
-            }
-            // Check for deaths
-            let dead: Vec<String> = party.members.iter()
-                .filter(|c| c.hp <= 0)
-                .map(|c| c.name.clone())
-                .collect();
-            if !dead.is_empty() {
-                result.msg(format!("Died from starvation: {}.", dead.join(", ")));
-            }
-        }
-    } else {
-        // Reset starvation counter when adequately fed
-        if party.days_without_food > 0 {
-            result.msg("The party is well-fed. Starvation effects end.");
-        }
-        party.days_without_food = 0;
+    // Consume rations and handle starvation
+    let overhead = apply_daily_overhead(rng, party);
+    result.rations_consumed = overhead.rations_consumed;
+    result.starving = overhead.starving;
+    result.starvation_damage = overhead.starvation_damage;
+    for msg in &overhead.messages {
+        result.msg(msg.clone());
     }
 
     // Check for getting lost
@@ -254,6 +194,84 @@ pub fn travel_day_with<R: Rng>(
     result
 }
 
+/// Result of daily overhead (ration consumption + starvation).
+#[derive(Debug, Default)]
+pub struct DayOverhead {
+    pub messages: Vec<String>,
+    pub rations_consumed: u32,
+    pub starving: bool,
+    pub starvation_damage: u32,
+}
+
+/// Apply daily overhead: consume rations, handle starvation.
+/// Called by all full-day actions (travel, forage, hunt, orient).
+pub fn apply_daily_overhead<R: Rng>(rng: &mut R, party: &mut Party) -> DayOverhead {
+    let mut overhead = DayOverhead::default();
+
+    let party_size = party.members.iter().filter(|c| c.is_alive()).count() as u32;
+    if party_size == 0 {
+        return overhead;
+    }
+
+    if party.rations >= party_size {
+        party.rations -= party_size;
+        overhead.rations_consumed = party_size;
+        overhead.messages.push(format!(
+            "Consumed {} rations ({} remaining).",
+            party_size, party.rations
+        ));
+    } else if party.rations > 0 {
+        overhead.rations_consumed = party.rations;
+        party.rations = 0;
+        overhead.starving = true;
+        overhead.messages.push(format!(
+            "Only {} rations available for {} party members. The party is STARVING!",
+            overhead.rations_consumed, party_size
+        ));
+    } else {
+        overhead.rations_consumed = 0;
+        overhead.starving = true;
+        overhead.messages.push("No rations! The party is STARVING!".to_string());
+    }
+
+    if overhead.starving {
+        party.days_without_food += 1;
+        let days = party.days_without_food;
+
+        let penalty = days.min(4) as i32;
+        overhead.messages.push(format!(
+            "Starvation day {}: -{} penalty to attack rolls and saving throws.",
+            days, penalty
+        ));
+
+        if days >= 3 {
+            let hp_damage: u32 = rng.gen_range(1..=4);
+            overhead.starvation_damage = hp_damage;
+            overhead.messages.push(format!(
+                "Severe starvation! Each party member takes {} HP damage.",
+                hp_damage
+            ));
+            for member in party.members.iter_mut().filter(|c| c.is_alive()) {
+                member.hp = (member.hp - hp_damage as i32).max(0);
+            }
+            let dead: Vec<String> = party.members.iter()
+                .filter(|c| c.hp <= 0)
+                .map(|c| c.name.clone())
+                .collect();
+            if !dead.is_empty() {
+                overhead.messages.push(format!("Died from starvation: {}.", dead.join(", ")));
+            }
+        }
+    } else {
+        if party.days_without_food > 0 {
+            overhead.messages.push("The party is well-fed. Starvation effects end.".to_string());
+        }
+        party.days_without_food = 0;
+    }
+
+    overhead
+}
+
 /// Result of a foraging attempt.
 #[derive(Debug)]
 pub struct ForageResult {
@@ -261,16 +279,19 @@ pub struct ForageResult {
     /// Person-days of food found (0 if unsuccessful).
     pub quantity: u32,
     pub success: bool,
+    /// Daily overhead info (rations consumed, starvation).
+    pub overhead: DayOverhead,
 }
 
 /// Attempt to forage for food in the current hex.
 /// Takes a full day (no travel). Chance varies by terrain.
-pub fn forage(wilderness: &WildernessState, party: &mut Party) -> ForageResult {
+/// Consumes rations and advances day counter.
+pub fn forage(wilderness: &mut WildernessState, party: &mut Party) -> ForageResult {
     forage_with(&mut rand::thread_rng(), wilderness, party)
 }
 
 /// Testable version.
-pub fn forage_with<R: Rng>(rng: &mut R, wilderness: &WildernessState, party: &mut Party) -> ForageResult {
+pub fn forage_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState, party: &mut Party) -> ForageResult {
     let terrain = wilderness.current_hex()
         .map(|h| h.terrain)
         .unwrap_or(Terrain::Clear);
@@ -280,32 +301,40 @@ pub fn forage_with<R: Rng>(rng: &mut R, wilderness: &WildernessState, party: &mu
             message: format!("Cannot forage in {} terrain.", terrain.name()),
             quantity: 0,
             success: false,
+            overhead: DayOverhead::default(),
         };
     }
 
+    // Forage first (food found can offset starvation)
     let chance = terrain.forage_chance();
     let roll: u32 = rng.gen_range(1..=6);
 
-    if roll <= chance {
+    let (quantity, success, forage_msg) = if roll <= chance {
         let quantity: u32 = rng.gen_range(1..=6);
         party.rations += quantity;
-        ForageResult {
-            message: format!(
-                "Foraging successful! Found {} person-days of food. (rolled {} vs {}-in-6, quantity: 1d6={})\nRations: {} (+{})",
-                quantity, roll, chance, quantity, party.rations, quantity
-            ),
-            quantity,
-            success: true,
-        }
+        let msg = format!(
+            "Day {}: Foraging successful! Found {} person-days of food. (rolled {} vs {}-in-6, quantity: 1d6={})\nRations: {} (+{})",
+            wilderness.travel_day, quantity, roll, chance, quantity, party.rations, quantity
+        );
+        (quantity, true, msg)
     } else {
-        ForageResult {
-            message: format!(
-                "Foraging unsuccessful. No food found. (rolled {} vs {}-in-6)",
-                roll, chance
-            ),
-            quantity: 0,
-            success: false,
-        }
+        let msg = format!(
+            "Day {}: Foraging unsuccessful. No food found. (rolled {} vs {}-in-6)",
+            wilderness.travel_day, roll, chance
+        );
+        (0, false, msg)
+    };
+
+    // Consume daily rations + handle starvation
+    let overhead = apply_daily_overhead(rng, party);
+
+    wilderness.travel_day += 1;
+
+    ForageResult {
+        message: forage_msg,
+        quantity,
+        success,
+        overhead,
     }
 }
 
@@ -316,16 +345,19 @@ pub struct HuntResult {
     /// Person-days of food obtained (0 if unsuccessful).
     pub quantity: u32,
     pub success: bool,
+    /// Daily overhead info (rations consumed, starvation).
+    pub overhead: DayOverhead,
 }
 
 /// Attempt to hunt. Similar to foraging but can be done in more terrain.
 /// Takes a full day. 1-in-6 base chance.
-pub fn hunt(wilderness: &WildernessState, party: &mut Party) -> HuntResult {
+/// Consumes rations and advances day counter.
+pub fn hunt(wilderness: &mut WildernessState, party: &mut Party) -> HuntResult {
     hunt_with(&mut rand::thread_rng(), wilderness, party)
 }
 
 /// Testable version.
-pub fn hunt_with<R: Rng>(rng: &mut R, wilderness: &WildernessState, party: &mut Party) -> HuntResult {
+pub fn hunt_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState, party: &mut Party) -> HuntResult {
     let terrain = wilderness.current_hex()
         .map(|h| h.terrain)
         .unwrap_or(Terrain::Clear);
@@ -335,27 +367,38 @@ pub fn hunt_with<R: Rng>(rng: &mut R, wilderness: &WildernessState, party: &mut 
             message: "Cannot hunt on the open ocean.".to_string(),
             quantity: 0,
             success: false,
+            overhead: DayOverhead::default(),
         };
     }
 
+    // Hunt first (food found can offset starvation)
     let roll: u32 = rng.gen_range(1..=6);
-    if roll == 1 {
+    let (quantity, success, hunt_msg) = if roll == 1 {
         let quantity: u32 = rng.gen_range(1..=6);
         party.rations += quantity;
-        HuntResult {
-            message: format!(
-                "Hunt successful! Killed game sufficient for {} person-days of food. (rolled {}, quantity: 1d6={})\nRations: {} (+{})",
-                quantity, roll, quantity, party.rations, quantity
-            ),
-            quantity,
-            success: true,
-        }
+        let msg = format!(
+            "Day {}: Hunt successful! Killed game sufficient for {} person-days of food. (rolled {}, quantity: 1d6={})\nRations: {} (+{})",
+            wilderness.travel_day, quantity, roll, quantity, party.rations, quantity
+        );
+        (quantity, true, msg)
     } else {
-        HuntResult {
-            message: format!("Hunt unsuccessful. No game found. (rolled {})", roll),
-            quantity: 0,
-            success: false,
-        }
+        let msg = format!(
+            "Day {}: Hunt unsuccessful. No game found. (rolled {})",
+            wilderness.travel_day, roll
+        );
+        (0, false, msg)
+    };
+
+    // Consume daily rations + handle starvation
+    let overhead = apply_daily_overhead(rng, party);
+
+    wilderness.travel_day += 1;
+
+    HuntResult {
+        message: hunt_msg,
+        quantity,
+        success,
+        overhead,
     }
 }
 
@@ -367,17 +410,19 @@ pub struct OrientResult {
     pub success: bool,
     /// The terrain where orientation was attempted.
     pub terrain: Terrain,
+    /// Daily overhead info (rations consumed, starvation).
+    pub overhead: DayOverhead,
 }
 
 /// Attempt to orient and find bearings when lost.
 /// Takes a full day. Success chance varies by terrain.
-/// Per OSE: easier terrain is easier to navigate out of.
-pub fn orient(wilderness: &mut WildernessState) -> OrientResult {
-    orient_with(&mut rand::thread_rng(), wilderness)
+/// Consumes rations and advances day counter.
+pub fn orient(wilderness: &mut WildernessState, party: &mut Party) -> OrientResult {
+    orient_with(&mut rand::thread_rng(), wilderness, party)
 }
 
 /// Testable version.
-pub fn orient_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState) -> OrientResult {
+pub fn orient_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState, party: &mut Party) -> OrientResult {
     let terrain = wilderness.current_hex()
         .map(|h| h.terrain)
         .unwrap_or(Terrain::Clear);
@@ -387,6 +432,7 @@ pub fn orient_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState) -> Ori
             message: "The party is not lost.".to_string(),
             success: false,
             terrain,
+            overhead: DayOverhead::default(),
         };
     }
 
@@ -395,6 +441,9 @@ pub fn orient_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState) -> Ori
     // Forest/Swamp/Jungle/etc have 2-in-6 lost chance -> 4-in-6 orient success
     let orient_chance = 6 - terrain.lost_chance();
     let roll: u32 = rng.gen_range(1..=6);
+
+    // Consume daily rations + handle starvation
+    let overhead = apply_daily_overhead(rng, party);
 
     wilderness.travel_day += 1;
 
@@ -413,6 +462,7 @@ pub fn orient_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState) -> Ori
             ),
             success: true,
             terrain,
+            overhead,
         }
     } else {
         wilderness.log(format!(
@@ -428,6 +478,7 @@ pub fn orient_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState) -> Ori
             ),
             success: false,
             terrain,
+            overhead,
         }
     }
 }
@@ -585,7 +636,7 @@ mod tests {
             let mut ws = test_wilderness();
             let mut party = test_party();
             ws.move_to(1, 0).unwrap(); // Forest
-            let result = forage_with(&mut rng, &ws, &mut party);
+            let result = forage_with(&mut rng, &mut ws, &mut party);
             if result.message.contains("successful!") {
                 success = true;
                 break;
@@ -599,16 +650,16 @@ mod tests {
         let mut ws = WildernessState::new();
         ws.add_hex(HexCell::new(0, 0, Terrain::Ocean)).unwrap();
         let mut party = test_party();
-        let result = forage_with(&mut test_rng(), &ws, &mut party);
+        let result = forage_with(&mut test_rng(), &mut ws, &mut party);
         assert!(result.message.contains("Cannot forage"));
     }
 
     #[test]
     fn hunt_basic() {
         let mut rng = test_rng();
-        let ws = test_wilderness();
+        let mut ws = test_wilderness();
         let mut party = test_party();
-        let result = hunt_with(&mut rng, &ws, &mut party);
+        let result = hunt_with(&mut rng, &mut ws, &mut party);
         assert!(result.message.contains("Hunt") || result.message.contains("hunt"));
     }
 
@@ -617,7 +668,7 @@ mod tests {
         let mut ws = WildernessState::new();
         ws.add_hex(HexCell::new(0, 0, Terrain::Ocean)).unwrap();
         let mut party = test_party();
-        let result = hunt_with(&mut test_rng(), &ws, &mut party);
+        let result = hunt_with(&mut test_rng(), &mut ws, &mut party);
         assert!(result.message.contains("Cannot hunt"));
     }
 
@@ -760,7 +811,7 @@ mod tests {
             let mut ws = test_wilderness();
             let mut party = test_party();
             ws.move_to(1, 0).unwrap(); // Forest (2-in-6 forage chance)
-            let result = forage_with(&mut rng, &ws, &mut party);
+            let result = forage_with(&mut rng, &mut ws, &mut party);
             if result.message.contains("successful!") {
                 // Should mention person-days quantity
                 assert!(
@@ -779,9 +830,9 @@ mod tests {
         let mut found_quantity = false;
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
-            let ws = test_wilderness(); // Clear terrain, hunting allowed
+            let mut ws = test_wilderness(); // Clear terrain, hunting allowed
             let mut party = test_party();
-            let result = hunt_with(&mut rng, &ws, &mut party);
+            let result = hunt_with(&mut rng, &mut ws, &mut party);
             if result.message.contains("successful!") {
                 assert!(
                     result.message.contains("person-days"),
@@ -799,7 +850,7 @@ mod tests {
         let mut ws = WildernessState::new();
         ws.add_hex(HexCell::new(0, 0, Terrain::Barren)).unwrap();
         let mut party = test_party();
-        let result = forage_with(&mut test_rng(), &ws, &mut party);
+        let result = forage_with(&mut test_rng(), &mut ws, &mut party);
         assert!(result.message.contains("Cannot forage"), "should not be able to forage in barren terrain");
     }
 
@@ -808,7 +859,7 @@ mod tests {
         let mut ws = WildernessState::new();
         ws.add_hex(HexCell::new(0, 0, Terrain::City)).unwrap();
         let mut party = test_party();
-        let result = forage_with(&mut test_rng(), &ws, &mut party);
+        let result = forage_with(&mut test_rng(), &mut ws, &mut party);
         assert!(result.message.contains("Cannot forage"), "should not be able to forage in city terrain");
     }
 
@@ -909,14 +960,14 @@ mod tests {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
             let mut party = test_party();
-            party.rations = 5;
+            party.rations = 10;
             ws.move_to(1, 0).unwrap(); // Forest (2-in-6 forage chance)
 
-            let result = forage_with(&mut rng, &ws, &mut party);
+            let result = forage_with(&mut rng, &mut ws, &mut party);
             if result.success {
                 assert!(result.quantity > 0);
-                assert!(party.rations > 5, "rations should increase on successful forage");
-                assert_eq!(party.rations, 5 + result.quantity);
+                // Foraged food added, then daily ration consumed (1 per party member)
+                assert_eq!(party.rations, 10 + result.quantity - result.overhead.rations_consumed);
                 success = true;
                 break;
             }
@@ -929,15 +980,15 @@ mod tests {
         let mut success = false;
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
-            let ws = test_wilderness();
+            let mut ws = test_wilderness();
             let mut party = test_party();
-            party.rations = 3;
+            party.rations = 10;
 
-            let result = hunt_with(&mut rng, &ws, &mut party);
+            let result = hunt_with(&mut rng, &mut ws, &mut party);
             if result.success {
                 assert!(result.quantity > 0);
-                assert!(party.rations > 3, "rations should increase on successful hunt");
-                assert_eq!(party.rations, 3 + result.quantity);
+                // Hunted food added, then daily ration consumed (1 per party member)
+                assert_eq!(party.rations, 10 + result.quantity - result.overhead.rations_consumed);
                 success = true;
                 break;
             }
@@ -1108,8 +1159,9 @@ mod tests {
     #[test]
     fn orient_when_not_lost_fails() {
         let mut ws = test_wilderness();
+        let mut party = test_party();
         ws.lost = false;
-        let result = orient_with(&mut test_rng(), &mut ws);
+        let result = orient_with(&mut test_rng(), &mut ws, &mut party);
         assert!(!result.success);
         assert!(result.message.contains("not lost"));
     }
@@ -1120,8 +1172,9 @@ mod tests {
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             ws.lost = true;
-            let result = orient_with(&mut rng, &mut ws);
+            let result = orient_with(&mut rng, &mut ws, &mut party);
             if result.success {
                 success_count += 1;
                 assert!(!ws.lost, "lost flag should be cleared on success");
@@ -1135,9 +1188,10 @@ mod tests {
     #[test]
     fn orient_advances_travel_day() {
         let mut ws = test_wilderness();
+        let mut party = test_party();
         ws.lost = true;
         let start_day = ws.travel_day;
-        orient_with(&mut test_rng(), &mut ws);
+        orient_with(&mut test_rng(), &mut ws, &mut party);
         assert_eq!(ws.travel_day, start_day + 1, "orient should advance the day");
     }
 
@@ -1152,8 +1206,9 @@ mod tests {
             // Clear terrain
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             ws.lost = true;
-            let result = orient_with(&mut rng, &mut ws);
+            let result = orient_with(&mut rng, &mut ws, &mut party);
             if result.success {
                 clear_success += 1;
             }
@@ -1161,9 +1216,10 @@ mod tests {
             // Swamp terrain
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             ws.move_to(0, 1).unwrap(); // Swamp
             ws.lost = true;
-            let result = orient_with(&mut rng, &mut ws);
+            let result = orient_with(&mut rng, &mut ws, &mut party);
             if result.success {
                 swamp_success += 1;
             }
@@ -1182,8 +1238,9 @@ mod tests {
         for seed in 0..100 {
             let mut rng = StdRng::seed_from_u64(seed);
             let mut ws = test_wilderness();
+            let mut party = test_party();
             ws.lost = true;
-            let result = orient_with(&mut rng, &mut ws);
+            let result = orient_with(&mut rng, &mut ws, &mut party);
             if !result.success {
                 assert!(ws.lost, "lost flag should remain on failure");
                 assert!(result.message.contains("remains lost"));
@@ -1196,8 +1253,9 @@ mod tests {
     #[test]
     fn orient_logs_attempt() {
         let mut ws = test_wilderness();
+        let mut party = test_party();
         ws.lost = true;
-        orient_with(&mut test_rng(), &mut ws);
+        orient_with(&mut test_rng(), &mut ws, &mut party);
         assert!(!ws.log.is_empty(), "orient should add to the log");
     }
 
@@ -1291,5 +1349,63 @@ mod tests {
         assert_eq!(party.rations, initial_rations, "rations must not be consumed");
         assert_eq!(ws.travel_day, initial_day, "day must not advance");
         assert_eq!((ws.current_x, ws.current_y), (2, 0), "position must not change");
+    }
+
+    // =========================================================================
+    // Bug fix: forage/hunt/orient must consume rations and advance day (oag-iasbo)
+    // =========================================================================
+
+    #[test]
+    fn forage_consumes_rations_and_advances_day() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        ws.move_to(1, 0).unwrap(); // Forest (can forage)
+        let mut party = test_party();
+        party.rations = 10;
+        let initial_day = ws.travel_day;
+
+        let result = forage_with(&mut rng, &mut ws, &mut party);
+        assert_eq!(ws.travel_day, initial_day + 1, "forage should advance the day");
+        assert!(result.overhead.rations_consumed > 0, "forage should consume rations");
+    }
+
+    #[test]
+    fn hunt_consumes_rations_and_advances_day() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 10;
+        let initial_day = ws.travel_day;
+
+        let result = hunt_with(&mut rng, &mut ws, &mut party);
+        assert_eq!(ws.travel_day, initial_day + 1, "hunt should advance the day");
+        assert!(result.overhead.rations_consumed > 0, "hunt should consume rations");
+    }
+
+    #[test]
+    fn orient_consumes_rations() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 10;
+        ws.lost = true;
+
+        let result = orient_with(&mut rng, &mut ws, &mut party);
+        assert!(result.overhead.rations_consumed > 0, "orient should consume rations");
+    }
+
+    #[test]
+    fn forage_starvation_during_forage() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        ws.move_to(1, 0).unwrap(); // Forest
+        let mut party = test_party();
+        party.rations = 0;
+        party.days_without_food = 2; // Next day will be day 3 (HP damage)
+        party.members[0].hp = 10;
+
+        let result = forage_with(&mut rng, &mut ws, &mut party);
+        assert!(result.overhead.starving, "should be starving with no rations");
+        assert!(result.overhead.starvation_damage > 0, "day 3+ starvation should deal HP damage");
     }
 }
