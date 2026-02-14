@@ -49,7 +49,7 @@ pub fn roll_gold_with<R: Rng>(notation: &str, rng: &mut R) -> u32 {
         let multiplier: u32 = mult_str.parse().unwrap_or(1);
         let expr = dice::parse(dice_part).expect("valid dice notation in starting_gold");
         let total = dice::roll_with(&expr, rng).total.max(0) as u32;
-        total * multiplier
+        total.saturating_mul(multiplier)
     } else {
         let expr = dice::parse(notation).expect("valid dice notation in starting_gold");
         dice::roll_with(&expr, rng).total.max(0) as u32

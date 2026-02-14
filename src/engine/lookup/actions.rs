@@ -264,7 +264,7 @@ fn parse_quantity_with_multiplier(quantity: &str) -> Result<i32, String> {
             .parse()
             .map_err(|_| format!("invalid multiplier '{}'", multiplier_part))?;
 
-        Ok(base * multiplier)
+        Ok(base.saturating_mul(multiplier))
     } else if normalized.contains('d') || normalized.contains('D') {
         dice::roll_str(&normalized)
             .map(|r| r.total)

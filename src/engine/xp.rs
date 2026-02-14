@@ -36,12 +36,12 @@ pub struct LevelUpResult {
 /// treasure_gp: gold pieces of treasure (1gp = 1xp).
 /// monster_xp: XP from defeated monsters.
 pub fn award_xp(character: &mut Character, treasure_gp: u64, monster_xp: u64) -> XpAwardResult {
-    let base_xp = treasure_gp + monster_xp;
+    let base_xp = treasure_gp.saturating_add(monster_xp);
     let abilities = character.abilities.to_array();
     let modifier_pct = prime_req_xp_modifier(character.class, &abilities);
     let adjusted_xp = adjust_xp(base_xp, modifier_pct);
 
-    character.xp += adjusted_xp;
+    character.xp = character.xp.saturating_add(adjusted_xp);
     let new_total = character.xp;
     let ready_to_train = check_level_up(character.class, character.level, character.xp).is_some();
 
@@ -77,8 +77,8 @@ pub fn apply_level_up_with<R: Rng>(rng: &mut R, character: &mut Character) -> Le
 
     // Apply changes
     character.level = new_level;
-    character.max_hp += hp_gained;
-    character.hp += hp_gained;
+    character.max_hp = character.max_hp.saturating_add(hp_gained);
+    character.hp = character.hp.saturating_add(hp_gained);
     character.thac0 = crate::engine::chargen::thac0(def.combat_aptitude, new_level);
     let save_cat = def.save_category;
     let new_saves = saving_throws(save_cat, new_level);
