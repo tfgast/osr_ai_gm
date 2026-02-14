@@ -46,6 +46,6 @@ pub fn check_morale_with<R: Rng>(combat: &mut CombatState, morale_score: u32, rn
     let passed = roll <= morale_score as i32;
 
     let result = MoraleResult { roll, morale_score, passed };
-    combat.log.push(result.to_string());
+    combat.log_event(result.to_string());
     result
 }

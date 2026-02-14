@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
+use crate::log_entry::LogEntry;
+
 /// Capitalize the first letter of a string.
 fn capitalize(s: &str) -> String {
     let mut c = s.chars();
@@ -87,7 +89,10 @@ pub struct TimeTracker {
     /// Active light sources.
     pub lights: Vec<ActiveLight>,
     /// Log of time-related events.
-    pub log: Vec<String>,
+    pub log: Vec<LogEntry>,
+    /// Monotonic sequence counter for log entry ordering.
+    #[serde(default)]
+    pub log_seq: u64,
 }
 
 impl TimeTracker {
@@ -100,6 +105,7 @@ impl TimeTracker {
             turns_since_rest: 0,
             lights: Vec::new(),
             log: Vec::new(),
+            log_seq: 0,
         }
     }
 
@@ -109,7 +115,8 @@ impl TimeTracker {
             let drain = self.log.len() - Self::MAX_LOG_ENTRIES / 2;
             self.log.drain(..drain);
         }
-        self.log.push(msg);
+        self.log_seq += 1;
+        self.log.push(LogEntry::new(self.log_seq, msg));
     }
 
     /// Advance time by one dungeon turn (10 minutes).

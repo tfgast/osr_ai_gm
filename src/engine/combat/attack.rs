@@ -175,7 +175,7 @@ pub fn coup_de_grace(
         target: target_name,
         target_was_helpless: true,
     };
-    combat.log.push(result.to_string());
+    combat.log_event(result.to_string());
     Ok(result)
 }
 
@@ -200,7 +200,7 @@ pub fn set_monster_helpless(combat: &mut CombatState, monster_idx: usize, helple
     } else {
         format!("{} is no longer helpless.", name)
     };
-    combat.log.push(msg.clone());
+    combat.log_event(msg.clone());
     Ok(msg)
 }
 
@@ -274,7 +274,7 @@ pub fn character_melee_attack_with<R: Rng>(
         target_hp_after,
         target_killed,
     };
-    combat.log.push(result.to_string());
+    combat.log_event(result.to_string());
     result
 }
 
@@ -356,7 +356,7 @@ pub fn character_missile_attack_with<R: Rng>(
         target_hp_after,
         target_killed,
     };
-    combat.log.push(result.to_string());
+    combat.log_event(result.to_string());
     Ok(result)
 }
 
@@ -437,6 +437,6 @@ pub(super) fn monster_attack_modified_with<R: Rng>(
         target_hp_after,
         target_killed,
     };
-    combat.log.push(result.to_string());
+    combat.log_event(result.to_string());
     result
 }

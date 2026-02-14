@@ -218,8 +218,8 @@ fn state_with_morale_selector_divergence() -> GameState {
 fn state_with_combat_log() -> GameState {
     let mut state = state_with_combat();
     if let Some(combat) = state.combat.as_mut() {
-        combat.log.push("Grond attacks Goblin 1".to_string());
-        combat.log.push("Goblin 1 misses Grond".to_string());
+        combat.log_event("Grond attacks Goblin 1".to_string());
+        combat.log_event("Goblin 1 misses Grond".to_string());
     }
     state
 }

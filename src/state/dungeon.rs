@@ -3,6 +3,8 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+use crate::log_entry::LogEntry;
+
 /// How a trap is triggered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum TrapTrigger {
@@ -234,7 +236,10 @@ pub struct DungeonState {
     /// The room the party is currently in (None if no rooms exist yet).
     pub current_room: Option<u32>,
     /// Event log.
-    pub log: Vec<String>,
+    pub log: Vec<LogEntry>,
+    /// Monotonic sequence counter for log entry ordering.
+    #[serde(default)]
+    pub log_seq: u64,
 }
 
 impl DungeonState {
@@ -249,6 +254,7 @@ impl DungeonState {
             explored: HashSet::new(),
             current_room: None,
             log: Vec::new(),
+            log_seq: 0,
         }
     }
 
@@ -341,7 +347,8 @@ impl DungeonState {
             let drain = self.log.len() - Self::MAX_LOG_ENTRIES / 2;
             self.log.drain(..drain);
         }
-        self.log.push(msg);
+        self.log_seq += 1;
+        self.log.push(LogEntry::new(self.log_seq, msg));
     }
 
     /// Status display of the current position.
