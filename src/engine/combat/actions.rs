@@ -183,7 +183,16 @@ pub fn action_spawn_monster(
 
 pub fn action_roll_initiative(state: &mut GameState) -> Result<InitiativeResult, EngineError> {
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
+
+    // Prevent rolling initiative twice without any intervening combat actions.
+    if combat.round > 0 && combat.log.len() <= combat.log_len_at_initiative {
+        return Err(EngineError::WrongState(
+            "initiative already rolled for this round.".to_string(),
+        ));
+    }
+
     let (party_initiative, monster_initiative) = roll_initiative(combat);
+    combat.log_len_at_initiative = combat.log.len();
     let winner = if party_initiative > monster_initiative {
         InitiativeWinner::Party
     } else if monster_initiative > party_initiative {
@@ -776,5 +785,86 @@ mod tests {
         let mut state = state_with_combat();
         let result = action_set_helpless(&mut state, 99, true);
         assert!(result.is_err());
+    }
+
+    // --- action_roll_initiative duplicate guard (oag-vtkww) ---
+
+    #[test]
+    fn roll_initiative_twice_without_action_is_rejected() {
+        let mut state = state_with_combat();
+        let result = action_roll_initiative(&mut state);
+        assert!(result.is_ok());
+        assert_eq!(state.combat.as_ref().unwrap().round, 1);
+
+        // Second call with no intervening action should fail
+        let result = action_roll_initiative(&mut state);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("initiative already rolled"), "expected initiative guard, got: {}", err);
+        // Round should NOT have advanced
+        assert_eq!(state.combat.as_ref().unwrap().round, 1);
+    }
+
+    fn state_with_melee_combat() -> GameState {
+        let mut state = GameState::new();
+        let fighter = test_fighter();
+        state.party.add_member(fighter);
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![
+                mk_monster("Goblin 1", "1", 4, 6, 7),
+                mk_monster("Goblin 2", "1", 4, 6, 7),
+            ],
+            5, // melee range
+        ));
+        state
+    }
+
+    #[test]
+    fn roll_initiative_allowed_after_attack() {
+        let mut state = state_with_melee_combat();
+        let result = action_roll_initiative(&mut state);
+        assert!(result.is_ok());
+
+        // Perform a melee attack at close range (adds to log)
+        let attack_result = action_attack(&mut state, "Grond", 0, "Sword");
+        assert!(attack_result.is_ok(), "attack failed: {:?}", attack_result.err());
+
+        // Now initiative should be allowed again
+        let result = action_roll_initiative(&mut state);
+        assert!(result.is_ok(), "second initiative failed: {:?}", result.err());
+        assert_eq!(state.combat.as_ref().unwrap().round, 2);
+    }
+
+    #[test]
+    fn roll_initiative_allowed_after_monster_attack() {
+        let mut state = state_with_melee_combat();
+        let result = action_roll_initiative(&mut state);
+        assert!(result.is_ok());
+
+        // Monster attacks at melee range (adds to log)
+        let attack_result = action_monster_attack(&mut state, 0, "Grond");
+        assert!(attack_result.is_ok(), "monster attack failed: {:?}", attack_result.err());
+
+        // Initiative should be allowed again
+        let result = action_roll_initiative(&mut state);
+        assert!(result.is_ok(), "second initiative failed: {:?}", result.err());
+        assert_eq!(state.combat.as_ref().unwrap().round, 2);
+    }
+
+    #[test]
+    fn roll_initiative_allowed_after_morale_check() {
+        let mut state = state_with_combat();
+        let result = action_roll_initiative(&mut state);
+        assert!(result.is_ok());
+
+        // Morale check (adds to log)
+        let _ = action_morale(&mut state, None);
+
+        // Initiative should be allowed again
+        let result = action_roll_initiative(&mut state);
+        assert!(result.is_ok());
+        assert_eq!(state.combat.as_ref().unwrap().round, 2);
     }
 }

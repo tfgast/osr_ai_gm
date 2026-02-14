@@ -266,6 +266,9 @@ pub struct CombatState {
     /// Initial monster count for morale trigger tracking.
     #[serde(default)]
     pub initial_monster_count: usize,
+    /// Combat log length after the last initiative roll (to detect repeated rolls).
+    #[serde(default)]
+    pub log_len_at_initiative: usize,
 }
 
 impl CombatState {
@@ -284,6 +287,7 @@ impl CombatState {
             first_death_checked: false,
             half_killed_checked: false,
             initial_monster_count: initial_count,
+            log_len_at_initiative: 0,
         }
     }
 
