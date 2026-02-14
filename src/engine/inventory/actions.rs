@@ -14,7 +14,9 @@ fn no_party_member_err(char_name: &str) -> EngineError {
 /// Returns (name, cost_gp, weight as f32).
 fn find_buyable(name: &str) -> Option<(String, u32, f32)> {
     if let Some(w) = equipment::find_weapon(name) {
-        return Some((w.name.clone(), w.cost_gp(), w.weight() as f32));
+        if w.cost_gp() > 0 {
+            return Some((w.name.clone(), w.cost_gp(), w.weight() as f32));
+        }
     }
     if let Some(a) = equipment::find_armour(name) {
         if a.cost_gp() > 0 {
@@ -40,7 +42,7 @@ fn suggest_equipment(query: &str) -> Vec<String> {
     let mut suggestions: Vec<String> = Vec::new();
 
     for w in equipment::weapons() {
-        if w.name.to_lowercase().contains(&query_lower) {
+        if w.cost_gp() > 0 && w.name.to_lowercase().contains(&query_lower) {
             suggestions.push(w.name.clone());
         }
     }
@@ -340,6 +342,35 @@ mod tests {
         let c = state.party.find_member("Aldric").unwrap();
         assert_eq!(c.inventory.len(), 1);
         assert_eq!(c.inventory[0].name, "Sword");
+    }
+
+    #[test]
+    fn buy_torch_costs_gp() {
+        let mut state = state_with_fighter();
+        let result =
+            action_buy(&mut state, "Aldric", "Torches (6)").expect("buy torches should succeed");
+        assert_eq!(result.cost_gp, 1);
+        assert_eq!(result.gold_remaining, 99);
+    }
+
+    #[test]
+    fn buy_holy_water_costs_gp() {
+        let mut state = state_with_fighter();
+        let result = action_buy(&mut state, "Aldric", "Holy water (vial)")
+            .expect("buy holy water should succeed");
+        assert_eq!(result.cost_gp, 25);
+        assert_eq!(result.gold_remaining, 75);
+    }
+
+    #[test]
+    fn buy_improvised_weapon_not_free() {
+        // "Torch" as improvised weapon has no cost — should not be buyable at 0 gp.
+        // It should fall through to gear lookup or fail, not return cost=0.
+        let result = find_buyable("Torch");
+        assert!(
+            result.is_none() || result.unwrap().1 > 0,
+            "Improvised weapons without a price should not be buyable at 0 gp"
+        );
     }
 
     #[test]
