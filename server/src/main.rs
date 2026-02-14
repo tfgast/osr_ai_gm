@@ -106,7 +106,8 @@ async fn gm_endpoint(
     let req = match protocol::parse_request(&body) {
         Ok(r) => r,
         Err(e) => {
-            return error_response(StatusCode::BAD_REQUEST, &e);
+            let id = protocol::extract_request_id(&body);
+            return error_response_with_id(StatusCode::BAD_REQUEST, &e, &id);
         }
     };
 
@@ -140,7 +141,11 @@ fn json_response(status: StatusCode, body: String) -> (StatusCode, [(header::Hea
 }
 
 fn error_response(status: StatusCode, msg: &str) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
-    let resp = GMResponse::err("", msg, osr_ai_gm::state::game::GameMode::Idle);
+    error_response_with_id(status, msg, "")
+}
+
+fn error_response_with_id(status: StatusCode, msg: &str, id: &str) -> (StatusCode, [(header::HeaderName, &'static str); 1], String) {
+    let resp = GMResponse::err(id, msg, osr_ai_gm::state::game::GameMode::Idle);
     json_response(status, protocol::serialize_response(&resp))
 }
 

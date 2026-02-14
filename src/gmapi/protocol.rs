@@ -443,6 +443,19 @@ impl GMResponse {
 /// Maximum request size in bytes (64KB).
 const MAX_REQUEST_SIZE: usize = 65_536;
 
+/// Try to extract the `id` field from raw JSON without full deserialization.
+/// Returns the id string if found, or an empty string if not parseable.
+pub fn extract_request_id(line: &str) -> String {
+    #[derive(Deserialize)]
+    struct IdOnly {
+        #[serde(default)]
+        id: String,
+    }
+    serde_json::from_str::<IdOnly>(line)
+        .map(|r| r.id)
+        .unwrap_or_default()
+}
+
 /// Parse a JSON line into a GMRequest, with size and field validation.
 pub fn parse_request(line: &str) -> Result<GMRequest, String> {
     if line.len() > MAX_REQUEST_SIZE {
@@ -877,6 +890,29 @@ mod tests {
         let result = parse_request("not json");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("invalid JSON request"));
+    }
+
+    #[test]
+    fn extract_id_from_valid_request() {
+        let json = r#"{"id":"test-42","command":{"type":"QueryState"}}"#;
+        assert_eq!(extract_request_id(json), "test-42");
+    }
+
+    #[test]
+    fn extract_id_from_invalid_command() {
+        let json = r#"{"id":"req-99","command":{"type":"DoesNotExist"}}"#;
+        assert_eq!(extract_request_id(json), "req-99");
+    }
+
+    #[test]
+    fn extract_id_from_garbage() {
+        assert_eq!(extract_request_id("not json"), "");
+    }
+
+    #[test]
+    fn extract_id_missing_field() {
+        let json = r#"{"command":{"type":"QueryState"}}"#;
+        assert_eq!(extract_request_id(json), "");
     }
 
     #[test]
