@@ -1074,6 +1074,21 @@ mod tests {
     }
 
     #[test]
+    fn retreat_turned_monsters_dont_attack() {
+        let mut combat = CombatState::new(vec![test_goblin(), test_goblin()], 10);
+        // Mark the first goblin as turned
+        combat.monsters[0].turned = true;
+        let mut fighter = test_fighter();
+        let result = retreat_with(&mut combat, &mut fighter, &mut test_rng());
+        // Only non-turned goblin attacks
+        assert_eq!(
+            result.free_attacks.len(),
+            1,
+            "turned goblin should not get a free attack"
+        );
+    }
+
+    #[test]
     fn retreat_stops_if_character_dies() {
         // Create multiple strong monsters
         let ogre = Monster {

@@ -376,6 +376,12 @@ pub fn action_monster_attack(
                 combat.monsters[monster_idx].name
             )));
         }
+        if combat.monsters[monster_idx].turned {
+            return Err(EngineError::InvalidInput(format!(
+                "{} is turned and cannot attack.",
+                combat.monsters[monster_idx].name
+            )));
+        }
         if combat.monsters_attacked_this_round.contains(&monster_idx) {
             return Err(EngineError::InvalidInput(format!(
                 "{} has already attacked this round.",
@@ -1143,6 +1149,27 @@ mod tests {
         // Same monster attacks again in round 2 — should succeed
         let result = action_monster_attack(&mut state, 0, "Grond");
         assert!(result.is_ok(), "monster should be allowed to attack in new round");
+    }
+
+    // --- turned monster attack guard (oag-pjcjk) ---
+
+    #[test]
+    fn turned_monster_cannot_attack() {
+        let mut state = state_with_melee_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        // Mark monster as turned
+        state.combat.as_mut().unwrap().monsters[0].turned = true;
+
+        // Turned monster should not be allowed to attack
+        let result = action_monster_attack(&mut state, 0, "Grond");
+        assert!(result.is_err(), "turned monster should not be able to attack");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("turned") && err.contains("cannot attack"),
+            "expected turned guard, got: {}",
+            err
+        );
     }
 
     #[test]
