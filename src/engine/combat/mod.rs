@@ -157,6 +157,7 @@ mod tests {
             saving_throws: None,
             thac0: 19,
             movement_rate: 120,
+            spell_slots_used: [0; 6],
         }
     }
 
@@ -184,6 +185,7 @@ mod tests {
             saving_throws: None,
             thac0: 19,
             movement_rate: 120,
+            spell_slots_used: [0; 6],
         }
     }
 
@@ -211,6 +213,7 @@ mod tests {
             saving_throws: None,
             thac0: 19,
             movement_rate: 120,
+            spell_slots_used: [0; 6],
         }
     }
 
