@@ -110,8 +110,8 @@ fn assert_response_format(resp: &GMResponse, expected_id: &str) {
     }
     // Error responses should have error field
     if !resp.success {
-        assert!(resp.error.is_some(), "error response should have error field");
-        assert!(!resp.error.as_ref().unwrap().is_empty(), "error field should not be empty");
+        let err = resp.error.as_ref().expect("error response should have error field");
+        assert!(!err.is_empty(), "error field should not be empty");
     }
 }
 
@@ -315,7 +315,7 @@ fn query_combat_active() {
     assert_eq!(resp.mode, GameMode::Combat);
 
     let data = resp.data.unwrap();
-    assert!(data["round"].as_u64().is_some());
+    let _round = data["round"].as_u64().expect("combat data should have round");
     assert_eq!(data["distance"], 5);
     let monsters = data["monsters"].as_array().unwrap();
     assert_eq!(monsters.len(), 3);
@@ -350,7 +350,7 @@ fn query_exploration_active() {
     let data = resp.data.unwrap();
     assert_eq!(data["dungeon_level"], 1);
     assert_eq!(data["current_room"], 0);
-    assert!(data["total_turns"].as_u64().is_some());
+    let _total_turns = data["total_turns"].as_u64().expect("exploration data should have total_turns");
 }
 
 // ===========================================================================
@@ -398,7 +398,8 @@ fn create_character_happy_path() {
     assert_response_format(&resp, "cc1");
     // Fighter has no ability requirements, so creation always succeeds.
     assert!(resp.success, "Fighter creation should always succeed (no requirements)");
-    assert!(resp.data.is_some(), "success should include character sheet");
+    let data = resp.data.as_ref().expect("success should include character sheet");
+    assert!(data.is_object(), "character sheet should be a JSON object");
     assert_eq!(state.party.members.len(), 1);
 }
 
@@ -648,9 +649,12 @@ fn roll_initiative_happy_path() {
     assert_eq!(resp.mode, GameMode::Combat);
 
     let data = resp.data.unwrap();
-    assert!(data["round"].as_u64().is_some());
-    assert!(data["party_initiative"].as_i64().is_some());
-    assert!(data["monster_initiative"].as_i64().is_some());
+    let round = data["round"].as_u64().expect("initiative data should have round");
+    assert!(round >= 1, "round should be at least 1");
+    let party_init = data["party_initiative"].as_i64().expect("initiative data should have party_initiative");
+    assert!((1..=6).contains(&party_init), "party initiative should be 1-6");
+    let monster_init = data["monster_initiative"].as_i64().expect("initiative data should have monster_initiative");
+    assert!((1..=6).contains(&monster_init), "monster initiative should be 1-6");
     let winner = data["winner"].as_str().unwrap();
     assert!(["party", "monsters", "simultaneous"].contains(&winner));
     // Verify state mutation: initiative values stored in combat state
@@ -1086,12 +1090,12 @@ fn end_combat_happy_path() {
     assert!(state.combat.is_none());
 
     let data = resp.data.unwrap();
-    assert!(data["rounds"].as_u64().is_some());
-    assert!(data["monsters_defeated"].as_u64().is_some());
-    assert!(data["total_xp"].as_u64().is_some());
-    assert!(data["xp_per_survivor"].as_u64().is_some());
-    assert!(data["xp_awards"].as_array().is_some());
-    assert!(data["party_casualties"].as_u64().is_some());
+    let _rounds = data["rounds"].as_u64().expect("end combat should have rounds");
+    let _monsters_defeated = data["monsters_defeated"].as_u64().expect("end combat should have monsters_defeated");
+    let _total_xp = data["total_xp"].as_u64().expect("end combat should have total_xp");
+    let _xp_per_survivor = data["xp_per_survivor"].as_u64().expect("end combat should have xp_per_survivor");
+    let _xp_awards = data["xp_awards"].as_array().expect("end combat should have xp_awards array");
+    let _party_casualties = data["party_casualties"].as_u64().expect("end combat should have party_casualties");
 }
 
 #[test]
@@ -1132,8 +1136,10 @@ fn enter_dungeon_happy_path() {
     assert_eq!(resp.mode, GameMode::Exploration);
     assert_eq!(state.mode, GameMode::Exploration);
     assert_eq!(state.dungeon_level, 3);
-    assert!(state.dungeon.is_some());
-    assert!(state.time.is_some());
+    let dungeon = state.dungeon.as_ref().expect("dungeon state should be initialized");
+    assert_eq!(dungeon.level, 3, "dungeon level should be 3");
+    let time = state.time.as_ref().expect("time tracker should be initialized");
+    assert_eq!(time.total_turns, 0, "time should start at 0 turns");
 }
 
 #[test]
@@ -1160,7 +1166,8 @@ fn enter_dungeon_rejected_in_wilderness_mode() {
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("wilderness mode"));
     assert_eq!(state.mode, GameMode::Wilderness, "mode must not change");
-    assert!(state.wilderness.is_some(), "wilderness state must be preserved");
+    let ws = state.wilderness.as_ref().expect("wilderness state must be preserved");
+    assert!(!ws.hexes.is_empty(), "wilderness hexes should not be empty");
 }
 
 #[test]
@@ -1210,9 +1217,9 @@ fn advance_turn_happy_path() {
     assert!(resp.success);
 
     let data = resp.data.unwrap();
-    assert!(data["messages"].as_array().is_some());
+    let _messages = data["messages"].as_array().expect("advance turn should have messages array");
     // has_encounter is a boolean
-    assert!(data["has_encounter"].as_bool().is_some());
+    let _has_encounter = data["has_encounter"].as_bool().expect("advance turn should report has_encounter as bool");
     // Verify state mutation: turn counter advanced
     assert!(state.time.as_ref().unwrap().total_turns > pre_turns,
         "total_turns should increment after advance");
@@ -1478,7 +1485,8 @@ fn enter_wilderness_happy_path() {
     assert!(resp.success);
     assert_eq!(resp.mode, GameMode::Wilderness);
     assert_eq!(state.mode, GameMode::Wilderness);
-    assert!(state.wilderness.is_some());
+    let ws = state.wilderness.as_ref().expect("wilderness state should be initialized");
+    assert!(!ws.hexes.is_empty(), "should have at least the starting hex");
 }
 
 #[test]
@@ -1599,10 +1607,10 @@ fn travel_happy_path() {
     assert!(resp.success);
 
     let data = resp.data.unwrap();
-    assert!(data["messages"].as_array().is_some());
-    assert!(data["lost"].as_bool().is_some());
-    assert!(data["has_encounter"].as_bool().is_some());
-    assert!(data["encounters"].as_array().is_some());
+    let _messages = data["messages"].as_array().expect("travel should have messages array");
+    let _lost = data["lost"].as_bool().expect("travel should report lost status as bool");
+    let _has_encounter = data["has_encounter"].as_bool().expect("travel should report has_encounter as bool");
+    let _encounters = data["encounters"].as_array().expect("travel should have encounters array");
     // Verify state mutation: travel day advanced
     assert!(state.wilderness.as_ref().unwrap().travel_day > pre_day,
         "travel day should advance after travel");
@@ -1633,10 +1641,12 @@ fn orient_when_lost_happy_path() {
     assert!(resp.success);
 
     let data = resp.data.unwrap();
-    assert!(data["success"].as_bool().is_some());
-    assert!(data["terrain"].as_str().is_some());
-    assert!(data["lost"].as_bool().is_some());
-    assert!(data["travel_day"].as_u64().is_some());
+    let _success = data["success"].as_bool().expect("orient should report success as bool");
+    let terrain = data["terrain"].as_str().expect("orient should report terrain");
+    assert!(!terrain.is_empty(), "terrain should not be empty");
+    let _lost = data["lost"].as_bool().expect("orient should report lost status as bool");
+    let travel_day = data["travel_day"].as_u64().expect("orient should report travel_day");
+    assert!(travel_day >= 1, "travel day should be at least 1");
 }
 
 #[test]
@@ -1713,10 +1723,12 @@ fn roll_reaction_happy_path() {
     let data = resp.data.unwrap();
     assert_eq!(data["character"], "Aldric");
     assert_eq!(data["charisma"], 12);
-    assert!(data["raw_roll"].as_i64().is_some());
-    assert!(data["modified_roll"].as_i64().is_some());
-    assert!(data["reaction"].as_str().is_some());
-    assert!(data["cha_modifier"].as_i64().is_some());
+    let raw_roll = data["raw_roll"].as_i64().expect("reaction should have raw_roll");
+    assert!((2..=12).contains(&raw_roll), "raw roll should be 2d6 range (2-12)");
+    let _modified_roll = data["modified_roll"].as_i64().expect("reaction should have modified_roll");
+    let reaction = data["reaction"].as_str().expect("reaction should have reaction string");
+    assert!(!reaction.is_empty(), "reaction should not be empty");
+    let _cha_modifier = data["cha_modifier"].as_i64().expect("reaction should have cha_modifier");
 }
 
 #[test]
@@ -1800,11 +1812,12 @@ fn award_treasure_xp_happy_path() {
 
     let data = resp.data.unwrap();
     assert_eq!(data["character"], "Aldric");
-    assert!(data["base_xp"].as_u64().is_some());
-    assert!(data["modifier_pct"].as_i64().is_some());
-    assert!(data["adjusted_xp"].as_u64().is_some());
-    assert!(data["total_xp"].as_u64().is_some());
-    assert!(data["ready_to_train"].as_bool().is_some());
+    let base_xp = data["base_xp"].as_u64().expect("should have base_xp");
+    assert!(base_xp > 0, "base_xp should be positive");
+    let _modifier_pct = data["modifier_pct"].as_i64().expect("should have modifier_pct");
+    let _adjusted_xp = data["adjusted_xp"].as_u64().expect("should have adjusted_xp");
+    let _total_xp = data["total_xp"].as_u64().expect("should have total_xp");
+    let _ready_to_train = data["ready_to_train"].as_bool().expect("should have ready_to_train");
     // Fighter with STR 16 gets +10%
     assert_eq!(data["modifier_pct"], 10);
     // Verify state mutation: character XP was actually updated
@@ -1845,8 +1858,9 @@ fn thief_skill_check_happy_path() {
     assert_eq!(data["character"], "Shade");
     assert_eq!(data["skill"], "Open Locks");
     assert_eq!(data["target"], 15);
-    assert!(data["roll"].as_u64().is_some());
-    assert!(data["success"].as_bool().is_some());
+    let roll = data["roll"].as_u64().expect("thief skill check should have roll");
+    assert!((1..=100).contains(&roll), "roll should be 1-100");
+    let _success = data["success"].as_bool().expect("thief skill check should report success");
 }
 
 #[test]
@@ -1967,9 +1981,9 @@ fn backstab_happy_path() {
         assert!(resp.success);
 
         let data = resp.data.unwrap();
-        assert!(data["hit"].as_bool().is_some());
-        assert!(data["attack_roll"].as_i64().is_some());
-        assert!(data["target_number"].as_i64().is_some());
+        let _hit = data["hit"].as_bool().expect("backstab should report hit");
+        let _attack_roll = data["attack_roll"].as_i64().expect("backstab should have attack_roll");
+        let _target_number = data["target_number"].as_i64().expect("backstab should have target_number");
         if data["hit"].as_bool().unwrap() {
             assert_eq!(data["multiplier"], 2); // Level 1 thief = x2
             assert!(data["damage"].as_i64().unwrap() > 0);
@@ -2093,10 +2107,13 @@ fn query_encumbrance_happy_path() {
 
     let data = resp.data.unwrap();
     assert_eq!(data["character"], "Aldric");
-    assert!(data["total_weight_cn"].as_u64().is_some());
-    assert!(data["encumbrance_level"].as_str().is_some());
-    assert!(data["movement_rate"].as_u64().is_some());
-    assert!(data["max_capacity"].as_u64().is_some());
+    let _weight = data["total_weight_cn"].as_u64().expect("encumbrance should have total_weight_cn");
+    let enc_level = data["encumbrance_level"].as_str().expect("encumbrance should have encumbrance_level");
+    assert!(!enc_level.is_empty(), "encumbrance level should not be empty");
+    let movement_rate = data["movement_rate"].as_u64().expect("encumbrance should have movement_rate");
+    assert!(movement_rate > 0, "movement rate should be positive");
+    let max_cap = data["max_capacity"].as_u64().expect("encumbrance should have max_capacity");
+    assert!(max_cap > 0, "max capacity should be positive");
 }
 
 #[test]
@@ -2129,8 +2146,9 @@ fn spawn_monster_happy_path() {
 
     let data = resp.data.unwrap();
     assert_eq!(data["monster"], "Goblin");
-    assert!(data["hit_dice"].as_str().is_some());
-    assert!(data["ac"].as_i64().is_some());
+    let hit_dice = data["hit_dice"].as_str().expect("spawn monster should have hit_dice");
+    assert!(!hit_dice.is_empty(), "hit dice should not be empty");
+    let _ac = data["ac"].as_i64().expect("spawn monster should have ac");
 }
 
 #[test]
@@ -2177,9 +2195,12 @@ fn lookup_spell_happy_path() {
     assert_eq!(data["name"], "Magic Missile");
     assert_eq!(data["level"], 1);
     assert_eq!(data["list"], "Magic-User");
-    assert!(data["range"].as_str().is_some());
-    assert!(data["duration"].as_str().is_some());
-    assert!(data["description"].as_str().is_some());
+    let range = data["range"].as_str().expect("spell should have range");
+    assert!(!range.is_empty(), "range should not be empty");
+    let duration = data["duration"].as_str().expect("spell should have duration");
+    assert!(!duration.is_empty(), "duration should not be empty");
+    let desc = data["description"].as_str().expect("spell should have description");
+    assert!(!desc.is_empty(), "description should not be empty");
 }
 
 #[test]
@@ -2253,11 +2274,15 @@ fn hire_retainer_happy_path() {
     assert_eq!(data["retainer"], "Hrothgar");
     assert_eq!(data["class"], "Fighter");
     assert_eq!(data["level"], 1);
-    assert!(data["hired"].as_bool().is_some());
-    assert!(data["loyalty"].as_u64().is_some());
-    assert!(data["wage_gp"].as_u64().is_some());
-    assert!(data["max_retainers"].as_u64().is_some());
-    assert!(data["reaction"].as_str().is_some());
+    let _hired = data["hired"].as_bool().expect("hire retainer should report hired status");
+    let loyalty = data["loyalty"].as_u64().expect("hire retainer should have loyalty");
+    assert!(loyalty > 0, "loyalty should be positive");
+    let wage = data["wage_gp"].as_u64().expect("hire retainer should have wage_gp");
+    assert!(wage > 0, "wage should be positive");
+    let max_ret = data["max_retainers"].as_u64().expect("hire retainer should have max_retainers");
+    assert!(max_ret > 0, "max retainers should be positive");
+    let reaction = data["reaction"].as_str().expect("hire retainer should have reaction");
+    assert!(!reaction.is_empty(), "reaction should not be empty");
 }
 
 #[test]
@@ -2674,7 +2699,8 @@ fn roll_invalid_notation() {
         notation: "abc".to_string(),
     }), &mut state);
     assert!(!resp.success);
-    assert!(resp.error.is_some());
+    let err = resp.error.as_ref().expect("invalid roll should have error");
+    assert!(!err.is_empty(), "error should not be empty");
 }
 
 // ===========================================================================
@@ -2888,7 +2914,8 @@ fn open_door_force_fail_returns_success_false() {
         if !moved {
             saw_failure = true;
             assert!(!resp.success, "failed force must return success=false");
-            assert!(resp.data.is_some(), "failed force should still include data payload");
+            let data = resp.data.as_ref().expect("failed force should still include data payload");
+            assert!(data.is_object(), "data should be a JSON object");
             // Party should NOT have moved
             assert_eq!(state.dungeon.as_ref().unwrap().current_room, Some(0));
         }
@@ -3155,7 +3182,8 @@ fn error_response_serializes_correctly() {
     let json = serde_json::to_string(&resp).unwrap();
     let deser: GMResponse = serde_json::from_str(&json).unwrap();
     assert!(!deser.success);
-    assert!(deser.error.is_some());
+    let err = deser.error.as_ref().expect("deserialized error response should have error");
+    assert!(!err.is_empty(), "error should not be empty");
 }
 
 // ===========================================================================
@@ -4137,7 +4165,8 @@ fn lookup_item_exact_match() {
     assert!(resp.success);
     let data = resp.data.unwrap();
     assert_eq!(data["name"], "Bag of Holding");
-    assert!(data["category"].as_str().is_some());
+    let category = data["category"].as_str().expect("item should have category");
+    assert!(!category.is_empty(), "category should not be empty");
 }
 
 #[test]
@@ -4349,8 +4378,10 @@ fn roll_treasure_has_structured_items() {
     let data = resp.data.unwrap();
     let items = data["items"].as_array().unwrap();
     for item in items {
-        assert!(item["type"].as_str().is_some(), "each item should have a type");
-        assert!(item["quantity"].as_i64().is_some(), "each item should have a quantity");
+        let item_type = item["type"].as_str().expect("each item should have a type");
+        assert!(!item_type.is_empty(), "item type should not be empty");
+        let quantity = item["quantity"].as_i64().expect("each item should have a quantity");
+        assert!(quantity > 0, "item quantity should be positive");
     }
 }
 
@@ -4378,10 +4409,12 @@ fn list_classes_returns_all() {
     assert_eq!(classes.len(), 22); // 22 OSE classes
     // Verify each class has expected fields
     for class in classes {
-        assert!(class["name"].as_str().is_some());
-        assert!(class["hit_die"].as_u64().is_some());
-        assert!(class["requirements"].as_array().is_some());
-        assert!(class["is_demihuman"].as_bool().is_some());
+        let name = class["name"].as_str().expect("class should have name");
+        assert!(!name.is_empty(), "class name should not be empty");
+        let hit_die = class["hit_die"].as_u64().expect("class should have hit_die");
+        assert!(hit_die > 0, "hit die should be positive");
+        let _reqs = class["requirements"].as_array().expect("class should have requirements array");
+        let _is_demihuman = class["is_demihuman"].as_bool().expect("class should have is_demihuman");
     }
 }
 
@@ -4393,7 +4426,8 @@ fn list_classes_includes_fighter() {
     let data = resp.data.unwrap();
     let classes = data["classes"].as_array().unwrap();
     let fighter = classes.iter().find(|c| c["name"] == "Fighter");
-    assert!(fighter.is_some(), "Fighter should be in class list");
+    let fighter = fighter.expect("Fighter should be in class list");
+    assert_eq!(fighter["name"], "Fighter");
 }
 
 #[test]
@@ -4497,8 +4531,8 @@ fn forage_happy_path() {
     assert!(resp.success);
     assert_eq!(resp.mode, GameMode::Wilderness);
     let data = resp.data.expect("forage should have data");
-    assert!(data.get("success").is_some(), "data should have 'success' field");
-    assert!(data.get("quantity").is_some(), "data should have 'quantity' field");
+    let _success = data["success"].as_bool().expect("forage should report success as bool");
+    let _quantity = data["quantity"].as_u64().expect("forage should have quantity"); // 0 is valid (failed forage)
 }
 
 #[test]
@@ -4535,8 +4569,8 @@ fn hunt_happy_path() {
     assert!(resp.success);
     assert_eq!(resp.mode, GameMode::Wilderness);
     let data = resp.data.expect("hunt should have data");
-    assert!(data.get("success").is_some(), "data should have 'success' field");
-    assert!(data.get("quantity").is_some(), "data should have 'quantity' field");
+    let _success = data["success"].as_bool().expect("hunt should report success as bool");
+    let _quantity = data["quantity"].as_u64().expect("hunt should have quantity");
 }
 
 #[test]
@@ -4578,10 +4612,12 @@ fn roll_encounter_dungeon_happy_path() {
     let data = resp.data.expect("roll_encounter should have data");
     assert_eq!(data["context"], "dungeon");
     assert!(data["level"].as_u64().unwrap() >= 1);
-    assert!(data["table_roll"].as_u64().is_some());
-    assert!(data["monster_name"].as_str().is_some());
+    let _table_roll = data["table_roll"].as_u64().expect("dungeon encounter should have table_roll");
+    let name = data["monster_name"].as_str().expect("dungeon encounter should have monster_name");
+    assert!(!name.is_empty(), "monster name should not be empty");
     assert!(data["number_appearing"].as_i64().unwrap() >= 1);
-    assert!(data["distance"].as_u64().is_some());
+    let distance = data["distance"].as_u64().expect("dungeon encounter should have distance");
+    assert!(distance > 0, "distance should be positive");
 }
 
 #[test]
@@ -4598,11 +4634,14 @@ fn roll_encounter_wilderness_happy_path() {
 
     let data = resp.data.expect("roll_encounter should have data");
     assert_eq!(data["context"], "wilderness");
-    assert!(data["terrain"].as_str().is_some());
-    assert!(data["table_roll"].as_u64().is_some());
-    assert!(data["monster_name"].as_str().is_some());
+    let terrain = data["terrain"].as_str().expect("wilderness encounter should have terrain");
+    assert!(!terrain.is_empty(), "terrain should not be empty");
+    let _table_roll = data["table_roll"].as_u64().expect("wilderness encounter should have table_roll");
+    let name = data["monster_name"].as_str().expect("wilderness encounter should have monster_name");
+    assert!(!name.is_empty(), "monster name should not be empty");
     assert!(data["number_appearing"].as_i64().unwrap() >= 1);
-    assert!(data["distance"].as_u64().is_some());
+    let distance = data["distance"].as_u64().expect("wilderness encounter should have distance");
+    assert!(distance > 0, "distance should be positive");
 }
 
 #[test]
@@ -4644,7 +4683,7 @@ fn evade_happy_path() {
     assert!(resp.message.contains("monsters"));
 
     let data = resp.data.expect("evade should have data");
-    assert!(data.get("escaped").is_some(), "data should have 'escaped' field");
+    let _escaped = data["escaped"].as_bool().expect("evade should report escaped status as bool");
     assert_eq!(data["party_size"], 1);
     assert_eq!(data["monster_count"], 5);
     assert_eq!(data["monster_movement"], 120);
@@ -4718,8 +4757,8 @@ fn spawn_npc_party_rejects_during_combat() {
     assert!(!resp.success);
     assert!(resp.error.as_ref().unwrap().contains("already active"));
     // Original combat state must be preserved
-    assert!(state.combat.is_some());
-    assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
+    let combat = state.combat.as_ref().expect("combat state should be preserved after rejection");
+    assert_eq!(combat.monsters.len(), 3);
 }
 
 // ===========================================================================
@@ -4740,8 +4779,8 @@ fn spawn_monster_rejects_during_combat() {
     assert!(!resp.success);
     assert!(resp.error.as_ref().unwrap().contains("already active"));
     // Original combat state must be preserved
-    assert!(state.combat.is_some());
-    assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
+    let combat = state.combat.as_ref().expect("combat state should be preserved after SpawnMonster rejection");
+    assert_eq!(combat.monsters.len(), 3);
 }
 
 // ===========================================================================
@@ -4753,7 +4792,8 @@ fn leave_wilderness_happy_path() {
     let mut state = GameState::new();
     setup_wilderness(&mut state);
     assert_eq!(state.mode, GameMode::Wilderness);
-    assert!(state.wilderness.is_some());
+    let ws = state.wilderness.as_ref().expect("wilderness state should exist before LeaveWilderness");
+    assert!(!ws.hexes.is_empty(), "should have at least starting hex");
 
     let resp = handle_request(&req("lw1", GMCommand::LeaveWilderness), &mut state);
     assert_response_format(&resp, "lw1");

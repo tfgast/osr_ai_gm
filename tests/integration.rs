@@ -362,7 +362,8 @@ fn encumbrance_query() {
     assert!(resp.success, "encumbrance query failed: {}", resp.message);
     let data = resp.data.unwrap();
     assert!(data["total_weight_cn"].as_u64().unwrap() > 0);
-    assert!(data["movement_rate"].as_u64().is_some());
+    let movement_rate = data["movement_rate"].as_u64().expect("movement_rate should be a u64");
+    assert!(movement_rate > 0, "movement rate should be positive");
 }
 
 // ===========================================================================
@@ -578,8 +579,10 @@ fn complete_ose_session() {
     }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Exploration);
-    assert!(state.dungeon.is_some(), "dungeon state should be initialized");
-    assert!(state.time.is_some(), "time tracker should be initialized");
+    let dungeon = state.dungeon.as_ref().expect("dungeon state should be initialized");
+    assert_eq!(dungeon.level, 1, "dungeon level should be 1");
+    let time = state.time.as_ref().expect("time tracker should be initialized");
+    assert_eq!(time.total_turns, 0, "time should start at 0 turns");
 
     // Light source
     let resp = handle_request(&req("d2", GMCommand::Light {
@@ -624,8 +627,10 @@ fn complete_ose_session() {
     let resp = handle_request(&req("c2", GMCommand::RollSurprise), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["party_roll"].as_u64().is_some(), "surprise should have party roll");
-    assert!(data["monster_roll"].as_u64().is_some(), "surprise should have monster roll");
+    let party_roll = data["party_roll"].as_u64().expect("surprise should have party roll");
+    assert!((1..=6).contains(&party_roll), "party roll should be 1-6, got {}", party_roll);
+    let monster_roll = data["monster_roll"].as_u64().expect("surprise should have monster roll");
+    assert!((1..=6).contains(&monster_roll), "monster roll should be 1-6, got {}", monster_roll);
 
     // Roll initiative
     let resp = handle_request(&req("c3", GMCommand::RollInitiative), &mut state);
@@ -729,8 +734,10 @@ fn complete_ose_session() {
     }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["total_weight_cn"].as_u64().is_some(), "encumbrance should have weight");
-    assert!(data["movement_rate"].as_u64().is_some(), "encumbrance should have movement rate");
+    let weight = data["total_weight_cn"].as_u64().expect("encumbrance should have weight");
+    assert!(weight > 0, "weight should be positive");
+    let movement_rate = data["movement_rate"].as_u64().expect("encumbrance should have movement rate");
+    assert!(movement_rate > 0, "movement rate should be positive");
 
     // === SPELL LOOKUP ===
     let resp = handle_request(&req("s1", GMCommand::LookupSpell {
@@ -802,7 +809,8 @@ fn level_up_from_treasure() {
     let gb = state.party.find_member("Goldbeard").unwrap();
     assert_eq!(gb.level, 2);
     assert!(gb.max_hp > 8); // gained HP
-    assert!(gb.saving_throws.is_some()); // saves updated
+    let saves = gb.saving_throws.as_ref().expect("saving throws should be set after level up");
+    assert!(saves.death > 0, "death save should be positive");
 }
 
 // ===========================================================================
@@ -1149,7 +1157,7 @@ fn wilderness_encounter() {
     let resp = handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["lost"].as_bool().is_some(), "travel should report lost status");
+    let _lost = data["lost"].as_bool().expect("travel should report lost status as bool");
     assert!(state.wilderness.as_ref().unwrap().travel_day > pre_travel_day, "travel day should advance");
 
     // Query wilderness state
@@ -1206,8 +1214,8 @@ fn mode_transition_idle_exploration_combat_exploration() {
     assert_eq!(state.mode, GameMode::Combat);
 
     // Verify dungeon state is preserved during combat
-    assert!(state.dungeon.is_some(), "dungeon state should persist during combat");
-    assert!(state.time.is_some(), "time tracker should persist during combat");
+    assert_eq!(state.dungeon.as_ref().expect("dungeon state should persist during combat").level, 1, "dungeon level should still be 1");
+    assert!(state.time.as_ref().expect("time tracker should persist during combat").total_turns > 0, "turns should be positive");
     assert_eq!(
         state.time.as_ref().unwrap().total_turns, dungeon_turn,
         "dungeon turn count should not change during combat"
@@ -1229,8 +1237,8 @@ fn mode_transition_idle_exploration_combat_exploration() {
     assert_eq!(state.mode, GameMode::Exploration);
 
     // Dungeon state should still be present — exploration can resume
-    assert!(state.dungeon.is_some(), "dungeon state should survive combat");
-    assert!(state.time.is_some(), "time tracker should survive combat");
+    assert_eq!(state.dungeon.as_ref().expect("dungeon state should survive combat").level, 1, "dungeon level should still be 1");
+    assert!(state.time.as_ref().expect("time tracker should survive combat").total_turns > 0, "turns should be positive after combat");
 
     // Verify exploration still works after combat
     let resp = handle_request(&req("8", GMCommand::AdvanceTurn), &mut state);
@@ -1283,11 +1291,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
     assert_eq!(state.mode, GameMode::Combat);
 
     // Wilderness state should persist during combat
-    assert!(state.wilderness.is_some(), "wilderness state should persist during combat");
-    assert_eq!(
-        state.wilderness.as_ref().unwrap().travel_day, travel_day,
-        "travel day should not change during combat"
-    );
+    assert_eq!(state.wilderness.as_ref().expect("wilderness state should persist during combat").travel_day, travel_day, "travel day should be preserved during combat");
 
     // Combat actions
     let resp = handle_request(&req("5", GMCommand::RollInitiative), &mut state);
@@ -1305,11 +1309,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
     assert_eq!(state.mode, GameMode::Wilderness);
 
     // Wilderness state should still be present
-    assert!(state.wilderness.is_some(), "wilderness state should survive combat");
-    assert_eq!(
-        state.wilderness.as_ref().unwrap().travel_day, travel_day,
-        "travel day should be preserved after combat"
-    );
+    assert_eq!(state.wilderness.as_ref().expect("wilderness state should survive combat").travel_day, travel_day, "travel day should be preserved after combat");
 
     // Add another hex and verify wilderness travel still works after combat
     let _resp = handle_request(&req("8", GMCommand::AddHex {
@@ -1718,7 +1718,8 @@ fn session_a_dungeon_crawl() {
     let fighter = state.party.find_member("Aldric the Bold").unwrap();
     assert_eq!(fighter.level, 2);
     assert!(fighter.max_hp > 8);
-    assert!(fighter.saving_throws.is_some());
+    let saves = fighter.saving_throws.as_ref().expect("fighter should have saving throws after level up");
+    assert!(saves.death > 0, "death save should be positive");
 
     // === STEP 7: Save state ===
     let save_name = unique_save_name("session_a");
@@ -1752,10 +1753,10 @@ fn session_a_dungeon_crawl() {
     assert_eq!(loaded_state.notes.len(), saved_notes_count);
 
     // Verify all 4 members survived the roundtrip
-    assert!(loaded_state.party.find_member("Aldric the Bold").is_some());
-    assert!(loaded_state.party.find_member("Vex").is_some());
-    assert!(loaded_state.party.find_member("Sister Mira").is_some());
-    assert!(loaded_state.party.find_member("Zanthus").is_some());
+    assert_eq!(loaded_state.party.find_member("Aldric the Bold").expect("Aldric should survive roundtrip").name, "Aldric the Bold");
+    assert_eq!(loaded_state.party.find_member("Vex").expect("Vex should survive roundtrip").name, "Vex");
+    assert_eq!(loaded_state.party.find_member("Sister Mira").expect("Sister Mira should survive roundtrip").name, "Sister Mira");
+    assert_eq!(loaded_state.party.find_member("Zanthus").expect("Zanthus should survive roundtrip").name, "Zanthus");
 
     // Clean up
     let _ = std::fs::remove_file(resolve_save(&save_name));
@@ -1807,8 +1808,8 @@ fn session_b_wilderness_travel() {
     assert!(resp.success);
     let data = resp.data.unwrap();
     // Travel response should include encounter/lost info
-    assert!(data.get("lost").is_some());
-    assert!(data.get("has_encounter").is_some());
+    let _lost = data["lost"].as_bool().expect("travel response should include lost status as bool");
+    let _has_encounter = data["has_encounter"].as_bool().expect("travel response should include has_encounter as bool");
 
     // Party may or may not arrive at destination (could get lost in forest, 2-in-6)
     let ws = state.wilderness.as_ref().unwrap();
@@ -1842,7 +1843,7 @@ fn session_b_wilderness_travel() {
         assert!(resp.success);
         let data = resp.data.unwrap();
         // Swamp has higher lost chance (2-in-6)
-        assert!(data.get("lost").is_some());
+        let _lost = data["lost"].as_bool().expect("swamp travel should report lost status as bool");
     }
 
     // === Query wilderness state ===
@@ -2162,12 +2163,12 @@ fn save_load_complex_state() {
     assert_eq!(time.lights.len(), pre_light_count, "light count mismatch");
     // Torch should have 3 turns remaining (started at 6, advanced 3)
     let torch = time.lights.iter().find(|l| l.carrier == "Grom");
-    assert!(torch.is_some(), "Grom's torch should persist");
-    assert_eq!(torch.unwrap().remaining_turns, 3, "torch remaining turns mismatch");
+    let torch = torch.expect("Grom's torch should persist");
+    assert_eq!(torch.remaining_turns, 3, "torch remaining turns mismatch");
     // Lantern should have 21 turns remaining (started at 24, advanced 3)
     let lantern = time.lights.iter().find(|l| l.carrier == "Father Odo");
-    assert!(lantern.is_some(), "Father Odo's lantern should persist");
-    assert_eq!(lantern.unwrap().remaining_turns, 21, "lantern remaining turns mismatch");
+    let lantern = lantern.expect("Father Odo's lantern should persist");
+    assert_eq!(lantern.remaining_turns, 21, "lantern remaining turns mismatch");
 
     // Dungeon state
     let dungeon = loaded.dungeon.as_ref().expect("dungeon should exist after load");
@@ -2374,7 +2375,8 @@ fn character_progression_multi_level() {
     assert_eq!(amara.level, 2);
     assert!(amara.max_hp > cleric_base_hp, "cleric HP should increase");
     // Cleric saving throws should be set
-    assert!(amara.saving_throws.is_some(), "cleric should have saving throws after level up");
+    let saves = amara.saving_throws.as_ref().expect("cleric should have saving throws after level up");
+    assert!(saves.death > 0, "cleric death save should be positive");
 
     // Fighter needs 2000 for L2 (STR 16 = +10%)
     let resp = handle_request(&req("p23", GMCommand::AwardTreasureXp {
@@ -2392,7 +2394,8 @@ fn character_progression_multi_level() {
     let bjorn = state.party.find_member("Bjorn").unwrap();
     assert_eq!(bjorn.level, 2);
     assert!(bjorn.max_hp > fighter_base_hp, "fighter HP should increase");
-    assert!(bjorn.saving_throws.is_some(), "fighter should have saving throws");
+    let saves = bjorn.saving_throws.as_ref().expect("fighter should have saving throws");
+    assert!(saves.death > 0, "fighter death save should be positive");
     // Fighter THAC0 stays 19 at L2 (changes at L4 for martial)
     assert_eq!(bjorn.thac0, 19, "fighter THAC0 should still be 19 at L2");
 
@@ -2958,8 +2961,8 @@ fn playtest2c_travel_all_terrain_types() {
     let resp = handle_request(&req("3a", GMCommand::Travel { x: 1, y: 0 }), &mut state);
     assert!(resp.success, "travel to clear failed: {}", resp.message);
     let data = resp.data.unwrap();
-    assert!(data.get("lost").is_some(), "response should include lost status");
-    assert!(data.get("has_encounter").is_some(), "response should include encounter info");
+    let _lost = data["lost"].as_bool().expect("response should include lost status as bool");
+    let _has_encounter = data["has_encounter"].as_bool().expect("response should include encounter info as bool");
 
     // Travel back to origin
     let resp = handle_request(&req("3b", GMCommand::Travel { x: 0, y: 0 }), &mut state);
@@ -3126,9 +3129,11 @@ fn playtest2c_roll_encounter_wilderness() {
         assert!(resp.success, "RollEncounter #{} failed: {}", i, resp.message);
         let data = resp.data.unwrap();
         assert_eq!(data["context"], "wilderness");
-        assert!(data["monster_name"].as_str().is_some());
+        let name = data["monster_name"].as_str().expect("encounter should have monster_name");
+        assert!(!name.is_empty(), "monster name should not be empty");
         assert!(data["number_appearing"].as_u64().unwrap() > 0);
-        assert!(data["distance"].as_u64().is_some(), "should have distance in yards");
+        let distance = data["distance"].as_u64().expect("should have distance in yards");
+        assert!(distance > 0, "distance should be positive");
     }
 }
 
@@ -3163,8 +3168,10 @@ fn playtest2c_surprise_in_wilderness() {
     let resp = handle_request(&req("2", GMCommand::RollSurprise), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    assert!(data["party_roll"].as_u64().is_some());
-    assert!(data["monster_roll"].as_u64().is_some());
+    let party_roll = data["party_roll"].as_u64().expect("surprise should have party roll");
+    assert!((1..=6).contains(&party_roll), "party roll should be 1-6");
+    let monster_roll = data["monster_roll"].as_u64().expect("surprise should have monster roll");
+    assert!((1..=6).contains(&monster_roll), "monster roll should be 1-6");
 }
 
 /// RollReaction with high-CHA character (no combat needed).
@@ -3212,7 +3219,7 @@ fn playtest2c_evade_mechanics() {
     }), &mut state);
     assert!(resp.success, "evade should succeed: {}", resp.message);
     let data = resp.data.unwrap();
-    assert!(data.get("escaped").is_some(), "evasion result should include escaped status");
+    let _escaped = data["escaped"].as_bool().expect("evasion result should include escaped status as bool");
 
     // Test evasion with many fast monsters (lower chance)
     let resp = handle_request(&req("e2", GMCommand::Evade {
@@ -3434,8 +3441,7 @@ fn playtest2c_hex_map_persistence() {
     assert!(resp.success, "load failed: {}", resp.message);
 
     // Verify wilderness state persisted
-    assert!(state2.wilderness.is_some(), "wilderness should persist after load");
-    let ws = state2.wilderness.as_ref().unwrap();
+    let ws = state2.wilderness.as_ref().expect("wilderness should persist after load");
     assert_eq!(ws.hexes.len(), pre_save_hexes, "hex count should match after load");
     assert_eq!(ws.travel_day, pre_save_day, "travel day should match after load");
     assert_eq!(state2.party.rations, pre_save_rations, "rations should match after load");
