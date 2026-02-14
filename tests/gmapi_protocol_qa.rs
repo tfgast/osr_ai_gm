@@ -939,7 +939,7 @@ fn check_morale_no_living_monsters() {
 fn turn_undead_cleric_happy_path() {
     let mut state = GameState::new();
     state.party.add_member(make_cleric("Brother Marcus"));
-    // Create combat with skeleton
+    // Create combat with skeleton (undead)
     let mut m = Monster::new("Skeleton", "1".parse().unwrap());
     m.hp = 4;
     m.max_hp = 4;
@@ -947,6 +947,7 @@ fn turn_undead_cleric_happy_path() {
     m.damage = "1d6".to_string();
     m.morale = 12;
     m.attacks = vec!["attack".to_string()];
+    m.undead = true;
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
@@ -990,7 +991,8 @@ fn turn_undead_no_combat() {
 fn turn_undead_idx_out_of_range() {
     let mut state = GameState::new();
     state.party.add_member(make_cleric("Brother Marcus"));
-    let m = Monster::new("Skeleton", "1".parse().unwrap());
+    let mut m = Monster::new("Skeleton", "1".parse().unwrap());
+    m.undead = true;
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
@@ -1008,6 +1010,7 @@ fn turn_undead_dead_monster() {
     state.party.add_member(make_cleric("Brother Marcus"));
     let mut m = Monster::new("Skeleton", "1".parse().unwrap());
     m.hp = 0;
+    m.undead = true;
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
@@ -1022,7 +1025,8 @@ fn turn_undead_dead_monster() {
 #[test]
 fn turn_undead_unknown_character() {
     let mut state = GameState::new();
-    let m = Monster::new("Skeleton", "1".parse().unwrap());
+    let mut m = Monster::new("Skeleton", "1".parse().unwrap());
+    m.undead = true;
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
@@ -1032,6 +1036,21 @@ fn turn_undead_unknown_character() {
     }), &mut state);
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("no party member"));
+}
+
+#[test]
+fn turn_undead_non_undead_monster() {
+    let mut state = GameState::new();
+    state.party.add_member(make_cleric("Brother Marcus"));
+    setup_combat(&mut state); // Goblins (not undead)
+
+    let resp = handle_request(&req("tu7", GMCommand::TurnUndead {
+        character: "Brother Marcus".to_string(),
+        monster_idx: 0,
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not undead"),
+        "should reject turn undead on non-undead monster");
 }
 
 // ===========================================================================
