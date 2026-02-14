@@ -5,22 +5,7 @@ use crate::state::dungeon::DoorState;
 use crate::state::time::LightSourceKind;
 use crate::state::wilderness::Terrain;
 use serde::Serialize;
-
-fn ok_with_typed_data<T: Serialize>(
-    id: &str,
-    state: &GameState,
-    message: String,
-    payload: T,
-) -> GMResponse {
-    match serde_json::to_value(payload) {
-        Ok(data) => GMResponse::ok_with_data(id, message, state.mode.clone(), data),
-        Err(err) => GMResponse::err(
-            id,
-            format!("internal error: failed to serialize response: {err}"),
-            state.mode.clone(),
-        ),
-    }
-}
+use super::ok_with_typed_data;
 
 fn fail_with_typed_data<T: Serialize>(
     id: &str,

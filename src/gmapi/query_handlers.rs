@@ -4,23 +4,8 @@ use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
 use crate::rules::encumbrance;
+use super::ok_with_typed_data;
 use serde::Serialize;
-
-fn ok_with_typed_data<T: Serialize>(
-    id: &str,
-    state: &GameState,
-    message: String,
-    payload: T,
-) -> GMResponse {
-    match serde_json::to_value(payload) {
-        Ok(data) => GMResponse::ok_with_data(id, message, state.mode.clone(), data),
-        Err(err) => GMResponse::err(
-            id,
-            format!("internal error: failed to serialize response: {err}"),
-            state.mode.clone(),
-        ),
-    }
-}
 
 pub(super) fn query_state(id: &str, state: &GameState) -> GMResponse {
     let data = serde_json::json!({
