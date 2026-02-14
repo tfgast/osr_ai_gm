@@ -87,9 +87,12 @@ impl GameState {
     ///
     /// Returns the `CombatState` so callers can extract results.
     /// Falls back to `Idle` if `pre_combat_mode` was not set.
+    /// No-op when no combat is active — the current mode is preserved.
     pub fn exit_combat(&mut self) -> Option<CombatState> {
         let combat = self.combat.take();
-        self.mode = self.pre_combat_mode.take().unwrap_or(GameMode::Idle);
+        if combat.is_some() {
+            self.mode = self.pre_combat_mode.take().unwrap_or(GameMode::Idle);
+        }
         combat
     }
 
@@ -489,6 +492,23 @@ mod tests {
         // pre_combat_mode not set
         let _ = state.exit_combat();
         assert_eq!(state.mode, GameMode::Idle);
+    }
+
+    /// Regression: exit_combat with no active combat must not change the mode.
+    /// Bug oag-uee9i: calling exit_combat when already in Exploration (no combat)
+    /// would reset the mode to Idle via unwrap_or(GameMode::Idle).
+    #[test]
+    fn exit_combat_no_combat_preserves_mode() {
+        let mut state = GameState::new();
+        let dungeon = DungeonState::new(1);
+        state.enter_exploration(dungeon, 1);
+        assert_eq!(state.mode, GameMode::Exploration);
+
+        // exit_combat with no active combat should be a no-op on mode
+        let combat = state.exit_combat();
+        assert!(combat.is_none());
+        assert_eq!(state.mode, GameMode::Exploration,
+            "exit_combat with no combat must not change mode");
     }
 
     #[test]

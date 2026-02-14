@@ -645,6 +645,58 @@ mod tests {
         assert!(!resp.success);
     }
 
+    /// Regression: EndCombat when no combat active must not change the game mode.
+    /// Bug oag-uee9i: calling EndCombat in Exploration mode (no combat) changed
+    /// the mode from Exploration to Idle.
+    #[test]
+    fn end_combat_no_combat_preserves_mode() {
+        use crate::state::dungeon::DungeonState;
+
+        let mut state = GameState::new();
+
+        // Set up exploration mode
+        let dungeon = DungeonState::new(1);
+        state.enter_exploration(dungeon, 1);
+        assert_eq!(state.mode, GameMode::Exploration);
+
+        // Add a character so we can enter combat
+        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        c.hp = 10;
+        c.max_hp = 10;
+        state.party.add_member(c);
+
+        // Enter and end a valid combat
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
+            name: "goblin".to_string(),
+            count: 1,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 10,
+            xp_value: None,
+        })), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.mode, GameMode::Combat);
+
+        let resp = handle_request(&make_req("2", GMCommand::EndCombat), &mut state);
+        assert!(resp.success);
+        assert_eq!(state.mode, GameMode::Exploration, "after first EndCombat mode should be Exploration");
+
+        // Now call EndCombat again with no active combat
+        let resp = handle_request(&make_req("3", GMCommand::EndCombat), &mut state);
+        assert!(!resp.success, "EndCombat with no combat should fail");
+        assert_eq!(
+            state.mode, GameMode::Exploration,
+            "failed EndCombat must not change mode from Exploration to Idle"
+        );
+        assert_eq!(
+            resp.mode, GameMode::Exploration,
+            "response mode must reflect actual state mode"
+        );
+    }
+
     #[test]
     fn retreat_auto_resolves_free_attacks() {
         let mut state = GameState::new();
