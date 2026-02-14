@@ -206,6 +206,26 @@ impl Command for OpenCommand {
     }
 }
 
+pub struct PickLockCommand;
+impl Command for PickLockCommand {
+    fn name(&self) -> &str { "pick_lock" }
+    fn help(&self) -> &str { "Thief picks a locked door (pick_lock <door_id> <character_name>)" }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: pick_lock <door_id> <character_name>");
+        }
+        let door_id: u32 = match args[0].parse() {
+            Ok(n) => n,
+            _ => return CommandResult::error("door_id must be a number"),
+        };
+        let char_name = args[1..].join(" ");
+        match exploration::action_pick_lock(state, door_id, &char_name) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 pub struct RestCommand;
 impl Command for RestCommand {
     fn name(&self) -> &str { "rest" }
@@ -299,5 +319,34 @@ mod tests {
         let result = cmd.execute(&["0"], &mut state);
         // Should attempt to force — output mentions Aldric (the forcer)
         assert!(result.output.contains("Aldric"));
+    }
+
+    #[test]
+    fn pick_lock_no_args() {
+        let cmd = PickLockCommand;
+        let mut state = dungeon_state_with_doors();
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.output.contains("Error:"));
+        assert!(result.output.contains("usage"));
+    }
+
+    #[test]
+    fn pick_lock_non_thief_rejected() {
+        let cmd = PickLockCommand;
+        let mut state = dungeon_state_with_doors();
+        let result = cmd.execute(&["1", "Aldric"], &mut state);
+        assert!(result.output.contains("does not have lockpicking"));
+    }
+
+    #[test]
+    fn pick_lock_thief_attempts() {
+        let cmd = PickLockCommand;
+        let mut state = dungeon_state_with_doors();
+        let mut thief = Character::new("Shade", Class::Thief);
+        thief.abilities.dexterity = 16;
+        state.party.add_member(thief);
+        let result = cmd.execute(&["1", "Shade"], &mut state);
+        // Either succeeds or fails, but should not error on input
+        assert!(!result.output.contains("usage"));
     }
 }
