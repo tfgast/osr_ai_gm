@@ -3,6 +3,7 @@ pub mod command;
 pub mod dice;
 pub mod engine;
 pub mod gmapi;
+pub mod log_entry;
 pub mod model;
 pub mod pathutil;
 pub mod persist;

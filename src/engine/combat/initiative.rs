@@ -32,7 +32,7 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
     };
     let msg = format!("Round {} — Initiative: Party {} vs Monsters {} — {}",
         combat.round, party, monsters, winner);
-    combat.log.push(msg);
+    combat.log_event(msg);
     combat.log_len_at_initiative = combat.log.len();
     (party, monsters)
 }
@@ -42,7 +42,7 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
 pub fn declare_spell(combat: &mut CombatState, character_name: &str, spell_name: &str) {
     combat.spell_declarations.push(character_name.to_string());
     combat.pending_spells.push((character_name.to_string(), spell_name.to_string()));
-    combat.log.push(format!("{} declares: casting {}", character_name, spell_name));
+    combat.log_event(format!("{} declares: casting {}", character_name, spell_name));
 }
 
 /// Check if a character's spell was disrupted this round.
@@ -58,6 +58,6 @@ pub(super) fn disrupt_caster(combat: &mut CombatState, character_name: &str) {
         .any(|n| n.eq_ignore_ascii_case(character_name));
     if is_casting && !already_disrupted {
         combat.disrupted.push(character_name.to_string());
-        combat.log.push(format!("{}'s spell is DISRUPTED!", character_name));
+        combat.log_event(format!("{}'s spell is DISRUPTED!", character_name));
     }
 }

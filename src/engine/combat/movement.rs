@@ -44,7 +44,7 @@ pub fn close(combat: &mut CombatState, character: &Character, feet: Option<u32>)
 
     let msg = format!("{} closes {}' (distance now {}')",
         character.name, actual, combat.distance);
-    combat.log.push(msg.clone());
+    combat.log_event(msg.clone());
     Ok(msg)
 }
 
@@ -57,7 +57,7 @@ pub fn fighting_withdrawal(combat: &mut CombatState, character: &Character) -> S
     combat.distance = combat.distance.saturating_add(half_move);
     let msg = format!("{} performs a fighting withdrawal ({}' backward, distance now {}')",
         character.name, half_move, combat.distance);
-    combat.log.push(msg.clone());
+    combat.log_event(msg.clone());
     msg
 }
 
@@ -106,7 +106,7 @@ pub fn retreat_with<R: Rng>(
     let retreat_msg = format!(
         "{} retreats at full speed ({}', distance now {}').",
         character.name, encounter_move, combat.distance);
-    combat.log.push(retreat_msg);
+    combat.log_event(retreat_msg);
 
     // All living monsters in melee range get a free attack at +2
     let mut free_attacks = Vec::new();

@@ -137,6 +137,6 @@ pub fn resolve_turn_undead_with<R: Rng>(
         hd_affected,
         destroyed,
     };
-    combat.log.push(result.to_string());
+    combat.log_event(result.to_string());
     result
 }

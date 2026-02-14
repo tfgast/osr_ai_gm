@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
+use crate::log_entry::LogEntry;
 use crate::rules::alignment::Alignment;
 use crate::rules::attack::HitDice;
 use crate::rules::class::Class;
@@ -257,7 +258,10 @@ pub struct CombatState {
     pub party_initiative: i32,
     pub monster_initiative: i32,
     pub distance: u32,
-    pub log: Vec<String>,
+    pub log: Vec<LogEntry>,
+    /// Monotonic sequence counter for log entry ordering.
+    #[serde(default)]
+    pub log_seq: u64,
     /// Characters who declared spells this round (for disruption tracking).
     #[serde(default)]
     pub spell_declarations: Vec<String>,
@@ -300,6 +304,7 @@ impl CombatState {
             monster_initiative: 0,
             distance,
             log: Vec::new(),
+            log_seq: 0,
             spell_declarations: Vec::new(),
             pending_spells: Vec::new(),
             disrupted: Vec::new(),
@@ -311,6 +316,12 @@ impl CombatState {
             monsters_attacked_this_round: HashSet::new(),
             characters_acted: Vec::new(),
         }
+    }
+
+    /// Append a message to the combat log with a monotonic sequence number.
+    pub fn log_event(&mut self, message: String) {
+        self.log_seq += 1;
+        self.log.push(LogEntry::new(self.log_seq, message));
     }
 
     fn default_phase() -> CombatPhase {

@@ -3,6 +3,8 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+use crate::log_entry::LogEntry;
+
 /// Terrain types for wilderness hexes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Terrain {
@@ -163,7 +165,10 @@ pub struct WildernessState {
     /// Whether the party is currently lost.
     pub lost: bool,
     /// Log of travel events.
-    pub log: Vec<String>,
+    pub log: Vec<LogEntry>,
+    /// Monotonic sequence counter for log entry ordering.
+    #[serde(default)]
+    pub log_seq: u64,
 }
 
 impl WildernessState {
@@ -179,6 +184,7 @@ impl WildernessState {
             travel_day: 1,
             lost: false,
             log: Vec::new(),
+            log_seq: 0,
         }
     }
 
@@ -198,7 +204,8 @@ impl WildernessState {
             let drain = self.log.len() - Self::MAX_LOG_ENTRIES / 2;
             self.log.drain(..drain);
         }
-        self.log.push(msg);
+        self.log_seq += 1;
+        self.log.push(LogEntry::new(self.log_seq, msg));
     }
 
     /// Find a hex by coordinates.

@@ -244,7 +244,7 @@ pub fn action_add_monster(
     let total_monsters = combat.monsters.len();
     let status = combat_status(combat, &state.party.members);
 
-    combat.log.push(format!(
+    combat.log_event(format!(
         "{} {}(s) added to combat (indices {}-{}).",
         params.count,
         params.name,
@@ -551,7 +551,7 @@ pub fn action_query_combat_log(state: &GameState) -> Result<CombatLogResult, Eng
     }
     Ok(CombatLogResult {
         message,
-        log: combat.log.clone(),
+        log: combat.log.iter().map(|e| e.message.clone()).collect(),
     })
 }
 
@@ -659,7 +659,7 @@ pub fn action_cast_spell(
     combat.characters_acted.push(char_name.to_string());
 
     let result = if was_disrupted {
-        combat.log.push(format!(
+        combat.log_event(format!(
             "{}'s {} fizzles — spell was disrupted!",
             char_name, spell_name
         ));
@@ -674,7 +674,7 @@ pub fn action_cast_spell(
             disrupted: true,
         }
     } else {
-        combat.log.push(format!(
+        combat.log_event(format!(
             "{} casts {}!",
             char_name, spell_name
         ));
@@ -902,7 +902,7 @@ pub fn action_backstab(
         combat.monsters[monster_idx].hp -= total_damage;
         let monster_name = combat.monsters[monster_idx].name.clone();
         let alive = combat.monsters[monster_idx].is_alive();
-        combat.log.push(format!(
+        combat.log_event(format!(
             "{} backstabs {} for {} damage (x{}){}",
             character.name,
             monster_name,
@@ -926,7 +926,7 @@ pub fn action_backstab(
             monster_alive: Some(alive),
         })
     } else {
-        combat.log.push(format!(
+        combat.log_event(format!(
             "{} backstab attempt on {} missed",
             character.name, combat.monsters[monster_idx].name
         ));
