@@ -182,7 +182,7 @@ fn mk_monster(name: &str, hd: &str, hp: i32, ac: i32, morale: u32, xp_value: u64
 fn state_with_combat() -> GameState {
     let mut state = base_state();
     state.mode = GameMode::Combat;
-    state.pre_combat_mode = Some(GameMode::Exploration);
+    state.pre_combat_mode = Some(GameMode::Idle);
     state.combat = Some(CombatState::new(
         vec![
             mk_monster("Goblin 1", "1", 4, 6, 7, 5),
@@ -204,7 +204,7 @@ fn state_with_helpless_target() -> GameState {
 fn state_with_morale_selector_divergence() -> GameState {
     let mut state = base_state();
     state.mode = GameMode::Combat;
-    state.pre_combat_mode = Some(GameMode::Exploration);
+    state.pre_combat_mode = Some(GameMode::Idle);
     state.combat = Some(CombatState::new(
         vec![
             mk_monster("Goblin Scout", "1", 4, 6, 6, 5),

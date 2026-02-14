@@ -3805,7 +3805,6 @@ fn loot_no_value() {
 #[test]
 fn loot_from_dungeon_room() {
     use osr_ai_gm::state::dungeon::{DungeonState, Room, PlacedTreasureInstance};
-    use osr_ai_gm::state::time::TimeTracker;
 
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
@@ -3818,9 +3817,7 @@ fn loot_from_dungeon_room() {
     dungeon.add_room(room).unwrap();
     dungeon.current_room = Some(0);
     dungeon.explored.insert(0);
-    state.dungeon = Some(dungeon);
-    state.time = Some(TimeTracker::new());
-    state.mode = GameMode::Exploration;
+    state.enter_exploration(dungeon, 1);
 
     let resp = handle_request(&req("lo3", GMCommand::Loot {
         character: "Aldric".to_string(),
@@ -3840,7 +3837,6 @@ fn loot_from_dungeon_room() {
 #[test]
 fn loot_item_not_in_room() {
     use osr_ai_gm::state::dungeon::{DungeonState, Room, PlacedTreasureInstance};
-    use osr_ai_gm::state::time::TimeTracker;
 
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
@@ -3852,9 +3848,7 @@ fn loot_item_not_in_room() {
         ]);
     dungeon.add_room(room).unwrap();
     dungeon.current_room = Some(0);
-    state.dungeon = Some(dungeon);
-    state.time = Some(TimeTracker::new());
-    state.mode = GameMode::Exploration;
+    state.enter_exploration(dungeon, 1);
 
     let resp = handle_request(&req("lo4", GMCommand::Loot {
         character: "Aldric".to_string(),

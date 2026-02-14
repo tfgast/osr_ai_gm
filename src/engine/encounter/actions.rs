@@ -249,9 +249,7 @@ pub fn action_spawn_npc_party(
     let member_count = monsters.len();
     let combat_state = CombatState::new(monsters, distance);
     let status = combat::combat_status(&combat_state, &state.party.members);
-    state.combat = Some(combat_state);
-    state.pre_combat_mode = Some(state.mode.clone());
-    state.mode = GameMode::Combat;
+    state.enter_combat(combat_state);
 
     let mut message = format!(
         "combat started: {} NPC adventurers ({}) at {}' distance.",

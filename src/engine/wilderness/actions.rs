@@ -5,7 +5,6 @@ use crate::engine::wilderness::results::{
 };
 use crate::engine::wilderness_engine;
 use crate::persist::GameState;
-use crate::state::game::GameMode;
 use crate::state::wilderness::{HexCell, Terrain, WildernessState};
 
 fn not_in_wilderness() -> EngineError {
@@ -31,8 +30,7 @@ pub fn action_enter_wilderness(
     wilderness
         .add_hex(HexCell::new(0, 0, terrain))
         .map_err(EngineError::Internal)?;
-    state.wilderness = Some(wilderness);
-    state.mode = GameMode::Wilderness;
+    state.enter_wilderness(wilderness);
 
     Ok(EnterWildernessResult {
         message: format!(

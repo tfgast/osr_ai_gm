@@ -1,8 +1,7 @@
 use crate::engine::result::EngineError;
 use crate::persist::GameState;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
-use crate::state::game::GameMode;
-use crate::state::time::{LightSourceKind, TimeTracker};
+use crate::state::time::LightSourceKind;
 
 use super::results::{
     AddDoorResult, AddRoomResult, AdvanceDungeonTurnResult, EnterDungeonResult, ForceDoorResult,
@@ -126,10 +125,7 @@ pub fn action_enter_dungeon(
         .map_err(EngineError::Internal)?;
     dungeon.explore_current();
 
-    state.dungeon = Some(dungeon);
-    state.time = Some(TimeTracker::new());
-    state.dungeon_level = level;
-    state.mode = GameMode::Exploration;
+    state.enter_exploration(dungeon, level);
 
     Ok(EnterDungeonResult {
         message: format!(
