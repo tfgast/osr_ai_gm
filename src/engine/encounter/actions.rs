@@ -107,7 +107,7 @@ pub fn action_roll_encounter(state: &mut GameState) -> Result<RollEncounterResul
                 ),
                 context: "wilderness".to_string(),
                 level: None,
-                terrain: Some(terrain.name().to_string()),
+                terrain: Some(terrain),
                 table_roll,
                 monster_name: entry.name,
                 number_notation: entry.number,
@@ -233,9 +233,9 @@ pub fn action_spawn_npc_party(
         .members
         .iter()
         .map(|member| SpawnNpcPartyMemberInfo {
-            class: member.class.clone(),
+            class: member.class,
             level: member.level,
-            alignment: member.alignment.to_string(),
+            alignment: member.alignment,
             role: member.role.clone(),
         })
         .collect();

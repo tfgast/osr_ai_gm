@@ -211,7 +211,7 @@ fn state_at_retainer_cap() -> GameState {
     for idx in 1..=5 {
         state
             .retainers
-            .push(Retainer::new(&format!("R{idx}"), "Fighter", 1, 4, 7, 25));
+            .push(Retainer::new(&format!("R{idx}"), Class::Fighter, 1, 4, 7, 25));
     }
     state
 }
@@ -220,7 +220,7 @@ fn state_with_one_retainer() -> GameState {
     let mut state = base_state(12);
     state
         .retainers
-        .push(Retainer::new("Hob", "Fighter", 1, 6, 7, 25));
+        .push(Retainer::new("Hob", Class::Fighter, 1, 6, 7, 25));
     state
 }
 

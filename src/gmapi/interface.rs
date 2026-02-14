@@ -379,7 +379,7 @@ fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &str) -> GMR
 #[derive(Serialize)]
 struct QueryPartyMemberData {
     name: String,
-    class: String,
+    class: Class,
     level: u32,
     hp: i32,
     max_hp: i32,
@@ -387,7 +387,7 @@ struct QueryPartyMemberData {
     thac0: u32,
     xp: u64,
     alive: bool,
-    alignment: String,
+    alignment: Alignment,
     movement_rate: u32,
 }
 
@@ -420,7 +420,7 @@ struct EligibleAbilitiesData {
 #[derive(Serialize)]
 struct EligibleClassesData {
     abilities: EligibleAbilitiesData,
-    eligible: Vec<String>,
+    eligible: Vec<Class>,
     count: usize,
 }
 
@@ -432,7 +432,7 @@ struct CreateCharacterData {
 fn query_party_member_data(member: &party::results::PartyMemberSummary) -> QueryPartyMemberData {
     QueryPartyMemberData {
         name: member.name.clone(),
-        class: member.class.clone(),
+        class: member.class,
         level: member.level,
         hp: member.hp,
         max_hp: member.max_hp,
@@ -440,7 +440,7 @@ fn query_party_member_data(member: &party::results::PartyMemberSummary) -> Query
         thac0: member.thac0,
         xp: member.xp,
         alive: member.alive,
-        alignment: member.alignment.clone(),
+        alignment: member.alignment,
         movement_rate: member.movement_rate,
     }
 }

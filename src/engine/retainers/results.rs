@@ -1,5 +1,7 @@
 use serde::Serialize;
 
+use crate::rules::class::Class;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HireRetainerMode {
     RecruitToParty,
@@ -11,7 +13,7 @@ pub struct HireRetainerResult {
     pub message: String,
     pub employer: String,
     pub retainer: String,
-    pub class: String,
+    pub class: Class,
     pub level: u32,
     pub reaction: String,
     pub hired: bool,
@@ -26,7 +28,7 @@ pub struct HireRetainerResult {
 #[derive(Debug, Clone, Serialize)]
 pub struct RetainerSummary {
     pub name: String,
-    pub class: String,
+    pub class: Class,
     pub level: u32,
     pub hp: i32,
     pub max_hp: i32,
@@ -43,7 +45,7 @@ pub struct ListRetainersResult {
 #[derive(Debug, Clone, Serialize)]
 pub struct DismissRetainerResult {
     pub name: String,
-    pub class: String,
+    pub class: Class,
 }
 
 #[derive(Debug, Clone, Serialize)]

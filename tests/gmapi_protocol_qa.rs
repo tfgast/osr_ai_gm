@@ -2363,8 +2363,8 @@ fn list_retainers_empty() {
 #[test]
 fn list_retainers_with_entries() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
-    state.retainers.push(Retainer::new("Mira", "Cleric", 2, 8, 9, 50));
+    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Mira", Class::Cleric, 2, 8, 9, 50));
     let resp = handle_request(&req("lr2", GMCommand::ListRetainers), &mut state);
     assert_response_format(&resp, "lr2");
     assert!(resp.success);
@@ -2382,7 +2382,7 @@ fn list_retainers_with_entries() {
 #[test]
 fn list_retainers_dead_retainer() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 0, 7, 25));
+    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 0, 7, 25));
     let resp = handle_request(&req("lr3", GMCommand::ListRetainers), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
@@ -2398,7 +2398,7 @@ fn list_retainers_dead_retainer() {
 #[test]
 fn dismiss_retainer_happy_path() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 6, 7, 25));
     let resp = handle_request(&req("dr1", GMCommand::DismissRetainer {
         name: "Gurd".to_string(),
     }), &mut state);
@@ -2414,7 +2414,7 @@ fn dismiss_retainer_happy_path() {
 #[test]
 fn dismiss_retainer_case_insensitive() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 6, 7, 25));
     let resp = handle_request(&req("dr2", GMCommand::DismissRetainer {
         name: "gurd".to_string(),
     }), &mut state);
@@ -2425,7 +2425,7 @@ fn dismiss_retainer_case_insensitive() {
 #[test]
 fn dismiss_retainer_not_found() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 6, 7, 25));
     let resp = handle_request(&req("dr3", GMCommand::DismissRetainer {
         name: "Nobody".to_string(),
     }), &mut state);

@@ -42,14 +42,11 @@ pub fn action_create_character(
     }
 
     if !class::meets_requirements(class, &abilities) {
-        let eligible_classes = class::eligible_classes(&abilities)
-            .iter()
-            .map(|c| c.name().to_string())
-            .collect();
+        let eligible_classes = class::eligible_classes(&abilities);
         return Ok(CreateCharacterResult {
             name: name.to_string(),
-            class: class.name().to_string(),
-            alignment: alignment.name().to_string(),
+            class,
+            alignment,
             used_provided_abilities: provided_abilities.is_some(),
             base_abilities,
             abilities,
@@ -66,8 +63,8 @@ pub fn action_create_character(
 
     Ok(CreateCharacterResult {
         name: name.to_string(),
-        class: class.name().to_string(),
-        alignment: alignment.name().to_string(),
+        class,
+        alignment,
         used_provided_abilities: provided_abilities.is_some(),
         base_abilities,
         abilities,
@@ -97,7 +94,7 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
 
             PartyMemberSummary {
                 name: character.name.clone(),
-                class: character.class.name().to_string(),
+                class: character.class,
                 level: character.level,
                 hp: character.hp,
                 max_hp: character.max_hp,
@@ -105,7 +102,7 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
                 thac0: character.thac0,
                 xp: character.xp,
                 alive: character.is_alive(),
-                alignment: character.alignment.name().to_string(),
+                alignment: character.alignment,
                 movement_rate: character.movement_rate,
                 next_level_xp,
                 ready_to_train: character.is_alive()
@@ -155,10 +152,7 @@ pub fn action_eligible_classes(abilities: [i32; 6]) -> Result<EligibleClassesRes
         }
     }
 
-    let eligible = class::eligible_classes(&abilities)
-        .iter()
-        .map(|c| c.name().to_string())
-        .collect();
+    let eligible = class::eligible_classes(&abilities);
 
     Ok(EligibleClassesResult {
         abilities,
