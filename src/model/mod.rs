@@ -56,6 +56,9 @@ pub struct Character {
     pub thac0: u32,
     #[serde(default)]
     pub movement_rate: u32,
+    /// Spell slots used since last rest (index 0 = 1st level, etc.). Resets on rest.
+    #[serde(default)]
+    pub spell_slots_used: [u32; 6],
 }
 
 impl Character {
@@ -76,6 +79,7 @@ impl Character {
             saving_throws: None,
             thac0: 19,
             movement_rate: 120,
+            spell_slots_used: [0; 6],
         }
     }
 

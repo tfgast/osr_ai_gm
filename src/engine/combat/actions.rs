@@ -4,7 +4,7 @@ use crate::engine::retainer::{self, LoyaltyResult};
 use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
 use crate::rules::class::{class_def, Class};
-use crate::rules::{ability, equipment, monster as monster_db, spell, thief};
+use crate::rules::{ability, equipment, monster as monster_db, spell, spell_data, thief};
 
 use super::results::{
     AddMonsterResult, AttackResult, BackstabResult, CastSpellResult, CloseResult, CombatLogResult,
@@ -573,6 +573,21 @@ pub fn action_declare_spell(
         )));
     }
 
+    // Check spell slot availability
+    if let Some(spell_def) = spell_data::find_spell(spell_name, None) {
+        let idx = (spell_def.level - 1) as usize;
+        if idx < 6 {
+            let max_slots = spell::spell_slots(cdef.spell_progression, character.level);
+            let used = character.spell_slots_used[idx];
+            if used >= max_slots[idx] {
+                return Err(EngineError::InvalidInput(format!(
+                    "{} has no level {} spell slots remaining ({} of {} used).",
+                    character.name, spell_def.level, used, max_slots[idx]
+                )));
+            }
+        }
+    }
+
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
 
     if combat.spell_declarations.iter().any(|n| n.eq_ignore_ascii_case(char_name)) {
@@ -643,12 +658,12 @@ pub fn action_cast_spell(
     // Mark character as having acted.
     combat.characters_acted.push(char_name.to_string());
 
-    if was_disrupted {
+    let result = if was_disrupted {
         combat.log.push(format!(
             "{}'s {} fizzles — spell was disrupted!",
             char_name, spell_name
         ));
-        Ok(CastSpellResult {
+        CastSpellResult {
             message: format!(
                 "{}'s {} was disrupted! The spell fails.",
                 char_name, spell_name
@@ -657,13 +672,13 @@ pub fn action_cast_spell(
             spell: spell_name,
             cast: false,
             disrupted: true,
-        })
+        }
     } else {
         combat.log.push(format!(
             "{} casts {}!",
             char_name, spell_name
         ));
-        Ok(CastSpellResult {
+        CastSpellResult {
             message: format!(
                 "{} casts {}! Apply spell effects as appropriate.",
                 char_name, spell_name
@@ -672,8 +687,20 @@ pub fn action_cast_spell(
             spell: spell_name,
             cast: true,
             disrupted: false,
-        })
+        }
+    };
+
+    // Consume spell slot (whether disrupted or not — per B/X, attempted casting uses the slot)
+    if let Some(spell_def) = spell_data::find_spell(&result.spell, None) {
+        let idx = (spell_def.level - 1) as usize;
+        if idx < 6 {
+            if let Some(character) = state.party.find_member_mut(char_name) {
+                character.spell_slots_used[idx] += 1;
+            }
+        }
     }
+
+    Ok(result)
 }
 
 pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, EngineError> {
@@ -1609,5 +1636,101 @@ mod tests {
         let result = action_fighting_withdrawal(&mut state, "Grond").unwrap();
         assert_eq!(result.distance_moved, 20, "distance_moved should be 20 (half encounter move)");
         assert_eq!(result.new_distance, 80, "new distance should be 60 + 20 = 80");
+    }
+
+    // --- spell slot tracking (oag-t8467) ---
+
+    #[test]
+    fn declare_spell_rejected_when_slots_exhausted() {
+        // Level 1 MU has 1 first-level slot. After casting, no more slots.
+        let mut state = GameState::new();
+        let mut caster = Character::new("Zara", Class::MagicUser);
+        caster.hp = 6;
+        caster.max_hp = 6;
+        caster.level = 1; // ArcaneFullCaster level 1 = [1, 0, 0, 0, 0, 0]
+        state.party.add_member(caster);
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin 1", "1", 4, 6, 7)],
+            60,
+        ));
+
+        // First declaration succeeds
+        let _ = action_roll_initiative(&mut state);
+        let result = action_declare_spell(&mut state, "Zara", "Sleep");
+        assert!(result.is_ok(), "first declare should succeed: {:?}", result.err());
+
+        // Cast the spell (consumes the slot)
+        let result = action_cast_spell(&mut state, "Zara");
+        assert!(result.is_ok(), "cast should succeed: {:?}", result.err());
+
+        // Verify slot was consumed
+        assert_eq!(state.party.find_member("Zara").unwrap().spell_slots_used[0], 1);
+
+        // New round, try to declare again — should fail (no slots left)
+        let _ = action_roll_initiative(&mut state);
+        let result = action_declare_spell(&mut state, "Zara", "Sleep");
+        assert!(result.is_err(), "second declare should fail (no slots remaining)");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("no level 1 spell slots remaining"),
+            "expected slot exhaustion error, got: {}", err);
+    }
+
+    #[test]
+    fn multiple_slots_allow_multiple_casts() {
+        // Level 3 MU has [2, 1, 0, 0, 0, 0] — 2 first-level slots
+        let mut state = state_with_caster_combat(); // level 3 MU
+        let _ = action_roll_initiative(&mut state);
+
+        // First cast
+        let _ = action_declare_spell(&mut state, "Zara", "Sleep");
+        let _ = action_cast_spell(&mut state, "Zara");
+
+        // New round — second cast should succeed (2 slots available)
+        let _ = action_roll_initiative(&mut state);
+        let result = action_declare_spell(&mut state, "Zara", "Sleep");
+        assert!(result.is_ok(), "second declare should succeed (2 slots): {:?}", result.err());
+        let _ = action_cast_spell(&mut state, "Zara");
+
+        // Third round — should fail (both slots used)
+        let _ = action_roll_initiative(&mut state);
+        let result = action_declare_spell(&mut state, "Zara", "Sleep");
+        assert!(result.is_err(), "third declare should fail (slots exhausted)");
+    }
+
+    #[test]
+    fn disrupted_spell_still_consumes_slot() {
+        let mut state = GameState::new();
+        let mut caster = Character::new("Zara", Class::MagicUser);
+        caster.hp = 6;
+        caster.max_hp = 6;
+        caster.level = 1;
+        state.party.add_member(caster);
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin 1", "1", 4, 6, 7)],
+            60,
+        ));
+
+        let _ = action_roll_initiative(&mut state);
+        let _ = action_declare_spell(&mut state, "Zara", "Sleep");
+
+        // Manually disrupt the caster
+        state.combat.as_mut().unwrap().disrupted.push("Zara".to_string());
+
+        let result = action_cast_spell(&mut state, "Zara");
+        assert!(result.is_ok());
+        assert!(result.unwrap().disrupted);
+
+        // Slot should still be consumed
+        assert_eq!(state.party.find_member("Zara").unwrap().spell_slots_used[0], 1,
+            "disrupted spell should still consume a slot");
+
+        // Next round — should fail (no slots left)
+        let _ = action_roll_initiative(&mut state);
+        let result = action_declare_spell(&mut state, "Zara", "Sleep");
+        assert!(result.is_err(), "should have no slots after disrupted cast");
     }
 }
