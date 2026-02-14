@@ -380,6 +380,31 @@ impl Command for BackstabCommand {
     }
 }
 
+pub struct ThiefCheckCommand;
+impl Command for ThiefCheckCommand {
+    fn name(&self) -> &str {
+        "thief_check"
+    }
+    fn help(&self) -> &str {
+        "Thief skill check (thief_check <character> <skill>)"
+    }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error(
+                "usage: thief_check <character_name> <skill_name>\n  \
+                 Skills: climb_walls, find_traps, hear_noise, hide_shadows,\n  \
+                 move_silently, open_locks, pick_pockets, read_languages",
+            );
+        }
+        let char_name = args[0];
+        let skill_name = args[1..].join(" ");
+        match gm::action_thief_skill_check(state, char_name, &skill_name) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 pub struct AwardTreasureXpCommand;
 impl Command for AwardTreasureXpCommand {
     fn name(&self) -> &str {
@@ -426,6 +451,7 @@ pub const GM_ONLY_COMMANDS: &[&str] = &[
     "award_xp",
     "award_treasure_xp",
     "backstab",
+    "thief_check",
     "train",
     "ruling",
     "heal",
@@ -1031,5 +1057,81 @@ mod tests {
     fn gm_commands_include_new() {
         assert!(GM_ONLY_COMMANDS.contains(&"backstab"));
         assert!(GM_ONLY_COMMANDS.contains(&"award_treasure_xp"));
+        assert!(GM_ONLY_COMMANDS.contains(&"thief_check"));
+    }
+
+    // === ThiefCheckCommand tests ===
+
+    #[test]
+    fn thief_check_basic() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Shadow", Class::Thief);
+        c.hp = 6;
+        c.max_hp = 6;
+        state.party.add_member(c);
+        let cmd = ThiefCheckCommand;
+        let result = cmd.execute(&["Shadow", "climb_walls"], &mut state);
+        assert!(
+            !result.output.starts_with("Error"),
+            "thief_check should succeed: {}",
+            result.output
+        );
+        assert!(result.output.contains("Climb Walls"));
+    }
+
+    #[test]
+    fn thief_check_multi_word_skill() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Shadow", Class::Thief);
+        c.hp = 6;
+        c.max_hp = 6;
+        state.party.add_member(c);
+        let cmd = ThiefCheckCommand;
+        let result = cmd.execute(&["Shadow", "move", "silently"], &mut state);
+        assert!(
+            !result.output.starts_with("Error"),
+            "multi-word skill should work: {}",
+            result.output
+        );
+        assert!(result.output.contains("Move Silently"));
+    }
+
+    #[test]
+    fn thief_check_non_thief_rejected() {
+        let mut state = GameState::new();
+        let c = Character::new("Aldric", Class::Fighter);
+        state.party.add_member(c);
+        let cmd = ThiefCheckCommand;
+        let result = cmd.execute(&["Aldric", "climb_walls"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("does not have thief skills"));
+    }
+
+    #[test]
+    fn thief_check_no_character() {
+        let mut state = GameState::new();
+        let cmd = ThiefCheckCommand;
+        let result = cmd.execute(&["Nobody", "climb_walls"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("no party member"));
+    }
+
+    #[test]
+    fn thief_check_unknown_skill() {
+        let mut state = GameState::new();
+        let c = Character::new("Shadow", Class::Thief);
+        state.party.add_member(c);
+        let cmd = ThiefCheckCommand;
+        let result = cmd.execute(&["Shadow", "fly"], &mut state);
+        assert!(result.output.starts_with("Error"));
+        assert!(result.output.contains("unknown thief skill"));
+    }
+
+    #[test]
+    fn thief_check_missing_args() {
+        let mut state = GameState::new();
+        let cmd = ThiefCheckCommand;
+        let result = cmd.execute(&["Shadow"], &mut state);
+        assert!(result.output.starts_with("Error"));
     }
 }
