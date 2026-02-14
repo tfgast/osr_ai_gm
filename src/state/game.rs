@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// The current game mode — determines which commands are valid.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum GameMode {
     /// No active game mode. Party management and setup only.
     #[default]

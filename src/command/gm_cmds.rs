@@ -219,6 +219,32 @@ impl Command for AddRationsCommand {
     }
 }
 
+pub struct AddGoldCommand;
+impl Command for AddGoldCommand {
+    fn name(&self) -> &str {
+        "add_gold"
+    }
+    fn help(&self) -> &str {
+        "GM: add gold to a character (add_gold <character> <amount>)"
+    }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.len() < 2 {
+            return CommandResult::error("usage: add_gold <character> <amount>");
+        }
+        let amount: u32 = match args[1].parse() {
+            Ok(n) if n >= 1 => n,
+            _ => return CommandResult::error("amount must be a positive integer"),
+        };
+        match gm::action_add_gold(state, args[0], amount) {
+            Ok(result) => CommandResult::ok(format!(
+                "{} gained {}gp. Gold: {}gp → {}gp.",
+                result.character, result.added, result.old_gold_gp, result.gold_gp
+            )),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 pub struct TrainCommand;
 impl Command for TrainCommand {
     fn name(&self) -> &str {
@@ -406,6 +432,7 @@ pub const GM_ONLY_COMMANDS: &[&str] = &[
     "set_hp",
     "set_rations",
     "add_rations",
+    "add_gold",
 ];
 
 #[cfg(test)]
@@ -677,9 +704,49 @@ mod tests {
     }
 
     #[test]
+    fn add_gold_basic() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.gold_gp = 100;
+        state.party.add_member(c);
+        let cmd = AddGoldCommand;
+        let result = cmd.execute(&["Aldric", "50"], &mut state);
+        assert!(result.output.contains("gained 50gp"));
+        assert_eq!(state.party.find_member("Aldric").unwrap().gold_gp, 150);
+    }
+
+    #[test]
+    fn add_gold_missing_args() {
+        let mut state = GameState::new();
+        let cmd = AddGoldCommand;
+        let result = cmd.execute(&["Aldric"], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn add_gold_no_character() {
+        let mut state = GameState::new();
+        let cmd = AddGoldCommand;
+        let result = cmd.execute(&["Nobody", "50"], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
+    fn add_gold_invalid_amount() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.gold_gp = 100;
+        state.party.add_member(c);
+        let cmd = AddGoldCommand;
+        let result = cmd.execute(&["Aldric", "0"], &mut state);
+        assert!(result.output.contains("Error"));
+    }
+
+    #[test]
     fn gm_commands_include_rations() {
         assert!(GM_ONLY_COMMANDS.contains(&"set_rations"));
         assert!(GM_ONLY_COMMANDS.contains(&"add_rations"));
+        assert!(GM_ONLY_COMMANDS.contains(&"add_gold"));
     }
 
     #[test]

@@ -297,6 +297,8 @@ pub enum GMCommand {
     SetRations { amount: u32 },
     /// Add rations to the party supply.
     AddRations { amount: u32 },
+    /// Add gold to a character.
+    AddGold { character: String, amount: u32 },
 
     // -- Inventory management --
     /// Buy equipment from tables.

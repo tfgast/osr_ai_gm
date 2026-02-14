@@ -5,6 +5,7 @@ use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
 use crate::rules::class::{class_def, Class};
 use crate::rules::{ability, equipment, monster as monster_db, spell, spell_data, thief};
+use crate::state::effect;
 
 use super::results::{
     AddMonsterResult, AttackResult, BackstabResult, CastSpellResult, CloseResult, CombatLogResult,
@@ -280,6 +281,13 @@ pub fn action_roll_initiative(state: &mut GameState) -> Result<InitiativeResult,
         ));
     }
 
+    // Tick round-based effects before advancing to the new round.
+    // This happens at the EndOfRound→Declaration transition point.
+    if combat.round > 0 {
+        tick_round_effects_on_combat(state);
+    }
+
+    let combat = state.combat.as_mut().unwrap();
     let (party_initiative, monster_initiative) = roll_initiative(combat);
     combat.log_len_at_initiative = combat.log.len();
     let winner = if party_initiative > monster_initiative {
@@ -303,6 +311,39 @@ pub fn action_roll_initiative(state: &mut GameState) -> Result<InitiativeResult,
         monster_initiative,
         winner,
     })
+}
+
+/// Tick all Rounds-based effects on monsters, party members, and global effects.
+/// Logs expiry messages to the combat log.
+fn tick_round_effects_on_combat(state: &mut GameState) {
+    let mut all_messages = Vec::new();
+
+    // Tick effects on all monsters in combat
+    if let Some(ref mut combat) = state.combat {
+        for monster in &mut combat.monsters {
+            let messages = effect::tick_round_effects(&mut monster.effects, &monster.name);
+            all_messages.extend(messages);
+        }
+    }
+
+    // Tick effects on all party members
+    for member in &mut state.party.members {
+        let messages = effect::tick_round_effects(&mut member.effects, &member.name);
+        all_messages.extend(messages);
+    }
+
+    // Tick global effects
+    {
+        let messages = effect::tick_round_effects(&mut state.effects, "the battlefield");
+        all_messages.extend(messages);
+    }
+
+    // Log all expiry messages to the combat log
+    if let Some(ref mut combat) = state.combat {
+        for msg in all_messages {
+            combat.log_event(msg);
+        }
+    }
 }
 
 pub fn action_attack(
@@ -809,7 +850,7 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
         xp_per_survivor,
         xp_awards,
         party_casualties,
-        mode_after: state.mode.clone(),
+        mode_after: state.mode,
         retainer_xp_each,
         retainer_xp_recipients,
         retainer_loyalty_checks,
@@ -1861,5 +1902,168 @@ mod tests {
         assert_eq!(result.xp_awards[0].modifier_pct, 10);
         assert_eq!(result.xp_awards[0].adjusted_xp, 110); // 100 + 10%
         assert_eq!(state.party.find_member("Grond").unwrap().xp, 110);
+    }
+
+    // --- round-based effect ticking (oag-1damc) ---
+
+    fn add_effect(effects: &mut Vec<crate::state::effect::ActiveEffect>, name: &str, duration: crate::state::effect::EffectDuration) {
+        use crate::state::effect::{ActiveEffect, next_effect_id};
+        let id = next_effect_id(effects);
+        effects.push(ActiveEffect {
+            id,
+            name: name.to_string(),
+            source: "test".to_string(),
+            duration,
+            modifiers: Vec::new(),
+            notes: String::new(),
+        });
+    }
+
+    #[test]
+    fn tick_rounds_effect_on_monster_decrements_and_expires() {
+        use crate::state::effect::EffectDuration;
+
+        let mut state = state_with_melee_combat();
+        // Add a Rounds(2) effect to monster 0
+        add_effect(&mut state.combat.as_mut().unwrap().monsters[0].effects, "Hold Person", EffectDuration::Rounds(2));
+
+        // Round 1 initiative (first round, no tick yet since round==0 before)
+        let _ = action_roll_initiative(&mut state);
+        // Effect should still be there (round was 0 before, no tick)
+        assert_eq!(state.combat.as_ref().unwrap().monsters[0].effects.len(), 1);
+
+        // Need an action between rounds to allow next initiative
+        state.combat.as_mut().unwrap().log_event("dummy action".into());
+
+        // Round 2 initiative — ticks the effect from Rounds(2) -> Rounds(1)
+        let _ = action_roll_initiative(&mut state);
+        assert_eq!(state.combat.as_ref().unwrap().monsters[0].effects.len(), 1);
+        assert_eq!(
+            state.combat.as_ref().unwrap().monsters[0].effects[0].duration,
+            EffectDuration::Rounds(1)
+        );
+
+        state.combat.as_mut().unwrap().log_event("dummy action".into());
+
+        // Round 3 initiative — ticks Rounds(1) -> Rounds(0) and expires
+        let _ = action_roll_initiative(&mut state);
+        assert!(state.combat.as_ref().unwrap().monsters[0].effects.is_empty());
+        // Expiry message should be in the combat log
+        let log_text: String = state.combat.as_ref().unwrap().log.iter()
+            .map(|e| e.message.clone()).collect::<Vec<_>>().join("\n");
+        assert!(log_text.contains("Hold Person"), "expiry message should mention effect name");
+        assert!(log_text.contains("worn off"), "expiry message should say worn off");
+    }
+
+    #[test]
+    fn tick_rounds_effect_on_character_in_combat() {
+        use crate::state::effect::EffectDuration;
+
+        let mut state = state_with_melee_combat();
+        // Add a Rounds(1) effect to the party member
+        add_effect(&mut state.party.members[0].effects, "Bless", EffectDuration::Rounds(1));
+
+        // Round 1
+        let _ = action_roll_initiative(&mut state);
+        // No tick yet (was round 0)
+        assert_eq!(state.party.members[0].effects.len(), 1);
+
+        state.combat.as_mut().unwrap().log_event("dummy action".into());
+
+        // Round 2 — ticks Rounds(1) -> expired
+        let _ = action_roll_initiative(&mut state);
+        assert!(state.party.members[0].effects.is_empty());
+        let log_text: String = state.combat.as_ref().unwrap().log.iter()
+            .map(|e| e.message.clone()).collect::<Vec<_>>().join("\n");
+        assert!(log_text.contains("Bless"), "expiry message should mention Bless");
+    }
+
+    #[test]
+    fn turns_permanent_concentration_not_ticked_by_round() {
+        use crate::state::effect::EffectDuration;
+
+        let mut state = state_with_melee_combat();
+        let monster = &mut state.combat.as_mut().unwrap().monsters[0];
+        add_effect(&mut monster.effects, "Light", EffectDuration::Turns(6));
+        add_effect(&mut monster.effects, "Curse", EffectDuration::Permanent);
+        add_effect(&mut monster.effects, "Detect Magic", EffectDuration::Concentration);
+
+        // Round 1
+        let _ = action_roll_initiative(&mut state);
+        state.combat.as_mut().unwrap().log_event("dummy action".into());
+
+        // Round 2 — tick should NOT affect Turns/Permanent/Concentration
+        let _ = action_roll_initiative(&mut state);
+
+        let effects = &state.combat.as_ref().unwrap().monsters[0].effects;
+        assert_eq!(effects.len(), 3, "all non-round effects should remain");
+        assert_eq!(effects[0].duration, EffectDuration::Turns(6), "Turns effect should not be ticked");
+        assert_eq!(effects[1].duration, EffectDuration::Permanent, "Permanent should not be ticked");
+        assert_eq!(effects[2].duration, EffectDuration::Concentration, "Concentration should not be ticked");
+    }
+
+    #[test]
+    fn expiry_messages_in_combat_log() {
+        use crate::state::effect::EffectDuration;
+
+        let mut state = state_with_melee_combat();
+        // Add effects that expire at different times
+        add_effect(&mut state.combat.as_mut().unwrap().monsters[0].effects, "Sleep", EffectDuration::Rounds(1));
+        add_effect(&mut state.combat.as_mut().unwrap().monsters[1].effects, "Web", EffectDuration::Rounds(1));
+
+        // Round 1 (no tick, round was 0)
+        let _ = action_roll_initiative(&mut state);
+        state.combat.as_mut().unwrap().log_event("dummy".into());
+
+        let log_before = state.combat.as_ref().unwrap().log.len();
+
+        // Round 2 — both effects expire
+        let _ = action_roll_initiative(&mut state);
+
+        let log_after = state.combat.as_ref().unwrap().log.len();
+        // Should have at least 2 new expiry messages plus the initiative message
+        assert!(log_after > log_before + 2, "should have logged expiry messages");
+
+        let log_text: String = state.combat.as_ref().unwrap().log.iter()
+            .map(|e| e.message.clone()).collect::<Vec<_>>().join("\n");
+        assert!(log_text.contains("Sleep"), "log should mention Sleep expiry");
+        assert!(log_text.contains("Web"), "log should mention Web expiry");
+    }
+
+    #[test]
+    fn multiple_effects_across_characters_and_monsters() {
+        use crate::state::effect::EffectDuration;
+
+        let mut state = state_with_melee_combat();
+
+        // Add effects to monster 0
+        add_effect(&mut state.combat.as_mut().unwrap().monsters[0].effects, "Slow", EffectDuration::Rounds(2));
+        // Add effects to monster 1
+        add_effect(&mut state.combat.as_mut().unwrap().monsters[1].effects, "Blindness", EffectDuration::Rounds(3));
+        // Add effect to party member
+        add_effect(&mut state.party.members[0].effects, "Shield", EffectDuration::Rounds(2));
+        // Add global effect
+        add_effect(&mut state.effects, "Darkness", EffectDuration::Rounds(1));
+
+        // Round 1 (no tick)
+        let _ = action_roll_initiative(&mut state);
+        state.combat.as_mut().unwrap().log_event("dummy".into());
+
+        // Round 2 — tick all: Slow 2->1, Blindness 3->2, Shield 2->1, Darkness 1->0 (expires)
+        let _ = action_roll_initiative(&mut state);
+
+        assert_eq!(state.combat.as_ref().unwrap().monsters[0].effects[0].duration, EffectDuration::Rounds(1));
+        assert_eq!(state.combat.as_ref().unwrap().monsters[1].effects[0].duration, EffectDuration::Rounds(2));
+        assert_eq!(state.party.members[0].effects[0].duration, EffectDuration::Rounds(1));
+        assert!(state.effects.is_empty(), "Darkness should have expired");
+
+        state.combat.as_mut().unwrap().log_event("dummy".into());
+
+        // Round 3 — Slow 1->0 (expires), Shield 1->0 (expires), Blindness 2->1
+        let _ = action_roll_initiative(&mut state);
+
+        assert!(state.combat.as_ref().unwrap().monsters[0].effects.is_empty(), "Slow should have expired");
+        assert_eq!(state.combat.as_ref().unwrap().monsters[1].effects[0].duration, EffectDuration::Rounds(1));
+        assert!(state.party.members[0].effects.is_empty(), "Shield should have expired");
     }
 }

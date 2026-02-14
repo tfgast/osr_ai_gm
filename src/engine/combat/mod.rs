@@ -158,6 +158,7 @@ mod tests {
             thac0: 19,
             movement_rate: 120,
             spell_slots_used: [0; 6],
+            effects: vec![],
         }
     }
 
@@ -186,6 +187,7 @@ mod tests {
             thac0: 19,
             movement_rate: 120,
             spell_slots_used: [0; 6],
+            effects: vec![],
         }
     }
 
@@ -214,6 +216,7 @@ mod tests {
             thac0: 19,
             movement_rate: 120,
             spell_slots_used: [0; 6],
+            effects: vec![],
         }
     }
 
@@ -231,6 +234,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: false,
+            effects: vec![],
         }
     }
 
@@ -248,6 +252,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: true,
+            effects: vec![],
         }
     }
 
@@ -265,6 +270,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: false,
+            effects: vec![],
         }
     }
 
@@ -968,6 +974,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: true,
+            effects: vec![],
         };
         // Also add a weak skeleton
         let mut combat = CombatState::new(vec![test_skeleton(), mummy], 10);
@@ -1111,6 +1118,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: false,
+            effects: vec![],
         };
         let mut combat = CombatState::new(vec![ogre.clone(), ogre.clone(), ogre], 10);
         // Create a very weak character (1 HP, bad AC)

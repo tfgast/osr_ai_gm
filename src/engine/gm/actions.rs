@@ -8,7 +8,7 @@ use crate::rules::spell;
 use crate::state::game::GameMode;
 
 use super::results::{
-    AddNoteResult, AddRationsResult, AwardTreasureXpResult, AwardXpResult, DamageResult,
+    AddGoldResult, AddNoteResult, AddRationsResult, AwardTreasureXpResult, AwardXpResult, DamageResult,
     DeleteNoteResult, DismissRetainerResult, HealResult, ListNotesResult, ListRetainersResult,
     NoteEntry, RetainerSummary, RulingResult, SetHpResult, SetRationsResult, ThiefSkillCheckResult,
     TrainResult,
@@ -284,6 +284,30 @@ pub fn action_add_rations(
     Ok(AddRationsResult {
         added: amount,
         rations: state.party.rations,
+    })
+}
+
+pub fn action_add_gold(
+    state: &mut GameState,
+    char_name: &str,
+    amount: u32,
+) -> Result<AddGoldResult, EngineError> {
+    if amount < 1 {
+        return Err(EngineError::InvalidInput(
+            "amount must be a positive integer".to_string(),
+        ));
+    }
+    let c = state
+        .party
+        .find_member_mut(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+    let old_gold_gp = c.gold_gp;
+    c.gold_gp = c.gold_gp.saturating_add(amount);
+    Ok(AddGoldResult {
+        character: char_name.to_string(),
+        added: amount,
+        old_gold_gp,
+        gold_gp: c.gold_gp,
     })
 }
 

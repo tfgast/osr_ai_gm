@@ -18,7 +18,7 @@ pub(super) fn query_state(id: &str, state: &GameState) -> GMResponse {
         "has_wilderness": state.wilderness.is_some(),
         "notes": state.notes,
     });
-    GMResponse::ok_with_data(id, "game state summary", state.mode.clone(), data)
+    GMResponse::ok_with_data(id, "game state summary", state.mode, data)
 }
 
 pub(super) fn query_combat(id: &str, state: &GameState) -> GMResponse {
@@ -36,7 +36,7 @@ pub(super) fn query_combat(id: &str, state: &GameState) -> GMResponse {
                 })
             }).collect();
             GMResponse::ok_with_data(
-                id, status, state.mode.clone(),
+                id, status, state.mode,
                 serde_json::json!({
                     "round": combat_state.round,
                     "distance": combat_state.distance,
@@ -46,22 +46,22 @@ pub(super) fn query_combat(id: &str, state: &GameState) -> GMResponse {
                 }),
             )
         }
-        None => GMResponse::err(id, "no active combat.", state.mode.clone()),
+        None => GMResponse::err(id, "no active combat.", state.mode),
     }
 }
 
 pub(super) fn query_exploration(id: &str, state: &GameState) -> GMResponse {
     let time = match &state.time {
         Some(t) => t,
-        None => return GMResponse::err(id, "not in exploration mode.", state.mode.clone()),
+        None => return GMResponse::err(id, "not in exploration mode.", state.mode),
     };
     let dungeon = match &state.dungeon {
         Some(d) => d,
-        None => return GMResponse::err(id, "no dungeon state.", state.mode.clone()),
+        None => return GMResponse::err(id, "no dungeon state.", state.mode),
     };
     let status = exploration::exploration_status(time, dungeon);
     GMResponse::ok_with_data(
-        id, status, state.mode.clone(),
+        id, status, state.mode,
         serde_json::json!({
             "dungeon_level": dungeon.level,
             "current_room": dungeon.current_room,
@@ -74,7 +74,7 @@ pub(super) fn query_exploration(id: &str, state: &GameState) -> GMResponse {
 pub(super) fn query_wilderness(id: &str, state: &GameState) -> GMResponse {
     let ws = match &state.wilderness {
         Some(w) => w,
-        None => return GMResponse::err(id, "not in wilderness mode.", state.mode.clone()),
+        None => return GMResponse::err(id, "not in wilderness mode.", state.mode),
     };
     let party_movement = state.party.members.iter()
         .filter(|c| c.is_alive())
@@ -83,7 +83,7 @@ pub(super) fn query_wilderness(id: &str, state: &GameState) -> GMResponse {
         .unwrap_or(120);
     let status = wilderness_engine::wilderness_status(ws, &state.party, party_movement);
     GMResponse::ok_with_data(
-        id, status, state.mode.clone(),
+        id, status, state.mode,
         serde_json::json!({
             "current_x": ws.current_x,
             "current_y": ws.current_y,
@@ -96,7 +96,7 @@ pub(super) fn query_wilderness(id: &str, state: &GameState) -> GMResponse {
 pub(super) fn query_encumbrance(id: &str, state: &GameState, char_name: &str) -> GMResponse {
     let character = match state.party.find_member(char_name) {
         Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
+        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode),
     };
     let item_weights: Vec<u32> = character.inventory.iter()
         .map(|item| (item.weight * 10.0) as u32) // weight is in pounds, convert to coins (10 cn = 1 lb)
@@ -108,7 +108,7 @@ pub(super) fn query_encumbrance(id: &str, state: &GameState, char_name: &str) ->
         id,
         format!("{}: {} cn total, {} (movement {}').",
             character.name, total, level.name(), movement),
-        state.mode.clone(),
+        state.mode,
         serde_json::json!({
             "character": character.name,
             "total_weight_cn": total,
@@ -180,7 +180,7 @@ pub(super) fn query_party(id: &str, state: &GameState) -> GMResponse {
                 QueryPartyData { members },
             )
         }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -226,7 +226,7 @@ pub(super) fn list_classes(id: &str, state: &GameState) -> GMResponse {
                 classes: result.classes,
             },
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -261,7 +261,7 @@ pub(super) fn eligible_classes(id: &str, state: &GameState, abilities: &[i32; 6]
                 },
             )
         }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -272,28 +272,28 @@ pub(super) fn eligible_classes(id: &str, state: &GameState, abilities: &[i32; 6]
 pub(super) fn lookup_item(id: &str, state: &GameState, name: &str) -> GMResponse {
     match lookup::action_lookup_item(name) {
         Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
 pub(super) fn search_items(id: &str, state: &GameState, query: &str) -> GMResponse {
     match lookup::action_search_items(query) {
         Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
 pub(super) fn lookup_treasure_type(id: &str, state: &GameState, letter: &str) -> GMResponse {
     match lookup::action_lookup_treasure_type(letter) {
         Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
 pub(super) fn roll_treasure(id: &str, state: &GameState, letter: &str) -> GMResponse {
     match lookup::action_roll_treasure(letter) {
         Ok(result) => ok_with_typed_data(id, state, result.api_message(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -304,14 +304,14 @@ pub(super) fn roll_treasure(id: &str, state: &GameState, letter: &str) -> GMResp
 pub(super) fn roll_rumor(id: &str, state: &GameState, table: &str) -> GMResponse {
     match rumor::action_roll_rumor(table) {
         Ok(result) => ok_with_typed_data(id, state, result.message, result.data),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
 pub(super) fn lookup_rumor_table(id: &str, state: &GameState, table: &str) -> GMResponse {
     match rumor::action_lookup_rumor_table(table) {
         Ok(result) => ok_with_typed_data(id, state, result.message, result.data),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -321,7 +321,7 @@ pub(super) fn list_rumor_tables(id: &str, state: &GameState) -> GMResponse {
             let msg = format!("{} rumor tables available.", result.tables.len());
             ok_with_typed_data(id, state, msg, result)
         }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -335,7 +335,7 @@ pub(super) fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &
                 return GMResponse::err(
                     id,
                     format!("unknown spell list '{}'.", list_name),
-                    state.mode.clone(),
+                    state.mode,
                 )
             }
         }
@@ -343,6 +343,6 @@ pub(super) fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &
 
     match lookup::action_lookup_spell(name, list) {
         Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }

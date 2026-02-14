@@ -13,7 +13,7 @@ use osr_ai_gm::command::exploration_cmds::{
     PickLockCommand, RestCommand, SearchCommand,
 };
 use osr_ai_gm::command::gm_cmds::{
-    AddRationsCommand, AdvanceTurnCommand, AwardTreasureXpCommand, AwardXpCommand, BackstabCommand,
+    AddGoldCommand, AddRationsCommand, AdvanceTurnCommand, AwardTreasureXpCommand, AwardXpCommand, BackstabCommand,
     DamageCommand, HealCommand, RulingCommand, SetHpCommand, SetRationsCommand,
     ThiefCheckCommand, TrainCommand,
 };
@@ -177,6 +177,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(SetHpCommand));
     registry.register(Box::new(SetRationsCommand));
     registry.register(Box::new(AddRationsCommand));
+    registry.register(Box::new(AddGoldCommand));
     // Notes
     registry.register(Box::new(NoteCommand));
     registry.register(Box::new(NotesCommand));
