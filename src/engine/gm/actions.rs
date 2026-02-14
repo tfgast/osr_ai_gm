@@ -1,12 +1,13 @@
 use crate::engine::result::EngineError;
 use crate::engine::xp;
 use crate::persist::GameState;
+use crate::rules::thief;
 use crate::rules::xp::{check_level_up, xp_for_level};
 
 use super::results::{
     AddRationsResult, AwardXpResult, DamageResult, DeleteNoteResult, DismissRetainerResult,
     HealResult, ListNotesResult, ListRetainersResult, NoteEntry, RetainerSummary, RulingResult,
-    SetHpResult, SetRationsResult,
+    SetHpResult, SetRationsResult, ThiefSkillCheckResult,
 };
 
 fn no_party_member_err(char_name: &str) -> EngineError {
@@ -253,5 +254,74 @@ pub fn action_add_rations(
     Ok(AddRationsResult {
         added: amount,
         rations: state.party.rations,
+    })
+}
+
+pub fn action_thief_skill_check(
+    state: &GameState,
+    char_name: &str,
+    skill_name: &str,
+) -> Result<ThiefSkillCheckResult, EngineError> {
+    let character = state
+        .party
+        .find_member(char_name)
+        .ok_or_else(|| no_party_member_err(char_name))?;
+
+    if !thief::has_thief_skills(character.class) {
+        return Err(EngineError::InvalidInput(format!(
+            "{} ({}) does not have thief skills.",
+            character.name,
+            character.class.name()
+        )));
+    }
+
+    let skill = match skill_name
+        .to_lowercase()
+        .replace([' ', '_', '-'], "")
+        .as_str()
+    {
+        "climbwalls" | "climb" => thief::ThiefSkill::ClimbWalls,
+        "findtraps" | "traps" => thief::ThiefSkill::FindTraps,
+        "hearnoise" | "hear" | "listen" => thief::ThiefSkill::HearNoise,
+        "hideshadows" | "hide" | "hideinshadows" => thief::ThiefSkill::HideShadows,
+        "movesilently" | "sneak" | "stealth" => thief::ThiefSkill::MoveSilently,
+        "openlocks" | "pick" | "lockpick" => thief::ThiefSkill::OpenLocks,
+        "pickpockets" | "pickpocket" | "steal" => thief::ThiefSkill::PickPockets,
+        "readlanguages" | "read" => thief::ThiefSkill::ReadLanguages,
+        _ => {
+            return Err(EngineError::InvalidInput(format!(
+                "unknown thief skill '{}'.",
+                skill_name
+            )))
+        }
+    };
+
+    let target = thief::skill_chance(skill, character.level);
+    let roll: u32 = if skill.is_d6() {
+        rand::Rng::gen_range(&mut rand::thread_rng(), 1..=6)
+    } else {
+        rand::Rng::gen_range(&mut rand::thread_rng(), 1..=100)
+    };
+    let result = thief::check_skill(skill, character.level, roll);
+    let die_type = if skill.is_d6() { "d6" } else { "d%" };
+
+    Ok(ThiefSkillCheckResult {
+        message: format!(
+            "{} attempts {} (level {}): target {}, rolled {} ({}) — {}.",
+            character.name,
+            skill.name(),
+            character.level,
+            target,
+            roll,
+            die_type,
+            if result.success { "SUCCESS" } else { "FAILURE" }
+        ),
+        character: character.name.clone(),
+        skill: skill.name().to_string(),
+        level: character.level,
+        target,
+        roll,
+        die_type: die_type.to_string(),
+        success: result.success,
     })
 }

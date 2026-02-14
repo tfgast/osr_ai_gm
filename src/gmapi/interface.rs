@@ -1,7 +1,6 @@
 use crate::engine::{exploration, gm, inventory, lookup, module as module_engine, party, retainers, system, wilderness, xp};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::GameState;
-use crate::rules::thief;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
 use crate::state::dungeon::DoorState;
@@ -596,47 +595,10 @@ fn award_treasure_xp(id: &str, state: &mut GameState, char_name: &str, treasure_
 }
 
 fn thief_skill_check(id: &str, state: &GameState, char_name: &str, skill_name: &str) -> GMResponse {
-    let character = match state.party.find_member(char_name) {
-        Some(c) => c,
-        None => return GMResponse::err(id, format!("no party member named '{}'.", char_name), state.mode.clone()),
-    };
-    if !thief::has_thief_skills(character.class) {
-        return GMResponse::err(id, format!("{} ({}) does not have thief skills.", character.name, character.class.name()), state.mode.clone());
+    match gm::action_thief_skill_check(state, char_name, skill_name) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let skill = match skill_name.to_lowercase().replace([' ', '_', '-'], "").as_str() {
-        "climbwalls" | "climb" => thief::ThiefSkill::ClimbWalls,
-        "findtraps" | "traps" => thief::ThiefSkill::FindTraps,
-        "hearnoise" | "hear" | "listen" => thief::ThiefSkill::HearNoise,
-        "hideshadows" | "hide" | "hideinshadows" => thief::ThiefSkill::HideShadows,
-        "movesilently" | "sneak" | "stealth" => thief::ThiefSkill::MoveSilently,
-        "openlocks" | "pick" | "lockpick" => thief::ThiefSkill::OpenLocks,
-        "pickpockets" | "pickpocket" | "steal" => thief::ThiefSkill::PickPockets,
-        "readlanguages" | "read" => thief::ThiefSkill::ReadLanguages,
-        _ => return GMResponse::err(id, format!("unknown thief skill '{}'.", skill_name), state.mode.clone()),
-    };
-    let target = thief::skill_chance(skill, character.level);
-    let roll: u32 = if skill.is_d6() {
-        rand::Rng::gen_range(&mut rand::thread_rng(), 1..=6)
-    } else {
-        rand::Rng::gen_range(&mut rand::thread_rng(), 1..=100)
-    };
-    let result = thief::check_skill(skill, character.level, roll);
-    let die_type = if skill.is_d6() { "d6" } else { "d%" };
-    GMResponse::ok_with_data(
-        id,
-        format!("{} attempts {} (level {}): target {}, rolled {} ({}) — {}.",
-            character.name, skill.name(), character.level,
-            target, roll, die_type,
-            if result.success { "SUCCESS" } else { "FAILURE" }),
-        state.mode.clone(),
-        serde_json::json!({
-            "character": character.name,
-            "skill": skill.name(),
-            "target": target,
-            "roll": roll,
-            "success": result.success,
-        }),
-    )
 }
 
 fn hire_retainer(id: &str, state: &mut GameState, employer_name: &str, ret_name: &str, ret_class: Class, ret_level: u32) -> GMResponse {

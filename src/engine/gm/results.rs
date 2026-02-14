@@ -111,3 +111,17 @@ pub struct AddRationsResult {
     pub added: u32,
     pub rations: u32,
 }
+
+/// Result payload for a thief skill check.
+#[derive(Debug, Clone, Serialize)]
+pub struct ThiefSkillCheckResult {
+    #[serde(skip_serializing)]
+    pub message: String,
+    pub character: String,
+    pub skill: String,
+    pub level: u32,
+    pub target: u32,
+    pub roll: u32,
+    pub die_type: String,
+    pub success: bool,
+}
