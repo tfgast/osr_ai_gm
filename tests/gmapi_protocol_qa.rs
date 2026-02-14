@@ -2603,6 +2603,18 @@ fn advance_turn_outside_exploration() {
 }
 
 #[test]
+fn advance_turn_rejected_in_wilderness() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    let resp = handle_request(&req("atw", GMCommand::AdvanceTurn), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.as_ref().unwrap().contains("dungeon exploration mode"),
+        "error should mention dungeon exploration mode, got: {:?}", resp.error);
+}
+
+#[test]
 fn travel_outside_wilderness() {
     let mut state = GameState::new();
     assert_eq!(state.mode, GameMode::Idle);
