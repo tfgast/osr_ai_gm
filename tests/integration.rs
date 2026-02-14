@@ -2518,3 +2518,1032 @@ fn wilderness_commands_rejected_in_dungeon_mode() {
     // Verify the mode is still Exploration (commands didn't change it)
     assert_eq!(state.mode, GameMode::Exploration);
 }
+
+// ===========================================================================
+// PLAYTEST PASS 2C: Wilderness & Mode Gating Verification
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Phase 2: Verify Pass 1 Fixes
+// ---------------------------------------------------------------------------
+
+/// oag-odo8b: Travel to hex not on map should NOT consume rations or advance day.
+#[test]
+fn playtest2c_travel_out_of_range_no_resource_consumption() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    state.party.add_member(make_cleric("Mira"));
+
+    // Set rations
+    handle_request(&req("r0", GMCommand::SetRations { amount: 20 }), &mut state);
+
+    // Enter wilderness
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    let ws = state.wilderness.as_ref().unwrap();
+    let day_before = ws.travel_day;
+    let rations_before = state.party.rations;
+
+    // Try to travel to unmapped hex (5,5) — not on map
+    let _resp = handle_request(&req("2", GMCommand::Travel { x: 5, y: 5 }), &mut state);
+    // Should fail or succeed without consuming resources
+    let ws = state.wilderness.as_ref().unwrap();
+    assert_eq!(ws.travel_day, day_before, "day should NOT advance for out-of-range travel");
+    assert_eq!(state.party.rations, rations_before, "rations should NOT be consumed for out-of-range travel");
+}
+
+/// oag-iasbo: Forage should consume a day AND daily rations.
+#[test]
+fn playtest2c_forage_consumes_day_and_rations() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Explorer"));
+
+    handle_request(&req("r0", GMCommand::SetRations { amount: 20 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    let ws = state.wilderness.as_ref().unwrap();
+    let day_before = ws.travel_day;
+
+    let resp = handle_request(&req("2", GMCommand::Forage), &mut state);
+    assert!(resp.success, "forage failed: {}", resp.message);
+
+    let ws = state.wilderness.as_ref().unwrap();
+    assert!(ws.travel_day > day_before, "forage should advance the day");
+    // Forage consumes daily rations (1 per party member) via apply_daily_overhead.
+    // If forage SUCCEEDS, it also adds rations, so net might be higher.
+    // Check the response data for rations_consumed instead.
+    let data = resp.data.unwrap();
+    assert!(data["rations_consumed"].as_u64().unwrap() > 0,
+        "forage should consume daily rations (via apply_daily_overhead)");
+}
+
+/// oag-iasbo: Hunt should consume a day AND daily rations.
+#[test]
+fn playtest2c_hunt_consumes_day_and_rations() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Hunter"));
+
+    handle_request(&req("r0", GMCommand::SetRations { amount: 20 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    let ws = state.wilderness.as_ref().unwrap();
+    let day_before = ws.travel_day;
+    let rations_before = state.party.rations;
+
+    let resp = handle_request(&req("2", GMCommand::Hunt), &mut state);
+    assert!(resp.success, "hunt failed: {}", resp.message);
+
+    let ws = state.wilderness.as_ref().unwrap();
+    assert!(ws.travel_day > day_before, "hunt should advance the day");
+    assert!(state.party.rations <= rations_before, "hunt should consume daily rations");
+}
+
+/// oag-iasbo: Orient when not lost should return "not lost" without consuming resources.
+/// Orient when LOST should consume a day AND daily rations.
+#[test]
+fn playtest2c_orient_behavior() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Navigator"));
+
+    handle_request(&req("r0", GMCommand::SetRations { amount: 20 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    // When NOT lost, orient should return early with no day/ration consumption
+    let ws = state.wilderness.as_ref().unwrap();
+    let day_before = ws.travel_day;
+    let rations_before = state.party.rations;
+
+    let resp = handle_request(&req("2", GMCommand::Orient), &mut state);
+    assert!(resp.success, "orient failed: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert!(!data["success"].as_bool().unwrap(), "orient when not lost should report success=false");
+
+    let ws = state.wilderness.as_ref().unwrap();
+    assert_eq!(ws.travel_day, day_before, "orient when not lost should NOT advance day");
+    assert_eq!(state.party.rations, rations_before, "orient when not lost should NOT consume rations");
+
+    // Manually set lost flag, then orient should consume resources
+    state.wilderness.as_mut().unwrap().lost = true;
+    let resp = handle_request(&req("3", GMCommand::Orient), &mut state);
+    assert!(resp.success, "orient when lost failed: {}", resp.message);
+    let ws = state.wilderness.as_ref().unwrap();
+    assert!(ws.travel_day > day_before, "orient when lost should advance the day");
+}
+
+/// oag-vsjm7: Travel to current hex (0,0) when already there.
+#[test]
+fn playtest2c_travel_to_current_hex() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    handle_request(&req("r0", GMCommand::SetRations { amount: 20 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Clear,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Travel to (0,0) — the current position
+    let resp = handle_request(&req("2", GMCommand::Travel { x: 0, y: 0 }), &mut state);
+    // Behavior: should either reject or be a no-op. Document actual behavior.
+    // Not crashing is the minimum bar.
+    let _ = resp; // Don't assert success/failure — just verify no panic
+}
+
+/// oag-0knyk: Wilderness commands in dungeon mode should be rejected.
+#[test]
+fn playtest2c_wilderness_cmds_in_dungeon() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    // Enter dungeon
+    let resp = handle_request(&req("1", GMCommand::EnterDungeon {
+        level: 1, room_name: "Entry".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    // All wilderness commands should fail
+    let resp = handle_request(&req("t1", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(!resp.success, "Travel should be rejected in dungeon mode");
+
+    let resp = handle_request(&req("t2", GMCommand::AddHex { x: 1, y: 0, terrain: Terrain::Forest }), &mut state);
+    assert!(!resp.success, "AddHex should be rejected in dungeon mode");
+
+    let resp = handle_request(&req("t3", GMCommand::Forage), &mut state);
+    assert!(!resp.success, "Forage should be rejected in dungeon mode");
+
+    let resp = handle_request(&req("t4", GMCommand::Hunt), &mut state);
+    assert!(!resp.success, "Hunt should be rejected in dungeon mode");
+
+    let resp = handle_request(&req("t5", GMCommand::Orient), &mut state);
+    assert!(!resp.success, "Orient should be rejected in dungeon mode");
+
+    let resp = handle_request(&req("t6", GMCommand::QueryWilderness), &mut state);
+    assert!(!resp.success, "QueryWilderness should be rejected in dungeon mode");
+
+    // Mode should be unchanged
+    assert_eq!(state.mode, GameMode::Exploration);
+}
+
+/// oag-61a6d: Dungeon commands in wilderness mode should be rejected.
+#[test]
+fn playtest2c_dungeon_cmds_in_wilderness() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    // Dungeon commands should fail
+    let resp = handle_request(&req("d1", GMCommand::AdvanceTurn), &mut state);
+    assert!(!resp.success, "AdvanceTurn should be rejected in wilderness mode");
+
+    let resp = handle_request(&req("d2", GMCommand::MoveRoom { door_id: 0 }), &mut state);
+    assert!(!resp.success, "MoveRoom should be rejected in wilderness mode");
+
+    let resp = handle_request(&req("d3", GMCommand::Search { is_elf: false }), &mut state);
+    assert!(!resp.success, "Search should be rejected in wilderness mode");
+
+    let resp = handle_request(&req("d4", GMCommand::Listen { is_demihuman: false }), &mut state);
+    assert!(!resp.success, "Listen should be rejected in wilderness mode");
+
+    let resp = handle_request(&req("d5", GMCommand::ForceDoor {
+        door_id: 0, character: "Aldric".to_string(),
+    }), &mut state);
+    assert!(!resp.success, "ForceDoor should be rejected in wilderness mode");
+
+    let resp = handle_request(&req("d6", GMCommand::QueryExploration), &mut state);
+    assert!(!resp.success, "QueryExploration should be rejected in wilderness mode");
+
+    // Mode should be unchanged
+    assert_eq!(state.mode, GameMode::Wilderness);
+}
+
+/// oag-g5i6n: EnterWilderness while already in wilderness should reject.
+#[test]
+fn playtest2c_enter_wilderness_while_in_wilderness() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    // Try to enter wilderness again
+    let resp = handle_request(&req("2", GMCommand::EnterWilderness {
+        terrain: Terrain::Clear,
+    }), &mut state);
+    assert!(!resp.success, "EnterWilderness should reject when already in wilderness");
+    assert!(resp.message.contains("already"), "should mention 'already': {}", resp.message);
+    assert_eq!(state.mode, GameMode::Wilderness);
+}
+
+/// oag-exmb2: EnterDungeon from wilderness currently rejects.
+/// The error says "Use LeaveWilderness first" but no LeaveWilderness command exists yet.
+/// This documents the current behavior and is a known gap.
+#[test]
+fn playtest2c_enter_dungeon_from_wilderness_blocked() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    // Enter dungeon from wilderness — currently blocked
+    let resp = handle_request(&req("2", GMCommand::EnterDungeon {
+        level: 1, room_name: "Cave Entrance".to_string(),
+    }), &mut state);
+    assert!(!resp.success, "EnterDungeon from wilderness should currently be blocked");
+    assert!(resp.message.contains("wilderness"), "error should mention wilderness: {}", resp.message);
+    // Mode should be unchanged
+    assert_eq!(state.mode, GameMode::Wilderness);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: Mode Gating Deep Dive
+// ---------------------------------------------------------------------------
+
+/// In Idle mode, all exploration/wilderness commands should reject gracefully.
+#[test]
+fn playtest2c_idle_mode_rejects_exploration_and_wilderness() {
+    let mut state = GameState::new();
+    assert_eq!(state.mode, GameMode::Idle);
+
+    // Wilderness commands in idle
+    let resp = handle_request(&req("w1", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(!resp.success, "Travel should fail in idle mode");
+
+    let resp = handle_request(&req("w2", GMCommand::AddHex { x: 1, y: 0, terrain: Terrain::Forest }), &mut state);
+    assert!(!resp.success, "AddHex should fail in idle mode");
+
+    let resp = handle_request(&req("w3", GMCommand::Forage), &mut state);
+    assert!(!resp.success, "Forage should fail in idle mode");
+
+    let resp = handle_request(&req("w4", GMCommand::Hunt), &mut state);
+    assert!(!resp.success, "Hunt should fail in idle mode");
+
+    let resp = handle_request(&req("w5", GMCommand::Orient), &mut state);
+    assert!(!resp.success, "Orient should fail in idle mode");
+
+    // Dungeon commands in idle
+    let resp = handle_request(&req("d1", GMCommand::AdvanceTurn), &mut state);
+    assert!(!resp.success, "AdvanceTurn should fail in idle mode");
+
+    let resp = handle_request(&req("d2", GMCommand::MoveRoom { door_id: 0 }), &mut state);
+    assert!(!resp.success, "MoveRoom should fail in idle mode");
+
+    let resp = handle_request(&req("d3", GMCommand::Search { is_elf: false }), &mut state);
+    assert!(!resp.success, "Search should fail in idle mode");
+
+    let resp = handle_request(&req("d4", GMCommand::Listen { is_demihuman: false }), &mut state);
+    assert!(!resp.success, "Listen should fail in idle mode");
+
+    let resp = handle_request(&req("d5", GMCommand::ForceDoor {
+        door_id: 0, character: "Nobody".to_string(),
+    }), &mut state);
+    assert!(!resp.success, "ForceDoor should fail in idle mode");
+
+    // Mode unchanged
+    assert_eq!(state.mode, GameMode::Idle);
+}
+
+/// RollEncounter should work in both Exploration and Wilderness but not Idle.
+#[test]
+fn playtest2c_roll_encounter_mode_gating() {
+    // Idle: should fail
+    let mut state = GameState::new();
+    let resp = handle_request(&req("1", GMCommand::RollEncounter), &mut state);
+    assert!(!resp.success, "RollEncounter should fail in idle mode");
+
+    // Wilderness: should work
+    let mut state = GameState::new();
+    let resp = handle_request(&req("w1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+    let resp = handle_request(&req("w2", GMCommand::RollEncounter), &mut state);
+    assert!(resp.success, "RollEncounter should work in wilderness: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert_eq!(data["context"], "wilderness");
+
+    // Exploration: should work
+    let mut state = GameState::new();
+    let resp = handle_request(&req("e1", GMCommand::EnterDungeon {
+        level: 1, room_name: "Test".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    let resp = handle_request(&req("e2", GMCommand::RollEncounter), &mut state);
+    assert!(resp.success, "RollEncounter should work in exploration: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert_eq!(data["context"], "dungeon");
+}
+
+/// SpawnEncounter should work from wilderness (enters combat, returns to wilderness).
+#[test]
+fn playtest2c_spawn_encounter_in_wilderness() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Ranger"));
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("2", GMCommand::SpawnMonster {
+        name: "Dire Wolf".to_string(),
+        count: 3,
+        distance: 60,
+    }), &mut state);
+    assert!(resp.success, "SpawnMonster should work from wilderness: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    // End combat should return to wilderness
+    let resp = handle_request(&req("3", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: Wilderness Travel Deep Dive
+// ---------------------------------------------------------------------------
+
+/// Build hex map with all terrain types and verify travel.
+#[test]
+fn playtest2c_travel_all_terrain_types() {
+    let mut state = GameState::new();
+    let mut fighter = make_fighter("Explorer");
+    fighter.movement_rate = 120; // Standard movement
+    state.party.add_member(fighter);
+
+    handle_request(&req("r0", GMCommand::SetRations { amount: 100 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Clear,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Add hexes with various terrain types adjacent to (0,0)
+    let hexes = [
+        (1, 0, Terrain::Clear),
+        (0, 1, Terrain::Hills),
+        (-1, 0, Terrain::Mountains),
+        (0, -1, Terrain::Swamp),
+        (1, 1, Terrain::Desert),
+        (-1, -1, Terrain::Jungle),
+    ];
+    for (x, y, terrain) in &hexes {
+        let resp = handle_request(&req("2", GMCommand::AddHex {
+            x: *x, y: *y, terrain: *terrain,
+        }), &mut state);
+        assert!(resp.success, "AddHex ({},{}) {:?} failed: {}", x, y, terrain, resp.message);
+    }
+
+    // Travel to Clear (1,0) — should be fast (1x cost)
+    let resp = handle_request(&req("3a", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(resp.success, "travel to clear failed: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert!(data.get("lost").is_some(), "response should include lost status");
+    assert!(data.get("has_encounter").is_some(), "response should include encounter info");
+
+    // Travel back to origin
+    let resp = handle_request(&req("3b", GMCommand::Travel { x: 0, y: 0 }), &mut state);
+    assert!(resp.success, "travel back failed: {}", resp.message);
+
+    // Travel to Hills (0,1) — 1.5x cost
+    let resp = handle_request(&req("4a", GMCommand::Travel { x: 0, y: 1 }), &mut state);
+    assert!(resp.success, "travel to hills failed: {}", resp.message);
+
+    // Day counter should be advancing
+    let ws = state.wilderness.as_ref().unwrap();
+    assert!(ws.travel_day >= 3, "should be at least day 3 after multiple travels");
+}
+
+/// Travel consumes rations per party member per day.
+#[test]
+fn playtest2c_travel_rations_consumption() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+    state.party.add_member(make_cleric("Mira"));
+    state.party.add_member(make_thief("Vex"));
+    state.party.add_member(make_magic_user("Zanthus"));
+
+    handle_request(&req("r0", GMCommand::SetRations { amount: 20 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Clear,
+    }), &mut state);
+    assert!(resp.success);
+
+    let rations_before = state.party.rations;
+    assert_eq!(rations_before, 20);
+
+    // Add and travel to adjacent hex
+    handle_request(&req("2", GMCommand::AddHex { x: 1, y: 0, terrain: Terrain::Clear }), &mut state);
+    let resp = handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(resp.success);
+
+    let rations_after = state.party.rations;
+    // 4 party members should consume 4 rations per day
+    assert_eq!(rations_before - rations_after, 4,
+        "4-member party should consume 4 rations per travel day (was {} now {})",
+        rations_before, rations_after);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: Foraging Economy
+// ---------------------------------------------------------------------------
+
+/// Run rations to 0, verify starvation triggers.
+#[test]
+fn playtest2c_starvation_at_zero_rations() {
+    let mut state = GameState::new();
+    let mut fighter = make_fighter("Starving Steve");
+    fighter.movement_rate = 120;
+    state.party.add_member(fighter);
+
+    // Start with exactly 2 rations (1 party member x 2 days)
+    handle_request(&req("r0", GMCommand::SetRations { amount: 2 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Clear,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Add hexes for travel
+    handle_request(&req("2a", GMCommand::AddHex { x: 1, y: 0, terrain: Terrain::Clear }), &mut state);
+    handle_request(&req("2b", GMCommand::AddHex { x: 0, y: 1, terrain: Terrain::Clear }), &mut state);
+    handle_request(&req("2c", GMCommand::AddHex { x: 1, y: 1, terrain: Terrain::Clear }), &mut state);
+    handle_request(&req("2d", GMCommand::AddHex { x: -1, y: 0, terrain: Terrain::Clear }), &mut state);
+    handle_request(&req("2e", GMCommand::AddHex { x: 0, y: -1, terrain: Terrain::Clear }), &mut state);
+    handle_request(&req("2f", GMCommand::AddHex { x: -1, y: -1, terrain: Terrain::Clear }), &mut state);
+    handle_request(&req("2g", GMCommand::AddHex { x: -1, y: 1, terrain: Terrain::Clear }), &mut state);
+    handle_request(&req("2h", GMCommand::AddHex { x: 1, y: -1, terrain: Terrain::Clear }), &mut state);
+
+    // Travel day 1: consume 1 ration (1 left)
+    let resp = handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.party.rations, 1, "should have 1 ration left after day 1");
+
+    // Travel day 2: consume 1 ration (0 left)
+    // Navigate back, handling possible lost status
+    let ws = state.wilderness.as_ref().unwrap();
+    let (cx, cy) = (ws.current_x, ws.current_y);
+    // Travel to an adjacent hex
+    let next = if cx == 1 && cy == 0 { (0, 0) } else { (1, 0) };
+    let resp = handle_request(&req("4", GMCommand::Travel { x: next.0, y: next.1 }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.party.rations, 0, "should have 0 rations left after day 2");
+
+    // Travel day 3+: 0 rations, should trigger starvation
+    let ws = state.wilderness.as_ref().unwrap();
+    let (cx, cy) = (ws.current_x, ws.current_y);
+    let next = if cx == 0 && cy == 0 { (1, 0) } else { (0, 0) };
+    let resp = handle_request(&req("5", GMCommand::Travel { x: next.0, y: next.1 }), &mut state);
+    assert!(resp.success);
+
+    // Verify starvation happening (days_without_food > 0)
+    assert!(state.party.days_without_food >= 1,
+        "party should be starving after traveling with 0 rations");
+}
+
+/// Forage success rate varies by terrain (Forest better than Desert).
+#[test]
+fn playtest2c_forage_terrain_variation() {
+    // Forage many times in Forest and Desert, verify both can succeed/fail
+    // (probabilistic, but with enough trials should see variance)
+
+    // Forest forage (2-in-6 chance)
+    let mut forest_successes = 0;
+    for i in 0..20 {
+        let mut state = GameState::new();
+        state.party.add_member(make_fighter(&format!("Forager{}", i)));
+        handle_request(&req("r0", GMCommand::SetRations { amount: 100 }), &mut state);
+        handle_request(&req("1", GMCommand::EnterWilderness { terrain: Terrain::Forest }), &mut state);
+        let resp = handle_request(&req("2", GMCommand::Forage), &mut state);
+        assert!(resp.success, "forage should succeed: {}", resp.message);
+        let data = resp.data.unwrap();
+        if data.get("rations_found").and_then(|v| v.as_u64()).unwrap_or(0) > 0 {
+            forest_successes += 1;
+        }
+    }
+
+    // Desert forage (1-in-6 chance)
+    let mut desert_successes = 0;
+    for i in 0..20 {
+        let mut state = GameState::new();
+        state.party.add_member(make_fighter(&format!("DesertF{}", i)));
+        handle_request(&req("r0", GMCommand::SetRations { amount: 100 }), &mut state);
+        handle_request(&req("1", GMCommand::EnterWilderness { terrain: Terrain::Desert }), &mut state);
+        let resp = handle_request(&req("2", GMCommand::Forage), &mut state);
+        assert!(resp.success, "desert forage should succeed: {}", resp.message);
+        let data = resp.data.unwrap();
+        if data.get("rations_found").and_then(|v| v.as_u64()).unwrap_or(0) > 0 {
+            desert_successes += 1;
+        }
+    }
+
+    // Probabilistic: Forest should tend to have more successes than desert
+    // Not a hard assert since this is random, but log it
+    eprintln!("Forage results: Forest {}/20, Desert {}/20", forest_successes, desert_successes);
+    // Sanity: at least some successes should happen in 20 tries
+    // (2-in-6 = 33% chance; 20 trials, probability of zero successes = (4/6)^20 ≈ 0.03%)
+    // Not asserting hard because it's stochastic
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6: Random Encounters & Evasion
+// ---------------------------------------------------------------------------
+
+/// RollEncounter in wilderness returns proper encounter data.
+#[test]
+fn playtest2c_roll_encounter_wilderness() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Roll encounters multiple times — all should succeed
+    for i in 0..5 {
+        let resp = handle_request(&req(&format!("e{}", i), GMCommand::RollEncounter), &mut state);
+        assert!(resp.success, "RollEncounter #{} failed: {}", i, resp.message);
+        let data = resp.data.unwrap();
+        assert_eq!(data["context"], "wilderness");
+        assert!(data["monster_name"].as_str().is_some());
+        assert!(data["number_appearing"].as_u64().unwrap() > 0);
+        assert!(data["distance"].as_u64().is_some(), "should have distance in yards");
+    }
+}
+
+/// RollEncounter in mountains (different terrain table).
+#[test]
+fn playtest2c_roll_encounter_mountains() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Mountains,
+    }), &mut state);
+    assert!(resp.success);
+
+    for i in 0..5 {
+        let resp = handle_request(&req(&format!("e{}", i), GMCommand::RollEncounter), &mut state);
+        assert!(resp.success, "RollEncounter mountains #{} failed: {}", i, resp.message);
+        let data = resp.data.unwrap();
+        assert_eq!(data["context"], "wilderness");
+    }
+}
+
+/// RollSurprise works from wilderness.
+#[test]
+fn playtest2c_surprise_in_wilderness() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("2", GMCommand::RollSurprise), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    assert!(data["party_roll"].as_u64().is_some());
+    assert!(data["monster_roll"].as_u64().is_some());
+}
+
+/// RollReaction with high-CHA character (no combat needed).
+#[test]
+fn playtest2c_reaction_high_charisma() {
+    let mut state = GameState::new();
+    let mut cleric = make_cleric("Diplomat");
+    cleric.abilities.charisma = 18;
+    state.party.add_member(cleric);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    // RollReaction works without active combat — it's a standalone encounter resolution tool
+    let resp = handle_request(&req("2", GMCommand::RollReaction {
+        character: "Diplomat".to_string(),
+    }), &mut state);
+    assert!(resp.success, "RollReaction should work: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert_eq!(data["character"], "Diplomat");
+    assert_eq!(data["charisma"], 18);
+    let reaction = data["reaction"].as_str().unwrap();
+    assert!(!reaction.is_empty(), "reaction result should not be empty");
+}
+
+/// Evade with various monster counts/movement rates.
+#[test]
+fn playtest2c_evade_mechanics() {
+    let mut state = GameState::new();
+    let mut fighter = make_fighter("Runner");
+    fighter.movement_rate = 120;
+    state.party.add_member(fighter);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Test evasion with few slow monsters (high chance of success)
+    let resp = handle_request(&req("e1", GMCommand::Evade {
+        monster_count: 1,
+        monster_movement: 60,
+    }), &mut state);
+    assert!(resp.success, "evade should succeed: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert!(data.get("escaped").is_some(), "evasion result should include escaped status");
+
+    // Test evasion with many fast monsters (lower chance)
+    let resp = handle_request(&req("e2", GMCommand::Evade {
+        monster_count: 10,
+        monster_movement: 180,
+    }), &mut state);
+    assert!(resp.success, "evade should always return a result: {}", resp.message);
+}
+
+/// SpawnNpcParty should use B/X classes only (oag-cqbud fix).
+#[test]
+fn playtest2c_npc_party_bx_classes() {
+    let bx_classes = [
+        "Fighter", "Thief", "Cleric", "Magic-User", "Elf", "Dwarf", "Halfling",
+    ];
+
+    // Generate several parties and check class distribution
+    for i in 0..5 {
+        let mut state = GameState::new();
+        let resp = handle_request(&req(&format!("n{}", i), GMCommand::SpawnNpcParty {
+            party_type: "basic".to_string(),
+            distance: 60,
+        }), &mut state);
+        assert!(resp.success, "SpawnNpcParty #{} failed: {:?}", i, resp.error);
+
+        let combat = state.combat.as_ref().unwrap();
+        for monster in &combat.monsters {
+            // NPC party members are spawned as "monsters" with class names
+            // Check that the name contains only B/X class references
+            let name_lower = monster.name.to_lowercase();
+            let is_bx = bx_classes.iter().any(|c| name_lower.contains(&c.to_lowercase()));
+            // Numbering may be appended ("fighter 1"), so just check the base
+            assert!(is_bx, "NPC party member '{}' should be a B/X class", monster.name);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7: Wilderness Combat
+// ---------------------------------------------------------------------------
+
+/// Full wilderness combat at wilderness distance scale.
+#[test]
+fn playtest2c_wilderness_combat_distance_yards() {
+    let mut state = GameState::new();
+    let mut fighter = make_fighter("Warrior");
+    fighter.hp = 50;
+    fighter.max_hp = 50;
+    state.party.add_member(fighter);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Roll encounter to get wilderness distance
+    let resp = handle_request(&req("2", GMCommand::RollEncounter), &mut state);
+    assert!(resp.success);
+    let data = resp.data.unwrap();
+    let encounter_distance = data["distance"].as_u64().unwrap();
+    // Wilderness encounters use yards (should be significantly larger than dungeon)
+    assert!(encounter_distance > 0, "encounter distance should be positive");
+    // Wilderness encounters are typically 40-240 yards
+    eprintln!("Wilderness encounter distance: {} yards", encounter_distance);
+
+    // Spawn combat at wilderness distance using SpawnEncounter (custom monster params)
+    // Use distance of 120 yards to demonstrate wilderness scale
+    let resp = handle_request(&req("3", GMCommand::SpawnEncounter(EncounterParams {
+        name: "bandit".to_string(),
+        count: 3,
+        hit_dice: "1".parse().unwrap(),
+        ac: 6,
+        hp: 4,
+        damage: "1d6".to_string(),
+        morale: 8,
+        distance: 120, // 120 yards — wilderness scale
+        xp_value: Some(10),
+    })), &mut state);
+    assert!(resp.success, "SpawnEncounter should work from wilderness: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Combat);
+    assert_eq!(state.combat.as_ref().unwrap().distance, 120);
+
+    // Verify wilderness encounter distance is in yards (much larger than dungeon feet)
+    // Dungeon encounters are 20-80 feet; wilderness are 40-240 yards
+    eprintln!("Combat distance set to {} (wilderness scale)", state.combat.as_ref().unwrap().distance);
+
+    // Close distance repeatedly to get to melee range (encounter move = movement_rate/3)
+    let resp = handle_request(&req("4", GMCommand::RollInitiative), &mut state);
+    assert!(resp.success);
+
+    // Close to melee range
+    while state.combat.as_ref().unwrap().distance > 5 {
+        let resp = handle_request(&req("4c", GMCommand::Close {
+            character: "Warrior".to_string(),
+            feet: None,
+        }), &mut state);
+        assert!(resp.success, "close should work: {}", resp.message);
+    }
+
+    // Attack at melee range
+    let resp = handle_request(&req("5", GMCommand::Attack {
+        character: "Warrior".to_string(),
+        monster_idx: 0,
+        weapon: "sword".to_string(),
+    }), &mut state);
+    assert!(resp.success, "attack should work at melee range: {}", resp.message);
+
+    // End combat — should return to Wilderness
+    let resp = handle_request(&req("6", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness, "should return to wilderness after combat");
+}
+
+/// Retreat/withdrawal at wilderness scale.
+#[test]
+fn playtest2c_wilderness_retreat() {
+    let mut state = GameState::new();
+    let mut fighter = make_fighter("Runner");
+    fighter.hp = 50;
+    fighter.max_hp = 50;
+    fighter.movement_rate = 120;
+    state.party.add_member(fighter);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Clear,
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("2", GMCommand::SpawnMonster {
+        name: "Ogre".to_string(),
+        count: 1,
+        distance: 30,
+    }), &mut state);
+    assert!(resp.success, "SpawnMonster Ogre failed: {}", resp.message);
+
+    // Fighting withdrawal first (no free attacks)
+    let resp = handle_request(&req("3", GMCommand::FightingWithdrawal {
+        character: "Runner".to_string(),
+    }), &mut state);
+    assert!(resp.success, "fighting withdrawal should work: {}", resp.message);
+
+    // Full retreat (with free attacks)
+    let resp = handle_request(&req("4", GMCommand::Retreat {
+        character: "Runner".to_string(),
+    }), &mut state);
+    assert!(resp.success, "retreat should work: {}", resp.message);
+
+    // End combat, verify return to wilderness
+    let resp = handle_request(&req("5", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8: Hex Map Persistence (Save/Load)
+// ---------------------------------------------------------------------------
+
+/// Build large hex map, save, reload, verify all hexes and state persist.
+#[test]
+fn playtest2c_hex_map_persistence() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    let save_name = format!("osr_test_wilderness_persist_{pid}_{n}");
+
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Explorer"));
+    state.party.add_member(make_cleric("Prior"));
+
+    handle_request(&req("r0", GMCommand::SetRations { amount: 50 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Build 15+ hex map
+    let hex_data = [
+        (1, 0, Terrain::Clear),
+        (0, 1, Terrain::Hills),
+        (-1, 0, Terrain::Mountains),
+        (0, -1, Terrain::Swamp),
+        (1, 1, Terrain::Desert),
+        (-1, -1, Terrain::Jungle),
+        (1, -1, Terrain::Barren),
+        (-1, 1, Terrain::River),
+        (2, 0, Terrain::City),
+        (2, 1, Terrain::Forest),
+        (2, -1, Terrain::Hills),
+        (-2, 0, Terrain::Clear),
+        (-2, 1, Terrain::Mountains),
+        (-2, -1, Terrain::Desert),
+        (0, 2, Terrain::Swamp),
+    ];
+
+    for (x, y, terrain) in &hex_data {
+        let resp = handle_request(&req("h", GMCommand::AddHex {
+            x: *x, y: *y, terrain: *terrain,
+        }), &mut state);
+        assert!(resp.success, "AddHex ({},{}) failed: {}", x, y, resp.message);
+    }
+
+    // Travel a couple hexes to change position
+    handle_request(&req("t1", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+
+    let pre_save_hexes = state.wilderness.as_ref().unwrap().hexes.len();
+    let pre_save_day = state.wilderness.as_ref().unwrap().travel_day;
+    let pre_save_rations = state.party.rations;
+    assert!(pre_save_hexes >= 16, "should have at least 16 hexes (15 added + 1 starting)");
+
+    // Save
+    let resp = handle_request(&req("s1", GMCommand::Save { path: save_name.clone() }), &mut state);
+    assert!(resp.success, "save failed: {}", resp.message);
+
+    // Load into fresh state
+    let mut state2 = GameState::new();
+    let resp = handle_request(&req("l1", GMCommand::Load { path: save_name.clone() }), &mut state2);
+    assert!(resp.success, "load failed: {}", resp.message);
+
+    // Verify wilderness state persisted
+    assert!(state2.wilderness.is_some(), "wilderness should persist after load");
+    let ws = state2.wilderness.as_ref().unwrap();
+    assert_eq!(ws.hexes.len(), pre_save_hexes, "hex count should match after load");
+    assert_eq!(ws.travel_day, pre_save_day, "travel day should match after load");
+    assert_eq!(state2.party.rations, pre_save_rations, "rations should match after load");
+    assert_eq!(state2.mode, GameMode::Wilderness, "mode should be Wilderness after load");
+
+    // Verify QueryWilderness works after load
+    let resp = handle_request(&req("q1", GMCommand::QueryWilderness), &mut state2);
+    assert!(resp.success, "QueryWilderness should work after load: {}", resp.message);
+
+    // Clean up save file
+    if let Ok(path) = osr_ai_gm::persist::safe_save_path(&save_name) {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Edge Cases
+// ---------------------------------------------------------------------------
+
+/// AddHex at same coordinates should reject (duplicate).
+#[test]
+fn playtest2c_add_hex_duplicate_coordinates() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    // (0,0) already exists from EnterWilderness
+    let resp = handle_request(&req("2", GMCommand::AddHex {
+        x: 0, y: 0, terrain: Terrain::Clear,
+    }), &mut state);
+    assert!(!resp.success, "duplicate hex should be rejected");
+    assert!(resp.message.contains("duplicate"), "error should mention duplicate: {}", resp.message);
+}
+
+/// Very large hex coordinates should work for AddHex.
+#[test]
+fn playtest2c_large_hex_coordinates() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Explorer"));
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Clear,
+    }), &mut state);
+    assert!(resp.success);
+
+    let resp = handle_request(&req("2", GMCommand::AddHex {
+        x: 1000, y: -1000, terrain: Terrain::Mountains,
+    }), &mut state);
+    assert!(resp.success, "large coordinates should be accepted: {}", resp.message);
+
+    // Can't travel there (too far) — distance check rejects early with
+    // "exceeds travel range" but returns success=true with no resources consumed.
+    // This is the out-of-range early rejection behavior (oag-odo8b).
+    let ws = state.wilderness.as_ref().unwrap();
+    let day_before = ws.travel_day;
+    let rations_before = state.party.rations;
+    let _resp = handle_request(&req("3", GMCommand::Travel { x: 1000, y: -1000 }), &mut state);
+    // Either fails or succeeds with "no travel attempted" — either way, no crash
+    let ws = state.wilderness.as_ref().unwrap();
+    assert_eq!(ws.travel_day, day_before, "should not advance day for out-of-range travel");
+    assert_eq!(state.party.rations, rations_before, "should not consume rations for out-of-range travel");
+}
+
+/// RollEncounter 20 times rapidly — no crashes.
+#[test]
+fn playtest2c_rapid_roll_encounters() {
+    let mut state = GameState::new();
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    for i in 0..20 {
+        let resp = handle_request(&req(&format!("r{}", i), GMCommand::RollEncounter), &mut state);
+        assert!(resp.success, "RollEncounter #{} failed: {}", i, resp.message);
+    }
+}
+
+/// Mode transition: wilderness → combat → wilderness (round trip).
+#[test]
+fn playtest2c_wilderness_combat_roundtrip() {
+    let mut state = GameState::new();
+    let mut fighter = make_fighter("Warrior");
+    fighter.hp = 100;
+    fighter.max_hp = 100;
+    state.party.add_member(fighter);
+
+    handle_request(&req("r0", GMCommand::SetRations { amount: 50 }), &mut state);
+
+    let resp = handle_request(&req("1", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+
+    // Add hex and travel
+    handle_request(&req("2", GMCommand::AddHex { x: 1, y: 0, terrain: Terrain::Hills }), &mut state);
+    handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+
+    let ws_day = state.wilderness.as_ref().unwrap().travel_day;
+    let ws_rations = state.party.rations;
+
+    // Enter combat (use SpawnEncounter for custom monster since "Bear" isn't in db)
+    let resp = handle_request(&req("4", GMCommand::SpawnEncounter(EncounterParams {
+        name: "bear".to_string(),
+        count: 1,
+        hit_dice: "4".parse().unwrap(),
+        ac: 6,
+        hp: 16,
+        damage: "2d4".to_string(),
+        morale: 7,
+        distance: 20,
+        xp_value: Some(75),
+    })), &mut state);
+    assert!(resp.success, "SpawnEncounter failed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    // Combat actions
+    handle_request(&req("5", GMCommand::RollInitiative), &mut state);
+    handle_request(&req("6", GMCommand::Attack {
+        character: "Warrior".to_string(), monster_idx: 0, weapon: "sword".to_string(),
+    }), &mut state);
+
+    // End combat
+    let resp = handle_request(&req("7", GMCommand::EndCombat), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness, "should return to wilderness");
+
+    // Verify wilderness state preserved through combat
+    let ws = state.wilderness.as_ref().unwrap();
+    assert_eq!(ws.travel_day, ws_day, "travel day should not change during combat");
+    assert_eq!(state.party.rations, ws_rations, "rations should not change during combat");
+
+    // Can still travel after combat
+    handle_request(&req("8", GMCommand::AddHex { x: 0, y: 1, terrain: Terrain::Clear }), &mut state);
+    // Need to navigate from current position
+    let ws = state.wilderness.as_ref().unwrap();
+    if ws.current_x == 1 && ws.current_y == 0 {
+        let resp = handle_request(&req("9", GMCommand::Travel { x: 0, y: 0 }), &mut state);
+        assert!(resp.success, "should be able to travel after combat: {}", resp.message);
+    }
+}
