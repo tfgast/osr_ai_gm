@@ -80,7 +80,10 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
             };
 
             if let std::collections::hash_map::Entry::Vacant(entry) = created_doors.entry(pair) {
-                let door = Door::new(door_id, pair.0, pair.1, exit.door)?;
+                let mut door = Door::new(door_id, pair.0, pair.1, exit.door)?;
+                if exit.door == crate::state::dungeon::DoorState::Open {
+                    door.module_open = true;
+                }
                 dungeon.add_door(door)?;
                 entry.insert(door_id);
                 door_id += 1;
@@ -360,5 +363,48 @@ mod tests {
             .find(|r| r.name == "Guard Chamber")
             .expect("should have Guard Chamber");
         assert_eq!(guard.key, Some("guard".to_string()));
+    }
+
+    #[test]
+    fn module_to_dungeon_open_doors_are_module_open() {
+        let json = r#"{
+            "name": "Open Passage Test",
+            "level_range": [1, 3],
+            "entry_room": "hall",
+            "rooms": {
+                "hall": {
+                    "name": "Great Hall",
+                    "description": "A wide hall.",
+                    "exits": [
+                        {"to": "gallery", "door": "open"},
+                        {"to": "cellar", "door": "closed"}
+                    ]
+                },
+                "gallery": {
+                    "name": "Gallery",
+                    "description": "An open gallery.",
+                    "exits": [{"to": "hall", "door": "open"}]
+                },
+                "cellar": {
+                    "name": "Cellar",
+                    "description": "A dark cellar.",
+                    "exits": [{"to": "hall", "door": "closed"}]
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        // The open door (hall <-> gallery) should have module_open = true
+        let open_door = dungeon.doors.iter()
+            .find(|d| d.state == DoorState::Open)
+            .expect("should have an open door");
+        assert!(open_door.module_open, "module-defined open door should have module_open = true");
+
+        // The closed door (hall <-> cellar) should have module_open = false
+        let closed_door = dungeon.doors.iter()
+            .find(|d| d.state == DoorState::Closed)
+            .expect("should have a closed door");
+        assert!(!closed_door.module_open, "closed door should have module_open = false");
     }
 }

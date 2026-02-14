@@ -70,6 +70,11 @@ pub struct Door {
     pub state: DoorState,
     /// Whether the door has been discovered (relevant for secret doors).
     pub discovered: bool,
+    /// Whether the door was defined as open by a module (permanent passage).
+    /// Module-open doors represent archways, open gates, or collapsed walls
+    /// and do not auto-close when passed through.
+    #[serde(default)]
+    pub module_open: bool,
 }
 
 impl Door {
@@ -78,7 +83,7 @@ impl Door {
             return Err(format!("door {} connects room {} to itself", id, room_a));
         }
         let discovered = state != DoorState::Secret;
-        Ok(Door { id, room_a, room_b, state, discovered })
+        Ok(Door { id, room_a, room_b, state, discovered, module_open: false })
     }
 
     /// Whether the party can attempt to pass through this door.
