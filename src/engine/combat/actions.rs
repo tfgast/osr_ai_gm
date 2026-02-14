@@ -22,59 +22,66 @@ fn no_active_combat() -> EngineError {
     EngineError::WrongState("no active combat.".to_string())
 }
 
+pub struct SpawnEncounterParams<'a> {
+    pub name: &'a str,
+    pub count: u32,
+    pub hit_dice: &'a str,
+    pub ac: i32,
+    pub hp: i32,
+    pub damage: &'a str,
+    pub morale: u32,
+    pub distance: u32,
+    pub xp_value: Option<u64>,
+}
+
 pub fn action_spawn_encounter(
     state: &mut GameState,
-    name: &str,
-    count: u32,
-    hit_dice: &str,
-    ac: i32,
-    hp: i32,
-    damage: &str,
-    morale: u32,
-    distance: u32,
-    xp_value: Option<u64>,
+    params: &SpawnEncounterParams<'_>,
 ) -> Result<SpawnEncounterResult, EngineError> {
     if state.combat.is_some() {
         return Err(EngineError::WrongState(
             "combat already active. Use 'end_combat' first.".to_string(),
         ));
     }
-    if count == 0 {
+    if params.count == 0 {
         return Err(EngineError::InvalidInput(
             "count must be a positive integer".to_string(),
         ));
     }
-    if hp < 1 {
+    if params.hp < 1 {
         return Err(EngineError::InvalidInput(
             "hp must be a positive integer".to_string(),
         ));
     }
-    if !(2..=12).contains(&morale) {
+    if !(2..=12).contains(&params.morale) {
         return Err(EngineError::InvalidInput("morale must be 2-12".to_string()));
     }
 
-    let xp_per_monster =
-        xp_value.unwrap_or_else(|| monster_db::find_monster(name).map(|m| m.xp()).unwrap_or(0));
+    let xp_per_monster = params.xp_value.unwrap_or_else(|| {
+        monster_db::find_monster(params.name)
+            .map(|m| m.xp())
+            .unwrap_or(0)
+    });
 
     let mut monsters = Vec::new();
-    for i in 0..count {
-        let monster_name = if count > 1 {
-            format!("{} {}", name, i + 1)
+    for i in 0..params.count {
+        let monster_name = if params.count > 1 {
+            format!("{} {}", params.name, i + 1)
         } else {
-            name.to_string()
+            params.name.to_string()
         };
-        let mut monster = Monster::new(&monster_name, hit_dice);
-        monster.hp = hp;
-        monster.max_hp = hp;
-        monster.ac = ac;
-        monster.damage = damage.to_string();
-        monster.morale = morale;
+        let mut monster = Monster::new(&monster_name, params.hit_dice);
+        monster.hp = params.hp;
+        monster.max_hp = params.hp;
+        monster.ac = params.ac;
+        monster.damage = params.damage.to_string();
+        monster.morale = params.morale;
         monster.xp_value = xp_per_monster;
         monster.attacks = vec!["attack".to_string()];
         monsters.push(monster);
     }
 
-    let combat = CombatState::new(monsters, distance);
+    let combat = CombatState::new(monsters, params.distance);
     let status = combat_status(&combat, &state.party.members);
     state.combat = Some(combat);
     state.pre_combat_mode = Some(state.mode.clone());
@@ -83,16 +90,16 @@ pub fn action_spawn_encounter(
     Ok(SpawnEncounterResult {
         message: format!(
             "combat started: {} {}(s) at {}' distance.",
-            count, name, distance
+            params.count, params.name, params.distance
         ),
-        encounter_name: name.to_string(),
-        count,
-        hit_dice: hit_dice.to_string(),
-        ac,
-        hp,
-        damage: damage.to_string(),
-        morale,
-        distance,
+        encounter_name: params.name.to_string(),
+        count: params.count,
+        hit_dice: params.hit_dice.to_string(),
+        ac: params.ac,
+        hp: params.hp,
+        damage: params.damage.to_string(),
+        morale: params.morale,
+        distance: params.distance,
         xp_per_monster,
         status,
     })

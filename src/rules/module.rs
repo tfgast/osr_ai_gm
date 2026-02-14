@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::pathutil::normalize_path;
 use crate::state::dungeon::DoorState;
 
 /// A complete adventure module definition.
@@ -88,6 +89,9 @@ pub const DEFAULT_MODULES_DIR: &str = "data/modules";
 /// This prevents path traversal attacks where a user could read arbitrary
 /// files by passing paths like `../../../../etc/passwd`.
 fn validate_module_path(user_path: &str, modules_dir: &str) -> Result<PathBuf, String> {
+    if user_path.contains('\0') {
+        return Err("Module path must not contain null bytes.".to_string());
+    }
     let expanded = expand_tilde(user_path);
     let path = Path::new(&expanded);
 
@@ -137,26 +141,6 @@ fn validate_module_path(user_path: &str, modules_dir: &str) -> Result<PathBuf, S
     Ok(canonical)
 }
 
-/// Normalize a path by resolving `.` and `..` components without filesystem access.
-fn normalize_path(path: &Path) -> PathBuf {
-    use std::path::Component;
-    let mut parts: Vec<Component> = Vec::new();
-    for component in path.components() {
-        match component {
-            Component::ParentDir => {
-                // Only pop if the last component is a normal directory
-                if matches!(parts.last(), Some(Component::Normal(_))) {
-                    parts.pop();
-                } else {
-                    parts.push(component);
-                }
-            }
-            Component::CurDir => {} // skip
-            c => parts.push(c),
-        }
-    }
-    parts.iter().collect()
-}
 
 /// Load a module definition from a JSON file.
 ///
@@ -587,5 +571,46 @@ mod tests {
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("must be within the modules directory"));
+    }
+
+    #[test]
+    fn validate_null_byte_rejected() {
+        let result = validate_module_path(
+            "data/modules/sample_crypt\0/../../etc/passwd",
+            "data/modules",
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("null bytes"));
+    }
+
+    #[test]
+    fn validate_tilde_traversal_rejected() {
+        // ~ expands to HOME but should still be checked against modules dir
+        let result = validate_module_path("~/../../etc/passwd", "data/modules");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must be within the modules directory"));
+    }
+
+    #[test]
+    fn validate_deeply_nested_traversal_rejected() {
+        let result = validate_module_path(
+            "data/modules/a/b/c/../../../../../etc/shadow",
+            "data/modules",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_dot_only_path_rejected() {
+        // "." resolves to cwd which is not within data/modules
+        let result = validate_module_path(".", "data/modules");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_empty_path_rejected() {
+        // Empty string resolves to cwd
+        let result = validate_module_path("", "data/modules");
+        assert!(result.is_err());
     }
 }
