@@ -62,8 +62,19 @@ impl TokenStore {
         self.tokens.iter().any(|t| constant_time_eq(t.token.as_bytes(), candidate_bytes))
     }
 
-    /// Add a new token and return it.
-    pub fn create_token(&mut self, name: &str) -> ApiToken {
+    /// Check if a token with the given name already exists.
+    pub fn has_name(&self, name: &str) -> bool {
+        self.tokens.iter().any(|t| t.name == name)
+    }
+
+    /// Add a new token and return it. Errors if the name is already taken.
+    pub fn create_token(&mut self, name: &str) -> Result<ApiToken, io::Error> {
+        if self.has_name(name) {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                format!("token name '{}' already exists", name),
+            ));
+        }
         let token = generate_token();
         let api_token = ApiToken {
             token,
@@ -71,7 +82,7 @@ impl TokenStore {
             created_at: now_iso8601(),
         };
         self.tokens.push(api_token.clone());
-        api_token
+        Ok(api_token)
     }
 
     /// Revoke a token by name. Returns true if found and removed.
@@ -149,7 +160,7 @@ mod tests {
     #[test]
     fn token_store_create_and_validate() {
         let mut store = TokenStore { tokens: vec![] };
-        let token = store.create_token("test");
+        let token = store.create_token("test").unwrap();
         assert!(store.validate(&token.token));
         assert!(!store.validate("not-a-real-token"));
     }
@@ -157,10 +168,29 @@ mod tests {
     #[test]
     fn token_store_revoke() {
         let mut store = TokenStore { tokens: vec![] };
-        let token = store.create_token("test");
+        let token = store.create_token("test").unwrap();
         assert!(store.validate(&token.token));
         assert!(store.revoke("test"));
         assert!(!store.validate(&token.token));
+    }
+
+    #[test]
+    fn token_store_create_duplicate_name_rejected() {
+        let mut store = TokenStore { tokens: vec![] };
+        store.create_token("dup").unwrap();
+        let err = store.create_token("dup").unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
+        assert!(err.to_string().contains("dup"));
+        assert_eq!(store.tokens.len(), 1);
+    }
+
+    #[test]
+    fn token_store_create_after_revoke_allowed() {
+        let mut store = TokenStore { tokens: vec![] };
+        store.create_token("reuse").unwrap();
+        store.revoke("reuse");
+        let token = store.create_token("reuse").unwrap();
+        assert!(store.validate(&token.token));
     }
 
     #[test]
@@ -176,7 +206,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
 
         let mut store = TokenStore { tokens: vec![] };
-        store.create_token("roundtrip-test");
+        store.create_token("roundtrip-test").unwrap();
         store.save(&path).unwrap();
 
         let loaded = TokenStore::load(&path).unwrap();
