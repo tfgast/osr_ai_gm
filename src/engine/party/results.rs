@@ -2,6 +2,7 @@ use serde::Serialize;
 
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
+use crate::rules::encumbrance::EncumbranceLevel;
 
 /// Result payload for create character flow.
 #[derive(Debug, Clone, Serialize)]
@@ -16,6 +17,15 @@ pub struct CreateCharacterResult {
     pub created: bool,
     pub eligible_classes: Vec<Class>,
     pub character_sheet: Option<String>,
+}
+
+/// Inventory summary for a single party member.
+#[derive(Debug, Clone, Serialize)]
+pub struct MemberInventorySummary {
+    pub total_weight_cn: u32,
+    pub encumbrance_level: EncumbranceLevel,
+    pub item_count: u32,
+    pub equipped_items: Vec<String>,
 }
 
 /// Party member summary for query responses.
@@ -34,6 +44,7 @@ pub struct PartyMemberSummary {
     pub movement_rate: u32,
     pub next_level_xp: Option<u64>,
     pub ready_to_train: bool,
+    pub inventory: MemberInventorySummary,
 }
 
 /// Result payload for querying party state.
@@ -41,6 +52,8 @@ pub struct PartyMemberSummary {
 pub struct QueryPartyResult {
     pub members: Vec<PartyMemberSummary>,
     pub days_without_food: u32,
+    pub rations: u32,
+    pub party_gold: u64,
 }
 
 /// One class requirement entry.

@@ -3,11 +3,12 @@ use crate::engine::result::EngineError;
 use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::{self, Class};
+use crate::rules::encumbrance;
 use crate::rules::xp::{check_level_up, xp_for_level};
 
 use super::results::{
     AbilityRequirement, ClassSummary, CreateCharacterResult, EligibleClassesResult,
-    ListClassesResult, PartyMemberSummary, QueryPartyResult,
+    ListClassesResult, MemberInventorySummary, PartyMemberSummary, QueryPartyResult,
 };
 
 fn ability_name(idx: usize) -> &'static str {
@@ -104,6 +105,21 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
                 None
             };
 
+            let item_weights: Vec<u32> = character
+                .inventory
+                .iter()
+                .map(|item| (item.weight * 10.0) as u32)
+                .collect();
+            let total_weight_cn =
+                encumbrance::total_weight(&item_weights, character.gold_gp);
+            let encumbrance_level = encumbrance::encumbrance_level(total_weight_cn);
+            let equipped_items: Vec<String> = character
+                .inventory
+                .iter()
+                .filter(|item| item.equipped)
+                .map(|item| item.name.clone())
+                .collect();
+
             PartyMemberSummary {
                 name: character.name.clone(),
                 class: character.class,
@@ -119,6 +135,12 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
                 next_level_xp,
                 ready_to_train: character.is_alive()
                     && check_level_up(character.class, character.level, character.xp).is_some(),
+                inventory: MemberInventorySummary {
+                    total_weight_cn,
+                    encumbrance_level,
+                    item_count: character.inventory.len() as u32,
+                    equipped_items,
+                },
             }
         })
         .collect();
@@ -126,6 +148,8 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
     Ok(QueryPartyResult {
         members,
         days_without_food: state.party.days_without_food,
+        rations: state.party.rations,
+        party_gold: state.party.gold,
     })
 }
 
@@ -170,4 +194,86 @@ pub fn action_eligible_classes(abilities: [i32; 6]) -> Result<EligibleClassesRes
         abilities,
         eligible,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Character, Item};
+    use crate::rules::encumbrance::EncumbranceLevel;
+
+    fn state_with_equipped_fighter() -> GameState {
+        let mut state = GameState::new();
+        let mut fighter = Character::new("Grond", Class::Fighter);
+        fighter.hp = 8;
+        fighter.max_hp = 8;
+        fighter.ac = 4;
+        fighter.gold_gp = 50;
+
+        let mut sword = Item::new("Sword", 6.0, 10);
+        sword.equipped = true;
+        let mut plate = Item::new("Plate mail", 50.0, 60);
+        plate.equipped = true;
+        let torch = Item::new("Torch", 0.0, 0);
+        fighter.inventory = vec![sword, plate, torch];
+
+        state.party.add_member(fighter);
+        state.party.rations = 7;
+        state.party.gold = 200;
+        state
+    }
+
+    #[test]
+    fn query_party_includes_inventory_summary() {
+        let state = state_with_equipped_fighter();
+        let result = action_query_party(&state).unwrap();
+
+        assert_eq!(result.members.len(), 1);
+        let member = &result.members[0];
+        let inv = &member.inventory;
+
+        // Sword 60cn + Plate 500cn + Torch 0cn + 50gp = 610cn
+        assert_eq!(inv.total_weight_cn, 610);
+        assert_eq!(inv.encumbrance_level, EncumbranceLevel::Heavy);
+        assert_eq!(inv.item_count, 3);
+        assert_eq!(inv.equipped_items, vec!["Sword", "Plate mail"]);
+    }
+
+    #[test]
+    fn query_party_includes_rations_and_gold() {
+        let state = state_with_equipped_fighter();
+        let result = action_query_party(&state).unwrap();
+
+        assert_eq!(result.rations, 7);
+        assert_eq!(result.party_gold, 200);
+    }
+
+    #[test]
+    fn query_party_empty_inventory() {
+        let mut state = GameState::new();
+        let fighter = Character::new("Arden", Class::Fighter);
+        state.party.add_member(fighter);
+
+        let result = action_query_party(&state).unwrap();
+        let inv = &result.members[0].inventory;
+
+        assert_eq!(inv.total_weight_cn, 0);
+        assert_eq!(inv.encumbrance_level, EncumbranceLevel::Unencumbered);
+        assert_eq!(inv.item_count, 0);
+        assert!(inv.equipped_items.is_empty());
+    }
+
+    #[test]
+    fn query_party_overloaded_character() {
+        let mut state = GameState::new();
+        let mut fighter = Character::new("Mule", Class::Fighter);
+        fighter.gold_gp = 1700; // Over 1600cn max
+        state.party.add_member(fighter);
+
+        let result = action_query_party(&state).unwrap();
+        let inv = &result.members[0].inventory;
+
+        assert_eq!(inv.total_weight_cn, 1700);
+        assert_eq!(inv.encumbrance_level, EncumbranceLevel::Overloaded);
+    }
 }

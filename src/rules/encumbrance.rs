@@ -11,7 +11,7 @@
 /// - Over maximum (>1600 cn): 0' (cannot move)
 ///
 /// Encumbrance category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum EncumbranceLevel {
     Unencumbered,
     Light,
