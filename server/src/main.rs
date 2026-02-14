@@ -52,7 +52,7 @@ async fn main() {
         eprintln!("  Create a token: osr-gm-server token create <name>");
     }
 
-    let port = port_from_args(&args);
+    let port_config = port_from_args(&args);
     let bind_addr = bind_addr_from_args(&args);
 
     let state = Arc::new(AppState {
@@ -65,19 +65,13 @@ async fn main() {
         .route("/api/v1/gm", post(gm_endpoint))
         .with_state(state);
 
-    let addr: SocketAddr = format!("{}:{}", bind_addr, port)
-        .parse()
-        .unwrap_or_else(|_| {
-            eprintln!("error: invalid bind address");
-            std::process::exit(1);
-        });
-
-    eprintln!("OSR GM Server listening on {}", addr);
-
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap_or_else(|e| {
-        eprintln!("error: failed to bind to {}: {}", addr, e);
+    let listener = bind_listener(&bind_addr, &port_config).await;
+    let local_addr = listener.local_addr().unwrap_or_else(|e| {
+        eprintln!("error: failed to get local address: {}", e);
         std::process::exit(1);
     });
+    eprintln!("OSR GM Server listening on {}", local_addr);
+
     axum::serve(listener, app).await.unwrap_or_else(|e| {
         eprintln!("error: server failed: {}", e);
         std::process::exit(1);
@@ -165,27 +159,40 @@ USAGE:
     osr-gm-server token revoke <name>    Revoke a token by name
 
 OPTIONS:
-    --port <PORT>           Listen port (default: 3000, or OSR_GM_PORT env)
+    --port <PORT|auto>      Listen port (default: 3000, or OSR_GM_PORT env)
+                            Use 'auto' to find an available port in 3000-3099
     --bind <ADDR>           Bind address (default: 127.0.0.1, or OSR_GM_BIND env)
     --token-file <PATH>     Token store path (default: ~/.osr_data/api_tokens.json)"
     );
 }
 
-fn port_from_args(args: &[String]) -> u16 {
+enum PortConfig {
+    Fixed(u16),
+    Auto,
+}
+
+fn port_from_args(args: &[String]) -> PortConfig {
     for i in 0..args.len() {
         if args[i] == "--port" {
             if let Some(val) = args.get(i + 1) {
-                return val.parse().unwrap_or_else(|_| {
-                    eprintln!("error: invalid port number");
+                if val == "auto" {
+                    return PortConfig::Auto;
+                }
+                return PortConfig::Fixed(val.parse().unwrap_or_else(|_| {
+                    eprintln!("error: invalid port number: {}", val);
                     std::process::exit(1);
-                });
+                }));
             }
         }
     }
-    std::env::var("OSR_GM_PORT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3000)
+    match std::env::var("OSR_GM_PORT") {
+        Ok(v) if v == "auto" => PortConfig::Auto,
+        Ok(v) => PortConfig::Fixed(v.parse().unwrap_or_else(|_| {
+            eprintln!("error: invalid OSR_GM_PORT value: {}", v);
+            std::process::exit(1);
+        })),
+        Err(_) => PortConfig::Fixed(3000),
+    }
 }
 
 fn bind_addr_from_args(args: &[String]) -> String {
@@ -199,6 +206,50 @@ fn bind_addr_from_args(args: &[String]) -> String {
     std::env::var("OSR_GM_BIND")
         .ok()
         .unwrap_or_else(|| "127.0.0.1".to_string())
+}
+
+async fn bind_listener(bind_addr: &str, port_config: &PortConfig) -> tokio::net::TcpListener {
+    match port_config {
+        PortConfig::Fixed(port) => {
+            let addr: SocketAddr = format!("{}:{}", bind_addr, port)
+                .parse()
+                .unwrap_or_else(|_| {
+                    eprintln!("error: invalid bind address: {}", bind_addr);
+                    std::process::exit(1);
+                });
+            tokio::net::TcpListener::bind(addr).await.unwrap_or_else(|e| {
+                if e.kind() == std::io::ErrorKind::AddrInUse {
+                    eprintln!("error: port {} is already in use on {}", port, bind_addr);
+                    eprintln!("  Try a different port:  osr-gm-server --port <PORT>");
+                    eprintln!("  Or set env variable:   OSR_GM_PORT=<PORT>");
+                    eprintln!("  Or auto-select a port: osr-gm-server --port auto");
+                } else {
+                    eprintln!("error: failed to bind to {}: {}", addr, e);
+                }
+                std::process::exit(1);
+            })
+        }
+        PortConfig::Auto => {
+            for port in 3000..=3099 {
+                let addr: SocketAddr = format!("{}:{}", bind_addr, port)
+                    .parse()
+                    .unwrap_or_else(|_| {
+                        eprintln!("error: invalid bind address: {}", bind_addr);
+                        std::process::exit(1);
+                    });
+                match tokio::net::TcpListener::bind(addr).await {
+                    Ok(listener) => return listener,
+                    Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => continue,
+                    Err(e) => {
+                        eprintln!("error: failed to bind to {}: {}", addr, e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            eprintln!("error: no available port in range 3000-3099 on {}", bind_addr);
+            std::process::exit(1);
+        }
+    }
 }
 
 fn token_path_from_args(args: &[String]) -> PathBuf {
@@ -309,5 +360,70 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("authorization", HeaderValue::from_static("Bearer "));
         assert_eq!(extract_bearer_token(&headers), None);
+    }
+
+    fn s(val: &str) -> String {
+        val.to_string()
+    }
+
+    #[test]
+    fn port_from_args_default() {
+        let args = vec![s("osr-gm-server")];
+        match port_from_args(&args) {
+            PortConfig::Fixed(3000) => {}
+            other => panic!("expected Fixed(3000), got {:?}", port_config_debug(&other)),
+        }
+    }
+
+    #[test]
+    fn port_from_args_explicit() {
+        let args = vec![s("osr-gm-server"), s("--port"), s("4000")];
+        match port_from_args(&args) {
+            PortConfig::Fixed(4000) => {}
+            other => panic!("expected Fixed(4000), got {:?}", port_config_debug(&other)),
+        }
+    }
+
+    #[test]
+    fn port_from_args_auto() {
+        let args = vec![s("osr-gm-server"), s("--port"), s("auto")];
+        match port_from_args(&args) {
+            PortConfig::Auto => {}
+            other => panic!("expected Auto, got {:?}", port_config_debug(&other)),
+        }
+    }
+
+    #[test]
+    fn port_from_env_auto() {
+        // Temporarily set the env var for this test.
+        std::env::set_var("OSR_GM_PORT", "auto");
+        let args = vec![s("osr-gm-server")];
+        let result = port_from_args(&args);
+        std::env::remove_var("OSR_GM_PORT");
+        match result {
+            PortConfig::Auto => {}
+            other => panic!("expected Auto, got {:?}", port_config_debug(&other)),
+        }
+    }
+
+    #[tokio::test]
+    async fn bind_listener_fixed_port() {
+        let listener = bind_listener("127.0.0.1", &PortConfig::Fixed(0)).await;
+        let addr = listener.local_addr().unwrap();
+        assert_ne!(addr.port(), 0); // OS assigns a real port
+    }
+
+    #[tokio::test]
+    async fn bind_listener_auto_finds_port() {
+        let listener = bind_listener("127.0.0.1", &PortConfig::Auto).await;
+        let addr = listener.local_addr().unwrap();
+        assert!((3000..=3099).contains(&addr.port()));
+    }
+
+    fn port_config_debug(pc: &PortConfig) -> String {
+        match pc {
+            PortConfig::Fixed(p) => format!("Fixed({})", p),
+            PortConfig::Auto => "Auto".to_string(),
+        }
     }
 }
