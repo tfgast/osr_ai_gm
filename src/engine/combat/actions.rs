@@ -283,6 +283,12 @@ pub fn action_monster_attack(
                 combat.monsters[monster_idx].name
             )));
         }
+        if combat.monsters[monster_idx].turned {
+            return Err(EngineError::InvalidInput(format!(
+                "{} is turned and cannot attack.",
+                combat.monsters[monster_idx].name
+            )));
+        }
     }
 
     let character = state.party.find_member_mut(char_name).ok_or_else(|| {
@@ -874,5 +880,17 @@ mod tests {
         let result = action_roll_initiative(&mut state);
         assert!(result.is_ok());
         assert_eq!(state.combat.as_ref().unwrap().round, 2);
+    }
+
+    #[test]
+    fn turned_monster_cannot_attack() {
+        let mut state = state_with_melee_combat();
+        // Mark monster as turned
+        state.combat.as_mut().unwrap().monsters[0].turned = true;
+
+        let result = action_monster_attack(&mut state, 0, "Grond");
+        assert!(result.is_err(), "turned monster should not be able to attack");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("turned"), "error should mention 'turned': {}", err_msg);
     }
 }

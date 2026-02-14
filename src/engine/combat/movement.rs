@@ -112,7 +112,7 @@ pub fn retreat_with<R: Rng>(
     let mut free_attacks = Vec::new();
     let alive_monster_indices: Vec<usize> = combat.monsters.iter()
         .enumerate()
-        .filter(|(_, m)| m.is_alive())
+        .filter(|(_, m)| m.is_alive() && !m.turned)
         .map(|(i, _)| i)
         .collect();
 
