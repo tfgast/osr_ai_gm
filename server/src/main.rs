@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 
 struct AppState {
     game: Mutex<GameState>,
-    tokens: TokenStore,
+    token_path: PathBuf,
 }
 
 #[tokio::main]
@@ -37,27 +37,27 @@ async fn main() {
         }
     }
 
-    // Load token store
+    // Validate token store is readable at startup
     let token_path = token_path_from_args(&args);
-    let tokens = match TokenStore::load(&token_path) {
-        Ok(store) => store,
+    match TokenStore::load(&token_path) {
+        Ok(store) => {
+            if store.tokens.is_empty() {
+                eprintln!("warning: no API tokens configured. All requests will be rejected.");
+                eprintln!("  Create a token: osr-gm-server token create <name>");
+            }
+        }
         Err(e) => {
             eprintln!("error: failed to load token store from {}: {}", token_path.display(), e);
             std::process::exit(1);
         }
     };
 
-    if tokens.tokens.is_empty() {
-        eprintln!("warning: no API tokens configured. All requests will be rejected.");
-        eprintln!("  Create a token: osr-gm-server token create <name>");
-    }
-
     let port_config = port_from_args(&args);
     let bind_addr = bind_addr_from_args(&args);
 
     let state = Arc::new(AppState {
         game: Mutex::new(GameState::new()),
-        tokens,
+        token_path,
     });
 
     let app = Router::new()
@@ -99,7 +99,19 @@ async fn gm_endpoint(
         }
     };
 
-    if !state.tokens.validate(token) {
+    let tokens = match TokenStore::load(&state.token_path) {
+        Ok(store) => store,
+        Err(e) => {
+            eprintln!("error: failed to reload token store: {}", e);
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "",
+                "failed to load token store",
+            );
+        }
+    };
+
+    if !tokens.validate(token) {
         return error_response(StatusCode::UNAUTHORIZED, "", "invalid API token");
     }
 
@@ -107,6 +119,7 @@ async fn gm_endpoint(
     if !is_json_content_type(&headers) {
         return error_response(
             StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "",
             "Content-Type must be application/json",
         );
     }
