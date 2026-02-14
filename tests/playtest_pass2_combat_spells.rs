@@ -961,11 +961,11 @@ fn phase6_save_load_combat_round_trip() {
     assert_eq!(loaded.mode, GameMode::Combat);
     assert_eq!(loaded.party.members.len(), 6);
     assert_eq!(loaded.party.find_member("Grond").unwrap().hp, grond_hp);
-    assert!(loaded.combat.is_some());
-    let combat = loaded.combat.as_ref().unwrap();
+    let combat = loaded.combat.as_ref().expect("combat state should be preserved after save/load");
     assert_eq!(combat.monsters.len(), 2);
     assert_eq!(loaded.pre_combat_mode, Some(GameMode::Exploration));
-    assert!(loaded.dungeon.is_some());
+    let dungeon = loaded.dungeon.as_ref().expect("dungeon state should be preserved after save/load");
+    assert_eq!(dungeon.level, 1, "dungeon level should be preserved after save/load");
 
     // Cleanup
     let _ = std::fs::remove_file(&save_path);
@@ -1045,8 +1045,8 @@ fn spawn_monster_from_database() {
     }), &mut state);
     assert_ok(&resp, "SpawnMonster from database");
     assert_eq!(state.mode, GameMode::Combat, "should enter combat mode");
-    assert!(state.combat.is_some());
-    assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 4);
+    let combat = state.combat.as_ref().expect("combat state should exist after SpawnMonster");
+    assert_eq!(combat.monsters.len(), 4, "should have spawned 4 monsters");
 }
 
 /// CreateCharacter via GMAPI protocol.
