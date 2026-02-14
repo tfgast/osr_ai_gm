@@ -799,19 +799,26 @@ fn monster_attack_happy_path() {
     let mut state = GameState::new();
     setup_combat(&mut state);
 
-    let pre_hp = state.party.find_member("Aldric").unwrap().hp;
-    let resp = handle_request(&req("ma1", GMCommand::MonsterAttack {
-        monster_idx: 0,
-        character: "Aldric".to_string(),
-    }), &mut state);
-    assert_response_format(&resp, "ma1");
-    assert!(resp.success);
-    assert_eq!(resp.mode, GameMode::Combat);
-    // Verify state mutation: on hit, character HP should decrease
-    if resp.message.contains("HIT") {
-        assert!(state.party.find_member("Aldric").unwrap().hp < pre_hp,
-            "character HP should decrease on hit");
+    let initial_hp = state.party.find_member("Aldric").unwrap().hp;
+    // Retry until a hit to ensure damage is actually verified
+    let mut hit_verified = false;
+    for i in 0..100 {
+        state.party.find_member_mut("Aldric").unwrap().hp = initial_hp;
+        let resp = handle_request(&req(&format!("ma1_{}", i), GMCommand::MonsterAttack {
+            monster_idx: 0,
+            character: "Aldric".to_string(),
+        }), &mut state);
+        assert_response_format(&resp, &format!("ma1_{}", i));
+        assert!(resp.success);
+        assert_eq!(resp.mode, GameMode::Combat);
+        if resp.message.contains("HIT") {
+            assert!(state.party.find_member("Aldric").unwrap().hp < initial_hp,
+                "character HP should decrease on hit");
+            hit_verified = true;
+            break;
+        }
     }
+    assert!(hit_verified, "monster should land at least one hit in 100 attempts");
 }
 
 #[test]
@@ -1831,22 +1838,31 @@ fn backstab_happy_path() {
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
-    let resp = handle_request(&req("bs1", GMCommand::Backstab {
-        character: "Shade".to_string(),
-        monster_idx: 0,
-        weapon: "dagger".to_string(),
-    }), &mut state);
-    assert_response_format(&resp, "bs1");
-    assert!(resp.success);
+    // Retry until a hit to ensure multiplier and damage are verified
+    let saved_hp = state.combat.as_ref().unwrap().monsters[0].hp;
+    let mut hit_verified = false;
+    for i in 0..100 {
+        state.combat.as_mut().unwrap().monsters[0].hp = saved_hp;
+        let resp = handle_request(&req(&format!("bs1_{}", i), GMCommand::Backstab {
+            character: "Shade".to_string(),
+            monster_idx: 0,
+            weapon: "dagger".to_string(),
+        }), &mut state);
+        assert_response_format(&resp, &format!("bs1_{}", i));
+        assert!(resp.success);
 
-    let data = resp.data.unwrap();
-    assert!(data["hit"].as_bool().is_some());
-    assert!(data["attack_roll"].as_i64().is_some());
-    assert!(data["target_number"].as_i64().is_some());
-    if data["hit"].as_bool().unwrap() {
-        assert_eq!(data["multiplier"], 2); // Level 1 thief = x2
-        assert!(data["damage"].as_i64().unwrap() > 0);
+        let data = resp.data.unwrap();
+        assert!(data["hit"].as_bool().is_some());
+        assert!(data["attack_roll"].as_i64().is_some());
+        assert!(data["target_number"].as_i64().is_some());
+        if data["hit"].as_bool().unwrap() {
+            assert_eq!(data["multiplier"], 2); // Level 1 thief = x2
+            assert!(data["damage"].as_i64().unwrap() > 0);
+            hit_verified = true;
+            break;
+        }
     }
+    assert!(hit_verified, "backstab should land at least once in 100 attempts");
 }
 
 #[test]
