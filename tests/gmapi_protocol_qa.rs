@@ -4036,7 +4036,7 @@ fn loot_from_dungeon_room() {
 }
 
 #[test]
-fn loot_item_not_in_room() {
+fn loot_adhoc_item_in_dungeon() {
     use osr_ai_gm::state::dungeon::{DungeonState, Room, PlacedTreasureInstance};
 
     let mut state = GameState::new();
@@ -4051,14 +4051,16 @@ fn loot_item_not_in_room() {
     dungeon.current_room = Some(0);
     state.enter_exploration(dungeon, 1);
 
+    // Ad-hoc item not in placed_treasure should succeed
     let resp = handle_request(&req("lo4", GMCommand::Loot {
         character: "Aldric".to_string(),
         item_name: "Diamond".to_string(),
-        value_gp: None,
+        value_gp: Some(300),
     }), &mut state);
     assert_response_format(&resp, "lo4");
-    assert!(!resp.success);
-    assert!(resp.message.contains("no lootable item"));
+    assert!(resp.success);
+    assert!(resp.message.contains("picks up Diamond"));
+    assert!(resp.message.contains("300 gp"));
 }
 
 #[test]
