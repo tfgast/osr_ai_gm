@@ -1,12 +1,9 @@
-use crate::engine::{exploration, gm, inventory, lookup, module as module_engine, party, retainers, system, wilderness, xp};
+use crate::engine::{gm, party, retainers, system, xp};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
-use crate::state::dungeon::DoorState;
-use crate::state::time::LightSourceKind;
-use crate::state::wilderness::Terrain;
-use super::{combat_handlers, query_handlers};
+use super::{combat_handlers, exploration_handlers, query_handlers};
 use serde::Serialize;
 
 fn ok_with_typed_data<T: Serialize>(
@@ -35,7 +32,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
             id, format!("current mode: {}", state.mode), state.mode.clone(),
             serde_json::json!({ "mode": state.mode.to_string() }),
         ),
-        GMCommand::QueryParty => query_party(id, state),
+        GMCommand::QueryParty => query_handlers::query_party(id, state),
         GMCommand::QueryCombat => query_handlers::query_combat(id, state),
         GMCommand::QueryExploration => query_handlers::query_exploration(id, state),
         GMCommand::QueryWilderness => query_handlers::query_wilderness(id, state),
@@ -69,29 +66,29 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 
         // -- Exploration --
         GMCommand::EnterDungeon { level, room_name } => {
-            enter_dungeon(id, state, *level, room_name)
+            exploration_handlers::enter_dungeon(id, state, *level, room_name)
         }
-        GMCommand::AdvanceTurn => advance_turn(id, state),
-        GMCommand::AddRoom { id: room_id, name } => add_room(id, state, *room_id, name),
+        GMCommand::AdvanceTurn => exploration_handlers::advance_turn(id, state),
+        GMCommand::AddRoom { id: room_id, name } => exploration_handlers::add_room(id, state, *room_id, name),
         GMCommand::AddDoor { id: door_id, room_a, room_b, state: door_state } => {
-            add_door(id, state, *door_id, *room_a, *room_b, *door_state)
+            exploration_handlers::add_door(id, state, *door_id, *room_a, *room_b, *door_state)
         }
-        GMCommand::MoveRoom { door_id } => move_room(id, state, *door_id),
-        GMCommand::Search { is_elf } => search(id, state, *is_elf),
-        GMCommand::Light { source, carrier } => light(id, state, *source, carrier),
-        GMCommand::LoadModule { path } => load_module(id, state, path),
-        GMCommand::OpenDoor { door_id } => open_door(id, state, *door_id),
-        GMCommand::ForceDoor { door_id, character } => force_door(id, state, *door_id, character),
-        GMCommand::Listen { is_demihuman } => listen(id, state, *is_demihuman),
-        GMCommand::Rest => rest(id, state),
+        GMCommand::MoveRoom { door_id } => exploration_handlers::move_room(id, state, *door_id),
+        GMCommand::Search { is_elf } => exploration_handlers::search(id, state, *is_elf),
+        GMCommand::Light { source, carrier } => exploration_handlers::light(id, state, *source, carrier),
+        GMCommand::LoadModule { path } => exploration_handlers::load_module(id, state, path),
+        GMCommand::OpenDoor { door_id } => exploration_handlers::open_door(id, state, *door_id),
+        GMCommand::ForceDoor { door_id, character } => exploration_handlers::force_door(id, state, *door_id, character),
+        GMCommand::Listen { is_demihuman } => exploration_handlers::listen(id, state, *is_demihuman),
+        GMCommand::Rest => exploration_handlers::rest(id, state),
 
         // -- Wilderness --
-        GMCommand::EnterWilderness { terrain } => enter_wilderness(id, state, *terrain),
-        GMCommand::AddHex { x, y, terrain } => add_hex(id, state, *x, *y, *terrain),
-        GMCommand::Travel { x, y } => travel(id, state, *x, *y),
-        GMCommand::Orient => orient(id, state),
-        GMCommand::Forage => forage(id, state),
-        GMCommand::Hunt => hunt(id, state),
+        GMCommand::EnterWilderness { terrain } => exploration_handlers::enter_wilderness(id, state, *terrain),
+        GMCommand::AddHex { x, y, terrain } => exploration_handlers::add_hex(id, state, *x, *y, *terrain),
+        GMCommand::Travel { x, y } => exploration_handlers::travel(id, state, *x, *y),
+        GMCommand::Orient => exploration_handlers::orient(id, state),
+        GMCommand::Forage => exploration_handlers::forage(id, state),
+        GMCommand::Hunt => exploration_handlers::hunt(id, state),
         GMCommand::RollEncounter => combat_handlers::roll_encounter(id, state),
         GMCommand::Evade { monster_count, monster_movement } => {
             combat_handlers::evade(id, state, *monster_count, *monster_movement)
@@ -119,7 +116,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::SpawnNpcParty { party_type, distance } => {
             combat_handlers::spawn_npc_party(id, state, party_type, *distance)
         }
-        GMCommand::LookupSpell { name, list } => lookup_spell(id, state, name, list),
+        GMCommand::LookupSpell { name, list } => query_handlers::lookup_spell(id, state, name, list),
         GMCommand::HireRetainer { employer, retainer_name, retainer_class, retainer_level } => {
             hire_retainer(id, state, employer, retainer_name, *retainer_class, *retainer_level)
         }
@@ -147,18 +144,18 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::AddRations { amount } => add_rations(id, state, *amount),
 
         // -- Inventory --
-        GMCommand::Buy { character, item_name } => buy(id, state, character, item_name),
-        GMCommand::Drop { character, item_name } => drop(id, state, character, item_name),
-        GMCommand::Equip { character, item_name } => equip(id, state, character, item_name),
-        GMCommand::Loot { character, item_name, value_gp } => loot(id, state, character, item_name, *value_gp),
+        GMCommand::Buy { character, item_name } => exploration_handlers::buy(id, state, character, item_name),
+        GMCommand::Drop { character, item_name } => exploration_handlers::drop(id, state, character, item_name),
+        GMCommand::Equip { character, item_name } => exploration_handlers::equip(id, state, character, item_name),
+        GMCommand::Loot { character, item_name, value_gp } => exploration_handlers::loot(id, state, character, item_name, *value_gp),
 
         // -- Lookup & reference --
-        GMCommand::LookupItem { name } => lookup_item(id, state, name),
-        GMCommand::SearchItems { query } => search_items(id, state, query),
-        GMCommand::LookupTreasureType { letter } => lookup_treasure_type(id, state, letter),
-        GMCommand::RollTreasure { letter } => roll_treasure(id, state, letter),
-        GMCommand::ListClasses => list_classes(id, state),
-        GMCommand::EligibleClasses { abilities } => eligible_classes(id, state, abilities),
+        GMCommand::LookupItem { name } => query_handlers::lookup_item(id, state, name),
+        GMCommand::SearchItems { query } => query_handlers::search_items(id, state, query),
+        GMCommand::LookupTreasureType { letter } => query_handlers::lookup_treasure_type(id, state, letter),
+        GMCommand::RollTreasure { letter } => query_handlers::roll_treasure(id, state, letter),
+        GMCommand::ListClasses => query_handlers::list_classes(id, state),
+        GMCommand::EligibleClasses { abilities } => query_handlers::eligible_classes(id, state, abilities),
 
         // -- System --
         GMCommand::Save { path } => save_game(id, state, path),
@@ -168,360 +165,14 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
     }
 }
 
-fn enter_dungeon(id: &str, state: &mut GameState, level: u32, room_name: &str) -> GMResponse {
-    match exploration::action_enter_dungeon(state, level, room_name) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn advance_turn(id: &str, state: &mut GameState) -> GMResponse {
-    match exploration::action_advance_dungeon_turn(state) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn add_room(id: &str, state: &mut GameState, room_id: u32, name: &str) -> GMResponse {
-    match exploration::action_add_room(state, room_id, name) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn add_door(id: &str, state: &mut GameState, door_id: u32, room_a: u32, room_b: u32, door_state: DoorState) -> GMResponse {
-    match exploration::action_add_door(state, door_id, room_a, room_b, door_state) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn move_room(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
-    match exploration::action_move_through_door(state, door_id) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn search(id: &str, state: &mut GameState, is_elf: bool) -> GMResponse {
-    match exploration::action_search_room(state, is_elf) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn light(id: &str, state: &mut GameState, source: LightSourceKind, carrier: &str) -> GMResponse {
-    match exploration::action_light(state, source, carrier) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn load_module(id: &str, state: &mut GameState, path: &str) -> GMResponse {
-    match module_engine::action_load_module(state, path) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn open_door(id: &str, state: &mut GameState, door_id: u32) -> GMResponse {
-    match exploration::action_open_door(state, door_id) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn force_door(id: &str, state: &mut GameState, door_id: u32, char_name: &str) -> GMResponse {
-    match exploration::action_force_door(state, door_id, char_name) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn listen(id: &str, state: &mut GameState, is_demihuman: bool) -> GMResponse {
-    match exploration::action_listen_at_door(state, is_demihuman) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn rest(id: &str, state: &mut GameState) -> GMResponse {
-    match exploration::action_rest(state) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn enter_wilderness(id: &str, state: &mut GameState, terrain: Terrain) -> GMResponse {
-    match wilderness::action_enter_wilderness(state, terrain) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn add_hex(id: &str, state: &mut GameState, x: i32, y: i32, terrain: Terrain) -> GMResponse {
-    match wilderness::action_add_hex(state, x, y, terrain) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn travel(id: &str, state: &mut GameState, x: i32, y: i32) -> GMResponse {
-    match wilderness::action_travel(state, x, y) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn orient(id: &str, state: &mut GameState) -> GMResponse {
-    match wilderness::action_orient(state) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn forage(id: &str, state: &mut GameState) -> GMResponse {
-    match wilderness::action_forage(state) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn hunt(id: &str, state: &mut GameState) -> GMResponse {
-    match wilderness::action_hunt(state) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn buy(id: &str, state: &mut GameState, character: &str, item_name: &str) -> GMResponse {
-    match inventory::action_buy(state, character, item_name) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn drop(id: &str, state: &mut GameState, character: &str, item_name: &str) -> GMResponse {
-    match inventory::action_drop(state, character, item_name) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn equip(id: &str, state: &mut GameState, character: &str, item_name: &str) -> GMResponse {
-    match inventory::action_equip(state, character, item_name) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn loot(id: &str, state: &mut GameState, character: &str, item_name: &str, explicit_gp: Option<u32>) -> GMResponse {
-    match inventory::action_loot(state, character, item_name, explicit_gp) {
-        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn lookup_item(id: &str, state: &GameState, name: &str) -> GMResponse {
-    match lookup::action_lookup_item(name) {
-        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn search_items(id: &str, state: &GameState, query: &str) -> GMResponse {
-    match lookup::action_search_items(query) {
-        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn lookup_treasure_type(id: &str, state: &GameState, letter: &str) -> GMResponse {
-    match lookup::action_lookup_treasure_type(letter) {
-        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn roll_treasure(id: &str, state: &GameState, letter: &str) -> GMResponse {
-    match lookup::action_roll_treasure(letter) {
-        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &str) -> GMResponse {
-    let list = if list_name.is_empty() {
-        None
-    } else {
-        match lookup::parse_spell_list(list_name) {
-            Some(list) => Some(list),
-            None => {
-                return GMResponse::err(
-                    id,
-                    format!("unknown spell list '{}'.", list_name),
-                    state.mode.clone(),
-                )
-            }
-        }
-    };
-
-    match lookup::action_lookup_spell(name, list) {
-        Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
 // =============================================================================
-// State queries
+// Character management
 // =============================================================================
-
-#[derive(Serialize)]
-struct QueryPartyMemberData {
-    name: String,
-    class: String,
-    level: u32,
-    hp: i32,
-    max_hp: i32,
-    ac: i32,
-    thac0: u32,
-    xp: u64,
-    alive: bool,
-    alignment: String,
-    movement_rate: u32,
-}
-
-#[derive(Serialize)]
-struct QueryPartyData {
-    members: Vec<QueryPartyMemberData>,
-}
-
-#[derive(Serialize)]
-struct ListClassesData {
-    classes: Vec<party::results::ClassSummary>,
-}
-
-#[derive(Serialize)]
-struct EligibleAbilitiesData {
-    #[serde(rename = "STR")]
-    str_score: i32,
-    #[serde(rename = "INT")]
-    int_score: i32,
-    #[serde(rename = "WIS")]
-    wis_score: i32,
-    #[serde(rename = "DEX")]
-    dex_score: i32,
-    #[serde(rename = "CON")]
-    con_score: i32,
-    #[serde(rename = "CHA")]
-    cha_score: i32,
-}
-
-#[derive(Serialize)]
-struct EligibleClassesData {
-    abilities: EligibleAbilitiesData,
-    eligible: Vec<String>,
-    count: usize,
-}
 
 #[derive(Serialize)]
 struct CreateCharacterData {
     character_sheet: String,
 }
-
-fn query_party_member_data(member: &party::results::PartyMemberSummary) -> QueryPartyMemberData {
-    QueryPartyMemberData {
-        name: member.name.clone(),
-        class: member.class.clone(),
-        level: member.level,
-        hp: member.hp,
-        max_hp: member.max_hp,
-        ac: member.ac,
-        thac0: member.thac0,
-        xp: member.xp,
-        alive: member.alive,
-        alignment: member.alignment.clone(),
-        movement_rate: member.movement_rate,
-    }
-}
-
-fn query_party(id: &str, state: &GameState) -> GMResponse {
-    match party::action_query_party(state) {
-        Ok(result) => {
-            let members: Vec<QueryPartyMemberData> = result
-                .members
-                .iter()
-                .map(query_party_member_data)
-                .collect();
-
-            let message = if members.is_empty() {
-                "no party members.".to_string()
-            } else {
-                format!("{} party members.", members.len())
-            };
-            ok_with_typed_data(
-                id,
-                state,
-                message,
-                QueryPartyData { members },
-            )
-        }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn list_classes(id: &str, state: &GameState) -> GMResponse {
-    match party::action_list_classes() {
-        Ok(result) => ok_with_typed_data(
-            id,
-            state,
-            format!("{} character classes available.", result.classes.len()),
-            ListClassesData {
-                classes: result.classes,
-            },
-        ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-fn eligible_classes(id: &str, state: &GameState, abilities: &[i32; 6]) -> GMResponse {
-    match party::action_eligible_classes(*abilities) {
-        Ok(result) => {
-            let eligible_count = result.eligible.len();
-            ok_with_typed_data(
-                id,
-                state,
-                format!(
-                    "abilities STR {} INT {} WIS {} DEX {} CON {} CHA {}: {} eligible class(es).",
-                    result.abilities[0],
-                    result.abilities[1],
-                    result.abilities[2],
-                    result.abilities[3],
-                    result.abilities[4],
-                    result.abilities[5],
-                    eligible_count
-                ),
-                EligibleClassesData {
-                    abilities: EligibleAbilitiesData {
-                        str_score: result.abilities[0],
-                        int_score: result.abilities[1],
-                        wis_score: result.abilities[2],
-                        dex_score: result.abilities[3],
-                        con_score: result.abilities[4],
-                        cha_score: result.abilities[5],
-                    },
-                    eligible: result.eligible,
-                    count: eligible_count,
-                },
-            )
-        }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
-    }
-}
-
-// =============================================================================
-// Character management
-// =============================================================================
 
 fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, alignment: Alignment, provided_abilities: Option<&[i32; 6]>) -> GMResponse {
     match party::action_create_character(state, name, class, alignment, provided_abilities.copied()) {
