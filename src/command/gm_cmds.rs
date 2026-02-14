@@ -371,9 +371,13 @@ impl Command for BackstabCommand {
             Ok(n) => n,
             _ => return CommandResult::error("monster_index must be a number"),
         };
-        let weapon_name = if args.len() >= 3 { args[2] } else { "sword" };
+        let weapon_name = if args.len() >= 3 {
+            args[2..].join(" ")
+        } else {
+            "sword".to_string()
+        };
 
-        match combat::action_backstab(state, char_name, monster_idx, weapon_name) {
+        match combat::action_backstab(state, char_name, monster_idx, &weapon_name) {
             Ok(result) => CommandResult::ok(result.message),
             Err(e) => CommandResult::error(e.to_string()),
         }
@@ -1004,6 +1008,19 @@ mod tests {
         let result = cmd.execute(&["Shadow", "0", "blastergun"], &mut state);
         assert!(result.output.starts_with("Error"));
         assert!(result.output.contains("unknown weapon"));
+    }
+
+    #[test]
+    fn backstab_multi_word_weapon() {
+        let mut state = make_combat_state_with_thief();
+        let cmd = BackstabCommand;
+        let result = cmd.execute(&["Shadow", "0", "Short", "sword"], &mut state);
+        assert!(
+            !result.output.starts_with("Error"),
+            "backstab with multi-word weapon should succeed: {}",
+            result.output
+        );
+        assert!(result.output.contains("backstab"));
     }
 
     // === AwardTreasureXpCommand tests ===
