@@ -21,6 +21,18 @@ pub fn action_create_character(
     alignment: Alignment,
     provided_abilities: Option<[i32; 6]>,
 ) -> Result<CreateCharacterResult, EngineError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(EngineError::InvalidInput(
+            "character name must not be empty.".to_string(),
+        ));
+    }
+    if state.party.find_member(trimmed).is_some() {
+        return Err(EngineError::InvalidInput(format!(
+            "a character named '{}' already exists in the party.",
+            trimmed
+        )));
+    }
     if let Some(abilities) = provided_abilities {
         for score in abilities {
             if !(3..=18).contains(&score) {

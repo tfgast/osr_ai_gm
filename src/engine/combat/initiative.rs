@@ -30,6 +30,7 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
     let msg = format!("Round {} — Initiative: Party {} vs Monsters {} — {}",
         combat.round, party, monsters, winner);
     combat.log.push(msg);
+    combat.log_len_at_initiative = combat.log.len();
     (party, monsters)
 }
 
