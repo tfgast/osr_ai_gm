@@ -7,10 +7,11 @@ use crate::rules::class::Class;
 use crate::rules::{ability, equipment, monster as monster_db, thief};
 
 use super::results::{
-    AttackResult, BackstabResult, CloseResult, CombatLogResult, DeclareSpellResult,
-    EndCombatResult, FightingWithdrawalResult, InitiativeResult, InitiativeWinner,
-    MonsterAttackResult, MoraleResult, RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome,
-    RetreatResult, SpawnEncounterResult, SpawnMonsterResult, TurnUndeadResult,
+    AttackResult, BackstabResult, CloseResult, CombatLogResult, CombatStatusResult,
+    DeclareSpellResult, EndCombatResult, FightingWithdrawalResult, InitiativeResult,
+    InitiativeWinner, MonsterAttackResult, MoraleResult, RetainerLoyaltyCheckResult,
+    RetainerLoyaltyOutcome, RetreatResult, SetHelplessResult, SpawnEncounterResult,
+    SpawnMonsterResult, TurnUndeadResult,
 };
 use super::{
     check_morale, close, combat_status, coup_de_grace, declare_spell, fighting_withdrawal,
@@ -628,6 +629,30 @@ pub fn action_backstab(
             monster_alive: None,
         })
     }
+}
+
+pub fn action_combat_status(state: &GameState) -> Result<CombatStatusResult, EngineError> {
+    let combat = state.combat.as_ref().ok_or_else(no_active_combat)?;
+    let status = combat_status(combat, &state.party.members);
+    Ok(CombatStatusResult {
+        message: status.clone(),
+        status,
+    })
+}
+
+pub fn action_set_helpless(
+    state: &mut GameState,
+    monster_idx: usize,
+    helpless: bool,
+) -> Result<SetHelplessResult, EngineError> {
+    let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
+    let msg = super::set_monster_helpless(combat, monster_idx, helpless)
+        .map_err(EngineError::InvalidInput)?;
+    Ok(SetHelplessResult {
+        message: msg,
+        monster_idx,
+        helpless,
+    })
 }
 
 pub fn action_coup_de_grace(

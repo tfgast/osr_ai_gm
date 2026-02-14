@@ -290,6 +290,21 @@ pub struct RetainerLoyaltyCheckResult {
     pub outcome: RetainerLoyaltyOutcome,
 }
 
+/// Typed success payload for `combat_status`.
+#[derive(Debug, Clone, Serialize)]
+pub struct CombatStatusResult {
+    pub message: String,
+    pub status: String,
+}
+
+/// Typed success payload for `set_helpless`.
+#[derive(Debug, Clone, Serialize)]
+pub struct SetHelplessResult {
+    pub message: String,
+    pub monster_idx: usize,
+    pub helpless: bool,
+}
+
 /// Typed success payload for `end_combat`.
 #[derive(Debug, Clone, Serialize)]
 pub struct EndCombatResult {

@@ -299,12 +299,10 @@ impl Command for CombatStatusCommand {
         "Show current combat status"
     }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        let combat = match state.combat.as_ref() {
-            Some(c) => c,
-            None => return CommandResult::error("no active combat."),
-        };
-        let status = combat::combat_status(combat, &state.party.members);
-        CommandResult::ok(status)
+        match combat::action_combat_status(state) {
+            Ok(result) => CommandResult::ok(result.status),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -407,14 +405,9 @@ impl Command for SetHelplessCommand {
         };
         let helpless = args.get(1).is_none_or(|s| *s != "false");
 
-        let combat = match state.combat.as_mut() {
-            Some(c) => c,
-            None => return CommandResult::error("no active combat."),
-        };
-
-        match combat::set_monster_helpless(combat, monster_idx, helpless) {
-            Ok(msg) => CommandResult::ok(msg),
-            Err(e) => CommandResult::error(e),
+        match combat::action_set_helpless(state, monster_idx, helpless) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }

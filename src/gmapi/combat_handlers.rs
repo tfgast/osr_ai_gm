@@ -218,21 +218,9 @@ pub(super) fn set_helpless(
     monster_idx: usize,
     helpless: bool,
 ) -> GMResponse {
-    let combat_state = match state.combat.as_mut() {
-        Some(c) => c,
-        None => return GMResponse::err(id, "no active combat.", state.mode.clone()),
-    };
-    match combat::set_monster_helpless(combat_state, monster_idx, helpless) {
-        Ok(msg) => GMResponse::ok_with_data(
-            id,
-            msg,
-            state.mode.clone(),
-            serde_json::json!({
-                "monster_idx": monster_idx,
-                "helpless": helpless,
-            }),
-        ),
-        Err(e) => GMResponse::err(id, e, state.mode.clone()),
+    match combat::action_set_helpless(state, monster_idx, helpless) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 

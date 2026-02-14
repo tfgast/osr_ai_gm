@@ -1,12 +1,8 @@
 use super::{Command, CommandResult};
 use crate::engine::combat::{self, SpawnEncounterParams};
-use crate::engine::{gm, xp};
+use crate::engine::{exploration, gm};
 use crate::persist::GameState;
 use crate::rules::attack::HitDice;
-use crate::rules::class::class_def;
-use crate::rules::xp::{check_level_up, xp_for_level};
-use crate::rules::{spell, thief};
-use crate::state::game::GameMode;
 
 pub struct SpawnEncounterCommand;
 impl Command for SpawnEncounterCommand {
@@ -78,17 +74,10 @@ impl Command for AdvanceTurnCommand {
         "GM: advance one dungeon exploration turn"
     }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        let level = state.dungeon_level;
-        let time = match state.time.as_mut() {
-            Some(t) => t,
-            None => return CommandResult::error("not in exploration mode."),
-        };
-        let dungeon = match state.dungeon.as_mut() {
-            Some(d) => d,
-            None => return CommandResult::error("no dungeon state."),
-        };
-        let result = crate::engine::exploration::advance_dungeon_turn(time, dungeon, level);
-        CommandResult::ok(result.to_string())
+        match exploration::action_advance_dungeon_turn(state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -299,94 +288,36 @@ impl Command for TrainCommand {
         if args.is_empty() {
             return CommandResult::error("usage: train <character_name>");
         }
-        if state.mode == GameMode::Combat {
-            return CommandResult::error("cannot train during combat.");
-        }
-        let character = match state.party.find_member_mut(args[0]) {
-            Some(c) => c,
-            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
-        };
-        if !character.is_alive() {
-            return CommandResult::error(format!("{} is dead.", character.name));
-        }
-        let cls = character.class;
-        match check_level_up(cls, character.level, character.xp) {
-            None => {
-                let needed = xp_for_level(cls, character.level + 1);
-                if needed == u64::MAX {
-                    return CommandResult::error(format!(
-                        "{} is at maximum level ({}).",
-                        character.name, character.level
-                    ));
-                }
-                CommandResult::error(format!(
-                    "{} needs {} XP for level {} (has {}).",
-                    character.name,
-                    needed,
-                    character.level + 1,
-                    character.xp
-                ))
-            }
-            Some(next_level) => {
-                let cost = next_level * 100;
-                if character.gold_gp < cost {
-                    return CommandResult::error(format!(
-                        "{} needs {}gp to train for level {} (has {}gp).",
-                        character.name, cost, next_level, character.gold_gp
-                    ));
-                }
-
-                // Capture old state for report
-                let old_saves = character.saving_throws;
-                let old_thac0 = character.thac0;
-                let old_hp = character.max_hp;
-                let def = class_def(cls);
-
-                // Deduct gold and apply level-up
-                character.gold_gp -= cost;
-                let result = xp::apply_level_up(character);
-
-                // Build report
+        match gm::action_train(state, args[0]) {
+            Ok(result) => {
                 let mut out = format!(
                     "{} trains to level {}! (cost: {}gp, {}gp remaining)\n",
-                    character.name, result.new_level, cost, character.gold_gp
+                    result.character, result.new_level, result.cost_gp, result.gold_remaining
                 );
                 out.push_str(&format!(
                     "  HP: {} -> {} (+{})\n",
-                    old_hp, character.max_hp, result.hp_gained
+                    result.old_hp, result.new_hp, result.hp_gained
                 ));
-                if result.new_thac0 != old_thac0 {
-                    out.push_str(&format!("  THAC0: {} -> {}\n", old_thac0, result.new_thac0));
+                if result.new_thac0 != result.old_thac0 {
+                    out.push_str(&format!(
+                        "  THAC0: {} -> {}\n",
+                        result.old_thac0, result.new_thac0
+                    ));
                 }
-
-                // Report saving throw changes
-                if let Some(old) = old_saves {
+                if let Some(old) = result.old_saves {
                     let new = &result.new_saves;
                     if old != *new {
                         out.push_str(&format!(
                             "  Saves: D{}->{} W{}->{} P{}->{} B{}->{} S{}->{}\n",
-                            old.death,
-                            new.death,
-                            old.wands,
-                            new.wands,
-                            old.paralysis,
-                            new.paralysis,
-                            old.breath,
-                            new.breath,
-                            old.spells,
-                            new.spells,
+                            old.death, new.death, old.wands, new.wands,
+                            old.paralysis, new.paralysis, old.breath, new.breath,
+                            old.spells, new.spells,
                         ));
                     }
                 }
-
-                // Report spell slot changes (casters only)
                 if result.old_spell_slots != result.new_spell_slots {
                     let fmt = |slots: &[u32; 6]| -> String {
-                        slots
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect::<Vec<_>>()
-                            .join("/")
+                        slots.iter().map(|s| s.to_string()).collect::<Vec<_>>().join("/")
                     };
                     out.push_str(&format!(
                         "  Spell slots: {} -> {}\n",
@@ -394,47 +325,28 @@ impl Command for TrainCommand {
                         fmt(&result.new_spell_slots)
                     ));
                 }
-
-                // Report thief skill improvement
-                if thief::has_thief_skills(cls) {
+                if result.has_thief_skills {
                     out.push_str(&format!(
                         "  Thief skills improved (now level {} rates)\n",
                         result.new_level
                     ));
                 }
-
-                // Check if ready for another level
-                if check_level_up(cls, character.level, character.xp).is_some() {
-                    let next_cost = (character.level + 1) * 100;
+                if result.ready_for_next {
                     out.push_str(&format!(
                         "  Ready to train again! (next: level {}, cost: {}gp)",
-                        character.level + 1,
-                        next_cost
+                        result.new_level + 1,
+                        result.next_cost.unwrap_or(0)
                     ));
                 }
-
-                // Show new spell slots for casters gaining their first spells
-                if result.old_spell_slots.iter().all(|&s| s == 0)
-                    && result.new_spell_slots.iter().any(|&s| s > 0)
-                {
-                    let list_name = match def.spell_list {
-                        spell::SpellListType::Cleric => "cleric",
-                        spell::SpellListType::Druid => "druid",
-                        spell::SpellListType::MagicUser => "magic-user",
-                        spell::SpellListType::Illusionist => "illusionist",
-                        spell::SpellListType::DrowArcaneAndDivine => "drow",
-                        spell::SpellListType::None => "",
-                    };
-                    if !list_name.is_empty() {
-                        out.push_str(&format!(
-                            "  {} can now cast {} spells!\n",
-                            character.name, list_name
-                        ));
-                    }
+                if result.gained_first_spells && !result.spell_list_name.is_empty() {
+                    out.push_str(&format!(
+                        "  {} can now cast {} spells!\n",
+                        result.character, result.spell_list_name
+                    ));
                 }
-
                 CommandResult::ok(out.trim_end().to_string())
             }
+            Err(e) => CommandResult::error(e.to_string()),
         }
     }
 }
@@ -491,20 +403,20 @@ impl Command for AwardTreasureXpCommand {
             Ok(n) => n,
             _ => return CommandResult::error("monster_xp must be a non-negative integer"),
         };
-        let character = match state.party.find_member_mut(args[0]) {
-            Some(c) => c,
-            None => return CommandResult::error(format!("no party member named '{}'.", args[0])),
-        };
-        let result = xp::award_xp(character, treasure_gp, monster_xp);
-        let mut msg = format!(
-            "{}: base {}xp ({}gp treasure + {}xp monsters), {:+}% prime req modifier = {} adjusted XP. Total: {}.",
-            character.name, result.base_xp, treasure_gp, monster_xp,
-            result.modifier_pct, result.adjusted_xp, result.new_total,
-        );
-        if result.ready_to_train {
-            msg.push_str(" Ready to train!");
+        match gm::action_award_treasure_xp(state, args[0], treasure_gp, monster_xp) {
+            Ok(result) => {
+                let mut msg = format!(
+                    "{}: base {}xp ({}gp treasure + {}xp monsters), {:+}% prime req modifier = {} adjusted XP. Total: {}.",
+                    result.character, result.base_xp, result.treasure_gp, result.monster_xp,
+                    result.modifier_pct, result.adjusted_xp, result.total_xp,
+                );
+                if result.ready_to_train {
+                    msg.push_str(" Ready to train!");
+                }
+                CommandResult::ok(msg)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        CommandResult::ok(msg)
     }
 }
 
@@ -528,6 +440,7 @@ mod tests {
     use super::*;
     use crate::model::{Character, CombatState};
     use crate::rules::class::Class;
+    use crate::state::game::GameMode;
 
     #[test]
     fn spawn_encounter_basic() {

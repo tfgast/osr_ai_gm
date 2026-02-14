@@ -1,5 +1,5 @@
 use super::{Command, CommandResult};
-use crate::engine::system;
+use crate::engine::{gm, system};
 use crate::persist::GameState;
 
 pub struct RollCommand;
@@ -82,8 +82,10 @@ impl Command for NoteCommand {
             return CommandResult::error("usage: note <text>");
         }
         let text = args.join(" ");
-        state.notes.push(text.clone());
-        CommandResult::ok(format!("Note added: {}", text))
+        match gm::action_add_note(state, &text) {
+            Ok(result) => CommandResult::ok(format!("Note added: {}", result.text)),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
     }
 }
 
@@ -96,14 +98,19 @@ impl Command for NotesCommand {
         "List all session notes"
     }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        if state.notes.is_empty() {
-            return CommandResult::ok("No notes yet.".to_string());
+        match gm::action_list_notes(state) {
+            Ok(result) => {
+                if result.notes.is_empty() {
+                    return CommandResult::ok("No notes yet.".to_string());
+                }
+                let mut out = String::from("Session notes:\n");
+                for note in &result.notes {
+                    out.push_str(&format!("  [{}] {}\n", note.index, note.text));
+                }
+                CommandResult::ok(out)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        let mut out = String::from("Session notes:\n");
-        for (i, note) in state.notes.iter().enumerate() {
-            out.push_str(&format!("  [{}] {}\n", i + 1, note));
-        }
-        CommandResult::ok(out)
     }
 }
 
@@ -119,9 +126,6 @@ impl Command for NoteDeleteCommand {
         if args.is_empty() {
             return CommandResult::error("usage: note_delete <index>");
         }
-        if state.notes.is_empty() {
-            return CommandResult::error("no notes to delete");
-        }
         let n: usize = match args[0].parse() {
             Ok(n) => n,
             Err(_) => return CommandResult::error("index must be a positive integer"),
@@ -129,16 +133,10 @@ impl Command for NoteDeleteCommand {
         if n < 1 {
             return CommandResult::error("notes use 1-based indexing; first note is index 1");
         }
-        if n > state.notes.len() {
-            return CommandResult::error(format!(
-                "index {} out of range; have {} note{}",
-                n,
-                state.notes.len(),
-                if state.notes.len() == 1 { "" } else { "s" }
-            ));
+        match gm::action_delete_note(state, n) {
+            Ok(result) => CommandResult::ok(format!("Deleted note [{}]: {}", result.index, result.deleted)),
+            Err(e) => CommandResult::error(e.to_string()),
         }
-        let removed = state.notes.remove(n - 1);
-        CommandResult::ok(format!("Deleted note [{}]: {}", n, removed))
     }
 }
 
