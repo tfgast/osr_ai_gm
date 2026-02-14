@@ -1106,6 +1106,54 @@ fn enter_dungeon_level_zero() {
     assert!(resp.error.unwrap().contains("positive integer"));
 }
 
+#[test]
+fn enter_dungeon_rejected_in_wilderness_mode() {
+    let mut state = GameState::new();
+    setup_wilderness(&mut state);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    let resp = handle_request(&req("ed3", GMCommand::EnterDungeon {
+        level: 1,
+        room_name: "Cave".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("wilderness mode"));
+    assert_eq!(state.mode, GameMode::Wilderness, "mode must not change");
+    assert!(state.wilderness.is_some(), "wilderness state must be preserved");
+}
+
+#[test]
+fn enter_dungeon_rejected_in_combat() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+    setup_combat(&mut state);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    let resp = handle_request(&req("ed4", GMCommand::EnterDungeon {
+        level: 1,
+        room_name: "Cave".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("combat"));
+    assert_eq!(state.mode, GameMode::Combat, "mode must not change");
+}
+
+#[test]
+fn enter_dungeon_rejected_when_already_exploring() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    let resp = handle_request(&req("ed5", GMCommand::EnterDungeon {
+        level: 2,
+        room_name: "Second Dungeon".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("already in exploration"));
+    assert_eq!(state.mode, GameMode::Exploration, "mode must not change");
+    assert_eq!(state.dungeon_level, 1, "dungeon level must not change");
+}
+
 // ===========================================================================
 // 16. AdvanceTurn
 // ===========================================================================
