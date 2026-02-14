@@ -605,6 +605,36 @@ mod tests {
     }
 
     #[test]
+    fn initiative_twice_without_action_rejected() {
+        let mut state = GameState::new();
+        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        c.hp = 10;
+        c.max_hp = 10;
+        state.party.add_member(c);
+
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(EncounterParams {
+            name: "Goblin".to_string(),
+            count: 1,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 5,
+            xp_value: None,
+        })), &mut state);
+        assert!(resp.success);
+
+        let resp = handle_request(&make_req("2", GMCommand::RollInitiative), &mut state);
+        assert!(resp.success, "first initiative should succeed");
+
+        let resp = handle_request(&make_req("3", GMCommand::RollInitiative), &mut state);
+        assert!(!resp.success, "second initiative without action should fail");
+        assert!(resp.error.unwrap().contains("initiative already rolled"));
+        assert_eq!(state.combat.as_ref().unwrap().round, 1, "round should not advance");
+    }
+
+    #[test]
     fn end_combat_no_combat() {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::EndCombat), &mut state);
