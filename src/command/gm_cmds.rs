@@ -48,7 +48,7 @@ impl Command for SpawnEncounterCommand {
         match combat::action_spawn_encounter(
             state,
             &SpawnEncounterParams {
-                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value: None,
+                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value: None, undead: None,
             },
         ) {
             Ok(result) => {

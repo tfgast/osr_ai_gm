@@ -477,6 +477,7 @@ fn spawn_encounter_happy_path() {
         morale: 8,
         distance: 30,
         xp_value: Some(10),
+        undead: None,
     })), &mut state);
     assert_response_format(&resp, "se1");
     assert!(resp.success);
@@ -503,6 +504,7 @@ fn spawn_encounter_combat_already_active() {
         morale: 8,
         distance: 30,
         xp_value: None,
+        undead: None,
     })), &mut state);
     assert_response_format(&resp, "se2");
     assert!(!resp.success);
@@ -522,6 +524,7 @@ fn spawn_encounter_invalid_morale_low() {
         morale: 1, // too low, must be 2-12
         distance: 60,
         xp_value: None,
+        undead: None,
     })), &mut state);
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("morale"));
@@ -540,6 +543,7 @@ fn spawn_encounter_invalid_morale_high() {
         morale: 13, // too high
         distance: 60,
         xp_value: None,
+        undead: None,
     })), &mut state);
     assert!(!resp.success);
 }
@@ -558,6 +562,7 @@ fn spawn_encounter_morale_boundary_valid() {
         morale: 2,
         distance: 60,
         xp_value: None,
+        undead: None,
     })), &mut state);
     assert!(resp.success, "morale=2 should be valid");
 
@@ -574,6 +579,7 @@ fn spawn_encounter_morale_boundary_valid() {
         morale: 12,
         distance: 120,
         xp_value: Some(1200),
+        undead: None,
     })), &mut state2);
     assert!(resp.success, "morale=12 should be valid");
 }
@@ -591,6 +597,7 @@ fn spawn_encounter_explicit_xp_value() {
         morale: 9,
         distance: 40,
         xp_value: Some(500),
+        undead: None,
     })), &mut state);
     assert!(resp.success);
     let combat = state.combat.as_ref().unwrap();
@@ -610,6 +617,7 @@ fn spawn_encounter_single_monster_no_numbering() {
         morale: 10,
         distance: 60,
         xp_value: Some(275),
+        undead: None,
     })), &mut state);
     assert!(resp.success);
     let combat = state.combat.as_ref().unwrap();
@@ -939,7 +947,7 @@ fn check_morale_no_living_monsters() {
 fn turn_undead_cleric_happy_path() {
     let mut state = GameState::new();
     state.party.add_member(make_cleric("Brother Marcus"));
-    // Create combat with skeleton
+    // Create combat with skeleton (undead)
     let mut m = Monster::new("Skeleton", "1".parse().unwrap());
     m.hp = 4;
     m.max_hp = 4;
@@ -947,6 +955,7 @@ fn turn_undead_cleric_happy_path() {
     m.damage = "1d6".to_string();
     m.morale = 12;
     m.attacks = vec!["attack".to_string()];
+    m.undead = true;
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 

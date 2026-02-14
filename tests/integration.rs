@@ -1202,6 +1202,7 @@ fn mode_transition_idle_exploration_combat_exploration() {
         morale: 12,
         distance: 5,
         xp_value: Some(10),
+        undead: None,
     })), &mut state);
     assert!(resp.success, "spawn encounter failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Combat);
@@ -1279,6 +1280,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
         morale: 8,
         distance: 5,
         xp_value: Some(20),
+        undead: None,
     })), &mut state);
     assert!(resp.success, "spawn encounter failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Combat);

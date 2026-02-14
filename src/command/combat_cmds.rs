@@ -59,7 +59,7 @@ impl Command for StartCombatCommand {
         match combat::action_spawn_encounter(
             state,
             &SpawnEncounterParams {
-                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value,
+                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value, undead: None,
             },
         ) {
             Ok(result) => {
@@ -136,7 +136,7 @@ impl Command for AddMonsterCommand {
         match combat::action_add_monster(
             state,
             &SpawnEncounterParams {
-                name, count, hit_dice: &hd, ac, hp, damage, morale, distance: 0, xp_value,
+                name, count, hit_dice: &hd, ac, hp, damage, morale, distance: 0, xp_value, undead: None,
             },
         ) {
             Ok(result) => {

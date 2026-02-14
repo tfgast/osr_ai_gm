@@ -193,6 +193,18 @@ fn state_with_combat() -> GameState {
     state
 }
 
+fn state_with_undead_combat() -> GameState {
+    let mut state = base_state();
+    state.mode = GameMode::Combat;
+    state.pre_combat_mode = Some(GameMode::Idle);
+    let mut s1 = mk_monster("Skeleton 1", "1", 4, 7, 12, 10);
+    s1.undead = true;
+    let mut s2 = mk_monster("Skeleton 2", "1", 4, 7, 12, 10);
+    s2.undead = true;
+    state.combat = Some(CombatState::new(vec![s1, s2], 60));
+    state
+}
+
 fn state_with_helpless_target() -> GameState {
     let mut state = state_with_combat();
     if let Some(combat) = state.combat.as_mut() {
@@ -259,6 +271,7 @@ fn combat_command_parity_golden_scaffold_captures_snapshots() {
                 morale: 7,
                 distance: 60,
                 xp_value: None,
+                undead: None,
             }),
         ),
         capture_parity(
@@ -294,7 +307,7 @@ fn combat_command_parity_golden_scaffold_captures_snapshots() {
         ),
         capture_parity(
             "turn_undead",
-            state_with_combat(),
+            state_with_undead_combat(),
             |state| TurnUndeadCommand.execute(&["Aldric", "0"], state),
             GMCommand::TurnUndead {
                 character: "Aldric".to_string(),

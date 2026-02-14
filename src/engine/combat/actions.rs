@@ -32,6 +32,7 @@ pub struct SpawnEncounterParams<'a> {
     pub morale: u32,
     pub distance: u32,
     pub xp_value: Option<u64>,
+    pub undead: Option<bool>,
 }
 
 pub fn action_spawn_encounter(
@@ -62,10 +63,14 @@ pub fn action_spawn_encounter(
         return Err(EngineError::InvalidInput("morale must be 2-12".to_string()));
     }
 
+    let db_def = monster_db::find_monster(params.name);
+
     let xp_per_monster = params.xp_value.unwrap_or_else(|| {
-        monster_db::find_monster(params.name)
-            .map(|m| m.xp())
-            .unwrap_or(0)
+        db_def.map(|m| m.xp()).unwrap_or(0)
+    });
+
+    let is_undead = params.undead.unwrap_or_else(|| {
+        db_def.map(|m| m.is_undead()).unwrap_or(false)
     });
 
     let mut monsters = Vec::new();
@@ -83,6 +88,7 @@ pub fn action_spawn_encounter(
         monster.morale = params.morale;
         monster.xp_value = xp_per_monster;
         monster.attacks = vec!["attack".to_string()];
+        monster.undead = is_undead;
         monsters.push(monster);
     }
 
@@ -155,6 +161,7 @@ pub fn action_spawn_monster(
         m.morale = def.morale;
         m.xp_value = def.xp();
         m.attacks = def.attack_names();
+        m.undead = def.is_undead();
         monsters.push(m);
     }
 
@@ -212,10 +219,14 @@ pub fn action_add_monster(
         return Err(EngineError::InvalidInput("morale must be 2-12".to_string()));
     }
 
+    let db_def = monster_db::find_monster(params.name);
+
     let xp_per_monster = params.xp_value.unwrap_or_else(|| {
-        monster_db::find_monster(params.name)
-            .map(|m| m.xp())
-            .unwrap_or(0)
+        db_def.map(|m| m.xp()).unwrap_or(0)
+    });
+
+    let is_undead = params.undead.unwrap_or_else(|| {
+        db_def.map(|m| m.is_undead()).unwrap_or(false)
     });
 
     let combat = state.combat.as_mut().unwrap();
@@ -235,6 +246,7 @@ pub fn action_add_monster(
         monster.morale = params.morale;
         monster.xp_value = xp_per_monster;
         monster.attacks = vec!["attack".to_string()];
+        monster.undead = is_undead;
         combat.monsters.push(monster);
     }
 
@@ -456,6 +468,12 @@ pub fn action_turn_undead(
         return Err(EngineError::InvalidInput(
             "target is already dead.".to_string(),
         ));
+    }
+    if !combat.monsters[monster_idx].undead {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is not undead and cannot be turned.",
+            combat.monsters[monster_idx].name
+        )));
     }
 
     let result = resolve_turn_undead(combat, &character, character.level, monster_idx);
@@ -1093,5 +1111,48 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("already acted"), "expected acted guard, got: {}", err);
+    }
+
+    // --- turn_undead non-undead rejection (oag-rdyi2) ---
+
+    fn test_cleric() -> Character {
+        let mut c = Character::new("Brother Oswin", Class::Cleric);
+        c.hp = 9;
+        c.max_hp = 9;
+        c.ac = 5;
+        c.level = 3;
+        c.abilities.wisdom = 15;
+        c
+    }
+
+    #[test]
+    fn turn_undead_rejects_non_undead_monster() {
+        let mut state = GameState::new();
+        state.party.add_member(test_cleric());
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Frost Elf Knight", "2", 9, 3, 9)],
+            60,
+        ));
+
+        let result = action_turn_undead(&mut state, "Brother Oswin", 0);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("not undead"), "expected 'not undead' error, got: {}", err);
+    }
+
+    #[test]
+    fn turn_undead_succeeds_on_undead_monster() {
+        let mut state = GameState::new();
+        state.party.add_member(test_cleric());
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        let mut skeleton = mk_monster("Skeleton", "1", 4, 7, 12);
+        skeleton.undead = true;
+        state.combat = Some(CombatState::new(vec![skeleton], 60));
+
+        let result = action_turn_undead(&mut state, "Brother Oswin", 0);
+        assert!(result.is_ok(), "turn_undead should succeed on undead: {:?}", result.err());
     }
 }

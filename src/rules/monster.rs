@@ -164,6 +164,11 @@ impl MonsterDef {
     pub fn xp(&self) -> u64 {
         self.xp_value.value()
     }
+
+    /// Check if this monster type is undead (has "Undead" in special_abilities).
+    pub fn is_undead(&self) -> bool {
+        self.special_abilities.iter().any(|s| s.starts_with("Undead"))
+    }
 }
 
 /// Container for loaded monster data.

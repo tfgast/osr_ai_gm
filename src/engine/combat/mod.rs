@@ -227,6 +227,7 @@ mod tests {
             xp_value: 5,
             turned: false,
             helpless: false,
+            undead: false,
         }
     }
 
@@ -243,6 +244,7 @@ mod tests {
             xp_value: 10,
             turned: false,
             helpless: false,
+            undead: false,
         }
     }
 
@@ -259,6 +261,7 @@ mod tests {
             xp_value: 125,
             turned: false,
             helpless: false,
+            undead: false,
         }
     }
 
@@ -957,6 +960,7 @@ mod tests {
             xp_value: 500,
             turned: false,
             helpless: false,
+            undead: true,
         };
         // Also add a weak skeleton
         let mut combat = CombatState::new(vec![test_skeleton(), mummy], 10);
@@ -1084,6 +1088,7 @@ mod tests {
             xp_value: 125,
             turned: false,
             helpless: false,
+            undead: false,
         };
         let mut combat = CombatState::new(vec![ogre.clone(), ogre.clone(), ogre], 10);
         // Create a very weak character (1 HP, bad AC)

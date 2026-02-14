@@ -34,6 +34,9 @@ pub struct EncounterParams {
     /// XP per monster. If omitted, auto-looked up from monster database.
     #[serde(default)]
     pub xp_value: Option<u64>,
+    /// Whether these monsters are undead. If omitted, auto-detected from monster database.
+    #[serde(default)]
+    pub undead: Option<bool>,
 }
 
 /// All commands an AI GM can issue through the JSON protocol.

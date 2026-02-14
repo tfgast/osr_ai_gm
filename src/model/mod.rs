@@ -103,6 +103,9 @@ pub struct Monster {
     /// Helpless creatures can be auto-killed without an attack roll.
     #[serde(default)]
     pub helpless: bool,
+    /// Whether this monster is undead (can be turned by clerics).
+    #[serde(default)]
+    pub undead: bool,
 }
 
 impl Monster {
@@ -119,6 +122,7 @@ impl Monster {
             xp_value: 0,
             turned: false,
             helpless: false,
+            undead: false,
         }
     }
 
