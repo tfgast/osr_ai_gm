@@ -1403,40 +1403,63 @@ fn wilderness_multi_day_travel() {
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Explorer"));
 
-    // Enter wilderness
+    // Enter wilderness at (0,0)
     let resp = handle_request(&req("1", GMCommand::EnterWilderness {
         terrain: Terrain::Clear,
     }), &mut state);
     assert!(resp.success);
 
-    // Build a hex path
-    handle_request(&req("2a", GMCommand::AddHex { x: 1, y: 0, terrain: Terrain::Clear }), &mut state);
-    handle_request(&req("2b", GMCommand::AddHex { x: 1, y: 1, terrain: Terrain::Forest }), &mut state);
-    handle_request(&req("2c", GMCommand::AddHex { x: 0, y: 1, terrain: Terrain::Mountains }), &mut state);
+    // Give the party rations so starvation doesn't complicate things
+    handle_request(&req("r0", GMCommand::SetRations { amount: 20 }), &mut state);
 
-    // Day 1: travel to (1,0) — clear terrain
-    let resp = handle_request(&req("3", GMCommand::Travel { x: 1, y: 0 }), &mut state);
-    assert!(resp.success);
-    let ws = state.wilderness.as_ref().unwrap();
-    assert_eq!(ws.travel_day, 2, "should be day 2 after first travel");
+    // Build a full ring of adjacent hexes around (0,0) — all Clear to keep
+    // travel range generous. This ensures that wherever the party ends up
+    // after getting lost, we can always find a valid adjacent destination
+    // that differs from the current position.
+    let grid: [(i32, i32); 8] = [
+        (1, 0), (-1, 0), (0, 1), (0, -1),
+        (1, 1), (-1, -1), (1, -1), (-1, 1),
+    ];
+    for (i, &(x, y)) in grid.iter().enumerate() {
+        handle_request(&req(&format!("2{}", (b'a' + i as u8) as char),
+            GMCommand::AddHex { x, y, terrain: Terrain::Clear }), &mut state);
+    }
 
-    // Day 2: travel to (1,1) — forest terrain
-    let resp = handle_request(&req("4", GMCommand::Travel { x: 1, y: 1 }), &mut state);
-    assert!(resp.success);
-    let ws = state.wilderness.as_ref().unwrap();
-    assert_eq!(ws.travel_day, 3, "should be day 3 after second travel");
+    // Travel 3 times. After each travel, read actual position and pick a
+    // destination different from current position. This handles the random
+    // lost-and-wander mechanic: when the party gets lost, they end up at
+    // a random adjacent hex, so the next planned destination may already
+    // be the current position (same-hex no-op, no day increment).
+    for trip in 0..3u32 {
+        let ws = state.wilderness.as_ref().unwrap();
+        let day_before = ws.travel_day;
+        let (cur_x, cur_y) = (ws.current_x, ws.current_y);
 
-    // Day 3: travel to (0,1) — mountains
-    let resp = handle_request(&req("5", GMCommand::Travel { x: 0, y: 1 }), &mut state);
-    assert!(resp.success);
-    let ws = state.wilderness.as_ref().unwrap();
-    assert_eq!(ws.travel_day, 4, "should be day 4 after third travel");
+        // Pick an adjacent hex that isn't the current position
+        let dest = grid.iter()
+            .copied()
+            .chain(std::iter::once((0, 0)))
+            .find(|&(x, y)| {
+                (x, y) != (cur_x, cur_y)
+                    && (x - cur_x).abs() <= 1
+                    && (y - cur_y).abs() <= 1
+            })
+            .expect("grid always has an adjacent hex different from current position");
 
-    // Verify final position
+        let resp = handle_request(&req(&format!("{}", trip + 3),
+            GMCommand::Travel { x: dest.0, y: dest.1 }), &mut state);
+        assert!(resp.success);
+
+        let ws = state.wilderness.as_ref().unwrap();
+        assert_eq!(ws.travel_day, day_before + 1,
+            "travel {} should advance the day (from ({},{}) toward ({},{}))",
+            trip + 1, cur_x, cur_y, dest.0, dest.1);
+    }
+
+    // Verify final day count: started at day 1, three travels = day 4
     let resp = handle_request(&req("6", GMCommand::QueryWilderness), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
-    // Position might be different if party got lost, but travel_day should still advance
     assert_eq!(data["travel_day"], 4);
 }
 
@@ -2599,14 +2622,18 @@ fn playtest2c_hunt_consumes_day_and_rations() {
 
     let ws = state.wilderness.as_ref().unwrap();
     let day_before = ws.travel_day;
-    let rations_before = state.party.rations;
 
     let resp = handle_request(&req("2", GMCommand::Hunt), &mut state);
     assert!(resp.success, "hunt failed: {}", resp.message);
 
     let ws = state.wilderness.as_ref().unwrap();
     assert!(ws.travel_day > day_before, "hunt should advance the day");
-    assert!(state.party.rations <= rations_before, "hunt should consume daily rations");
+    // Check that daily rations were consumed via response data, not absolute count.
+    // A successful hunt (1-in-6) adds rations before daily overhead subtracts them,
+    // so net rations can increase. The rations_consumed field proves overhead ran.
+    let data = resp.data.unwrap();
+    let consumed = data["rations_consumed"].as_u64().unwrap_or(0);
+    assert!(consumed > 0, "hunt should consume daily rations (rations_consumed={})", consumed);
 }
 
 /// oag-iasbo: Orient when not lost should return "not lost" without consuming resources.
