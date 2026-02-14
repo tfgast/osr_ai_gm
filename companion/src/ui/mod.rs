@@ -205,3 +205,76 @@ fn render_help_overlay(f: &mut Frame, area: Rect) {
     let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: false });
     f.render_widget(paragraph, popup);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hp_color_full_health() {
+        assert_eq!(hp_color(10, 10), Color::Green);
+    }
+
+    #[test]
+    fn hp_color_above_half() {
+        assert_eq!(hp_color(6, 10), Color::Green);
+    }
+
+    #[test]
+    fn hp_color_at_half() {
+        // 50% is not > 50%, so should be Yellow
+        assert_eq!(hp_color(5, 10), Color::Yellow);
+    }
+
+    #[test]
+    fn hp_color_above_quarter() {
+        assert_eq!(hp_color(3, 10), Color::Yellow);
+    }
+
+    #[test]
+    fn hp_color_at_quarter() {
+        // 25% is not > 25%, so should be Red
+        assert_eq!(hp_color(1, 4), Color::Red);
+    }
+
+    #[test]
+    fn hp_color_low() {
+        assert_eq!(hp_color(1, 10), Color::Red);
+    }
+
+    #[test]
+    fn hp_color_zero_max() {
+        assert_eq!(hp_color(0, 0), Color::Red);
+    }
+
+    #[test]
+    fn hp_bar_dead() {
+        let (bar, color) = hp_bar(0, 0, 10);
+        assert_eq!(bar, "DEAD");
+        assert_eq!(color, Color::Red);
+    }
+
+    #[test]
+    fn hp_bar_full() {
+        let (bar, color) = hp_bar(10, 10, 10);
+        assert!(bar.contains("10/10"));
+        assert_eq!(color, Color::Green);
+        // Should have all filled blocks
+        assert!(bar.contains("██████████"));
+    }
+
+    #[test]
+    fn hp_bar_half() {
+        let (bar, color) = hp_bar(5, 10, 10);
+        assert!(bar.contains("5/10"));
+        assert_eq!(color, Color::Yellow);
+    }
+
+    #[test]
+    fn hp_bar_negative_hp_clamped() {
+        let (bar, _color) = hp_bar(-5, 10, 10);
+        // Should show -5/10 but no filled blocks
+        assert!(bar.contains("-5/10"));
+        assert!(bar.contains("░░░░░░░░░░"));
+    }
+}

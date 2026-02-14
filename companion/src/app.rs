@@ -55,3 +55,63 @@ impl App {
         self.last_update.map(|t| t.elapsed().as_secs())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use osr_ai_gm::persist::GameState;
+
+    #[test]
+    fn new_app_has_no_state() {
+        let app = App::new(None);
+        assert!(app.state.is_none());
+        assert!(app.last_update.is_none());
+        assert!(!app.quit);
+        assert!(!app.show_help);
+        assert!(app.show_log);
+        assert!(app.show_image);
+        assert_eq!(app.log_scroll, 0);
+    }
+
+    #[test]
+    fn update_state_sets_last_update() {
+        let mut app = App::new(None);
+        assert!(app.last_update.is_none());
+
+        app.update_state(GameState::new());
+        assert!(app.state.is_some());
+        assert!(app.last_update.is_some());
+    }
+
+    #[test]
+    fn seconds_since_update_none_when_no_update() {
+        let app = App::new(None);
+        assert_eq!(app.seconds_since_update(), None);
+    }
+
+    #[test]
+    fn seconds_since_update_returns_elapsed() {
+        let mut app = App::new(None);
+        app.update_state(GameState::new());
+        // Just after update, should be 0 seconds
+        let secs = app.seconds_since_update().unwrap();
+        assert!(secs < 2, "expected <2s, got {}", secs);
+    }
+
+    #[test]
+    fn update_state_replaces_previous() {
+        let mut app = App::new(None);
+
+        let mut state1 = GameState::new();
+        state1.notes.push("first".to_string());
+        app.update_state(state1);
+
+        let mut state2 = GameState::new();
+        state2.notes.push("second".to_string());
+        app.update_state(state2);
+
+        let notes = &app.state.as_ref().unwrap().notes;
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0], "second");
+    }
+}
