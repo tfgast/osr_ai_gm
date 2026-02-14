@@ -1,5 +1,6 @@
 use super::{Command, CommandResult};
-use crate::engine::{combat, gm, xp};
+use crate::engine::combat::{self, SpawnEncounterParams};
+use crate::engine::{gm, xp};
 use crate::persist::GameState;
 use crate::rules::class::class_def;
 use crate::rules::xp::{check_level_up, xp_for_level};
@@ -45,7 +46,10 @@ impl Command for SpawnEncounterCommand {
         };
 
         match combat::action_spawn_encounter(
-            state, name, count, hd, ac, hp, damage, morale, distance, None,
+            state,
+            &SpawnEncounterParams {
+                name, count, hit_dice: hd, ac, hp, damage, morale, distance, xp_value: None,
+            },
         ) {
             Ok(result) => {
                 let mut out = format!(

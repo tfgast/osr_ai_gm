@@ -1,5 +1,5 @@
 use super::{Command, CommandResult};
-use crate::engine::combat;
+use crate::engine::combat::{self, SpawnEncounterParams};
 use crate::engine::combat::results::RetainerLoyaltyOutcome;
 use crate::persist::GameState;
 
@@ -53,7 +53,10 @@ impl Command for StartCombatCommand {
         };
 
         match combat::action_spawn_encounter(
-            state, name, count, hd, ac, hp, damage, morale, distance, xp_value,
+            state,
+            &SpawnEncounterParams {
+                name, count, hit_dice: hd, ac, hp, damage, morale, distance, xp_value,
+            },
         ) {
             Ok(result) => {
                 let mut out = format!(
