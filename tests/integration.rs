@@ -2461,3 +2461,51 @@ fn character_progression_multi_level() {
     let nyx = state.party.find_member("Nyx").unwrap();
     assert!(nyx.max_hp > thief_base_hp, "thief should have gained HP from leveling");
 }
+
+// ===========================================================================
+// INTEGRATION TEST: Wilderness commands rejected in dungeon mode
+// ===========================================================================
+
+#[test]
+fn wilderness_commands_rejected_in_dungeon_mode() {
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    // Enter dungeon — mode should be Exploration
+    let resp = handle_request(&req("1", GMCommand::EnterDungeon {
+        level: 1,
+        room_name: "Test Room".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    // Travel should fail
+    let resp = handle_request(&req("2", GMCommand::Travel { x: 1, y: 0 }), &mut state);
+    assert!(!resp.success, "Travel should fail in dungeon mode");
+    assert!(resp.message.contains("wilderness"), "error should mention wilderness");
+
+    // AddHex should fail
+    let resp = handle_request(&req("3", GMCommand::AddHex {
+        x: 1, y: 0, terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(!resp.success, "AddHex should fail in dungeon mode");
+    assert!(resp.message.contains("wilderness"), "error should mention wilderness");
+
+    // Forage should fail
+    let resp = handle_request(&req("4", GMCommand::Forage), &mut state);
+    assert!(!resp.success, "Forage should fail in dungeon mode");
+    assert!(resp.message.contains("wilderness"), "error should mention wilderness");
+
+    // Hunt should fail
+    let resp = handle_request(&req("5", GMCommand::Hunt), &mut state);
+    assert!(!resp.success, "Hunt should fail in dungeon mode");
+    assert!(resp.message.contains("wilderness"), "error should mention wilderness");
+
+    // Orient should fail
+    let resp = handle_request(&req("6", GMCommand::Orient), &mut state);
+    assert!(!resp.success, "Orient should fail in dungeon mode");
+    assert!(resp.message.contains("wilderness"), "error should mention wilderness");
+
+    // Verify the mode is still Exploration (commands didn't change it)
+    assert_eq!(state.mode, GameMode::Exploration);
+}

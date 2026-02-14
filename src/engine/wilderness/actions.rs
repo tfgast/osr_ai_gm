@@ -5,10 +5,18 @@ use crate::engine::wilderness::results::{
 };
 use crate::engine::wilderness_engine;
 use crate::persist::GameState;
+use crate::state::game::GameMode;
 use crate::state::wilderness::{HexCell, Terrain, WildernessState};
 
 fn not_in_wilderness() -> EngineError {
     EngineError::WrongState("not in wilderness mode.".to_string())
+}
+
+fn require_wilderness_mode(state: &GameState) -> Result<(), EngineError> {
+    if state.mode != GameMode::Wilderness {
+        return Err(not_in_wilderness());
+    }
+    Ok(())
 }
 
 fn party_movement_rate(state: &GameState) -> u32 {
@@ -49,6 +57,7 @@ pub fn action_add_hex(
     y: i32,
     terrain: Terrain,
 ) -> Result<AddHexResult, EngineError> {
+    require_wilderness_mode(state)?;
     let wilderness = state.wilderness.as_mut().ok_or_else(not_in_wilderness)?;
     wilderness
         .add_hex(HexCell::new(x, y, terrain))
@@ -63,6 +72,7 @@ pub fn action_add_hex(
 }
 
 pub fn action_travel(state: &mut GameState, x: i32, y: i32) -> Result<TravelResult, EngineError> {
+    require_wilderness_mode(state)?;
     let movement_rate = party_movement_rate(state);
     let wilderness = state.wilderness.as_mut().ok_or_else(not_in_wilderness)?;
     let core = wilderness_engine::travel_day(wilderness, &mut state.party, x, y, movement_rate);
@@ -89,6 +99,7 @@ pub fn action_travel(state: &mut GameState, x: i32, y: i32) -> Result<TravelResu
 }
 
 pub fn action_orient(state: &mut GameState) -> Result<OrientResult, EngineError> {
+    require_wilderness_mode(state)?;
     let wilderness = state.wilderness.as_mut().ok_or_else(not_in_wilderness)?;
     let core = wilderness_engine::orient(wilderness);
 
@@ -102,6 +113,7 @@ pub fn action_orient(state: &mut GameState) -> Result<OrientResult, EngineError>
 }
 
 pub fn action_forage(state: &mut GameState) -> Result<ForageResult, EngineError> {
+    require_wilderness_mode(state)?;
     let wilderness = state.wilderness.as_ref().ok_or_else(not_in_wilderness)?;
     let core = wilderness_engine::forage(wilderness, &mut state.party);
 
@@ -114,6 +126,7 @@ pub fn action_forage(state: &mut GameState) -> Result<ForageResult, EngineError>
 }
 
 pub fn action_hunt(state: &mut GameState) -> Result<HuntResult, EngineError> {
+    require_wilderness_mode(state)?;
     let wilderness = state.wilderness.as_ref().ok_or_else(not_in_wilderness)?;
     let core = wilderness_engine::hunt(wilderness, &mut state.party);
 
@@ -126,6 +139,7 @@ pub fn action_hunt(state: &mut GameState) -> Result<HuntResult, EngineError> {
 }
 
 pub fn action_wilderness_status(state: &GameState) -> Result<WildernessStatusResult, EngineError> {
+    require_wilderness_mode(state)?;
     let wilderness = state.wilderness.as_ref().ok_or_else(not_in_wilderness)?;
     let movement_rate = party_movement_rate(state);
     let message = wilderness_engine::wilderness_status(wilderness, &state.party, movement_rate);
