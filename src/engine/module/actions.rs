@@ -48,7 +48,7 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
         for placed_treasure in &module_room.treasure {
             let (description, gp_value) = match placed_treasure {
                 PlacedTreasure::Coins { gp } => (format!("{} gold pieces", gp), *gp),
-                PlacedTreasure::Item { item } => (item.clone(), 0),
+                PlacedTreasure::Item { item, value_gp } => (item.clone(), *value_gp),
             };
             room.placed_treasure
                 .push(PlacedTreasureInstance::new(&description, gp_value));
@@ -284,6 +284,44 @@ mod tests {
         assert_eq!(vault.placed_treasure[1].description, "Potion of Healing");
         assert_eq!(vault.placed_treasure[1].gp_value, 0);
         assert!(!vault.treasure_looted);
+    }
+
+    #[test]
+    fn module_to_dungeon_item_treasure_with_value_gp() {
+        let json = r#"{
+            "name": "Valued Items",
+            "level_range": [1, 3],
+            "entry_room": "crypt",
+            "rooms": {
+                "crypt": {
+                    "name": "Family Crypt",
+                    "description": "A dusty crypt.",
+                    "treasure": [
+                        {"item": "Pearl necklace (500gp)", "value_gp": 500},
+                        {"item": "Silver-framed mirror (1000gp)", "value_gp": 1000},
+                        {"item": "Potion of Healing"},
+                        {"gp": 50}
+                    ],
+                    "exits": []
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        let dungeon = module_to_dungeon(&module).unwrap();
+        let crypt = &dungeon.rooms[0];
+
+        assert_eq!(crypt.placed_treasure.len(), 4);
+        // Item with value_gp preserves GP value
+        assert_eq!(crypt.placed_treasure[0].description, "Pearl necklace (500gp)");
+        assert_eq!(crypt.placed_treasure[0].gp_value, 500);
+        // Item with value_gp preserves GP value
+        assert_eq!(crypt.placed_treasure[1].description, "Silver-framed mirror (1000gp)");
+        assert_eq!(crypt.placed_treasure[1].gp_value, 1000);
+        // Item without value_gp defaults to 0
+        assert_eq!(crypt.placed_treasure[2].description, "Potion of Healing");
+        assert_eq!(crypt.placed_treasure[2].gp_value, 0);
+        // Coins still work correctly
+        assert_eq!(crypt.placed_treasure[3].gp_value, 50);
     }
 
     #[test]

@@ -55,7 +55,11 @@ fn default_count() -> u32 {
 #[serde(untagged)]
 pub enum PlacedTreasure {
     Coins { gp: u64 },
-    Item { item: String },
+    Item {
+        item: String,
+        #[serde(default)]
+        value_gp: u64,
+    },
 }
 
 /// An exit from a module room to another room.
@@ -273,7 +277,36 @@ mod tests {
             _ => panic!("Expected coins"),
         }
         match &vault.treasure[1] {
-            PlacedTreasure::Item { item } => assert_eq!(item, "Potion of Healing"),
+            PlacedTreasure::Item { item, value_gp } => {
+                assert_eq!(item, "Potion of Healing");
+                assert_eq!(*value_gp, 0);
+            }
+            _ => panic!("Expected item"),
+        }
+    }
+
+    #[test]
+    fn parse_item_treasure_with_value_gp() {
+        let json = r#"{"item": "Pearl necklace (500gp)", "value_gp": 500}"#;
+        let treasure: PlacedTreasure = serde_json::from_str(json).unwrap();
+        match &treasure {
+            PlacedTreasure::Item { item, value_gp } => {
+                assert_eq!(item, "Pearl necklace (500gp)");
+                assert_eq!(*value_gp, 500);
+            }
+            _ => panic!("Expected item with value_gp"),
+        }
+    }
+
+    #[test]
+    fn parse_item_treasure_without_value_gp_defaults_zero() {
+        let json = r#"{"item": "Potion of Healing"}"#;
+        let treasure: PlacedTreasure = serde_json::from_str(json).unwrap();
+        match &treasure {
+            PlacedTreasure::Item { item, value_gp } => {
+                assert_eq!(item, "Potion of Healing");
+                assert_eq!(*value_gp, 0);
+            }
             _ => panic!("Expected item"),
         }
     }
