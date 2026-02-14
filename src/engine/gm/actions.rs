@@ -162,6 +162,13 @@ pub fn action_heal(
         .find_member_mut(char_name)
         .ok_or_else(|| no_party_member_err(char_name))?;
 
+    if !character.is_alive() {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is dead and cannot be healed (use SetHp to override).",
+            character.name
+        )));
+    }
+
     let old_hp = character.hp;
     character.hp = (character.hp + amount).min(character.max_hp);
     let healed = character.hp - old_hp;

@@ -1184,4 +1184,23 @@ mod tests {
             "monsters_cleared should be true after EndCombat"
         );
     }
+
+    #[test]
+    fn heal_dead_character_rejected() {
+        let mut state = GameState::new();
+        let mut c = crate::model::Character::new("Shadow", Class::Fighter);
+        c.hp = -1;
+        c.max_hp = 6;
+        state.party.add_member(c);
+
+        let resp = handle_request(&make_req("1", GMCommand::Heal {
+            character: "Shadow".to_string(),
+            amount: 10,
+        }), &mut state);
+        assert!(!resp.success, "healing a dead character should fail");
+        assert!(resp.message.contains("dead"), "error should mention dead: {}", resp.message);
+
+        // HP should be unchanged
+        assert_eq!(state.party.find_member("Shadow").unwrap().hp, -1);
+    }
 }
