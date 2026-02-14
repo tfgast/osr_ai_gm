@@ -58,8 +58,8 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
             combat_handlers::turn_undead(id, state, character, *monster_idx)
         }
         GMCommand::Close { character, feet } => combat_handlers::close(id, state, character, *feet),
-        GMCommand::Retreat { character } => combat_handlers::retreat(id, state, character),
-        GMCommand::FightingWithdrawal { character } => combat_handlers::fighting_withdrawal(id, state, character),
+        GMCommand::Retreat { character } => combat_handlers::retreat(id, state, character.as_deref()),
+        GMCommand::FightingWithdrawal { character } => combat_handlers::fighting_withdrawal(id, state, character.as_deref()),
         GMCommand::QueryCombatLog => combat_handlers::query_combat_log(id, state),
         GMCommand::DeclareSpell { character, spell } => {
             combat_handlers::declare_spell(id, state, character, spell)
@@ -736,7 +736,7 @@ mod tests {
 
         // Retreat
         let resp = handle_request(&make_req("3", GMCommand::Retreat {
-            character: "Aldric".to_string(),
+            character: Some("Aldric".to_string()),
         }), &mut state);
         assert!(resp.success, "retreat should succeed: {}", resp.message);
 
@@ -783,7 +783,7 @@ mod tests {
 
         // Fighting withdrawal
         let resp = handle_request(&make_req("3", GMCommand::FightingWithdrawal {
-            character: "Aldric".to_string(),
+            character: Some("Aldric".to_string()),
         }), &mut state);
         assert!(resp.success, "fighting withdrawal should succeed: {}", resp.message);
 
@@ -796,10 +796,100 @@ mod tests {
     fn retreat_no_combat_error() {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::Retreat {
-            character: "Nobody".to_string(),
+            character: Some("Nobody".to_string()),
         }), &mut state);
         assert!(!resp.success);
         assert!(resp.message.contains("no active combat"), "should error: no active combat");
+    }
+
+    #[test]
+    fn retreat_without_character_auto_selects_sole_member() {
+        let mut state = GameState::new();
+        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        c.hp = 100;
+        c.max_hp = 100;
+        state.party.add_member(c);
+
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(crate::gmapi::protocol::EncounterParams {
+            name: "goblin".to_string(),
+            count: 1,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 10,
+            xp_value: Some(5),
+        })), &mut state);
+        assert!(resp.success);
+
+        // Retreat without specifying character — should auto-select Aldric
+        let resp = handle_request(&make_req("2", GMCommand::Retreat {
+            character: None,
+        }), &mut state);
+        assert!(resp.success, "retreat without character should auto-select sole member: {}", resp.message);
+        assert!(resp.message.contains("Aldric"), "should retreat Aldric");
+    }
+
+    #[test]
+    fn retreat_without_character_errors_with_multiple_members() {
+        let mut state = GameState::new();
+        let mut c1 = crate::model::Character::new("Aldric", Class::Fighter);
+        c1.hp = 10;
+        c1.max_hp = 10;
+        state.party.add_member(c1);
+        let mut c2 = crate::model::Character::new("Bran", Class::Fighter);
+        c2.hp = 10;
+        c2.max_hp = 10;
+        state.party.add_member(c2);
+
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(crate::gmapi::protocol::EncounterParams {
+            name: "goblin".to_string(),
+            count: 1,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 10,
+            xp_value: Some(5),
+        })), &mut state);
+        assert!(resp.success);
+
+        // Retreat without specifying character — should error with multiple alive members
+        let resp = handle_request(&make_req("2", GMCommand::Retreat {
+            character: None,
+        }), &mut state);
+        assert!(!resp.success, "should require character when multiple alive members");
+        assert!(resp.message.contains("multiple alive party members"), "should list members: {}", resp.message);
+    }
+
+    #[test]
+    fn fighting_withdrawal_without_character_auto_selects() {
+        let mut state = GameState::new();
+        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        c.hp = 10;
+        c.max_hp = 10;
+        state.party.add_member(c);
+
+        let resp = handle_request(&make_req("1", GMCommand::SpawnEncounter(crate::gmapi::protocol::EncounterParams {
+            name: "goblin".to_string(),
+            count: 1,
+            hit_dice: "1".parse().unwrap(),
+            ac: 6,
+            hp: 3,
+            damage: "1d6".to_string(),
+            morale: 7,
+            distance: 10,
+            xp_value: Some(5),
+        })), &mut state);
+        assert!(resp.success);
+
+        let resp = handle_request(&make_req("2", GMCommand::FightingWithdrawal {
+            character: None,
+        }), &mut state);
+        assert!(resp.success, "withdrawal without character should auto-select: {}", resp.message);
+        assert!(resp.message.contains("Aldric"), "should withdraw Aldric");
     }
 
     #[test]

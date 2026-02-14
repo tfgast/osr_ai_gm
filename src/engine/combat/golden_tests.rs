@@ -315,7 +315,7 @@ fn combat_command_parity_golden_scaffold_captures_snapshots() {
             state_with_combat(),
             |state| RetreatCommand.execute(&["Grond"], state),
             GMCommand::Retreat {
-                character: "Grond".to_string(),
+                character: Some("Grond".to_string()),
             },
         ),
         capture_parity(
@@ -323,7 +323,7 @@ fn combat_command_parity_golden_scaffold_captures_snapshots() {
             state_with_combat(),
             |state| WithdrawalCommand.execute(&["Grond"], state),
             GMCommand::FightingWithdrawal {
-                character: "Grond".to_string(),
+                character: Some("Grond".to_string()),
             },
         ),
         capture_parity(

@@ -103,12 +103,16 @@ pub enum GMCommand {
         feet: Option<u32>,
     },
     /// Retreat from combat — full speed, enemies get free attack at +2.
+    /// Character is optional — omit for single-member parties.
     Retreat {
-        character: String,
+        #[serde(default)]
+        character: Option<String>,
     },
     /// Fighting withdrawal — half speed, no free attacks.
+    /// Character is optional — omit for single-member parties.
     FightingWithdrawal {
-        character: String,
+        #[serde(default)]
+        character: Option<String>,
     },
     /// Query the combat log for the current encounter.
     QueryCombatLog,
@@ -507,8 +511,12 @@ impl GMCommand {
             GMCommand::MonsterAttack { character, .. } => check_len("character", character, 128),
             GMCommand::TurnUndead { character, .. } => check_len("character", character, 128),
             GMCommand::Close { character, .. } => check_len("character", character, 128),
-            GMCommand::Retreat { character } => check_len("character", character, 128),
-            GMCommand::FightingWithdrawal { character } => check_len("character", character, 128),
+            GMCommand::Retreat { character } => {
+                if let Some(c) = character { check_len("character", c, 128) } else { Ok(()) }
+            }
+            GMCommand::FightingWithdrawal { character } => {
+                if let Some(c) = character { check_len("character", c, 128) } else { Ok(()) }
+            }
             GMCommand::DeclareSpell { character, spell } => {
                 check_len("character", character, 128)?;
                 check_len("spell", spell, 128)
@@ -1348,5 +1356,45 @@ mod tests {
         // id is a number, not a string — should return empty since we expect strings.
         let json = r#"{"id":42,"command":{"type":"QueryState"}}"#;
         assert_eq!(extract_request_id(json), "");
+    }
+
+    #[test]
+    fn parse_retreat_with_character() {
+        let json = r#"{"id":"r1","command":{"type":"Retreat","params":{"character":"Aldric"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Retreat { character } => assert_eq!(character.as_deref(), Some("Aldric")),
+            _ => panic!("expected Retreat"),
+        }
+    }
+
+    #[test]
+    fn parse_retreat_without_character() {
+        let json = r#"{"id":"r2","command":{"type":"Retreat","params":{}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::Retreat { character } => assert!(character.is_none()),
+            _ => panic!("expected Retreat"),
+        }
+    }
+
+    #[test]
+    fn parse_fighting_withdrawal_with_character() {
+        let json = r#"{"id":"fw1","command":{"type":"FightingWithdrawal","params":{"character":"Aldric"}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::FightingWithdrawal { character } => assert_eq!(character.as_deref(), Some("Aldric")),
+            _ => panic!("expected FightingWithdrawal"),
+        }
+    }
+
+    #[test]
+    fn parse_fighting_withdrawal_without_character() {
+        let json = r#"{"id":"fw2","command":{"type":"FightingWithdrawal","params":{}}}"#;
+        let req = parse_request(json).unwrap();
+        match &req.command {
+            GMCommand::FightingWithdrawal { character } => assert!(character.is_none()),
+            _ => panic!("expected FightingWithdrawal"),
+        }
     }
 }

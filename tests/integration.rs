@@ -3350,13 +3350,13 @@ fn playtest2c_wilderness_retreat() {
 
     // Fighting withdrawal first (no free attacks)
     let resp = handle_request(&req("3", GMCommand::FightingWithdrawal {
-        character: "Runner".to_string(),
+        character: Some("Runner".to_string()),
     }), &mut state);
     assert!(resp.success, "fighting withdrawal should work: {}", resp.message);
 
     // Full retreat (with free attacks)
     let resp = handle_request(&req("4", GMCommand::Retreat {
-        character: "Runner".to_string(),
+        character: Some("Runner".to_string()),
     }), &mut state);
     assert!(resp.success, "retreat should work: {}", resp.message);
 

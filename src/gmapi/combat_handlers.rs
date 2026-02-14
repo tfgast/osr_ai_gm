@@ -132,15 +132,45 @@ pub(super) fn close(
     }
 }
 
-pub(super) fn retreat(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
-    match combat::action_retreat(state, char_name) {
+/// Resolve an optional character name to a concrete name.
+/// If None, auto-selects when there is exactly one alive party member.
+fn resolve_character(state: &GameState, char_name: Option<&str>) -> Result<String, String> {
+    match char_name {
+        Some(name) => Ok(name.to_string()),
+        None => {
+            let alive: Vec<&str> = state.party.members.iter()
+                .filter(|c| c.is_alive())
+                .map(|c| c.name.as_str())
+                .collect();
+            match alive.len() {
+                0 => Err("no alive party members.".to_string()),
+                1 => Ok(alive[0].to_string()),
+                _ => Err(format!(
+                    "multiple alive party members — specify which character: {}",
+                    alive.join(", ")
+                )),
+            }
+        }
+    }
+}
+
+pub(super) fn retreat(id: &str, state: &mut GameState, char_name: Option<&str>) -> GMResponse {
+    let name = match resolve_character(state, char_name) {
+        Ok(n) => n,
+        Err(e) => return GMResponse::err(id, e, state.mode.clone()),
+    };
+    match combat::action_retreat(state, &name) {
         Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
 }
 
-pub(super) fn fighting_withdrawal(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
-    match combat::action_fighting_withdrawal(state, char_name) {
+pub(super) fn fighting_withdrawal(id: &str, state: &mut GameState, char_name: Option<&str>) -> GMResponse {
+    let name = match resolve_character(state, char_name) {
+        Ok(n) => n,
+        Err(e) => return GMResponse::err(id, e, state.mode.clone()),
+    };
+    match combat::action_fighting_withdrawal(state, &name) {
         Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }

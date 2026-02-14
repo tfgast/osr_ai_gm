@@ -700,7 +700,7 @@ fn phase4_retreat_triggers_free_attacks() {
     setup_combat_with_monsters(&mut state, bandits, 5); // melee range
 
     let resp = handle_request(&req("ret1", GMCommand::Retreat {
-        character: "Zara".to_string(),
+        character: Some("Zara".to_string()),
     }), &mut state);
     assert_ok(&resp, "retreat should succeed");
 
@@ -725,7 +725,7 @@ fn phase4_turned_monsters_no_free_attacks_on_retreat() {
     setup_combat_with_monsters(&mut state, skeletons, 5);
 
     let resp = handle_request(&req("ret2", GMCommand::Retreat {
-        character: "Zara".to_string(),
+        character: Some("Zara".to_string()),
     }), &mut state);
     assert_ok(&resp, "retreat should succeed even with turned monsters");
 
@@ -750,7 +750,7 @@ fn phase4_fighting_withdrawal_no_free_attacks() {
     setup_combat_with_monsters(&mut state, bandits, 5);
 
     let resp = handle_request(&req("fw1", GMCommand::FightingWithdrawal {
-        character: "Thorin".to_string(),
+        character: Some("Thorin".to_string()),
     }), &mut state);
     assert_ok(&resp, "fighting withdrawal should succeed");
 
