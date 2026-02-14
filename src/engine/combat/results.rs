@@ -319,7 +319,6 @@ pub struct RetainerLoyaltyCheckResult {
 /// Typed success payload for `combat_status`.
 #[derive(Debug, Clone, Serialize)]
 pub struct CombatStatusResult {
-    pub message: String,
     pub status: String,
 }
 

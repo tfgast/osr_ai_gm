@@ -915,10 +915,7 @@ pub fn action_backstab(
 pub fn action_combat_status(state: &GameState) -> Result<CombatStatusResult, EngineError> {
     let combat = state.combat.as_ref().ok_or_else(no_active_combat)?;
     let status = combat_status(combat, &state.party.members);
-    Ok(CombatStatusResult {
-        message: status.clone(),
-        status,
-    })
+    Ok(CombatStatusResult { status })
 }
 
 pub fn action_set_helpless(
