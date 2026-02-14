@@ -344,6 +344,13 @@ pub enum GMCommand {
     LookupTreasureType { letter: String },
     /// Roll on a treasure type table to generate treasure.
     RollTreasure { letter: String },
+    /// Roll a random rumor from a named table.
+    RollRumor { table: String },
+    /// Look up a rumor table to see all entries.
+    LookupRumorTable { table: String },
+    /// List all available rumor tables.
+    ListRumorTables,
+
     /// List all character classes with requirements.
     ListClasses,
     /// Show eligible classes for given ability scores.
@@ -588,6 +595,8 @@ impl GMCommand {
                     Ok(())
                 }
             }
+            GMCommand::RollRumor { table } => check_len("table", table, 128),
+            GMCommand::LookupRumorTable { table } => check_len("table", table, 128),
             GMCommand::LookupItem { name } => check_len("name", name, 128),
             GMCommand::SearchItems { query } => check_len("query", query, 128),
             GMCommand::LookupTreasureType { letter } => check_len("letter", letter, 16),

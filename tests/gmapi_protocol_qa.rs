@@ -4851,3 +4851,103 @@ fn leave_wilderness_parses_from_json() {
     assert_eq!(req.id, "lw5");
     assert!(matches!(req.command, GMCommand::LeaveWilderness));
 }
+
+// ===========================================================================
+// Rumor commands
+// ===========================================================================
+
+#[test]
+fn roll_rumor_success() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("rr1", GMCommand::RollRumor {
+        table: "tavern".to_string(),
+    }), &mut state);
+    assert!(resp.success, "roll_rumor should succeed: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert_eq!(data["table"], "tavern");
+    assert!(!data["text"].as_str().unwrap().is_empty());
+    assert!(data["true_rumor"].is_boolean());
+}
+
+#[test]
+fn roll_rumor_unknown_table() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("rr2", GMCommand::RollRumor {
+        table: "nonexistent".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("unknown rumor table"));
+}
+
+#[test]
+fn roll_rumor_case_insensitive() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("rr3", GMCommand::RollRumor {
+        table: "TAVERN".to_string(),
+    }), &mut state);
+    assert!(resp.success, "roll_rumor should be case insensitive: {}", resp.message);
+}
+
+#[test]
+fn lookup_rumor_table_success() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lr1", GMCommand::LookupRumorTable {
+        table: "tavern".to_string(),
+    }), &mut state);
+    assert!(resp.success, "lookup_rumor_table should succeed: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert_eq!(data["name"], "tavern");
+    assert!(!data["entries"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn lookup_rumor_table_unknown() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lr2", GMCommand::LookupRumorTable {
+        table: "nonexistent".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+}
+
+#[test]
+fn list_rumor_tables_success() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("lt1", GMCommand::ListRumorTables), &mut state);
+    assert!(resp.success, "list_rumor_tables should succeed: {}", resp.message);
+    let data = resp.data.unwrap();
+    let tables = data["tables"].as_array().unwrap();
+    assert!(tables.len() >= 3);
+    assert!(tables.iter().any(|t| t["name"] == "tavern"));
+    assert!(tables.iter().any(|t| t["name"] == "market"));
+    assert!(tables.iter().any(|t| t["name"] == "docks"));
+}
+
+#[test]
+fn roll_rumor_parses_from_json() {
+    let json = r#"{"id":"rr4","command":{"type":"RollRumor","params":{"table":"tavern"}}}"#;
+    let req = parse_request(json).unwrap();
+    assert_eq!(req.id, "rr4");
+    match &req.command {
+        GMCommand::RollRumor { table } => assert_eq!(table, "tavern"),
+        _ => panic!("expected RollRumor"),
+    }
+}
+
+#[test]
+fn lookup_rumor_table_parses_from_json() {
+    let json = r#"{"id":"lr3","command":{"type":"LookupRumorTable","params":{"table":"market"}}}"#;
+    let req = parse_request(json).unwrap();
+    assert_eq!(req.id, "lr3");
+    match &req.command {
+        GMCommand::LookupRumorTable { table } => assert_eq!(table, "market"),
+        _ => panic!("expected LookupRumorTable"),
+    }
+}
+
+#[test]
+fn list_rumor_tables_parses_from_json() {
+    let json = r#"{"id":"lt2","command":{"type":"ListRumorTables"}}"#;
+    let req = parse_request(json).unwrap();
+    assert_eq!(req.id, "lt2");
+    assert!(matches!(req.command, GMCommand::ListRumorTables));
+}

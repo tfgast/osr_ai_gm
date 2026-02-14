@@ -143,6 +143,11 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::Unequip { character, item_name } => exploration_handlers::unequip(id, state, character, item_name),
         GMCommand::Loot { character, item_name, value_gp } => exploration_handlers::loot(id, state, character, item_name, *value_gp),
 
+        // -- Rumors --
+        GMCommand::RollRumor { table } => query_handlers::roll_rumor(id, state, table),
+        GMCommand::LookupRumorTable { table } => query_handlers::lookup_rumor_table(id, state, table),
+        GMCommand::ListRumorTables => query_handlers::list_rumor_tables(id, state),
+
         // -- Lookup & reference --
         GMCommand::LookupItem { name } => query_handlers::lookup_item(id, state, name),
         GMCommand::SearchItems { query } => query_handlers::search_items(id, state, query),
