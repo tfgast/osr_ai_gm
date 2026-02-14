@@ -15,7 +15,7 @@ use osr_ai_gm::command::exploration_cmds::{
 use osr_ai_gm::command::gm_cmds::{
     AddRationsCommand, AdvanceTurnCommand, AwardTreasureXpCommand, AwardXpCommand, BackstabCommand,
     DamageCommand, HealCommand, RulingCommand, SetHpCommand, SetRationsCommand,
-    SpawnEncounterCommand, ThiefCheckCommand, TrainCommand,
+    ThiefCheckCommand, TrainCommand,
 };
 use osr_ai_gm::command::inventory_cmds::{BuyCommand, DropCommand, EquipCommand, LootCommand, ShopCommand};
 use osr_ai_gm::command::lookup_cmds::{
@@ -170,7 +170,6 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(SetHpCommand));
     registry.register(Box::new(SetRationsCommand));
     registry.register(Box::new(AddRationsCommand));
-    registry.register(Box::new(SpawnEncounterCommand));
     // Notes
     registry.register(Box::new(NoteCommand));
     registry.register(Box::new(NotesCommand));

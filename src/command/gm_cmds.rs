@@ -1,69 +1,6 @@
 use super::{Command, CommandResult};
-use crate::engine::combat::{self, SpawnEncounterParams};
-use crate::engine::{exploration, gm};
+use crate::engine::{combat, exploration, gm};
 use crate::persist::GameState;
-use crate::rules::attack::HitDice;
-
-pub struct SpawnEncounterCommand;
-impl Command for SpawnEncounterCommand {
-    fn name(&self) -> &str {
-        "spawn_encounter"
-    }
-    fn help(&self) -> &str {
-        "GM: spawn monsters (spawn_encounter <name> <count> <hd> <ac> <hp> <damage> <morale> <distance>)"
-    }
-    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        if args.len() < 8 {
-            return CommandResult::error(
-                "usage: spawn_encounter <name> <count> <hd> <ac> <hp> <damage> <morale> <distance>",
-            );
-        }
-        let name = args[0];
-        let count: u32 = match args[1].parse() {
-            Ok(n) if n >= 1 => n,
-            _ => return CommandResult::error("count must be a positive integer"),
-        };
-        let hd: HitDice = match args[2].parse() {
-            Ok(h) => h,
-            Err(e) => return CommandResult::error(format!("invalid hit dice '{}': {}", args[2], e)),
-        };
-        let ac: i32 = match args[3].parse() {
-            Ok(n) => n,
-            _ => return CommandResult::error("ac must be an integer"),
-        };
-        let hp: i32 = match args[4].parse() {
-            Ok(n) if n >= 1 => n,
-            _ => return CommandResult::error("hp must be a positive integer"),
-        };
-        let damage = args[5];
-        let morale: u32 = match args[6].parse() {
-            Ok(n) if (2..=12).contains(&n) => n,
-            _ => return CommandResult::error("morale must be 2-12"),
-        };
-        let distance: u32 = match args[7].parse() {
-            Ok(n) => n,
-            _ => return CommandResult::error("distance must be a non-negative integer"),
-        };
-
-        match combat::action_spawn_encounter(
-            state,
-            &SpawnEncounterParams {
-                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value: None,
-            },
-        ) {
-            Ok(result) => {
-                let mut out = format!(
-                    "Encounter spawned! {} {}(s) at {}' distance.\n\n",
-                    result.count, result.encounter_name, result.distance
-                );
-                out.push_str(&result.status);
-                out.push_str("\nUse 'initiative' to roll for the first round.");
-                CommandResult::ok(out)
-            }
-            Err(e) => CommandResult::error(e.to_string()),
-        }
-    }
-}
 
 pub struct AdvanceTurnCommand;
 impl Command for AdvanceTurnCommand {
@@ -450,7 +387,7 @@ impl Command for AwardTreasureXpCommand {
 }
 
 pub const GM_ONLY_COMMANDS: &[&str] = &[
-    "spawn_encounter",
+    "start_combat",
     "advance_turn",
     "award_xp",
     "award_treasure_xp",
@@ -471,44 +408,6 @@ mod tests {
     use crate::model::{Character, CombatState};
     use crate::rules::class::Class;
     use crate::state::game::GameMode;
-
-    #[test]
-    fn spawn_encounter_basic() {
-        let mut state = GameState::new();
-        state
-            .party
-            .add_member(Character::new("Aldric", Class::Fighter));
-        let cmd = SpawnEncounterCommand;
-        let result = cmd.execute(
-            &["goblin", "3", "1", "6", "3", "1d6", "7", "60"],
-            &mut state,
-        );
-        assert!(!result.quit);
-        assert!(result.output.contains("Encounter spawned"));
-        assert!(state.combat.is_some());
-        assert_eq!(state.mode, GameMode::Combat);
-    }
-
-    #[test]
-    fn spawn_encounter_count_zero() {
-        let mut state = GameState::new();
-        let cmd = SpawnEncounterCommand;
-        let result = cmd.execute(
-            &["goblin", "0", "1", "6", "3", "1d6", "7", "60"],
-            &mut state,
-        );
-        assert!(result.output.contains("Error"));
-        assert!(result.output.contains("count must be a positive integer"));
-        assert!(state.combat.is_none());
-    }
-
-    #[test]
-    fn spawn_encounter_too_few_args() {
-        let mut state = GameState::new();
-        let cmd = SpawnEncounterCommand;
-        let result = cmd.execute(&["goblin", "3"], &mut state);
-        assert!(result.output.contains("Error"));
-    }
 
     #[test]
     fn award_xp_basic() {
@@ -550,7 +449,7 @@ mod tests {
 
     #[test]
     fn gm_only_commands_list() {
-        assert!(GM_ONLY_COMMANDS.contains(&"spawn_encounter"));
+        assert!(GM_ONLY_COMMANDS.contains(&"start_combat"));
         assert!(GM_ONLY_COMMANDS.contains(&"award_xp"));
         assert!(GM_ONLY_COMMANDS.contains(&"ruling"));
         assert!(GM_ONLY_COMMANDS.contains(&"heal"));
