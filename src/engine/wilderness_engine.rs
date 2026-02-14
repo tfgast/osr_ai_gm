@@ -386,13 +386,13 @@ pub fn hunt_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState, party: &
         let quantity: u32 = rng.gen_range(1..=6);
         party.rations += quantity;
         let msg = format!(
-            "Day {}: Hunt successful! Killed game sufficient for {} person-days of food. (rolled {}, quantity: 1d6={})\nRations: {} (+{})",
+            "Day {}: Hunt successful! Killed game sufficient for {} person-days of food. (rolled {} vs 1-in-6, quantity: 1d6={})\nRations: {} (+{})",
             wilderness.travel_day, quantity, roll, quantity, party.rations, quantity
         );
         (quantity, true, msg)
     } else {
         let msg = format!(
-            "Day {}: Hunt unsuccessful. No game found. (rolled {})",
+            "Day {}: Hunt unsuccessful. No game found. (rolled {} vs 1-in-6)",
             wilderness.travel_day, roll
         );
         (0, false, msg)
