@@ -12,7 +12,7 @@ pub use actions::{
 use crate::model::Character;
 use crate::rules::ability;
 use crate::rules::encounter;
-use crate::state::dungeon::{DoorState, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance};
+use crate::state::dungeon::{DoorState, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, TrapTrigger};
 use crate::state::time::TimeTracker;
 
 /// Check for wandering monsters (1-in-6 every 2 turns).
@@ -389,31 +389,46 @@ pub fn move_through_door(
     move_through_door_with(&mut rand::thread_rng(), time, dungeon, dungeon_level, door_id)
 }
 
-/// Check for a trap when entering a room. If the room has an untriggered trap,
-/// roll for it and mark triggered on success.
+/// Check for a trap when entering a room. Only `Entry` traps roll automatically
+/// on room entry (1-2 on d6). `Action` traps require explicit character
+/// interaction and are not triggered on entry — instead, the GM is notified
+/// that the room contains a trap requiring a character action.
 fn check_room_trap<R: Rng>(
     rng: &mut R,
     dungeon: &mut DungeonState,
     dest: u32,
     result: &mut ExplorationResult,
 ) {
-    let has_untriggered_trap = dungeon.find_room(dest)
-        .map(|r| r.trap.is_some() && !r.trap_triggered)
-        .unwrap_or(false);
-    if !has_untriggered_trap {
-        return;
-    }
+    let room_info = dungeon.find_room(dest).and_then(|r| {
+        if r.trap.is_some() && !r.trap_triggered {
+            Some((r.name.clone(), r.trap.clone().unwrap(), r.trap_trigger))
+        } else {
+            None
+        }
+    });
 
-    let room_name = dungeon.find_room(dest)
-        .map(|r| r.name.clone())
-        .unwrap_or_else(|| format!("room {}", dest));
-    let trap = check_trap_with(rng, &room_name);
-    if trap.triggered {
-        if let Some(room) = dungeon.find_room_mut(dest) {
-            room.trap_triggered = true;
+    let (room_name, trap_desc, trigger) = match room_info {
+        Some(info) => info,
+        None => return,
+    };
+
+    match trigger {
+        TrapTrigger::Entry => {
+            let trap = check_trap_with(rng, &room_name);
+            if trap.triggered {
+                if let Some(room) = dungeon.find_room_mut(dest) {
+                    room.trap_triggered = true;
+                }
+            }
+            result.msg(trap.message);
+        }
+        TrapTrigger::Action => {
+            result.msg(format!(
+                "TRAP PRESENT in {}: {} (requires character action to trigger)",
+                room_name, trap_desc
+            ));
         }
     }
-    result.msg(trap.message);
 }
 
 /// Check for placed monsters (module support) in a room. Collects unspawned
@@ -1292,5 +1307,96 @@ mod tests {
         // Search room
         let result = search_room_with(&mut rng, &mut time, &mut dungeon, 1, false);
         assert!(result.placed_treasure.is_none(), "empty room should have no treasure");
+    }
+
+    // =========================================================================
+    // Trap trigger type tests
+    // =========================================================================
+
+    #[test]
+    fn action_trap_does_not_trigger_on_room_entry() {
+        // Action traps should never auto-trigger on room entry, regardless of RNG
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut time = TimeTracker::new();
+            let mut dungeon = DungeonState::new(1);
+            time.light(LightSourceKind::Lantern, "Test");
+
+            dungeon.add_room(Room::new(0, "Entrance")).unwrap();
+            dungeon.add_room(
+                Room::new(1, "Freezing Mirror")
+                    .with_trap("Save vs paralysis or be frozen")
+                    .with_trap_trigger(TrapTrigger::Action)
+            ).unwrap();
+            dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+
+            let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+            assert!(result.is_ok());
+            let output = result.unwrap().to_string();
+            assert!(
+                !output.contains("TRAP TRIGGERED"),
+                "action trap should never auto-trigger on entry (seed {}), got: {}",
+                seed, output
+            );
+            assert!(
+                !dungeon.find_room(1).unwrap().trap_triggered,
+                "action trap flag should not be set on entry (seed {})",
+                seed
+            );
+        }
+    }
+
+    #[test]
+    fn action_trap_notifies_gm_on_entry() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        dungeon.add_room(Room::new(0, "Entrance")).unwrap();
+        dungeon.add_room(
+            Room::new(1, "Freezing Mirror")
+                .with_trap("Save vs paralysis or be frozen")
+                .with_trap_trigger(TrapTrigger::Action)
+        ).unwrap();
+        dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        let output = result.unwrap().to_string();
+        assert!(
+            output.contains("TRAP PRESENT") && output.contains("requires character action"),
+            "should notify GM about action trap, got: {}",
+            output
+        );
+    }
+
+    #[test]
+    fn entry_trap_still_triggers_on_room_entry() {
+        // Verify Entry traps (the default) still behave as before
+        let mut triggered = false;
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut time = TimeTracker::new();
+            let mut dungeon = DungeonState::new(1);
+            time.light(LightSourceKind::Lantern, "Test");
+
+            dungeon.add_room(Room::new(0, "Entrance")).unwrap();
+            dungeon.add_room(
+                Room::new(1, "Pit Room")
+                    .with_trap("Pit trap (1d6 damage)")
+                    .with_trap_trigger(TrapTrigger::Entry)
+            ).unwrap();
+            dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+
+            let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+            assert!(result.is_ok());
+            if result.unwrap().to_string().contains("TRAP TRIGGERED") {
+                triggered = true;
+                assert!(dungeon.find_room(1).unwrap().trap_triggered);
+                break;
+            }
+        }
+        assert!(triggered, "entry trap should eventually trigger on room entry");
     }
 }

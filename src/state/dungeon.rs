@@ -3,6 +3,19 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+/// How a trap is triggered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum TrapTrigger {
+    /// Trap rolls automatically when entering the room (1-2 on d6).
+    #[serde(alias = "entry")]
+    #[default]
+    Entry,
+    /// Trap triggers based on character action (e.g., interacting with an object).
+    /// Does NOT auto-trigger on room entry.
+    #[serde(alias = "action")]
+    Action,
+}
+
 /// State of a door in the dungeon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum DoorState {
@@ -136,6 +149,9 @@ pub struct Room {
     pub searched: bool,
     pub trap: Option<String>,
     pub trap_triggered: bool,
+    /// How the trap is triggered: automatically on entry, or by character action.
+    #[serde(default)]
+    pub trap_trigger: TrapTrigger,
     /// Module room key for cross-referencing (e.g., "entrance", "guard").
     #[serde(default)]
     pub key: Option<String>,
@@ -162,6 +178,7 @@ impl Room {
             searched: false,
             trap: None,
             trap_triggered: false,
+            trap_trigger: TrapTrigger::Entry,
             key: None,
             placed_monsters: Vec::new(),
             placed_treasure: Vec::new(),
@@ -177,6 +194,11 @@ impl Room {
 
     pub fn with_trap(mut self, trap: &str) -> Self {
         self.trap = Some(trap.to_string());
+        self
+    }
+
+    pub fn with_trap_trigger(mut self, trigger: TrapTrigger) -> Self {
+        self.trap_trigger = trigger;
         self
     }
 
@@ -547,6 +569,28 @@ mod tests {
         assert!(room.placed_treasure.is_empty());
         assert!(!room.monsters_cleared);
         assert!(!room.treasure_looted);
+        // trap_trigger defaults to Entry for backward compatibility
+        assert_eq!(room.trap_trigger, TrapTrigger::Entry);
+    }
+
+    #[test]
+    fn room_with_action_trap() {
+        let room = Room::new(0, "Mirror Room")
+            .with_trap("Save vs paralysis or be frozen")
+            .with_trap_trigger(TrapTrigger::Action);
+        assert_eq!(room.trap, Some("Save vs paralysis or be frozen".to_string()));
+        assert_eq!(room.trap_trigger, TrapTrigger::Action);
+        assert!(!room.trap_triggered);
+    }
+
+    #[test]
+    fn trap_trigger_serializes_round_trip() {
+        let room = Room::new(0, "Test")
+            .with_trap("Freezing mirror")
+            .with_trap_trigger(TrapTrigger::Action);
+        let json = serde_json::to_string(&room).unwrap();
+        let loaded: Room = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.trap_trigger, TrapTrigger::Action);
     }
 
     #[test]

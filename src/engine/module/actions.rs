@@ -36,6 +36,7 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
         let mut room = Room::new(id, &module_room.name);
         room.description = module_room.description.clone();
         room.trap = module_room.trap.clone();
+        room.trap_trigger = module_room.trap_trigger;
         room.key = Some((*key).clone());
 
         for placed_monster in &module_room.monsters {
@@ -360,5 +361,44 @@ mod tests {
             .find(|r| r.name == "Guard Chamber")
             .expect("should have Guard Chamber");
         assert_eq!(guard.key, Some("guard".to_string()));
+    }
+
+    #[test]
+    fn module_to_dungeon_propagates_trap_trigger() {
+        use crate::state::dungeon::TrapTrigger;
+
+        let json = r#"{
+            "name": "Trap Test",
+            "level_range": [1, 3],
+            "entry_room": "entrance",
+            "rooms": {
+                "entrance": {
+                    "name": "Entrance",
+                    "exits": [
+                        {"to": "pit_room", "door": "closed"},
+                        {"to": "mirror_room", "door": "closed"}
+                    ]
+                },
+                "pit_room": {
+                    "name": "Pit Room",
+                    "trap": "Pit trap (1d6 damage)",
+                    "exits": [{"to": "entrance", "door": "closed"}]
+                },
+                "mirror_room": {
+                    "name": "Freezing Mirror",
+                    "trap": "Save vs paralysis or be frozen",
+                    "trap_trigger": "Action",
+                    "exits": [{"to": "entrance", "door": "closed"}]
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        let pit = dungeon.rooms.iter().find(|r| r.name == "Pit Room").unwrap();
+        assert_eq!(pit.trap_trigger, TrapTrigger::Entry, "pit trap should default to Entry");
+
+        let mirror = dungeon.rooms.iter().find(|r| r.name == "Freezing Mirror").unwrap();
+        assert_eq!(mirror.trap_trigger, TrapTrigger::Action, "mirror trap should be Action");
     }
 }
