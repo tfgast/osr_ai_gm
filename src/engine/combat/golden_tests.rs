@@ -168,7 +168,7 @@ fn base_state() -> GameState {
 }
 
 fn mk_monster(name: &str, hd: &str, hp: i32, ac: i32, morale: u32, xp_value: u64) -> Monster {
-    let mut monster = Monster::new(name, hd);
+    let mut monster = Monster::new(name, hd.parse().unwrap());
     monster.hp = hp;
     monster.max_hp = hp;
     monster.ac = ac;

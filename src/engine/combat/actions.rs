@@ -25,7 +25,7 @@ fn no_active_combat() -> EngineError {
 pub struct SpawnEncounterParams<'a> {
     pub name: &'a str,
     pub count: u32,
-    pub hit_dice: &'a str,
+    pub hit_dice: &'a crate::rules::attack::HitDice,
     pub ac: i32,
     pub hp: i32,
     pub damage: &'a str,
@@ -70,7 +70,7 @@ pub fn action_spawn_encounter(
         } else {
             params.name.to_string()
         };
-        let mut monster = Monster::new(&monster_name, params.hit_dice);
+        let mut monster = Monster::new(&monster_name, params.hit_dice.clone());
         monster.hp = params.hp;
         monster.max_hp = params.hp;
         monster.ac = params.ac;
@@ -94,7 +94,7 @@ pub fn action_spawn_encounter(
         ),
         encounter_name: params.name.to_string(),
         count: params.count,
-        hit_dice: params.hit_dice.to_string(),
+        hit_dice: params.hit_dice.clone(),
         ac: params.ac,
         hp: params.hp,
         damage: params.damage.to_string(),
@@ -131,17 +131,18 @@ pub fn action_spawn_monster(
         } else {
             def.name.to_string()
         };
-        let mut m = Monster::new(&monster_name, &def.hit_dice);
-        let hd = crate::rules::attack::parse_monster_hd(&def.hit_dice);
-        let hp = if hd == 0 {
+        let mut m = Monster::new(&monster_name, def.hit_dice.clone());
+        let dice_count = def.hit_dice.hp_dice_count();
+        let hp_mod = def.hit_dice.hp_modifier();
+        let hp = if dice_count == 0 {
             match crate::dice::roll_str("1d4") {
-                Ok(r) => r.total.max(1),
+                Ok(r) => (r.total + hp_mod).max(1),
                 Err(_) => 2,
             }
         } else {
-            match crate::dice::roll_str(&format!("{}d8", hd)) {
-                Ok(r) => r.total.max(1),
-                Err(_) => (hd as i32 * 4).max(1),
+            match crate::dice::roll_str(&format!("{}d8", dice_count)) {
+                Ok(r) => (r.total + hp_mod).max(1),
+                Err(_) => (dice_count as i32 * 4 + hp_mod).max(1),
             }
         };
         m.hp = hp;

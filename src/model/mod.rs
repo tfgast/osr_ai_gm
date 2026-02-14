@@ -104,12 +104,10 @@ pub struct Monster {
 }
 
 impl Monster {
-    pub fn new(name: &str, hit_dice: &str) -> Self {
+    pub fn new(name: &str, hit_dice: HitDice) -> Self {
         Monster {
             name: name.to_string(),
-            hit_dice: hit_dice.parse().unwrap_or(HitDice {
-                base: 1, modifier: 0, specials: 0, fractional: false, range_end: None,
-            }),
+            hit_dice,
             hp: 1,
             max_hp: 1,
             ac: 9,

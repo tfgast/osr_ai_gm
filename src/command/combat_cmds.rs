@@ -2,6 +2,7 @@ use super::{Command, CommandResult};
 use crate::engine::combat::{self, SpawnEncounterParams};
 use crate::engine::combat::results::RetainerLoyaltyOutcome;
 use crate::persist::GameState;
+use crate::rules::attack::HitDice;
 
 pub struct StartCombatCommand;
 impl Command for StartCombatCommand {
@@ -24,7 +25,10 @@ impl Command for StartCombatCommand {
             Ok(n) if n >= 1 => n,
             _ => return CommandResult::error("count must be a positive integer"),
         };
-        let hd = args[2];
+        let hd: HitDice = match args[2].parse() {
+            Ok(h) => h,
+            Err(e) => return CommandResult::error(format!("invalid hit dice '{}': {}", args[2], e)),
+        };
         let ac: i32 = match args[3].parse() {
             Ok(n) => n,
             _ => return CommandResult::error("ac must be an integer"),
@@ -55,7 +59,7 @@ impl Command for StartCombatCommand {
         match combat::action_spawn_encounter(
             state,
             &SpawnEncounterParams {
-                name, count, hit_dice: hd, ac, hp, damage, morale, distance, xp_value,
+                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value,
             },
         ) {
             Ok(result) => {

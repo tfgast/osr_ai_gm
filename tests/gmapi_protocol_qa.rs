@@ -104,7 +104,7 @@ fn setup_combat(state: &mut GameState) {
     state.party.add_member(make_fighter("Aldric"));
     let mut monsters = Vec::new();
     for i in 0..3 {
-        let mut m = Monster::new(&format!("Goblin {}", i + 1), "1");
+        let mut m = Monster::new(&format!("Goblin {}", i + 1), "1".parse().unwrap());
         m.hp = 3;
         m.max_hp = 3;
         m.ac = 6;
@@ -771,7 +771,7 @@ fn attack_melee_at_distance() {
     let mut state = GameState::new();
     state.party.add_member(make_fighter("Aldric"));
     // Create combat at long distance
-    let mut m = Monster::new("Orc", "1");
+    let mut m = Monster::new("Orc", "1".parse().unwrap());
     m.hp = 4;
     m.max_hp = 4;
     m.ac = 6;
@@ -936,7 +936,7 @@ fn turn_undead_cleric_happy_path() {
     let mut state = GameState::new();
     state.party.add_member(make_cleric("Brother Marcus"));
     // Create combat with skeleton
-    let mut m = Monster::new("Skeleton", "1");
+    let mut m = Monster::new("Skeleton", "1".parse().unwrap());
     m.hp = 4;
     m.max_hp = 4;
     m.ac = 7;
@@ -986,7 +986,7 @@ fn turn_undead_no_combat() {
 fn turn_undead_idx_out_of_range() {
     let mut state = GameState::new();
     state.party.add_member(make_cleric("Brother Marcus"));
-    let m = Monster::new("Skeleton", "1");
+    let m = Monster::new("Skeleton", "1".parse().unwrap());
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
@@ -1002,7 +1002,7 @@ fn turn_undead_idx_out_of_range() {
 fn turn_undead_dead_monster() {
     let mut state = GameState::new();
     state.party.add_member(make_cleric("Brother Marcus"));
-    let mut m = Monster::new("Skeleton", "1");
+    let mut m = Monster::new("Skeleton", "1".parse().unwrap());
     m.hp = 0;
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
@@ -1018,7 +1018,7 @@ fn turn_undead_dead_monster() {
 #[test]
 fn turn_undead_unknown_character() {
     let mut state = GameState::new();
-    let m = Monster::new("Skeleton", "1");
+    let m = Monster::new("Skeleton", "1".parse().unwrap());
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
@@ -1828,7 +1828,7 @@ fn thief_skill_check_aliases() {
 fn backstab_happy_path() {
     let mut state = GameState::new();
     state.party.add_member(make_thief("Shade"));
-    let mut m = Monster::new("Goblin", "1");
+    let mut m = Monster::new("Goblin", "1".parse().unwrap());
     m.hp = 3;
     m.max_hp = 3;
     m.ac = 6;
@@ -1897,7 +1897,7 @@ fn backstab_no_combat() {
 fn backstab_idx_out_of_range() {
     let mut state = GameState::new();
     state.party.add_member(make_thief("Shade"));
-    let m = Monster::new("Goblin", "1");
+    let m = Monster::new("Goblin", "1".parse().unwrap());
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
@@ -1914,7 +1914,7 @@ fn backstab_idx_out_of_range() {
 fn backstab_dead_monster() {
     let mut state = GameState::new();
     state.party.add_member(make_thief("Shade"));
-    let mut m = Monster::new("Goblin", "1");
+    let mut m = Monster::new("Goblin", "1".parse().unwrap());
     m.hp = 0;
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
@@ -1932,7 +1932,7 @@ fn backstab_dead_monster() {
 fn backstab_unknown_weapon() {
     let mut state = GameState::new();
     state.party.add_member(make_thief("Shade"));
-    let m = Monster::new("Goblin", "1");
+    let m = Monster::new("Goblin", "1".parse().unwrap());
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 
@@ -1948,7 +1948,7 @@ fn backstab_unknown_weapon() {
 #[test]
 fn backstab_unknown_character() {
     let mut state = GameState::new();
-    let m = Monster::new("Goblin", "1");
+    let m = Monster::new("Goblin", "1".parse().unwrap());
     state.combat = Some(CombatState::new(vec![m], 5));
     state.mode = GameMode::Combat;
 

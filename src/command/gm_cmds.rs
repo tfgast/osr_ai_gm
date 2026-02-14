@@ -2,6 +2,7 @@ use super::{Command, CommandResult};
 use crate::engine::combat::{self, SpawnEncounterParams};
 use crate::engine::{gm, xp};
 use crate::persist::GameState;
+use crate::rules::attack::HitDice;
 use crate::rules::class::class_def;
 use crate::rules::xp::{check_level_up, xp_for_level};
 use crate::rules::{spell, thief};
@@ -26,7 +27,10 @@ impl Command for SpawnEncounterCommand {
             Ok(n) if n >= 1 => n,
             _ => return CommandResult::error("count must be a positive integer"),
         };
-        let hd = args[2];
+        let hd: HitDice = match args[2].parse() {
+            Ok(h) => h,
+            Err(e) => return CommandResult::error(format!("invalid hit dice '{}': {}", args[2], e)),
+        };
         let ac: i32 = match args[3].parse() {
             Ok(n) => n,
             _ => return CommandResult::error("ac must be an integer"),
@@ -48,7 +52,7 @@ impl Command for SpawnEncounterCommand {
         match combat::action_spawn_encounter(
             state,
             &SpawnEncounterParams {
-                name, count, hit_dice: hd, ac, hp, damage, morale, distance, xp_value: None,
+                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value: None,
             },
         ) {
             Ok(result) => {
@@ -956,7 +960,7 @@ mod tests {
         c.abilities.strength = 12;
         state.party.add_member(c);
         // Set up active combat with a monster
-        let mut m = crate::model::Monster::new("Goblin", "1");
+        let mut m = crate::model::Monster::new("Goblin", "1".parse().unwrap());
         m.hp = 5;
         m.max_hp = 5;
         m.ac = 6;

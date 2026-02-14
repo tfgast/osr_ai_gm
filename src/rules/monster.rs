@@ -7,6 +7,8 @@ use std::fs;
 use std::path::Path;
 use std::sync::OnceLock;
 
+use super::attack::HitDice;
+
 /// XP value - can be single value or array (for variable HD monsters).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -48,10 +50,8 @@ pub struct MonsterDef {
     pub armor_class: i32,
     #[serde(default)]
     pub armor_class_ascending: Option<i32>,
-    /// Hit Dice notation: "3" = 3 HD, "3+1" = 3 HD + 1 hp bonus,
-    /// "½" = half HD. Asterisks denote special abilities (* = one, ** = two, etc.)
-    /// which affect XP. Ranges like "1 to 3" indicate variable HD.
-    pub hit_dice: String,
+    /// Structured hit dice (parsed from notation like "3+1*").
+    pub hit_dice: HitDice,
     #[serde(default)]
     pub hp_typical: Option<String>,
     #[serde(default)]
@@ -334,7 +334,7 @@ mod tests {
         // Either we have data or we don't - shouldn't panic either way
         for m in monsters {
             assert!(!m.name.is_empty());
-            assert!(!m.hit_dice.is_empty());
+            assert!(m.hit_dice.base > 0 || m.hit_dice.fractional);
         }
     }
 
@@ -345,7 +345,7 @@ mod tests {
         }
         for m in all_monsters() {
             assert!(!m.name.is_empty(), "monster has empty name");
-            assert!(!m.hit_dice.is_empty(), "{} has empty hit_dice", m.name);
+            assert!(m.hit_dice.base > 0 || m.hit_dice.fractional, "{} has invalid hit_dice", m.name);
             // xp_value can be 0 for special monsters, but morale should be set
             assert!(m.morale > 0 || m.morale <= 12, "{} has invalid morale", m.name);
         }

@@ -26,13 +26,12 @@ pub(super) fn spawn_encounter(
     state: &mut GameState,
     params: &crate::gmapi::protocol::EncounterParams,
 ) -> GMResponse {
-    let hit_dice = params.hit_dice.to_string();
     match combat::action_spawn_encounter(
         state,
         &SpawnEncounterParams {
             name: &params.name,
             count: params.count,
-            hit_dice: &hit_dice,
+            hit_dice: &params.hit_dice,
             ac: params.ac,
             hp: params.hp,
             damage: &params.damage,

@@ -53,6 +53,32 @@ impl HitDice {
             self.base
         }
     }
+
+    /// Number of dice to roll for HP (0 for fractional — roll 1d4 instead).
+    pub fn hp_dice_count(&self) -> u32 {
+        if self.fractional {
+            0
+        } else {
+            self.base
+        }
+    }
+
+    /// HP modifier applied after rolling dice (e.g. +1 for "3+1").
+    pub fn hp_modifier(&self) -> i32 {
+        self.modifier
+    }
+}
+
+impl Default for HitDice {
+    fn default() -> Self {
+        HitDice {
+            base: 1,
+            modifier: 0,
+            specials: 0,
+            fractional: false,
+            range_end: None,
+        }
+    }
 }
 
 impl FromStr for HitDice {
@@ -64,12 +90,25 @@ impl FromStr for HitDice {
             return Err("empty hit dice string".to_string());
         }
 
-        // Handle fractional HD like "1/2"
-        if s.contains('/') {
+        // Handle "X to Y" range notation (e.g. "1 to 3")
+        if let Some(pos) = s.find(" to ") {
+            let base: u32 = s[..pos].trim().parse()
+                .map_err(|_| format!("invalid hit dice range: '{}'", s))?;
+            let rest = &s[pos + 4..];
+            let specials = rest.chars().rev().take_while(|c| *c == '*').count() as u8;
+            let end_str = &rest[..rest.len() - specials as usize];
+            let end: u32 = end_str.trim().parse()
+                .map_err(|_| format!("invalid hit dice range end: '{}'", s))?;
+            return Ok(HitDice { base, modifier: 0, specials, fractional: false, range_end: Some(end) });
+        }
+
+        // Handle fractional HD like "1/2" or "½"
+        if s.contains('/') || s.starts_with('½') {
+            let specials = s.chars().rev().take_while(|c| *c == '*').count() as u8;
             return Ok(HitDice {
                 base: 1,
                 modifier: 0,
-                specials: 0,
+                specials,
                 fractional: true,
                 range_end: None,
             });
@@ -209,16 +248,6 @@ pub fn monster_thac0(hd: u32) -> u32 {
     }
 }
 
-/// Parse a monster's hit dice string to get the effective HD number.
-///
-/// Delegates to `HitDice::from_str` and returns `combat_hd()`.
-/// Kept for backward compatibility with code that only needs the number.
-pub fn parse_monster_hd(hd_str: &str) -> u32 {
-    hd_str.parse::<HitDice>()
-        .map(|hd| hd.combat_hd())
-        .unwrap_or(1)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -350,55 +379,6 @@ mod tests {
     #[test]
     fn missile_zero_distance() {
         assert_eq!(missile_range_modifier(0, 50, 100, 150), None);
-    }
-
-    // --- parse_monster_hd ---
-
-    #[test]
-    fn parse_hd_simple() {
-        assert_eq!(parse_monster_hd("1"), 1);
-        assert_eq!(parse_monster_hd("2"), 2);
-        assert_eq!(parse_monster_hd("5"), 5);
-        assert_eq!(parse_monster_hd("10"), 10);
-    }
-
-    #[test]
-    fn parse_hd_with_bonus() {
-        assert_eq!(parse_monster_hd("1+1"), 1);
-        assert_eq!(parse_monster_hd("3+1"), 3);
-        assert_eq!(parse_monster_hd("2+2"), 2);
-    }
-
-    #[test]
-    fn parse_hd_with_penalty() {
-        // "1-1" = less than 1 HD, attacks as 0 HD (THAC0 20)
-        assert_eq!(parse_monster_hd("1-1"), 0);
-    }
-
-    #[test]
-    fn parse_hd_range() {
-        // "7-9**" = vampire, 7 to 9 HD range, midpoint = 8
-        assert_eq!(parse_monster_hd("7-9**"), 8);
-        // Range without asterisks
-        assert_eq!(parse_monster_hd("7-9"), 8);
-        // Even range
-        assert_eq!(parse_monster_hd("6-8"), 7);
-    }
-
-    #[test]
-    fn parse_hd_with_asterisk() {
-        assert_eq!(parse_monster_hd("3*"), 3);
-        assert_eq!(parse_monster_hd("6**"), 6);
-    }
-
-    #[test]
-    fn parse_hd_fractional() {
-        assert_eq!(parse_monster_hd("1/2"), 1);
-    }
-
-    #[test]
-    fn parse_hd_whitespace() {
-        assert_eq!(parse_monster_hd("  3  "), 3);
     }
 
     // --- monster_thac0 ---

@@ -572,6 +572,7 @@ pub fn reaction_description(reaction: RulerReaction) -> &'static str {
 /// and the OSE attack tables.
 pub fn npc_member_to_monster(member: &NpcMember) -> crate::model::Monster {
     use crate::model::Monster;
+    use crate::rules::attack::HitDice;
     use crate::rules::class::{Class, class_def, CombatAptitude};
     use crate::dice;
 
@@ -604,7 +605,8 @@ pub fn npc_member_to_monster(member: &NpcMember) -> crate::model::Monster {
     };
 
     let name = format!("NPC {} Lv{}", member.class, member.level);
-    let mut m = Monster::new(&name, &hd_expr);
+    let hd = HitDice { base: member.level, ..HitDice::default() };
+    let mut m = Monster::new(&name, hd);
     m.hp = hp;
     m.max_hp = hp;
     m.ac = ac;

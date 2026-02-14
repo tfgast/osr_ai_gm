@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use crate::rules::attack::HitDice;
 use crate::rules::turn::TurnResult;
 use crate::state::game::GameMode;
 
@@ -16,7 +17,7 @@ pub struct SpawnMonsterResult {
     #[serde(rename = "monster")]
     pub monster_name: String,
     pub count: u32,
-    pub hit_dice: String,
+    pub hit_dice: HitDice,
     pub ac: i32,
     pub damage: String,
     pub morale: u32,
@@ -33,7 +34,7 @@ pub struct SpawnEncounterResult {
     pub message: String,
     pub encounter_name: String,
     pub count: u32,
-    pub hit_dice: String,
+    pub hit_dice: HitDice,
     pub ac: i32,
     pub hp: i32,
     pub damage: String,
