@@ -445,6 +445,17 @@ impl GMResponse {
 /// Maximum request size in bytes (64KB).
 const MAX_REQUEST_SIZE: usize = 65_536;
 
+/// Extract just the `id` field from raw JSON, for error responses when full parsing fails.
+///
+/// Returns the id string if the JSON is at least valid enough to contain an `"id"` field,
+/// or an empty string if extraction fails entirely.
+pub fn extract_request_id(line: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(line)
+        .ok()
+        .and_then(|v| v.get("id")?.as_str().map(String::from))
+        .unwrap_or_default()
+}
+
 /// Parse a JSON line into a GMRequest, with size and field validation.
 pub fn parse_request(line: &str) -> Result<GMRequest, String> {
     if line.len() > MAX_REQUEST_SIZE {
@@ -1296,5 +1307,36 @@ mod tests {
     fn accept_valid_monster_count() {
         let json = r#"{"id":"v3","command":{"type":"SpawnMonster","params":{"name":"goblin","count":100}}}"#;
         assert!(parse_request(json).is_ok());
+    }
+
+    #[test]
+    fn extract_id_from_valid_json() {
+        let json = r#"{"id":"e3","command":{"type":"AddHex","params":{"x":3,"y":0,"terrain":"Lava"}}}"#;
+        assert_eq!(extract_request_id(json), "e3");
+    }
+
+    #[test]
+    fn extract_id_from_invalid_command() {
+        // JSON is valid but command enum is not — id should still be extractable.
+        let json = r#"{"id":"req-99","command":{"type":"BogusCommand"}}"#;
+        assert_eq!(extract_request_id(json), "req-99");
+    }
+
+    #[test]
+    fn extract_id_from_invalid_json() {
+        assert_eq!(extract_request_id("not json at all"), "");
+    }
+
+    #[test]
+    fn extract_id_from_json_without_id() {
+        let json = r#"{"command":{"type":"QueryState"}}"#;
+        assert_eq!(extract_request_id(json), "");
+    }
+
+    #[test]
+    fn extract_id_from_numeric_id() {
+        // id is a number, not a string — should return empty since we expect strings.
+        let json = r#"{"id":42,"command":{"type":"QueryState"}}"#;
+        assert_eq!(extract_request_id(json), "");
     }
 }
