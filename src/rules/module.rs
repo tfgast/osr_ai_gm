@@ -613,4 +613,38 @@ mod tests {
         let result = validate_module_path("", "data/modules");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn load_module_from_absolute_dir() {
+        // Simulates loading from data_dir()/modules/ by using a temp directory
+        let tmp = std::env::temp_dir().join("osr_test_modules_abs");
+        let sub = tmp.join("test_mod");
+        std::fs::create_dir_all(&sub).unwrap();
+        let module_path = sub.join("module.json");
+        std::fs::write(&module_path, sample_module_json()).unwrap();
+
+        let dir_str = tmp.to_string_lossy().to_string();
+        let file_path = format!("{}/test_mod/module.json", dir_str);
+        let result = load_module(&file_path, &dir_str);
+        assert!(result.is_ok(), "should load from absolute dir: {:?}", result);
+        assert_eq!(result.unwrap().name, "Test Crypt");
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn validate_path_traversal_from_absolute_dir_rejected() {
+        // Even with an absolute modules dir, path traversal should be rejected
+        let tmp = std::env::temp_dir().join("osr_test_modules_trav");
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        let dir_str = tmp.to_string_lossy().to_string();
+        let result = validate_module_path(
+            &format!("{}/../etc/passwd", dir_str),
+            &dir_str,
+        );
+        assert!(result.is_err());
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
 }

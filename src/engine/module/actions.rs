@@ -97,8 +97,25 @@ pub fn action_load_module(
     state: &mut GameState,
     path: &str,
 ) -> Result<LoadModuleResult, EngineError> {
-    let module_def = module_rules::load_module(path, module_rules::DEFAULT_MODULES_DIR)
-        .map_err(EngineError::InvalidInput)?;
+    // Try DEFAULT_MODULES_DIR first; on "not found" fall back to data_dir()/modules/
+    let module_def = match module_rules::load_module(path, module_rules::DEFAULT_MODULES_DIR) {
+        Ok(m) => m,
+        Err(e) if e.contains("not found") => {
+            // Strip the default modules dir prefix to get the module-relative path,
+            // then reconstruct it under data_dir()/modules/.
+            let prefix = format!("{}/", module_rules::DEFAULT_MODULES_DIR);
+            let relative = path.strip_prefix(&prefix).unwrap_or(path);
+            let data_modules = crate::persist::data_dir()
+                .map(|d| d.join("modules"))
+                .map_err(|_| EngineError::InvalidInput(e.clone()))?;
+            let full_path = data_modules.join(relative);
+            let dir_str = data_modules.to_string_lossy().to_string();
+            let path_str = full_path.to_string_lossy().to_string();
+            module_rules::load_module(&path_str, &dir_str)
+                .map_err(EngineError::InvalidInput)?
+        }
+        Err(e) => return Err(EngineError::InvalidInput(e)),
+    };
     let dungeon = module_to_dungeon(&module_def).map_err(EngineError::InvalidInput)?;
 
     let module_name = module_def.name.clone();
