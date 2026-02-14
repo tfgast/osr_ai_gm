@@ -402,22 +402,36 @@ mod tests {
     }
 
     #[test]
-    fn loot_item_not_in_room() {
+    fn loot_adhoc_item_in_dungeon() {
         let cmd = LootCommand;
         let mut state = state_with_dungeon_treasure();
-        let result = cmd.execute(&["Aldric", "Diamond"], &mut state);
-        assert!(result.output.contains("Error"));
-        assert!(result.output.contains("no lootable item"));
+        let result = cmd.execute(&["Aldric", "gold", "coins", "50"], &mut state);
+        assert!(result.output.contains("picks up gold coins"));
+        assert!(result.output.contains("50 gp"));
     }
 
     #[test]
-    fn loot_already_taken() {
+    fn loot_adhoc_item_in_dungeon_no_value() {
         let cmd = LootCommand;
         let mut state = state_with_dungeon_treasure();
-        cmd.execute(&["Aldric", "Ruby", "gem"], &mut state);
-        let result = cmd.execute(&["Aldric", "Ruby", "gem"], &mut state);
-        assert!(result.output.contains("Error"));
-        assert!(result.output.contains("no lootable item"));
+        let result = cmd.execute(&["Aldric", "Old", "scroll"], &mut state);
+        assert!(result.output.contains("picks up Old scroll"));
+        assert!(!result.output.contains("gp"));
+    }
+
+    #[test]
+    fn loot_already_taken_becomes_adhoc() {
+        let cmd = LootCommand;
+        let mut state = state_with_dungeon_treasure();
+        // First loot takes from room treasure (500 gp)
+        let result1 = cmd.execute(&["Aldric", "Ruby", "gem"], &mut state);
+        assert!(result1.output.contains("500 gp"));
+        // Second loot of same name creates ad-hoc item (0 gp, no explicit value)
+        let result2 = cmd.execute(&["Aldric", "Ruby", "gem"], &mut state);
+        assert!(result2.output.contains("picks up Ruby gem"));
+        assert!(!result2.output.contains("gp"));
+        let c = state.party.find_member("Aldric").unwrap();
+        assert_eq!(c.inventory.len(), 2);
     }
 
     #[test]

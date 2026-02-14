@@ -217,29 +217,26 @@ pub fn action_loot(
     explicit_gp: Option<u32>,
 ) -> Result<LootResult, EngineError> {
     let room_gp = if let Some(dungeon) = &mut state.dungeon {
-        let current = dungeon
-            .current_room
-            .ok_or_else(|| EngineError::WrongState("no current room.".to_string()))?;
-        let room = dungeon
-            .find_room_mut(current)
-            .ok_or_else(|| EngineError::WrongState("current room not found.".to_string()))?;
-        let idx = room
-            .placed_treasure
-            .iter()
-            .position(|t| !t.taken && t.description.eq_ignore_ascii_case(item_name));
+        if let Some(current) = dungeon.current_room {
+            if let Some(room) = dungeon.find_room_mut(current) {
+                let idx = room
+                    .placed_treasure
+                    .iter()
+                    .position(|t| !t.taken && t.description.eq_ignore_ascii_case(item_name));
 
-        match idx {
-            Some(i) => {
-                let gp = room.placed_treasure[i].gp_value;
-                room.placed_treasure[i].taken = true;
-                Some(gp)
+                match idx {
+                    Some(i) => {
+                        let gp = room.placed_treasure[i].gp_value;
+                        room.placed_treasure[i].taken = true;
+                        Some(gp)
+                    }
+                    None => None, // not in room treasure → ad-hoc item
+                }
+            } else {
+                None
             }
-            None => {
-                return Err(EngineError::InvalidInput(format!(
-                    "no lootable item '{}' in this room.",
-                    item_name
-                )));
-            }
+        } else {
+            None
         }
     } else {
         None
@@ -440,11 +437,22 @@ mod tests {
     }
 
     #[test]
-    fn loot_missing_room_item_errors() {
+    fn loot_adhoc_item_in_dungeon() {
         let mut state = state_with_dungeon_treasure();
-        let err = action_loot(&mut state, "Aldric", "Diamond", None)
-            .expect_err("missing room item should fail");
-        assert!(err.to_string().contains("no lootable item"));
+        let result = action_loot(&mut state, "Aldric", "Diamond", Some(200))
+            .expect("ad-hoc loot in dungeon should succeed");
+        assert!(result.message.contains("picks up Diamond"));
+        assert!(result.message.contains("200 gp"));
+        assert_eq!(result.value_gp, 200);
+    }
+
+    #[test]
+    fn loot_adhoc_item_in_dungeon_no_value() {
+        let mut state = state_with_dungeon_treasure();
+        let result = action_loot(&mut state, "Aldric", "Old scroll", None)
+            .expect("ad-hoc loot without value should succeed");
+        assert!(result.message.contains("picks up Old scroll"));
+        assert_eq!(result.value_gp, 0);
     }
 
     #[test]
