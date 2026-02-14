@@ -143,6 +143,7 @@ pub struct TrainResult {
     pub hp_gained: i32,
     pub old_hp: i32,
     pub new_hp: i32,
+    pub current_hp: i32,
     pub old_thac0: u32,
     pub new_thac0: u32,
     pub old_saves: Option<crate::rules::save::SavingThrows>,

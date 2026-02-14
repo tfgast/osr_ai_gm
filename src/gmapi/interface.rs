@@ -272,7 +272,7 @@ fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
             state,
             format!("{} leveled up to {}! Gained {} HP. HP: {}/{}.",
                 result.character, result.new_level, result.hp_gained,
-                result.new_hp, result.new_hp),
+                result.current_hp, result.new_hp),
             result,
         ),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
