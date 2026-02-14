@@ -3,6 +3,7 @@ use crate::persist::GameState;
 use crate::engine::party;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
+use crate::rules::encumbrance::{EncumbranceLevel, MAX_CAPACITY_CN};
 
 pub struct ChargenCommand;
 impl Command for ChargenCommand {
@@ -183,10 +184,103 @@ impl Command for EligibleCommand {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Character, Item};
+
+    fn state_with_inventory() -> GameState {
+        let mut state = GameState::new();
+        let mut fighter = Character::new("Grond", Class::Fighter);
+        fighter.hp = 8;
+        fighter.max_hp = 8;
+        fighter.ac = 4;
+        fighter.thac0 = 19;
+        fighter.gold_gp = 50;
+        fighter.movement_rate = 120;
+
+        let mut sword = Item::new("Sword", 6.0, 10);
+        sword.equipped = true;
+        let mut plate = Item::new("Plate mail", 50.0, 60);
+        plate.equipped = true;
+        fighter.inventory = vec![sword, plate];
+
+        state.party.add_member(fighter);
+        state.party.rations = 14;
+        state.party.gold = 300;
+        state
+    }
+
+    #[test]
+    fn party_command_shows_inventory_section() {
+        let mut state = state_with_inventory();
+        let result = PartyCommand.execute(&[], &mut state);
+        assert!(result.success);
+        assert!(result.output.contains("Inventory:"));
+        assert!(result.output.contains("Grond:"));
+        assert!(result.output.contains("cn/1600 cn"));
+        assert!(result.output.contains("Sword, Plate mail"));
+    }
+
+    #[test]
+    fn party_command_shows_resources() {
+        let mut state = state_with_inventory();
+        let result = PartyCommand.execute(&[], &mut state);
+        assert!(result.success);
+        assert!(result.output.contains("Resources: 300 gp (treasury), 14 rations"));
+    }
+
+    #[test]
+    fn party_command_shows_overloaded_tag() {
+        let mut state = GameState::new();
+        let mut fighter = Character::new("Mule", Class::Fighter);
+        fighter.hp = 8;
+        fighter.max_hp = 8;
+        fighter.gold_gp = 1700;
+        fighter.movement_rate = 120;
+        state.party.add_member(fighter);
+
+        let result = PartyCommand.execute(&[], &mut state);
+        assert!(result.success);
+        assert!(result.output.contains("[OVERLOADED]"));
+    }
+
+    #[test]
+    fn party_command_hides_inventory_when_empty() {
+        let mut state = GameState::new();
+        let mut fighter = Character::new("Arden", Class::Fighter);
+        fighter.hp = 8;
+        fighter.max_hp = 8;
+        fighter.movement_rate = 120;
+        state.party.add_member(fighter);
+
+        let result = PartyCommand.execute(&[], &mut state);
+        assert!(result.success);
+        assert!(!result.output.contains("Inventory:"));
+        assert!(!result.output.contains("Resources:"));
+    }
+
+    #[test]
+    fn party_command_shows_encumbrance_tag() {
+        let mut state = GameState::new();
+        let mut fighter = Character::new("Heavy", Class::Fighter);
+        fighter.hp = 8;
+        fighter.max_hp = 8;
+        fighter.movement_rate = 120;
+        // 700cn worth of items = Heavy encumbrance
+        fighter.inventory = vec![Item::new("Big Sack", 70.0, 0)];
+        state.party.add_member(fighter);
+
+        let result = PartyCommand.execute(&[], &mut state);
+        assert!(result.success);
+        assert!(result.output.contains("[HEAVILY ENCUMBERED]"));
+    }
+}
+
 pub struct PartyCommand;
 impl Command for PartyCommand {
     fn name(&self) -> &str { "party" }
-    fn help(&self) -> &str { "Show party members" }
+    fn help(&self) -> &str { "Show party members and inventory summary" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
         match party::action_query_party(state) {
             Ok(result) => {
@@ -229,6 +323,49 @@ impl Command for PartyCommand {
                         out.push_str(" — taking HP damage!");
                     }
                     out.push('\n');
+                }
+
+                // Inventory summary section
+                let alive_members: Vec<_> = result.members.iter().filter(|m| m.alive).collect();
+                let has_inventory = alive_members
+                    .iter()
+                    .any(|m| m.inventory.item_count > 0 || m.inventory.total_weight_cn > 0);
+
+                if has_inventory {
+                    out.push_str("\nInventory:\n");
+                    for member in &alive_members {
+                        let inv = &member.inventory;
+                        if inv.item_count == 0 && inv.total_weight_cn == 0 {
+                            continue;
+                        }
+                        let enc_tag = match inv.encumbrance_level {
+                            EncumbranceLevel::Unencumbered => String::new(),
+                            EncumbranceLevel::Overloaded => " [OVERLOADED]".to_string(),
+                            level => format!(" [{}]", level.name().to_uppercase()),
+                        };
+                        let equipped_str = if inv.equipped_items.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" — {}", inv.equipped_items.join(", "))
+                        };
+                        out.push_str(&format!(
+                            "  {}: {} cn/{} cn ({} items){}{}\n",
+                            member.name,
+                            inv.total_weight_cn,
+                            MAX_CAPACITY_CN,
+                            inv.item_count,
+                            enc_tag,
+                            equipped_str,
+                        ));
+                    }
+                }
+
+                // Party resources
+                if result.rations > 0 || result.party_gold > 0 {
+                    out.push_str(&format!(
+                        "\nResources: {} gp (treasury), {} rations\n",
+                        result.party_gold, result.rations
+                    ));
                 }
 
                 CommandResult::ok(out)
