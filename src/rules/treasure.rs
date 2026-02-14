@@ -237,7 +237,7 @@ pub fn all_treasure_types() -> &'static [TreasureTypeDef] {
 }
 
 // =============================================================================
-// Gem and Jewellery Value Tables
+// Gem and Jewellery Value Tables (loaded from gems_jewellery.json)
 // =============================================================================
 
 /// Gem value table entry.
@@ -248,17 +248,139 @@ pub struct GemValueEntry {
     pub value_gp: u32,
 }
 
-/// The gem value table (d20 roll).
-/// From OSE: 1-4 = 10gp, 5-9 = 50gp, 10-15 = 100gp, 16-19 = 500gp, 20 = 1000gp
-pub const GEM_VALUE_TABLE: &[GemValueEntry] = &[
-    GemValueEntry { min_roll: 1, max_roll: 4, value_gp: 10 },
-    GemValueEntry { min_roll: 5, max_roll: 9, value_gp: 50 },
-    GemValueEntry { min_roll: 10, max_roll: 15, value_gp: 100 },
-    GemValueEntry { min_roll: 16, max_roll: 19, value_gp: 500 },
-    GemValueEntry { min_roll: 20, max_roll: 20, value_gp: 1000 },
-];
+/// JSON format for a gem value table entry.
+#[derive(Debug, Deserialize)]
+struct GemValueEntryJson {
+    min: u32,
+    max: u32,
+    value_gp: u32,
+}
 
-/// Roll a single gem's value using the standard d20 table.
+/// JSON format for the gem value table.
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct GemValueTableJson {
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    die: Option<String>,
+    entries: Vec<GemValueEntryJson>,
+    average_gp: u32,
+}
+
+/// JSON format for jewellery data.
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct JewelleryJson {
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    dice: Option<String>,
+    multiplier: u32,
+    average_gp: u32,
+    damaged_modifier: f64,
+    #[serde(default)]
+    damaged_description: Option<String>,
+}
+
+/// JSON file format for gems_jewellery.json.
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct GemsJewelleryFile {
+    #[serde(default)]
+    source: Option<String>,
+    gem_value_table: GemValueTableJson,
+    jewellery: JewelleryJson,
+    #[serde(default)]
+    notes: Option<serde_json::Value>,
+}
+
+/// Runtime-loaded gem and jewellery data.
+struct GemsJewelleryData {
+    gem_entries: Vec<GemValueEntry>,
+    gem_average_gp: u32,
+    jewellery_multiplier: u32,
+    jewellery_average_gp: u32,
+    jewellery_damaged_modifier: f64,
+}
+
+/// Hardcoded fallback values used when the JSON file is not found.
+fn default_gems_jewellery() -> GemsJewelleryData {
+    GemsJewelleryData {
+        gem_entries: vec![
+            GemValueEntry { min_roll: 1, max_roll: 4, value_gp: 10 },
+            GemValueEntry { min_roll: 5, max_roll: 9, value_gp: 50 },
+            GemValueEntry { min_roll: 10, max_roll: 15, value_gp: 100 },
+            GemValueEntry { min_roll: 16, max_roll: 19, value_gp: 500 },
+            GemValueEntry { min_roll: 20, max_roll: 20, value_gp: 1000 },
+        ],
+        gem_average_gp: 96,
+        jewellery_multiplier: 100,
+        jewellery_average_gp: 1050,
+        jewellery_damaged_modifier: 0.5,
+    }
+}
+
+/// Global gems/jewellery data.
+static GEMS_JEWELLERY: OnceLock<GemsJewelleryData> = OnceLock::new();
+
+/// Initialize gems/jewellery data by loading from JSON.
+fn init_gems_jewellery() -> GemsJewelleryData {
+    let data_paths = [
+        "data/core/gems_jewellery.json",
+        "../data/core/gems_jewellery.json",
+        "gems_jewellery.json",
+    ];
+
+    for path_str in &data_paths {
+        let path = Path::new(path_str);
+        if path.exists() {
+            match fs::read_to_string(path) {
+                Ok(content) => match serde_json::from_str::<GemsJewelleryFile>(&content) {
+                    Ok(file) => {
+                        let gem_entries = file
+                            .gem_value_table
+                            .entries
+                            .iter()
+                            .map(|e| GemValueEntry {
+                                min_roll: e.min,
+                                max_roll: e.max,
+                                value_gp: e.value_gp,
+                            })
+                            .collect();
+
+                        eprintln!("Loaded gems/jewellery data from {}", path.display());
+                        return GemsJewelleryData {
+                            gem_entries,
+                            gem_average_gp: file.gem_value_table.average_gp,
+                            jewellery_multiplier: file.jewellery.multiplier,
+                            jewellery_average_gp: file.jewellery.average_gp,
+                            jewellery_damaged_modifier: file.jewellery.damaged_modifier,
+                        };
+                    }
+                    Err(e) => eprintln!("Warning: Failed to parse {}: {}", path.display(), e),
+                },
+                Err(e) => eprintln!("Warning: Failed to read {}: {}", path.display(), e),
+            }
+        }
+    }
+
+    eprintln!("Warning: No gems_jewellery data file found. Using defaults.");
+    eprintln!("Expected: data/core/gems_jewellery.json");
+    default_gems_jewellery()
+}
+
+/// Get the global gems/jewellery data.
+fn gems_jewellery() -> &'static GemsJewelleryData {
+    GEMS_JEWELLERY.get_or_init(init_gems_jewellery)
+}
+
+/// Get the gem value table entries.
+pub fn gem_value_table() -> &'static [GemValueEntry] {
+    &gems_jewellery().gem_entries
+}
+
+/// Roll a single gem's value using the loaded d20 table.
 /// Returns the gem value in gold pieces.
 pub fn roll_gem_value() -> u32 {
     let mut rng = rand::thread_rng();
@@ -268,7 +390,7 @@ pub fn roll_gem_value() -> u32 {
 
 /// Get gem value from a specific d20 roll (useful for testing/deterministic scenarios).
 pub fn gem_value_from_roll(roll: u32) -> u32 {
-    for entry in GEM_VALUE_TABLE {
+    for entry in gem_value_table() {
         if roll >= entry.min_roll && roll <= entry.max_roll {
             return entry.value_gp;
         }
@@ -285,18 +407,18 @@ pub fn roll_gem_values(count: u32) -> Vec<u32> {
 }
 
 /// Roll the value of a single piece of jewellery.
-/// Standard formula: 3d6 × 100 gp
+/// Uses the multiplier from gems_jewellery.json (default: 3d6 × 100 gp).
 pub fn roll_jewellery_value() -> u32 {
     let mut rng = rand::thread_rng();
     let d1: u32 = rng.gen_range(1..=6);
     let d2: u32 = rng.gen_range(1..=6);
     let d3: u32 = rng.gen_range(1..=6);
-    (d1 + d2 + d3) * 100
+    (d1 + d2 + d3) * gems_jewellery().jewellery_multiplier
 }
 
 /// Roll jewellery value from a specific 3d6 total (useful for testing).
 pub fn jewellery_value_from_roll(roll_3d6: u32) -> u32 {
-    roll_3d6 * 100
+    roll_3d6 * gems_jewellery().jewellery_multiplier
 }
 
 /// Roll values for multiple pieces of jewellery.
@@ -306,9 +428,9 @@ pub fn roll_jewellery_values(count: u32) -> Vec<u32> {
     (0..count.min(500)).map(|_| roll_jewellery_value()).collect()
 }
 
-/// Calculate damaged jewellery value (50% of normal).
+/// Calculate damaged jewellery value using the loaded modifier.
 pub fn damaged_jewellery_value(normal_value: u32) -> u32 {
-    normal_value / 2
+    (normal_value as f64 * gems_jewellery().jewellery_damaged_modifier) as u32
 }
 
 /// Result of rolling treasure valuables (gems or jewellery).
@@ -334,13 +456,15 @@ pub fn roll_jewellery(count: u32) -> ValuablesResult {
     ValuablesResult { values, total_gp }
 }
 
-/// Average gem value (for estimation purposes).
-/// Calculated as: (4×10 + 5×50 + 6×100 + 4×500 + 1×1000) / 20 = 96 gp
-pub const AVERAGE_GEM_VALUE: u32 = 96;
+/// Average gem value (loaded from data file).
+pub fn average_gem_value() -> u32 {
+    gems_jewellery().gem_average_gp
+}
 
-/// Average jewellery value (for estimation purposes).
-/// 3d6 average = 10.5, × 100 = 1050 gp
-pub const AVERAGE_JEWELLERY_VALUE: u32 = 1050;
+/// Average jewellery value (loaded from data file).
+pub fn average_jewellery_value() -> u32 {
+    gems_jewellery().jewellery_average_gp
+}
 
 #[cfg(test)]
 mod tests {
@@ -459,7 +583,7 @@ mod tests {
     #[test]
     fn gem_value_distribution() {
         // Verify the possible values
-        let possible_values: Vec<u32> = GEM_VALUE_TABLE.iter().map(|e| e.value_gp).collect();
+        let possible_values: Vec<u32> = gem_value_table().iter().map(|e| e.value_gp).collect();
         assert_eq!(possible_values, vec![10, 50, 100, 500, 1000]);
     }
 
@@ -507,8 +631,17 @@ mod tests {
     #[test]
     fn average_values_are_reasonable() {
         // Average gem: 96 gp (calculated from distribution)
-        assert_eq!(AVERAGE_GEM_VALUE, 96);
+        assert_eq!(average_gem_value(), 96);
         // Average jewellery: 3d6 avg = 10.5, × 100 = 1050
-        assert_eq!(AVERAGE_JEWELLERY_VALUE, 1050);
+        assert_eq!(average_jewellery_value(), 1050);
+    }
+
+    #[test]
+    fn gems_jewellery_loads_from_file() {
+        // Verify the data file is loaded (not just defaults)
+        let table = gem_value_table();
+        assert_eq!(table.len(), 5, "Should have 5 gem value entries");
+        assert_eq!(table[0].value_gp, 10);
+        assert_eq!(table[4].value_gp, 1000);
     }
 }
