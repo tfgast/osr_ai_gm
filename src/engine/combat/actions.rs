@@ -809,7 +809,7 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
         xp_per_survivor,
         xp_awards,
         party_casualties,
-        mode_after: state.mode.clone(),
+        mode_after: state.mode,
         retainer_xp_each,
         retainer_xp_recipients,
         retainer_loyalty_checks,

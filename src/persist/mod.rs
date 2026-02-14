@@ -104,7 +104,7 @@ impl GameState {
     pub fn enter_combat(&mut self, mut combat: CombatState) {
         debug_assert!(self.combat.is_none(), "enter_combat called with combat already active");
         self.sync_log_seq_from_subsystems();
-        self.pre_combat_mode = Some(self.mode.clone());
+        self.pre_combat_mode = Some(self.mode);
         combat.log_seq = self.log_seq;
         self.combat = Some(combat);
         self.mode = GameMode::Combat;

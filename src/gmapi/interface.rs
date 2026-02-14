@@ -14,7 +14,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         // -- State queries --
         GMCommand::QueryState => query_handlers::query_state(id, state),
         GMCommand::QueryMode => GMResponse::ok_with_data(
-            id, format!("current mode: {}", state.mode), state.mode.clone(),
+            id, format!("current mode: {}", state.mode), state.mode,
             serde_json::json!({ "mode": state.mode.to_string() }),
         ),
         GMCommand::QueryParty => query_handlers::query_party(id, state),
@@ -183,7 +183,7 @@ fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, a
                 return GMResponse::err(
                     id,
                     format!("{} abilities do not meet requirements for {}.", source, class.name()),
-                    state.mode.clone(),
+                    state.mode,
                 );
             }
             ok_with_typed_data(
@@ -195,7 +195,7 @@ fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, a
                 },
             )
         }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -208,14 +208,14 @@ fn award_xp(id: &str, state: &mut GameState, char_name: &str, xp_amount: u64) ->
         Ok(result) => GMResponse::ok_with_data(
             id,
             format!("{} awarded {} XP (total: {}).", result.character, result.base_xp, result.total_xp),
-            state.mode.clone(),
+            state.mode,
             serde_json::json!({
                 "character": result.character,
                 "xp_awarded": result.base_xp,
                 "total_xp": result.total_xp,
             }),
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -232,14 +232,14 @@ fn award_treasure_xp(id: &str, state: &mut GameState, char_name: &str, treasure_
             }
             ok_with_typed_data(id, state, msg, result)
         }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
 fn thief_skill_check(id: &str, state: &GameState, char_name: &str, skill_name: &str) -> GMResponse {
     match gm::action_thief_skill_check(state, char_name, skill_name) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -253,14 +253,14 @@ fn hire_retainer(id: &str, state: &mut GameState, employer_name: &str, ret_name:
         retainers::results::HireRetainerMode::AssessOnly,
     ) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
 fn loyalty_check(id: &str, state: &GameState, ret_name: &str, loyalty: u32) -> GMResponse {
     match retainers::action_loyalty_check(ret_name, loyalty) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -274,7 +274,7 @@ fn level_up(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
                 result.current_hp, result.new_hp),
             result,
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -286,7 +286,7 @@ fn heal(id: &str, state: &mut GameState, char_name: &str, amount: i32) -> GMResp
             format!("{} healed {} HP ({} -> {}/{}).", result.character, result.healed, result.old_hp, result.hp, result.max_hp),
             result,
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -298,7 +298,7 @@ fn damage(id: &str, state: &mut GameState, char_name: &str, amount: i32) -> GMRe
             format!("{} takes {} damage ({} -> {}/{}). Status: {}.", result.character, result.damage, result.old_hp, result.hp, result.max_hp, result.status),
             result,
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -311,7 +311,7 @@ fn set_hp(id: &str, state: &mut GameState, char_name: &str, hp: i32) -> GMRespon
             }
             ok_with_typed_data(id, state, msg, result)
         }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -323,7 +323,7 @@ fn set_rations(id: &str, state: &mut GameState, amount: u32) -> GMResponse {
             format!("rations set to {} person-days (was {}).", result.rations, result.old_rations),
             result,
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -335,7 +335,7 @@ fn add_rations(id: &str, state: &mut GameState, amount: u32) -> GMResponse {
             format!("added {} rations. Total: {} person-days.", result.added, result.rations),
             result,
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -344,9 +344,9 @@ fn ruling(id: &str, state: &mut GameState, text: &str) -> GMResponse {
         Ok(result) => GMResponse::ok(
             id,
             format!("ruling recorded: {}", result.text),
-            state.mode.clone(),
+            state.mode,
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -355,7 +355,7 @@ fn list_notes(id: &str, state: &GameState) -> GMResponse {
         Ok(result) => {
             if result.notes.is_empty() {
                 return GMResponse::ok_with_data(
-                    id, "no notes yet.", state.mode.clone(),
+                    id, "no notes yet.", state.mode,
                     serde_json::json!({ "notes": [] }),
                 );
             }
@@ -367,7 +367,7 @@ fn list_notes(id: &str, state: &GameState) -> GMResponse {
 
             ok_with_typed_data(id, state, msg, result)
         }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -379,7 +379,7 @@ fn delete_note(id: &str, state: &mut GameState, index: usize) -> GMResponse {
             format!("deleted note [{}]: {}", result.index, result.deleted),
             result,
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -388,7 +388,7 @@ fn list_retainers(id: &str, state: &GameState) -> GMResponse {
         Ok(result) => {
             if result.retainers.is_empty() {
                 return GMResponse::ok_with_data(
-                    id, "no retainers.", state.mode.clone(),
+                    id, "no retainers.", state.mode,
                     serde_json::json!({ "retainers": [] }),
                 );
             }
@@ -405,7 +405,7 @@ fn list_retainers(id: &str, state: &GameState) -> GMResponse {
 
             ok_with_typed_data(id, state, msg, result)
         }
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -417,7 +417,7 @@ fn dismiss_retainer(id: &str, state: &mut GameState, name: &str) -> GMResponse {
             format!("{} ({}) dismissed from service.", result.name, result.class),
             result,
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -427,8 +427,8 @@ fn dismiss_retainer(id: &str, state: &mut GameState, name: &str) -> GMResponse {
 
 fn quit_session(id: &str, state: &GameState) -> GMResponse {
     match system::action_quit() {
-        Ok(_) => GMResponse::ok(id, "session ended.", state.mode.clone()),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Ok(_) => GMResponse::ok(id, "session ended.", state.mode),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 
@@ -437,9 +437,9 @@ fn save_game(id: &str, state: &GameState, path: &str) -> GMResponse {
         Ok(result) => GMResponse::ok(
             id,
             format!("game saved to {}.", result.path.display()),
-            state.mode.clone(),
+            state.mode,
         ),
-        Err(e) => GMResponse::err(id, format!("save failed: {}.", e), state.mode.clone()),
+        Err(e) => GMResponse::err(id, format!("save failed: {}.", e), state.mode),
     }
 }
 
@@ -450,9 +450,9 @@ fn load_game(id: &str, state: &mut GameState, path: &str) -> GMResponse {
                 "loaded: turn {}, dungeon level {}, {} party members.",
                 result.turn, result.dungeon_level, result.party_members,
             );
-            GMResponse::ok(id, msg, state.mode.clone())
+            GMResponse::ok(id, msg, state.mode)
         }
-        Err(e) => GMResponse::err(id, format!("load failed: {}.", e), state.mode.clone()),
+        Err(e) => GMResponse::err(id, format!("load failed: {}.", e), state.mode),
     }
 }
 
@@ -461,10 +461,10 @@ fn roll_dice(id: &str, state: &GameState, notation: &str) -> GMResponse {
         Ok(result) => GMResponse::ok_with_data(
             id,
             result.rendered,
-            state.mode.clone(),
+            state.mode,
             serde_json::json!({ "total": result.total }),
         ),
-        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
 }
 

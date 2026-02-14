@@ -15,11 +15,11 @@ pub(crate) fn ok_with_typed_data<T: Serialize>(
     payload: T,
 ) -> GMResponse {
     match serde_json::to_value(payload) {
-        Ok(data) => GMResponse::ok_with_data(id, message, state.mode.clone(), data),
+        Ok(data) => GMResponse::ok_with_data(id, message, state.mode, data),
         Err(err) => GMResponse::err(
             id,
             format!("internal error: failed to serialize response: {err}"),
-            state.mode.clone(),
+            state.mode,
         ),
     }
 }
