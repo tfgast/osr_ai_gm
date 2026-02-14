@@ -302,12 +302,16 @@ mod tests {
     }
 
     #[test]
-    fn initiative_clears_spell_tracking() {
+    fn initiative_clears_disruptions_but_preserves_declarations() {
         let mut combat = CombatState::new(vec![test_goblin()], 60);
         combat.spell_declarations.push("Elara".to_string());
+        combat.pending_spells.push(("Elara".to_string(), "Sleep".to_string()));
         combat.disrupted.push("Elara".to_string());
         roll_initiative_with(&mut combat, &mut test_rng());
-        assert!(combat.spell_declarations.is_empty());
+        // Declarations survive initiative so the Declare → Initiative → Cast flow works
+        assert!(!combat.spell_declarations.is_empty());
+        assert!(!combat.pending_spells.is_empty());
+        // Disruptions from the previous round are cleared
         assert!(combat.disrupted.is_empty());
     }
 
@@ -864,10 +868,10 @@ mod tests {
         combat.disrupted.push("Elara".to_string());
         assert!(is_disrupted(&combat, "Elara"));
 
-        // New round clears disruption
+        // New round clears disruption but preserves declarations
         roll_initiative_with(&mut combat, &mut test_rng());
         assert!(!is_disrupted(&combat, "Elara"));
-        assert!(combat.spell_declarations.is_empty());
+        assert!(!combat.spell_declarations.is_empty());
     }
 
     // --- Initiative ties ---
