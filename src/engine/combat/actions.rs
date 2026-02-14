@@ -3,8 +3,8 @@ use crate::engine::result::EngineError;
 use crate::engine::retainer::{self, LoyaltyResult};
 use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
-use crate::rules::class::Class;
-use crate::rules::{ability, equipment, monster as monster_db, thief};
+use crate::rules::class::{class_def, Class};
+use crate::rules::{ability, equipment, monster as monster_db, spell, thief};
 
 use super::results::{
     AddMonsterResult, AttackResult, BackstabResult, CastSpellResult, CloseResult, CombatLogResult,
@@ -554,10 +554,16 @@ pub fn action_declare_spell(
     char_name: &str,
     spell_name: &str,
 ) -> Result<DeclareSpellResult, EngineError> {
-    if state.party.find_member(char_name).is_none() {
+    let character = state.party.find_member(char_name).ok_or_else(|| {
+        EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
+    })?;
+
+    let cdef = class_def(character.class);
+    if !spell::can_cast(cdef.spell_progression, character.level) {
         return Err(EngineError::InvalidInput(format!(
-            "no party member named '{}'.",
-            char_name
+            "{} ({}) cannot cast spells.",
+            character.name,
+            character.class.name()
         )));
     }
 

@@ -84,6 +84,22 @@ fn make_cleric(name: &str) -> Character {
     c
 }
 
+fn make_magic_user(name: &str) -> Character {
+    let mut c = Character::new(name, Class::MagicUser);
+    c.abilities = AbilityScores {
+        strength: 8, intelligence: 16, wisdom: 10,
+        dexterity: 10, constitution: 10, charisma: 12,
+    };
+    c.hp = 4;
+    c.max_hp = 4;
+    c.ac = 9;
+    c.thac0 = 19;
+    c.alignment = Alignment::Neutral;
+    c.gold_gp = 80;
+    c.movement_rate = 120;
+    c
+}
+
 /// Verify all GMResponse fields are well-formed.
 fn assert_response_format(resp: &GMResponse, expected_id: &str) {
     assert_eq!(resp.id, expected_id, "response ID mismatch");
@@ -3625,25 +3641,42 @@ fn query_combat_log_after_attack() {
 #[test]
 fn declare_spell_happy_path() {
     let mut state = GameState::new();
-    setup_combat(&mut state);
+    state.party.add_member(make_magic_user("Merlin"));
+    let resp = handle_request(&req("s1", GMCommand::SpawnMonster {
+        name: "Goblin".to_string(), count: 1, distance: 5,
+    }), &mut state);
+    assert!(resp.success);
     let resp = handle_request(&req("1", GMCommand::DeclareSpell {
-        character: "Aldric".to_string(),
+        character: "Merlin".to_string(),
         spell: "Sleep".to_string(),
     }), &mut state);
     assert_response_format(&resp, "1");
     assert!(resp.success);
-    assert!(resp.message.contains("Aldric"));
+    assert!(resp.message.contains("Merlin"));
     assert!(resp.message.contains("Sleep"));
     assert!(resp.message.contains("disrupted"), "message should mention disruption");
     assert_eq!(resp.mode, GameMode::Combat);
 }
 
 #[test]
-fn declare_spell_no_combat() {
+fn declare_spell_non_caster_rejected() {
     let mut state = GameState::new();
-    state.party.add_member(make_fighter("Aldric"));
+    setup_combat(&mut state); // Aldric is Fighter
     let resp = handle_request(&req("1", GMCommand::DeclareSpell {
         character: "Aldric".to_string(),
+        spell: "Sleep".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "1");
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("cannot cast spells"));
+}
+
+#[test]
+fn declare_spell_no_combat() {
+    let mut state = GameState::new();
+    state.party.add_member(make_magic_user("Merlin"));
+    let resp = handle_request(&req("1", GMCommand::DeclareSpell {
+        character: "Merlin".to_string(),
         spell: "Sleep".to_string(),
     }), &mut state);
     assert_response_format(&resp, "1");
