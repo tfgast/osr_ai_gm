@@ -107,7 +107,7 @@ pub fn action_travel(state: &mut GameState, x: i32, y: i32) -> Result<TravelResu
 pub fn action_orient(state: &mut GameState) -> Result<OrientResult, EngineError> {
     require_wilderness_mode(state)?;
     let wilderness = state.wilderness.as_mut().ok_or_else(not_in_wilderness)?;
-    let core = wilderness_engine::orient(wilderness);
+    let core = wilderness_engine::orient(wilderness, &mut state.party);
 
     Ok(OrientResult {
         message: core.message,
@@ -115,12 +115,15 @@ pub fn action_orient(state: &mut GameState) -> Result<OrientResult, EngineError>
         terrain: core.terrain,
         lost: wilderness.lost,
         travel_day: wilderness.travel_day,
+        rations_consumed: core.overhead.rations_consumed,
+        starving: core.overhead.starving,
+        starvation_damage: core.overhead.starvation_damage,
     })
 }
 
 pub fn action_forage(state: &mut GameState) -> Result<ForageResult, EngineError> {
     require_wilderness_mode(state)?;
-    let wilderness = state.wilderness.as_ref().ok_or_else(not_in_wilderness)?;
+    let wilderness = state.wilderness.as_mut().ok_or_else(not_in_wilderness)?;
     let core = wilderness_engine::forage(wilderness, &mut state.party);
 
     Ok(ForageResult {
@@ -128,12 +131,16 @@ pub fn action_forage(state: &mut GameState) -> Result<ForageResult, EngineError>
         quantity: core.quantity,
         success: core.success,
         rations_remaining: state.party.rations,
+        rations_consumed: core.overhead.rations_consumed,
+        starving: core.overhead.starving,
+        starvation_damage: core.overhead.starvation_damage,
+        travel_day: wilderness.travel_day,
     })
 }
 
 pub fn action_hunt(state: &mut GameState) -> Result<HuntResult, EngineError> {
     require_wilderness_mode(state)?;
-    let wilderness = state.wilderness.as_ref().ok_or_else(not_in_wilderness)?;
+    let wilderness = state.wilderness.as_mut().ok_or_else(not_in_wilderness)?;
     let core = wilderness_engine::hunt(wilderness, &mut state.party);
 
     Ok(HuntResult {
@@ -141,6 +148,10 @@ pub fn action_hunt(state: &mut GameState) -> Result<HuntResult, EngineError> {
         quantity: core.quantity,
         success: core.success,
         rations_remaining: state.party.rations,
+        rations_consumed: core.overhead.rations_consumed,
+        starving: core.overhead.starving,
+        starvation_damage: core.overhead.starvation_damage,
+        travel_day: wilderness.travel_day,
     })
 }
 
