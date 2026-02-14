@@ -531,7 +531,7 @@ pub fn action_fighting_withdrawal(
     Ok(FightingWithdrawalResult {
         message,
         withdrawer: character.name,
-        distance_moved: old_distance.saturating_sub(combat.distance),
+        distance_moved: combat.distance.saturating_sub(old_distance),
         new_distance: combat.distance,
     })
 }
@@ -1595,5 +1595,16 @@ mod tests {
         assert!(result.is_err(), "backstab with dagger at 20' should fail");
         let err = result.unwrap_err().to_string();
         assert!(err.contains("melee weapon"), "expected melee weapon error, got: {}", err);
+    }
+
+    // --- fighting_withdrawal distance_moved (oag-09jya) ---
+
+    #[test]
+    fn fighting_withdrawal_distance_moved_is_nonzero() {
+        let mut state = state_with_combat(); // distance = 60, fighter movement_rate = 120
+        // encounter_move = 120/3 = 40, half = 20
+        let result = action_fighting_withdrawal(&mut state, "Grond").unwrap();
+        assert_eq!(result.distance_moved, 20, "distance_moved should be 20 (half encounter move)");
+        assert_eq!(result.new_distance, 80, "new distance should be 60 + 20 = 80");
     }
 }
