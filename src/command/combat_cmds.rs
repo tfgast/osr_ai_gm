@@ -270,6 +270,25 @@ impl Command for TurnUndeadCommand {
     }
 }
 
+/// Resolve a character name from args, auto-selecting if only one alive party member.
+fn resolve_character_arg(args: &[&str], state: &GameState) -> Result<String, String> {
+    if !args.is_empty() {
+        return Ok(args[0].to_string());
+    }
+    let alive: Vec<&str> = state.party.members.iter()
+        .filter(|c| c.is_alive())
+        .map(|c| c.name.as_str())
+        .collect();
+    match alive.len() {
+        0 => Err("no alive party members.".to_string()),
+        1 => Ok(alive[0].to_string()),
+        _ => Err(format!(
+            "multiple alive party members — specify which character: {}",
+            alive.join(", ")
+        )),
+    }
+}
+
 pub struct RetreatCommand;
 impl Command for RetreatCommand {
     fn name(&self) -> &str {
@@ -279,10 +298,11 @@ impl Command for RetreatCommand {
         "Retreat from combat — full speed, enemies get free attack at +2"
     }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        if args.is_empty() {
-            return CommandResult::error("usage: retreat <character_name>");
-        }
-        match combat::action_retreat(state, args[0]) {
+        let char_name = match resolve_character_arg(args, state) {
+            Ok(name) => name,
+            Err(e) => return CommandResult::error(e),
+        };
+        match combat::action_retreat(state, &char_name) {
             Ok(result) => CommandResult::ok(result.message),
             Err(e) => CommandResult::error(e.to_string()),
         }
@@ -298,10 +318,11 @@ impl Command for WithdrawalCommand {
         "Fighting withdrawal — half speed, no free attacks"
     }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
-        if args.is_empty() {
-            return CommandResult::error("usage: withdrawal <character_name>");
-        }
-        match combat::action_fighting_withdrawal(state, args[0]) {
+        let char_name = match resolve_character_arg(args, state) {
+            Ok(name) => name,
+            Err(e) => return CommandResult::error(e),
+        };
+        match combat::action_fighting_withdrawal(state, &char_name) {
             Ok(result) => CommandResult::ok(result.message),
             Err(e) => CommandResult::error(e.to_string()),
         }
