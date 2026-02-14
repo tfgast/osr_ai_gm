@@ -165,6 +165,13 @@ pub(super) fn declare_spell(
     }
 }
 
+pub(super) fn cast_spell(id: &str, state: &mut GameState, char_name: &str) -> GMResponse {
+    match combat::action_cast_spell(state, char_name) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
 pub(super) fn end_combat(id: &str, state: &mut GameState) -> GMResponse {
     match combat::action_end_combat(state) {
         Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),

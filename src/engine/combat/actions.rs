@@ -7,7 +7,7 @@ use crate::rules::class::Class;
 use crate::rules::{ability, equipment, monster as monster_db, thief};
 
 use super::results::{
-    AddMonsterResult, AttackResult, BackstabResult, CloseResult, CombatLogResult,
+    AddMonsterResult, AttackResult, BackstabResult, CastSpellResult, CloseResult, CombatLogResult,
     CombatStatusResult, DeclareSpellResult, EndCombatResult, FightingWithdrawalResult,
     InitiativeResult, InitiativeWinner, MonsterAttackResult, MoraleResult,
     RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome, RetreatResult, SetHelplessResult,
@@ -565,6 +565,88 @@ pub fn action_declare_spell(
     })
 }
 
+pub fn action_cast_spell(
+    state: &mut GameState,
+    char_name: &str,
+) -> Result<CastSpellResult, EngineError> {
+    if state.party.find_member(char_name).is_none() {
+        return Err(EngineError::InvalidInput(format!(
+            "no party member named '{}'.",
+            char_name
+        )));
+    }
+
+    let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
+
+    if combat.characters_acted.iter().any(|n| n.eq_ignore_ascii_case(char_name)) {
+        return Err(EngineError::InvalidInput(format!(
+            "{} has already acted this round.",
+            char_name
+        )));
+    }
+
+    // Find the pending spell for this character.
+    let pending_idx = combat.pending_spells.iter().position(|(name, _)| {
+        name.eq_ignore_ascii_case(char_name)
+    });
+    let pending_idx = match pending_idx {
+        Some(idx) => idx,
+        None => {
+            return Err(EngineError::InvalidInput(format!(
+                "{} has not declared a spell this round. Use DeclareSpell first.",
+                char_name
+            )));
+        }
+    };
+
+    let (_, spell_name) = combat.pending_spells.remove(pending_idx);
+
+    // Remove from spell_declarations too.
+    if let Some(decl_idx) = combat.spell_declarations.iter().position(|n| {
+        n.eq_ignore_ascii_case(char_name)
+    }) {
+        combat.spell_declarations.remove(decl_idx);
+    }
+
+    // Check if the spell was disrupted.
+    let was_disrupted = super::is_disrupted(combat, char_name);
+
+    // Mark character as having acted.
+    combat.characters_acted.push(char_name.to_string());
+
+    if was_disrupted {
+        combat.log.push(format!(
+            "{}'s {} fizzles — spell was disrupted!",
+            char_name, spell_name
+        ));
+        Ok(CastSpellResult {
+            message: format!(
+                "{}'s {} was disrupted! The spell fails.",
+                char_name, spell_name
+            ),
+            character: char_name.to_string(),
+            spell: spell_name,
+            cast: false,
+            disrupted: true,
+        })
+    } else {
+        combat.log.push(format!(
+            "{} casts {}!",
+            char_name, spell_name
+        ));
+        Ok(CastSpellResult {
+            message: format!(
+                "{} casts {}! Apply spell effects as appropriate.",
+                char_name, spell_name
+            ),
+            character: char_name.to_string(),
+            spell: spell_name,
+            cast: true,
+            disrupted: false,
+        })
+    }
+}
+
 pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, EngineError> {
     if state.combat.is_none() {
         return Err(no_active_combat());
@@ -1093,5 +1175,137 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("already acted"), "expected acted guard, got: {}", err);
+    }
+
+    // --- cast_spell (oag-aarw0) ---
+
+    fn state_with_caster_combat() -> GameState {
+        let mut state = GameState::new();
+        let mut mage = crate::model::Character::new("Elara", crate::rules::class::Class::MagicUser);
+        mage.hp = 3;
+        mage.max_hp = 3;
+        mage.ac = 7;
+        mage.level = 1;
+        state.party.add_member(mage);
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin", "1", 4, 6, 7)],
+            10,
+        ));
+        state
+    }
+
+    #[test]
+    fn cast_spell_resolves_declared_spell() {
+        let mut state = state_with_caster_combat();
+        let _ = action_declare_spell(&mut state, "Elara", "Magic Missile");
+        let _ = action_roll_initiative(&mut state);
+
+        // Re-declare after initiative (initiative clears declarations)
+        let _ = action_declare_spell(&mut state, "Elara", "Magic Missile");
+
+        let result = action_cast_spell(&mut state, "Elara");
+        assert!(result.is_ok(), "cast_spell should succeed: {:?}", result.err());
+        let result = result.unwrap();
+        assert!(result.cast);
+        assert!(!result.disrupted);
+        assert_eq!(result.spell, "Magic Missile");
+        assert_eq!(result.character, "Elara");
+    }
+
+    #[test]
+    fn cast_spell_fails_without_declaration() {
+        let mut state = state_with_caster_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        let result = action_cast_spell(&mut state, "Elara");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("not declared"), "expected 'not declared' error, got: {}", err);
+    }
+
+    #[test]
+    fn cast_spell_reports_disruption() {
+        let mut state = state_with_caster_combat();
+        let _ = action_roll_initiative(&mut state);
+        let _ = action_declare_spell(&mut state, "Elara", "Sleep");
+
+        // Manually disrupt the caster
+        state.combat.as_mut().unwrap().disrupted.push("Elara".to_string());
+
+        let result = action_cast_spell(&mut state, "Elara");
+        assert!(result.is_ok(), "cast_spell should return Ok even when disrupted");
+        let result = result.unwrap();
+        assert!(!result.cast);
+        assert!(result.disrupted);
+        assert_eq!(result.spell, "Sleep");
+    }
+
+    #[test]
+    fn cast_spell_clears_declaration() {
+        let mut state = state_with_caster_combat();
+        let _ = action_roll_initiative(&mut state);
+        let _ = action_declare_spell(&mut state, "Elara", "Magic Missile");
+
+        assert!(!state.combat.as_ref().unwrap().pending_spells.is_empty());
+        assert!(!state.combat.as_ref().unwrap().spell_declarations.is_empty());
+
+        let _ = action_cast_spell(&mut state, "Elara");
+
+        assert!(state.combat.as_ref().unwrap().pending_spells.is_empty());
+        assert!(state.combat.as_ref().unwrap().spell_declarations.is_empty());
+    }
+
+    #[test]
+    fn cast_spell_marks_character_acted() {
+        let mut state = state_with_caster_combat();
+        let _ = action_roll_initiative(&mut state);
+        let _ = action_declare_spell(&mut state, "Elara", "Magic Missile");
+
+        let _ = action_cast_spell(&mut state, "Elara");
+
+        // Character cannot attack after casting
+        let result = action_attack(&mut state, "Elara", 0, "Dagger");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("already acted"), "expected 'already acted', got: {}", err);
+    }
+
+    #[test]
+    fn cast_spell_no_combat_error() {
+        let mut state = GameState::new();
+        let mut mage = crate::model::Character::new("Elara", crate::rules::class::Class::MagicUser);
+        mage.hp = 3;
+        mage.max_hp = 3;
+        state.party.add_member(mage);
+
+        let result = action_cast_spell(&mut state, "Elara");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cast_spell_unknown_character_error() {
+        let mut state = state_with_caster_combat();
+        let result = action_cast_spell(&mut state, "Nobody");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("no party member"));
+    }
+
+    #[test]
+    fn cast_spell_cannot_cast_twice_per_round() {
+        let mut state = state_with_caster_combat();
+        let _ = action_roll_initiative(&mut state);
+        let _ = action_declare_spell(&mut state, "Elara", "Magic Missile");
+
+        let result = action_cast_spell(&mut state, "Elara");
+        assert!(result.is_ok());
+
+        // Second cast attempt should fail (already acted)
+        let _ = action_declare_spell(&mut state, "Elara", "Sleep");
+        let result = action_cast_spell(&mut state, "Elara");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("already acted"), "got: {}", err);
     }
 }

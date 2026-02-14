@@ -362,6 +362,26 @@ impl Command for DeclareSpellCommand {
     }
 }
 
+pub struct CastSpellCommand;
+impl Command for CastSpellCommand {
+    fn name(&self) -> &str {
+        "cast_spell"
+    }
+    fn help(&self) -> &str {
+        "Resolve a declared spell during the magic phase (cast_spell <character>)"
+    }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        if args.is_empty() {
+            return CommandResult::error("usage: cast_spell <character_name>");
+        }
+        let char_name = args[0];
+        match combat::action_cast_spell(state, char_name) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 pub struct CombatStatusCommand;
 impl Command for CombatStatusCommand {
     fn name(&self) -> &str {

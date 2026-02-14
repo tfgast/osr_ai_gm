@@ -63,6 +63,9 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::DeclareSpell { character, spell } => {
             combat_handlers::declare_spell(id, state, character, spell)
         }
+        GMCommand::CastSpell { character } => {
+            combat_handlers::cast_spell(id, state, character)
+        }
         GMCommand::EndCombat => combat_handlers::end_combat(id, state),
 
         // -- Exploration --

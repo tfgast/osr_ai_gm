@@ -289,6 +289,16 @@ pub struct DeclareSpellResult {
     pub spell: String,
 }
 
+/// Typed success payload for `cast_spell`.
+#[derive(Debug, Clone, Serialize)]
+pub struct CastSpellResult {
+    pub message: String,
+    pub character: String,
+    pub spell: String,
+    pub cast: bool,
+    pub disrupted: bool,
+}
+
 /// End-combat loyalty outcome per surviving retainer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

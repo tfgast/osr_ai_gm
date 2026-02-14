@@ -115,6 +115,10 @@ pub enum GMCommand {
         character: String,
         spell: String,
     },
+    /// Resolve a declared spell during the magic phase. Fails if disrupted.
+    CastSpell {
+        character: String,
+    },
     /// End the current combat.
     EndCombat,
 
@@ -492,6 +496,7 @@ impl GMCommand {
                 check_len("character", character, 128)?;
                 check_len("spell", spell, 128)
             }
+            GMCommand::CastSpell { character } => check_len("character", character, 128),
             GMCommand::EnterDungeon { room_name, .. } => check_len("room_name", room_name, 128),
             GMCommand::AddRoom { name, .. } => check_len("name", name, 128),
             GMCommand::Light { carrier, .. } => check_len("carrier", carrier, 128),
@@ -1066,6 +1071,19 @@ mod tests {
                 assert_eq!(spell, "Sleep");
             }
             _ => panic!("expected DeclareSpell"),
+        }
+    }
+
+    #[test]
+    fn parse_cast_spell() {
+        let json = r#"{"id":"cs1","command":{"type":"CastSpell","params":{"character":"Mira"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "cs1");
+        match &req.command {
+            GMCommand::CastSpell { character } => {
+                assert_eq!(character, "Mira");
+            }
+            _ => panic!("expected CastSpell"),
         }
     }
 
