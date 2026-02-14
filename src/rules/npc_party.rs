@@ -320,7 +320,6 @@ pub fn roll_alignment<R: Rng>(rng: &mut R) -> Alignment {
 /// Generate a basic adventuring party (1d4+4 members, levels 1-3).
 pub fn generate_basic_party<R: Rng>(rng: &mut R) -> NpcParty {
     let party_size = roll_dice_expr(rng, "1d4+4");
-    let party_alignment = roll_alignment(rng);
 
     let mut members = Vec::new();
     for _ in 0..party_size {
@@ -328,7 +327,7 @@ pub fn generate_basic_party<R: Rng>(rng: &mut R) -> NpcParty {
         members.push(NpcMember {
             class,
             level,
-            alignment: party_alignment,
+            alignment: roll_alignment(rng),
             role: None,
         });
     }
@@ -344,7 +343,6 @@ pub fn generate_basic_party<R: Rng>(rng: &mut R) -> NpcParty {
 /// Generate an expert adventuring party (1d6+3 members, levels 5-10+).
 pub fn generate_expert_party<R: Rng>(rng: &mut R) -> NpcParty {
     let party_size = roll_dice_expr(rng, "1d6+3");
-    let party_alignment = roll_alignment(rng);
     let mounted = rng.gen_range(1..=100) <= 75;
 
     let mut members = Vec::new();
@@ -353,7 +351,7 @@ pub fn generate_expert_party<R: Rng>(rng: &mut R) -> NpcParty {
         members.push(NpcMember {
             class,
             level,
-            alignment: party_alignment,
+            alignment: roll_alignment(rng),
             role: None,
         });
     }
@@ -372,7 +370,6 @@ pub fn generate_expert_party<R: Rng>(rng: &mut R) -> NpcParty {
 
 /// Generate a high-level cleric party.
 pub fn generate_high_level_cleric_party<R: Rng>(rng: &mut R) -> NpcParty {
-    let party_alignment = roll_alignment(rng);
     let mounted = rng.gen_range(1..=100) <= 75;
 
     let mut members = Vec::new();
@@ -382,7 +379,7 @@ pub fn generate_high_level_cleric_party<R: Rng>(rng: &mut R) -> NpcParty {
     members.push(NpcMember {
         class: Class::Cleric,
         level: leader_level,
-        alignment: party_alignment,
+        alignment: roll_alignment(rng),
         role: Some("Leader".to_string()),
     });
 
@@ -393,7 +390,7 @@ pub fn generate_high_level_cleric_party<R: Rng>(rng: &mut R) -> NpcParty {
         members.push(NpcMember {
             class: Class::Cleric,
             level,
-            alignment: party_alignment,
+            alignment: roll_alignment(rng),
             role: None,
         });
     }
@@ -405,7 +402,7 @@ pub fn generate_high_level_cleric_party<R: Rng>(rng: &mut R) -> NpcParty {
         members.push(NpcMember {
             class: Class::Fighter,
             level,
-            alignment: party_alignment,
+            alignment: roll_alignment(rng),
             role: None,
         });
     }
@@ -423,7 +420,6 @@ pub fn generate_high_level_cleric_party<R: Rng>(rng: &mut R) -> NpcParty {
 
 /// Generate a high-level fighter party.
 pub fn generate_high_level_fighter_party<R: Rng>(rng: &mut R) -> NpcParty {
-    let party_alignment = roll_alignment(rng);
     let mounted = rng.gen_range(1..=100) <= 75;
 
     let mut members = Vec::new();
@@ -433,7 +429,7 @@ pub fn generate_high_level_fighter_party<R: Rng>(rng: &mut R) -> NpcParty {
     members.push(NpcMember {
         class: Class::Fighter,
         level: leader_level,
-        alignment: party_alignment,
+        alignment: roll_alignment(rng),
         role: Some("Leader".to_string()),
     });
 
@@ -445,7 +441,7 @@ pub fn generate_high_level_fighter_party<R: Rng>(rng: &mut R) -> NpcParty {
         members.push(NpcMember {
             class,
             level,
-            alignment: party_alignment,
+            alignment: roll_alignment(rng),
             role: Some("Retainer".to_string()),
         });
     }
@@ -800,6 +796,49 @@ mod tests {
         assert!(found_classes.contains(&Class::Cleric));
         assert!(found_classes.contains(&Class::MagicUser));
         assert!(found_classes.contains(&Class::Thief));
+    }
+
+    #[test]
+    fn npc_party_members_have_individual_alignments() {
+        // Generate many parties and verify that members within a party can
+        // have different alignments (not all forced to the same one).
+        let mut found_variation = false;
+
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let party = generate_basic_party(&mut rng);
+            let alignments: std::collections::HashSet<_> =
+                party.members.iter().map(|m| m.alignment).collect();
+            if alignments.len() > 1 {
+                found_variation = true;
+                break;
+            }
+        }
+
+        assert!(
+            found_variation,
+            "expected alignment variation among party members across 100 parties"
+        );
+    }
+
+    #[test]
+    fn all_alignments_appear_in_npc_parties() {
+        let mut found = std::collections::HashSet::new();
+
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let party = generate_basic_party(&mut rng);
+            for member in &party.members {
+                found.insert(member.alignment);
+            }
+            if found.len() == 3 {
+                break;
+            }
+        }
+
+        assert!(found.contains(&Alignment::Lawful), "should find Lawful members");
+        assert!(found.contains(&Alignment::Neutral), "should find Neutral members");
+        assert!(found.contains(&Alignment::Chaotic), "should find Chaotic members");
     }
 
     #[test]
