@@ -1,4 +1,6 @@
-use crate::engine::inventory::results::{BuyResult, DropResult, EquipResult, LootResult};
+use crate::engine::inventory::results::{
+    BuyResult, DropResult, EquipResult, EquipmentItemSummary, ListEquipmentResult, LootResult,
+};
 use crate::engine::result::EngineError;
 use crate::model::Item;
 use crate::persist::GameState;
@@ -262,6 +264,53 @@ pub fn action_loot(
         character: character.name.clone(),
         item: item_name.to_string(),
         value_gp,
+    })
+}
+
+pub fn action_list_equipment() -> Result<ListEquipmentResult, EngineError> {
+    let weapons: Vec<EquipmentItemSummary> = equipment::weapons()
+        .iter()
+        .filter(|w| w.cost_gp() > 0)
+        .map(|w| EquipmentItemSummary {
+            name: w.name.clone(),
+            cost_gp: w.cost_gp(),
+            category: "weapon".to_string(),
+        })
+        .collect();
+
+    let armour: Vec<EquipmentItemSummary> = equipment::armour()
+        .iter()
+        .filter(|a| a.cost_gp() > 0)
+        .map(|a| EquipmentItemSummary {
+            name: a.name.clone(),
+            cost_gp: a.cost_gp(),
+            category: "armour".to_string(),
+        })
+        .collect();
+
+    let gear: Vec<EquipmentItemSummary> = equipment::gear()
+        .iter()
+        .map(|g| EquipmentItemSummary {
+            name: g.name.clone(),
+            cost_gp: g.cost_gp(),
+            category: "gear".to_string(),
+        })
+        .collect();
+
+    let ammunition: Vec<EquipmentItemSummary> = equipment::ammunition()
+        .iter()
+        .map(|a| EquipmentItemSummary {
+            name: a.name.clone(),
+            cost_gp: a.cost_gp(),
+            category: "ammunition".to_string(),
+        })
+        .collect();
+
+    Ok(ListEquipmentResult {
+        weapons,
+        armour,
+        gear,
+        ammunition,
     })
 }
 

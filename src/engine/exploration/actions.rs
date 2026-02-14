@@ -1,6 +1,7 @@
 use crate::engine::result::EngineError;
 use crate::persist::GameState;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
+use crate::state::game::GameMode;
 use crate::state::time::LightSourceKind;
 
 use super::results::{
@@ -117,6 +118,24 @@ pub fn action_enter_dungeon(
         return Err(EngineError::InvalidInput(
             "level must be a positive integer.".to_string(),
         ));
+    }
+    match state.mode {
+        GameMode::Combat => {
+            return Err(EngineError::WrongState(
+                "cannot enter dungeon during combat. Use 'end_combat' first.".to_string(),
+            ));
+        }
+        GameMode::Wilderness => {
+            return Err(EngineError::WrongState(
+                "cannot enter dungeon while in wilderness mode. Leave wilderness first.".to_string(),
+            ));
+        }
+        GameMode::Exploration => {
+            return Err(EngineError::WrongState(
+                "already in exploration mode. Leave dungeon first.".to_string(),
+            ));
+        }
+        _ => {}
     }
 
     let mut dungeon = DungeonState::new(level);

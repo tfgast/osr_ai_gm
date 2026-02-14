@@ -155,6 +155,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::LookupTreasureType { letter } => query_handlers::lookup_treasure_type(id, state, letter),
         GMCommand::RollTreasure { letter } => query_handlers::roll_treasure(id, state, letter),
         GMCommand::ListClasses => query_handlers::list_classes(id, state),
+        GMCommand::ListEquipment => query_handlers::list_equipment(id, state),
         GMCommand::EligibleClasses { abilities } => query_handlers::eligible_classes(id, state, abilities),
 
         // -- System --

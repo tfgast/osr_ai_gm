@@ -43,6 +43,11 @@ pub fn action_spawn_encounter(
             "combat already active. Use 'end_combat' first.".to_string(),
         ));
     }
+    if params.name.trim().is_empty() {
+        return Err(EngineError::InvalidInput(
+            "monster name must not be empty.".to_string(),
+        ));
+    }
     if params.count == 0 {
         return Err(EngineError::InvalidInput(
             "count must be a positive integer".to_string(),
@@ -183,6 +188,11 @@ pub fn action_spawn_monster(
 
 pub fn action_roll_initiative(state: &mut GameState) -> Result<InitiativeResult, EngineError> {
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
+    if combat.round > 0 && combat.log.len() == combat.initiative_log_len {
+        return Err(EngineError::WrongState(
+            "initiative already rolled this round. Resolve actions before rolling again.".to_string(),
+        ));
+    }
     let (party_initiative, monster_initiative) = roll_initiative(combat);
     let winner = if party_initiative > monster_initiative {
         InitiativeWinner::Party
@@ -455,7 +465,10 @@ pub fn action_declare_spell(
 }
 
 pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, EngineError> {
-    let combat = state.exit_combat().ok_or_else(no_active_combat)?;
+    if state.combat.is_none() {
+        return Err(no_active_combat());
+    }
+    let combat = state.exit_combat().unwrap();
 
     let rounds = combat.round;
     let monsters_defeated = combat.monsters.iter().filter(|m| !m.is_alive()).count();

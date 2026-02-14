@@ -84,6 +84,41 @@ impl Command for LootCommand {
     }
 }
 
+pub struct ListEquipmentCommand;
+impl Command for ListEquipmentCommand {
+    fn name(&self) -> &str {
+        "list_equipment"
+    }
+    fn help(&self) -> &str {
+        "List buyable equipment (weapons, armour, gear, ammunition)"
+    }
+    fn execute(&self, _args: &[&str], _state: &mut GameState) -> CommandResult {
+        match inventory::action_list_equipment() {
+            Ok(result) => {
+                let mut out = String::new();
+                out.push_str("=== Weapons ===\n");
+                for item in &result.weapons {
+                    out.push_str(&format!("  {:24} {} gp\n", item.name, item.cost_gp));
+                }
+                out.push_str("\n=== Armour ===\n");
+                for item in &result.armour {
+                    out.push_str(&format!("  {:24} {} gp\n", item.name, item.cost_gp));
+                }
+                out.push_str("\n=== Gear ===\n");
+                for item in &result.gear {
+                    out.push_str(&format!("  {:24} {} gp\n", item.name, item.cost_gp));
+                }
+                out.push_str("\n=== Ammunition ===\n");
+                for item in &result.ammunition {
+                    out.push_str(&format!("  {:24} {} gp\n", item.name, item.cost_gp));
+                }
+                CommandResult::ok(out)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 pub struct EquipCommand;
 impl Command for EquipCommand {
     fn name(&self) -> &str {

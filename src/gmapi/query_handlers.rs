@@ -1,4 +1,4 @@
-use crate::engine::{combat, exploration, lookup, party, wilderness_engine};
+use crate::engine::{combat, exploration, inventory, lookup, party, wilderness_engine};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
@@ -274,6 +274,28 @@ pub(super) fn eligible_classes(id: &str, state: &GameState, abilities: &[i32; 6]
                     eligible: result.eligible,
                     count: eligible_count,
                 },
+            )
+        }
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
+// =============================================================================
+// Equipment listing
+// =============================================================================
+
+pub(super) fn list_equipment(id: &str, state: &GameState) -> GMResponse {
+    match inventory::action_list_equipment() {
+        Ok(result) => {
+            let total = result.weapons.len()
+                + result.armour.len()
+                + result.gear.len()
+                + result.ammunition.len();
+            ok_with_typed_data(
+                id,
+                state,
+                format!("{} buyable items available.", total),
+                result,
             )
         }
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),

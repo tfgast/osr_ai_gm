@@ -102,7 +102,17 @@ impl FromStr for HitDice {
             return Ok(HitDice { base, modifier: 0, specials, fractional: false, range_end: Some(end) });
         }
 
-        // Handle fractional HD like "1/2" or "½"
+        // Handle fractional HD like "1/2", "½", or "0.5"
+        if s == "0.5" || s.starts_with("0.5*") {
+            let specials = s.chars().rev().take_while(|c| *c == '*').count() as u8;
+            return Ok(HitDice {
+                base: 1,
+                modifier: 0,
+                specials,
+                fractional: true,
+                range_end: None,
+            });
+        }
         if s.contains('/') || s.starts_with('½') {
             let specials = s.chars().rev().take_while(|c| *c == '*').count() as u8;
             return Ok(HitDice {

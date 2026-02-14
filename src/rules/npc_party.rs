@@ -224,14 +224,15 @@ fn roll_dice_expr<R: Rng>(rng: &mut R, expr: &str) -> u32 {
 // Public API
 // ============================================================================
 
-/// Roll a random NPC class from the d20 table.
+/// Roll a random NPC class from the d20 table, mapped to B/X equivalents.
 pub fn roll_class<R: Rng>(rng: &mut R) -> Class {
     let data = load_data();
     let roll: u32 = rng.gen_range(1..=20);
 
     for entry in &data.class_level_table {
         if entry.roll == roll {
-            return Class::parse(&entry.class).unwrap_or(Class::Fighter);
+            let raw = Class::parse(&entry.class).unwrap_or(Class::Fighter);
+            return to_bx_class(raw);
         }
     }
 
@@ -254,6 +255,30 @@ pub fn level_dice_for_class(class: &str, tier: &str) -> Option<&'static str> {
     None
 }
 
+/// Map Advanced Fantasy classes to their B/X equivalents.
+///
+/// NPC parties should use B/X classes only (Fighter, Cleric, Magic-User,
+/// Thief, Elf, Dwarf, Halfling) since the game's chargen uses B/X rules.
+fn to_bx_class(class: Class) -> Class {
+    match class {
+        // Already B/X
+        Class::Fighter | Class::Cleric | Class::MagicUser | Class::Thief
+        | Class::Elf | Class::Dwarf | Class::Halfling => class,
+        // Martial-flavored → Fighter
+        Class::Barbarian | Class::Knight | Class::Paladin | Class::Ranger => Class::Fighter,
+        // Rogue-flavored → Thief
+        Class::Acrobat | Class::Assassin | Class::Bard => Class::Thief,
+        // Divine → Cleric
+        Class::Druid => Class::Cleric,
+        // Arcane → Magic-User
+        Class::Illusionist => Class::MagicUser,
+        // Demihuman variants → B/X demihuman
+        Class::HalfElf | Class::Drow => Class::Elf,
+        Class::HalfOrc | Class::Duergar => Class::Dwarf,
+        Class::Gnome | Class::Svirfneblin => Class::Halfling,
+    }
+}
+
 /// Roll a random NPC class and level.
 pub fn roll_class_and_level<R: Rng>(rng: &mut R, tier: &str) -> (Class, u32) {
     let data = load_data();
@@ -266,8 +291,8 @@ pub fn roll_class_and_level<R: Rng>(rng: &mut R, tier: &str) -> (Class, u32) {
                 _ => &entry.expert_level_dice,
             };
             let level = roll_dice_expr(rng, dice);
-            let class = Class::parse(&entry.class).unwrap_or(Class::Fighter);
-            return (class, level);
+            let raw_class = Class::parse(&entry.class).unwrap_or(Class::Fighter);
+            return (to_bx_class(raw_class), level);
         }
     }
 

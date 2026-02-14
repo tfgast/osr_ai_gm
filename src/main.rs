@@ -16,7 +16,9 @@ use osr_ai_gm::command::gm_cmds::{
     DamageCommand, HealCommand, RulingCommand, SetHpCommand, SetRationsCommand,
     SpawnEncounterCommand, TrainCommand,
 };
-use osr_ai_gm::command::inventory_cmds::{BuyCommand, DropCommand, EquipCommand, LootCommand};
+use osr_ai_gm::command::inventory_cmds::{
+    BuyCommand, DropCommand, EquipCommand, ListEquipmentCommand, LootCommand,
+};
 use osr_ai_gm::command::lookup_cmds::{
     ItemCommand, SearchItemsCommand, SpellCommand, TreasureTypeCommand,
 };
@@ -118,6 +120,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(DropCommand));
     registry.register(Box::new(LootCommand));
     registry.register(Box::new(EquipCommand));
+    registry.register(Box::new(ListEquipmentCommand));
     // Dungeon Exploration
     registry.register(Box::new(EnterDungeonCommand));
     registry.register(Box::new(LightCommand));

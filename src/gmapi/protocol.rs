@@ -317,6 +317,8 @@ pub enum GMCommand {
     RollTreasure { letter: String },
     /// List all character classes with requirements.
     ListClasses,
+    /// List buyable equipment (weapons, armour, gear, ammunition).
+    ListEquipment,
     /// Show eligible classes for given ability scores.
     EligibleClasses { abilities: [i32; 6] },
 

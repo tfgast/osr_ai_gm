@@ -5,6 +5,7 @@ use crate::engine::wilderness::results::{
 };
 use crate::engine::wilderness_engine;
 use crate::persist::GameState;
+use crate::state::game::GameMode;
 use crate::state::wilderness::{HexCell, Terrain, WildernessState};
 
 fn not_in_wilderness() -> EngineError {
@@ -26,6 +27,20 @@ pub fn action_enter_wilderness(
     state: &mut GameState,
     terrain: Terrain,
 ) -> Result<EnterWildernessResult, EngineError> {
+    match state.mode {
+        GameMode::Combat => {
+            return Err(EngineError::WrongState(
+                "cannot enter wilderness during combat. Use 'end_combat' first.".to_string(),
+            ));
+        }
+        GameMode::Wilderness => {
+            return Err(EngineError::WrongState(
+                "already in wilderness mode.".to_string(),
+            ));
+        }
+        _ => {}
+    }
+
     let mut wilderness = WildernessState::new();
     wilderness
         .add_hex(HexCell::new(0, 0, terrain))
