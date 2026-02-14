@@ -164,6 +164,12 @@ impl MonsterDef {
     pub fn xp(&self) -> u64 {
         self.xp_value.value()
     }
+
+    /// Check if this monster is undead based on special_abilities.
+    /// Undead monsters have a special ability starting with "Undead:".
+    pub fn is_undead(&self) -> bool {
+        self.special_abilities.iter().any(|s| s.starts_with("Undead:"))
+    }
 }
 
 /// Container for loaded monster data.
@@ -376,6 +382,25 @@ mod tests {
                 "Basilisk special: {}",
                 special
             );
+        }
+    }
+
+    #[test]
+    fn is_undead_detection() {
+        if !has_data() {
+            return;
+        }
+        // Known undead monsters should be detected
+        for name in &["Skeleton", "Zombie", "Ghoul", "Wraith", "Vampire", "Mummy", "Spectre", "Wight"] {
+            if let Some(m) = find_monster(name) {
+                assert!(m.is_undead(), "{} should be detected as undead", name);
+            }
+        }
+        // Known living monsters should not be detected as undead
+        for name in &["Goblin", "Orc", "Basilisk", "Ogre", "Dragon, Red"] {
+            if let Some(m) = find_monster(name) {
+                assert!(!m.is_undead(), "{} should NOT be detected as undead", name);
+            }
         }
     }
 }

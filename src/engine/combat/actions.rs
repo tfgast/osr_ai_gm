@@ -62,11 +62,11 @@ pub fn action_spawn_encounter(
         return Err(EngineError::InvalidInput("morale must be 2-12".to_string()));
     }
 
+    let db_entry = monster_db::find_monster(params.name);
     let xp_per_monster = params.xp_value.unwrap_or_else(|| {
-        monster_db::find_monster(params.name)
-            .map(|m| m.xp())
-            .unwrap_or(0)
+        db_entry.map(|m| m.xp()).unwrap_or(0)
     });
+    let is_undead = db_entry.map(|m| m.is_undead()).unwrap_or(false);
 
     let mut monsters = Vec::new();
     for i in 0..params.count {
@@ -83,6 +83,7 @@ pub fn action_spawn_encounter(
         monster.morale = params.morale;
         monster.xp_value = xp_per_monster;
         monster.attacks = vec!["attack".to_string()];
+        monster.undead = is_undead;
         monsters.push(monster);
     }
 
@@ -155,6 +156,7 @@ pub fn action_spawn_monster(
         m.morale = def.morale;
         m.xp_value = def.xp();
         m.attacks = def.attack_names();
+        m.undead = def.is_undead();
         monsters.push(m);
     }
 
@@ -212,11 +214,11 @@ pub fn action_add_monster(
         return Err(EngineError::InvalidInput("morale must be 2-12".to_string()));
     }
 
+    let db_entry = monster_db::find_monster(params.name);
     let xp_per_monster = params.xp_value.unwrap_or_else(|| {
-        monster_db::find_monster(params.name)
-            .map(|m| m.xp())
-            .unwrap_or(0)
+        db_entry.map(|m| m.xp()).unwrap_or(0)
     });
+    let is_undead = db_entry.map(|m| m.is_undead()).unwrap_or(false);
 
     let combat = state.combat.as_mut().unwrap();
     let existing_count = combat.monsters.len();
@@ -235,6 +237,7 @@ pub fn action_add_monster(
         monster.morale = params.morale;
         monster.xp_value = xp_per_monster;
         monster.attacks = vec!["attack".to_string()];
+        monster.undead = is_undead;
         combat.monsters.push(monster);
     }
 
@@ -456,6 +459,12 @@ pub fn action_turn_undead(
         return Err(EngineError::InvalidInput(
             "target is already dead.".to_string(),
         ));
+    }
+    if !combat.monsters[monster_idx].undead {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is not undead.",
+            combat.monsters[monster_idx].name
+        )));
     }
 
     let result = resolve_turn_undead(combat, &character, character.level, monster_idx);
