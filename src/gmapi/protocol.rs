@@ -51,6 +51,8 @@ pub enum GMCommand {
     QueryCombat,
     /// Get exploration status (if exploring).
     QueryExploration,
+    /// Look at the current room — show name, description, and contents.
+    Look,
     /// Get wilderness status (if in wilderness).
     QueryWilderness,
 
@@ -974,6 +976,14 @@ mod tests {
         assert_eq!(resp.id, resp2.id);
         assert_eq!(resp.mode, resp2.mode);
         assert!(resp2.success);
+    }
+
+    #[test]
+    fn parse_look() {
+        let json = r#"{"id":"lk1","command":{"type":"Look"}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "lk1");
+        assert!(matches!(req.command, GMCommand::Look));
     }
 
     #[test]

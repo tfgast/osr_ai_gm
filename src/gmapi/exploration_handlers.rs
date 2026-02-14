@@ -134,6 +134,13 @@ pub(super) fn rest(id: &str, state: &mut GameState) -> GMResponse {
     }
 }
 
+pub(super) fn look(id: &str, state: &GameState) -> GMResponse {
+    match exploration::action_look(state) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
 // =============================================================================
 // Wilderness
 // =============================================================================

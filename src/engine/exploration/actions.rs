@@ -6,7 +6,7 @@ use crate::state::time::LightSourceKind;
 
 use super::results::{
     AddDoorResult, AddRoomResult, AdvanceDungeonTurnResult, EnterDungeonResult, ForceDoorResult,
-    ExplorationStatusResult, ListenAtDoorResult, LightResult, MoveThroughDoorResult,
+    ExplorationStatusResult, ListenAtDoorResult, LightResult, LookResult, MoveThroughDoorResult,
     OpenDoorResult, PickLockResult, RestResult, SearchRoomResult,
 };
 use super::{
@@ -381,5 +381,49 @@ pub fn action_exploration_status(state: &GameState) -> Result<ExplorationStatusR
         .ok_or_else(|| EngineError::WrongState("no dungeon state.".to_string()))?;
     Ok(ExplorationStatusResult {
         message: exploration_status(time, dungeon),
+    })
+}
+
+pub fn action_look(state: &GameState) -> Result<LookResult, EngineError> {
+    let dungeon = state
+        .dungeon
+        .as_ref()
+        .ok_or_else(|| EngineError::WrongState("no dungeon state.".to_string()))?;
+    let room_id = dungeon
+        .current_room
+        .ok_or_else(|| EngineError::WrongState("no current room.".to_string()))?;
+    let room = dungeon
+        .find_room(room_id)
+        .ok_or_else(|| EngineError::Internal(format!("room {} not found.", room_id)))?;
+
+    let mut lines = Vec::new();
+    lines.push(format!("== {} (room {}) ==", room.name, room.id));
+
+    if room.description.is_empty() {
+        lines.push("No description available.".to_string());
+    } else {
+        lines.push(room.description.clone());
+    }
+
+    // Show exits
+    let doors = dungeon.doors_from_current();
+    if !doors.is_empty() {
+        lines.push(String::new());
+        lines.push("Exits:".to_string());
+        for d in &doors {
+            let dest = if d.room_a == room_id { d.room_b } else { d.room_a };
+            let dest_name = dungeon
+                .find_room(dest)
+                .map(|r| r.name.as_str())
+                .unwrap_or("?");
+            lines.push(format!("  Door {} → {} ({}) [{}]", d.id, dest, dest_name, d.state));
+        }
+    }
+
+    Ok(LookResult {
+        message: lines.join("\n"),
+        room_id,
+        room_name: room.name.clone(),
+        description: room.description.clone(),
     })
 }

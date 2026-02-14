@@ -35,6 +35,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::QueryParty => query_handlers::query_party(id, state),
         GMCommand::QueryCombat => query_handlers::query_combat(id, state),
         GMCommand::QueryExploration => query_handlers::query_exploration(id, state),
+        GMCommand::Look => exploration_handlers::look(id, state),
         GMCommand::QueryWilderness => query_handlers::query_wilderness(id, state),
 
         // -- Character management --
@@ -1420,6 +1421,44 @@ mod tests {
         assert!(data["armour"].as_array().unwrap().is_empty());
         assert!(data["gear"].as_array().unwrap().is_empty());
         assert!(data["ammunition"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn look_shows_room_description() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LoadModule {
+            path: "data/modules/sample_crypt/module.json".to_string(),
+        }), &mut state);
+        assert!(resp.success, "load module should succeed: {:?}", resp.error);
+
+        let resp = handle_request(&make_req("2", GMCommand::Look), &mut state);
+        assert!(resp.success, "look should succeed: {:?}", resp.error);
+        assert!(resp.message.contains("Crypt Entrance"), "should show room name");
+        let data = resp.data.unwrap();
+        assert_eq!(data["room_id"], 0);
+        assert_eq!(data["room_name"], "Crypt Entrance");
+        assert!(!data["description"].as_str().unwrap().is_empty(), "description should not be empty");
+    }
+
+    #[test]
+    fn look_not_exploring() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::Look), &mut state);
+        assert!(!resp.success, "look without dungeon should fail");
+    }
+
+    #[test]
+    fn look_shows_exits() {
+        let mut state = GameState::new();
+        let resp = handle_request(&make_req("1", GMCommand::LoadModule {
+            path: "data/modules/sample_crypt/module.json".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+
+        let resp = handle_request(&make_req("2", GMCommand::Look), &mut state);
+        assert!(resp.success);
+        assert!(resp.message.contains("Exits:"), "should show exits");
+        assert!(resp.message.contains("Door"), "should show door info");
     }
 
     #[test]

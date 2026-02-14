@@ -122,3 +122,12 @@ pub struct PickLockResult {
 pub struct ExplorationStatusResult {
     pub message: String,
 }
+
+/// Typed success payload for `look` (describe current room).
+#[derive(Debug, Clone, Serialize)]
+pub struct LookResult {
+    pub message: String,
+    pub room_id: u32,
+    pub room_name: String,
+    pub description: String,
+}
