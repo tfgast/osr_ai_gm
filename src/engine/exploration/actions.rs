@@ -1,6 +1,7 @@
 use crate::engine::result::EngineError;
 use crate::persist::GameState;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
+use crate::state::game::GameMode;
 use crate::state::time::LightSourceKind;
 
 use super::results::{
@@ -94,6 +95,11 @@ pub fn action_force_door(
 pub fn action_advance_dungeon_turn(
     state: &mut GameState,
 ) -> Result<AdvanceDungeonTurnResult, EngineError> {
+    if state.mode != GameMode::Exploration {
+        return Err(EngineError::WrongState(
+            "AdvanceTurn is only available in dungeon exploration mode.".to_string(),
+        ));
+    }
     let level = state.dungeon_level;
     let time = state
         .time
