@@ -1,7 +1,8 @@
 use osr_ai_gm::command::combat_cmds::{
-    AttackCommand, CloseCommand, CombatLogCommand, CombatStatusCommand, DeclareSpellCommand,
-    EndCombatCommand, InitiativeCommand, KillCommand, MonsterAttackCommand, MoraleCommand,
-    RetreatCommand, SetHelplessCommand, StartCombatCommand, TurnUndeadCommand, WithdrawalCommand,
+    AddMonsterCommand, AttackCommand, CloseCommand, CombatLogCommand, CombatStatusCommand,
+    DeclareSpellCommand, EndCombatCommand, InitiativeCommand, KillCommand, MonsterAttackCommand,
+    MoraleCommand, RetreatCommand, SetHelplessCommand, StartCombatCommand, TurnUndeadCommand,
+    WithdrawalCommand,
 };
 use osr_ai_gm::command::encounter_cmds::{
     EncounterCommand, EvadeCommand, ReactionCommand, SpawnNpcCommand, SurpriseCommand,
@@ -99,6 +100,7 @@ fn build_registry() -> CommandRegistry {
     registry.register(Box::new(PartyCommand));
     // Combat
     registry.register(Box::new(StartCombatCommand));
+    registry.register(Box::new(AddMonsterCommand));
     registry.register(Box::new(InitiativeCommand));
     registry.register(Box::new(AttackCommand));
     registry.register(Box::new(MonsterAttackCommand));

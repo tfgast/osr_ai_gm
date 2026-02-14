@@ -44,6 +44,22 @@ pub struct SpawnEncounterResult {
     pub status: String,
 }
 
+/// Typed success payload for `add_monster`.
+#[derive(Debug, Clone, Serialize)]
+pub struct AddMonsterResult {
+    pub message: String,
+    pub monster_name: String,
+    pub count: u32,
+    pub hit_dice: HitDice,
+    pub ac: i32,
+    pub hp: i32,
+    pub damage: String,
+    pub morale: u32,
+    pub xp_per_monster: u64,
+    pub total_monsters: usize,
+    pub status: String,
+}
+
 /// Which side won initiative for the round.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
