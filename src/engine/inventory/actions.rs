@@ -10,9 +10,23 @@ fn no_party_member_err(char_name: &str) -> EngineError {
     EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
 }
 
+/// Strip non-alphanumeric characters and lowercase for fuzzy matching.
+/// "Chain Mail" → "chainmail", "Thieves' tools" → "thievestools"
+fn normalize_for_matching(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .collect()
+}
+
 /// Look up an item across all equipment tables.
 /// Returns (name, cost_gp, weight as f32).
+///
+/// First tries exact case-insensitive lookup, then falls back to normalized
+/// matching (stripping spaces, punctuation) so "Chain Mail" finds "Chainmail"
+/// and "Thieves tools" finds "Thieves' tools".
 fn find_buyable(name: &str) -> Option<(String, u32, f32)> {
+    // Pass 1: exact case-insensitive lookup via HashMap
     if let Some(w) = equipment::find_weapon(name) {
         if w.cost_gp() > 0 {
             return Some((w.name.clone(), w.cost_gp(), w.weight() as f32));
@@ -32,35 +46,80 @@ fn find_buyable(name: &str) -> Option<(String, u32, f32)> {
     {
         return Some((a.name.clone(), a.cost_gp(), 0.0));
     }
+
+    // Pass 2: normalized matching (strip spaces/punctuation, then compare)
+    let query_norm = normalize_for_matching(name);
+    if query_norm.is_empty() {
+        return None;
+    }
+    for w in equipment::weapons() {
+        if w.cost_gp() > 0 && normalize_for_matching(&w.name) == query_norm {
+            return Some((w.name.clone(), w.cost_gp(), w.weight() as f32));
+        }
+    }
+    for a in equipment::armour() {
+        if a.cost_gp() > 0 && normalize_for_matching(&a.name) == query_norm {
+            return Some((a.name.clone(), a.cost_gp(), a.weight() as f32));
+        }
+    }
+    for g in equipment::gear() {
+        if normalize_for_matching(&g.name) == query_norm {
+            return Some((g.name.clone(), g.cost_gp(), 0.0));
+        }
+    }
+    for a in equipment::ammunition() {
+        if normalize_for_matching(&a.name) == query_norm {
+            return Some((a.name.clone(), a.cost_gp(), 0.0));
+        }
+    }
+
     None
 }
 
-/// Find equipment names that contain the query as a substring (case-insensitive).
+/// Check if a query fuzzy-matches an item name for suggestion purposes.
+/// Handles substring matching in both directions, plus normalized matching
+/// (stripping spaces/punctuation) so "Leather Armor" suggests "Leather" and
+/// "Thieves tools" suggests "Thieves' tools".
+fn names_match_for_suggestion(item_name: &str, query: &str) -> bool {
+    let item_lower = item_name.to_lowercase();
+    let query_lower = query.to_lowercase();
+
+    // Bidirectional substring: item contains query or query contains item
+    if item_lower.contains(&query_lower) || query_lower.contains(&item_lower) {
+        return true;
+    }
+
+    // Normalized containment: strip non-alphanumeric, then check both directions
+    let item_norm = normalize_for_matching(item_name);
+    let query_norm = normalize_for_matching(query);
+    item_norm.contains(&query_norm) || query_norm.contains(&item_norm)
+}
+
+/// Find equipment names that fuzzy-match the query.
 /// Returns up to 3 suggestions.
 fn suggest_equipment(query: &str) -> Vec<String> {
-    let query_lower = query.to_lowercase();
     let mut suggestions: Vec<String> = Vec::new();
 
     for w in equipment::weapons() {
-        if w.cost_gp() > 0 && w.name.to_lowercase().contains(&query_lower) {
+        if w.cost_gp() > 0 && names_match_for_suggestion(&w.name, query) {
             suggestions.push(w.name.clone());
         }
     }
 
     for a in equipment::armour() {
-        if a.cost_gp() > 0 && a.name.to_lowercase().contains(&query_lower) {
+        if a.cost_gp() > 0 && names_match_for_suggestion(&a.name, query) {
             suggestions.push(a.name.clone());
         }
     }
 
     for g in equipment::gear() {
-        if g.name.to_lowercase().contains(&query_lower) {
+        if names_match_for_suggestion(&g.name, query) {
             suggestions.push(g.name.clone());
         }
     }
 
     for a in equipment::ammunition() {
-        if a.name.to_lowercase().contains(&query_lower) {
+        if names_match_for_suggestion(&a.name, query) {
             suggestions.push(a.name.clone());
         }
     }
@@ -380,6 +439,52 @@ mod tests {
             .expect_err("partial query should suggest matches");
         assert!(err.to_string().contains("Did you mean"));
         assert!(err.to_string().contains("Chainmail"));
+    }
+
+    // ---- Fuzzy matching tests (bug oag-ntpgk) ----
+
+    #[test]
+    fn buy_chain_mail_with_space_resolves_to_chainmail() {
+        let mut state = state_with_fighter();
+        let result =
+            action_buy(&mut state, "Aldric", "Chain Mail").expect("should resolve Chain Mail");
+        assert!(result.message.contains("buys Chainmail"));
+        assert_eq!(result.cost_gp, 40);
+    }
+
+    #[test]
+    fn buy_thieves_tools_without_apostrophe() {
+        let mut state = state_with_fighter();
+        let result = action_buy(&mut state, "Aldric", "Thieves tools")
+            .expect("should resolve without apostrophe");
+        assert!(result.message.contains("Thieves' tools"));
+        assert_eq!(result.cost_gp, 25);
+    }
+
+    #[test]
+    fn buy_leather_armor_suggests_leather() {
+        let mut state = state_with_fighter();
+        let err = action_buy(&mut state, "Aldric", "Leather Armor")
+            .expect_err("Leather Armor should not match exactly");
+        let msg = err.to_string();
+        assert!(msg.contains("Did you mean"), "should suggest: {}", msg);
+        assert!(msg.contains("Leather"), "should suggest Leather: {}", msg);
+    }
+
+    #[test]
+    fn buy_plate_mail_with_extra_space_resolves() {
+        let mut state = state_with_fighter();
+        let result = action_buy(&mut state, "Aldric", "Plate Mail")
+            .expect("should resolve Plate Mail with different spacing");
+        assert!(result.message.contains("Plate mail"));
+    }
+
+    #[test]
+    fn buy_war_hammer_without_space_resolves() {
+        let mut state = state_with_fighter();
+        let result = action_buy(&mut state, "Aldric", "Warhammer")
+            .expect("should resolve Warhammer to War hammer");
+        assert!(result.message.contains("War hammer"));
     }
 
     #[test]
