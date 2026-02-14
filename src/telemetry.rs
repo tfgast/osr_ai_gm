@@ -29,9 +29,7 @@ pub fn log_failed_command(entry: &FailedCommand) {
 }
 
 fn telemetry_dir() -> Option<PathBuf> {
-    std::env::var("HOME")
-        .ok()
-        .map(|h| PathBuf::from(h).join(".osr_data").join("telemetry"))
+    crate::persist::data_dir().ok().map(|d| d.join("telemetry"))
 }
 
 fn log_to_path(entry: &FailedCommand, path: &Path) -> io::Result<()> {
@@ -126,6 +124,20 @@ mod tests {
 
         if let Some(home) = original {
             unsafe { std::env::set_var("HOME", home) };
+        }
+    }
+
+    #[test]
+    fn telemetry_dir_respects_osr_data_dir() {
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
+
+        let dir = telemetry_dir().unwrap();
+        assert_eq!(dir, std::path::PathBuf::from("/tmp/custom_osr/telemetry"));
+
+        match orig {
+            Some(v) => unsafe { std::env::set_var("OSR_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("OSR_DATA_DIR") },
         }
     }
 }
