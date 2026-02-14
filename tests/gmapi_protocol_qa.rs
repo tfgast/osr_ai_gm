@@ -1915,6 +1915,8 @@ fn backstab_happy_path() {
     let mut hit_verified = false;
     for i in 0..100 {
         state.combat.as_mut().unwrap().monsters[0].hp = saved_hp;
+        // Clear per-round action tracking so retry is allowed
+        state.combat.as_mut().unwrap().characters_acted.clear();
         let resp = handle_request(&req(&format!("bs1_{}", i), GMCommand::Backstab {
             character: "Shade".to_string(),
             monster_idx: 0,
@@ -3018,16 +3020,17 @@ fn rapid_combat_sequence() {
     let resp = handle_request(&req("2", GMCommand::RollInitiative), &mut state);
     assert!(resp.success);
 
-    // Rapid attacks
-    for i in 0..4 {
+    // Each party member attacks one goblin (one attack per character per round)
+    let attackers = ["Aldric", "Shade", "Marcus"];
+    for (i, attacker) in attackers.iter().enumerate() {
         let idx = i % state.combat.as_ref().unwrap().monsters.len();
         if state.combat.as_ref().unwrap().monsters[idx].is_alive() {
             let resp = handle_request(&req(&format!("a{}", i), GMCommand::Attack {
-                character: "Aldric".to_string(),
+                character: attacker.to_string(),
                 monster_idx: idx,
                 weapon: "sword".to_string(),
             }), &mut state);
-            assert!(resp.success, "attack {} failed: {}", i, resp.message);
+            assert!(resp.success, "{} attack failed: {}", attacker, resp.message);
         }
     }
 

@@ -269,6 +269,9 @@ pub struct CombatState {
     /// Combat log length after the last initiative roll (to detect repeated rolls).
     #[serde(default)]
     pub log_len_at_initiative: usize,
+    /// Characters who have already acted (attacked/backstabbed) this round.
+    #[serde(default)]
+    pub characters_acted: Vec<String>,
 }
 
 impl CombatState {
@@ -288,6 +291,7 @@ impl CombatState {
             half_killed_checked: false,
             initial_monster_count: initial_count,
             log_len_at_initiative: 0,
+            characters_acted: Vec::new(),
         }
     }
 
