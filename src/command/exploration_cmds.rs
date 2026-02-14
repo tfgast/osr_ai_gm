@@ -250,6 +250,18 @@ impl Command for ExplorationStatusCommand {
     }
 }
 
+pub struct LookCommand;
+impl Command for LookCommand {
+    fn name(&self) -> &str { "look" }
+    fn help(&self) -> &str { "Describe the current room (name, description, exits)" }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        match exploration::action_look(state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

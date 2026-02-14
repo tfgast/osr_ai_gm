@@ -63,7 +63,7 @@ pub trait Command {
 /// Resolve common aliases to canonical command names.
 fn resolve_alias(name: &str) -> &str {
     match name {
-        "look" | "l" => "exploration_status",
+        "l" => "look",
         "go" => "move",
         "status" => "exploration_status",
         "inventory" | "i" => "party",
@@ -193,8 +193,7 @@ mod tests {
 
     #[test]
     fn alias_look_resolves() {
-        assert_eq!(resolve_alias("look"), "exploration_status");
-        assert_eq!(resolve_alias("l"), "exploration_status");
+        assert_eq!(resolve_alias("l"), "look");
     }
 
     #[test]
