@@ -88,9 +88,9 @@ impl GameState {
     /// Returns the `CombatState` so callers can extract results.
     /// Falls back to `Idle` if `pre_combat_mode` was not set.
     pub fn exit_combat(&mut self) -> Option<CombatState> {
-        let combat = self.combat.take();
+        let combat = self.combat.take()?;
         self.mode = self.pre_combat_mode.take().unwrap_or(GameMode::Idle);
-        combat
+        Some(combat)
     }
 
     /// Transition into Exploration mode with a freshly-initialised dungeon.
@@ -489,6 +489,19 @@ mod tests {
         // pre_combat_mode not set
         let _ = state.exit_combat();
         assert_eq!(state.mode, GameMode::Idle);
+    }
+
+    #[test]
+    fn exit_combat_no_combat_preserves_mode() {
+        let mut state = GameState::new();
+        let dungeon = DungeonState::new(1);
+        state.enter_exploration(dungeon, 1);
+        assert_eq!(state.mode, GameMode::Exploration);
+
+        // No combat active — exit_combat should return None and NOT change mode
+        let result = state.exit_combat();
+        assert!(result.is_none());
+        assert_eq!(state.mode, GameMode::Exploration);
     }
 
     #[test]

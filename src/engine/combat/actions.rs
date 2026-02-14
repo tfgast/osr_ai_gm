@@ -777,4 +777,40 @@ mod tests {
         let result = action_set_helpless(&mut state, 99, true);
         assert!(result.is_err());
     }
+
+    // --- action_end_combat mode preservation (oag-uee9i) ---
+
+    #[test]
+    fn end_combat_no_combat_preserves_exploration_mode() {
+        let mut state = GameState::new();
+        state.party.add_member(test_fighter());
+        state.mode = GameMode::Exploration;
+
+        // No combat active — EndCombat should error without changing mode
+        let result = action_end_combat(&mut state);
+        assert!(result.is_err());
+        assert_eq!(state.mode, GameMode::Exploration);
+    }
+
+    #[test]
+    fn end_combat_twice_preserves_mode() {
+        let mut state = GameState::new();
+        state.party.add_member(test_fighter());
+        state.mode = GameMode::Exploration;
+        state.pre_combat_mode = Some(GameMode::Exploration);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Goblin", "1", 4, 6, 7)],
+            60,
+        ));
+
+        // First EndCombat succeeds, restores Exploration
+        let result = action_end_combat(&mut state);
+        assert!(result.is_ok());
+        assert_eq!(state.mode, GameMode::Exploration);
+
+        // Second EndCombat fails, mode must remain Exploration
+        let result = action_end_combat(&mut state);
+        assert!(result.is_err());
+        assert_eq!(state.mode, GameMode::Exploration);
+    }
 }
