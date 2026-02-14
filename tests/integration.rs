@@ -196,17 +196,25 @@ fn full_dungeon_session() {
     }
 
     // -- STEP 10: Thief attempts backstab on a different goblin --
-    let resp = handle_request(&req("23", GMCommand::Backstab {
-        character: "Shade".to_string(),
-        monster_idx: 1,
-        weapon: "dagger".to_string(),
-    }), &mut state);
-    assert!(resp.success, "backstab failed: {}", resp.message);
-    let data = resp.data.unwrap();
-    // Backstab should have multiplier 2 at level 1
-    if data["hit"].as_bool().unwrap_or(false) {
-        assert_eq!(data["multiplier"], 2);
+    // Retry until hit to ensure multiplier is actually verified
+    let saved_hp_1 = state.combat.as_ref().unwrap().monsters[1].hp;
+    let mut backstab_hit = false;
+    for i in 0..100 {
+        state.combat.as_mut().unwrap().monsters[1].hp = saved_hp_1;
+        let resp = handle_request(&req(&format!("23_{}", i), GMCommand::Backstab {
+            character: "Shade".to_string(),
+            monster_idx: 1,
+            weapon: "dagger".to_string(),
+        }), &mut state);
+        assert!(resp.success, "backstab failed: {}", resp.message);
+        let data = resp.data.unwrap();
+        if data["hit"].as_bool().unwrap_or(false) {
+            assert_eq!(data["multiplier"], 2);
+            backstab_hit = true;
+            break;
+        }
     }
+    assert!(backstab_hit, "backstab should land at least once in 100 attempts");
 
     // -- STEP 11: Check morale --
     let resp = handle_request(&req("24", GMCommand::CheckMorale), &mut state);
@@ -636,19 +644,26 @@ fn complete_ose_session() {
         assert!(state.combat.as_ref().unwrap().monsters[0].hp < pre_hp_0, "goblin 0 HP should decrease on hit");
     }
 
-    // Thief backstabs
-    let pre_hp_1 = state.combat.as_ref().unwrap().monsters[1].hp;
-    let resp = handle_request(&req("c5", GMCommand::Backstab {
-        character: "Nyx the Shadow".to_string(),
-        monster_idx: 1,
-        weapon: "dagger".to_string(),
-    }), &mut state);
-    assert!(resp.success);
-    let data = resp.data.as_ref().unwrap();
-    if data["hit"].as_bool().unwrap_or(false) {
-        assert_eq!(data["multiplier"], 2, "level 1 backstab should be x2");
-        assert!(state.combat.as_ref().unwrap().monsters[1].hp < pre_hp_1, "goblin 1 HP should decrease on hit");
+    // Thief backstabs — retry until hit to ensure multiplier is verified
+    let saved_hp_1 = state.combat.as_ref().unwrap().monsters[1].hp;
+    let mut backstab_hit = false;
+    for i in 0..100 {
+        state.combat.as_mut().unwrap().monsters[1].hp = saved_hp_1;
+        let resp = handle_request(&req(&format!("c5_{}", i), GMCommand::Backstab {
+            character: "Nyx the Shadow".to_string(),
+            monster_idx: 1,
+            weapon: "dagger".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.as_ref().unwrap();
+        if data["hit"].as_bool().unwrap_or(false) {
+            assert_eq!(data["multiplier"], 2, "level 1 backstab should be x2");
+            assert!(state.combat.as_ref().unwrap().monsters[1].hp < saved_hp_1, "goblin 1 HP should decrease on hit");
+            backstab_hit = true;
+            break;
+        }
     }
+    assert!(backstab_hit, "backstab should land at least once in 100 attempts");
 
     // Cleric attacks
     let pre_hp_2 = state.combat.as_ref().unwrap().monsters[2].hp;
@@ -803,17 +818,25 @@ fn backstab_multiplier_level_1_x2() {
     }), &mut state);
     assert!(resp.success);
 
-    // Backstab
-    let resp = handle_request(&req("2", GMCommand::Backstab {
-        character: "Dagger Dan".to_string(),
-        monster_idx: 0,
-        weapon: "dagger".to_string(),
-    }), &mut state);
-    assert!(resp.success);
-    let data = resp.data.unwrap();
-    if data["hit"].as_bool().unwrap_or(false) {
-        assert_eq!(data["multiplier"], 2, "level 1 thief should have x2 backstab");
+    // Retry backstab until a hit to ensure multiplier is verified
+    let saved_hp = state.combat.as_ref().unwrap().monsters[0].hp;
+    let mut hit_verified = false;
+    for i in 0..100 {
+        state.combat.as_mut().unwrap().monsters[0].hp = saved_hp;
+        let resp = handle_request(&req(&format!("2_{}", i), GMCommand::Backstab {
+            character: "Dagger Dan".to_string(),
+            monster_idx: 0,
+            weapon: "dagger".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        if data["hit"].as_bool().unwrap_or(false) {
+            assert_eq!(data["multiplier"], 2, "level 1 thief should have x2 backstab");
+            hit_verified = true;
+            break;
+        }
     }
+    assert!(hit_verified, "backstab should land at least once in 100 attempts");
 }
 
 #[test]
@@ -829,16 +852,25 @@ fn backstab_multiplier_level_5_x3() {
     }), &mut state);
     assert!(resp.success);
 
-    let resp = handle_request(&req("2", GMCommand::Backstab {
-        character: "Shadow Blade".to_string(),
-        monster_idx: 0,
-        weapon: "dagger".to_string(),
-    }), &mut state);
-    assert!(resp.success);
-    let data = resp.data.unwrap();
-    if data["hit"].as_bool().unwrap_or(false) {
-        assert_eq!(data["multiplier"], 3, "level 5 thief should have x3 backstab");
+    // Retry backstab until a hit to ensure multiplier is verified
+    let saved_hp = state.combat.as_ref().unwrap().monsters[0].hp;
+    let mut hit_verified = false;
+    for i in 0..100 {
+        state.combat.as_mut().unwrap().monsters[0].hp = saved_hp;
+        let resp = handle_request(&req(&format!("2_{}", i), GMCommand::Backstab {
+            character: "Shadow Blade".to_string(),
+            monster_idx: 0,
+            weapon: "dagger".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        if data["hit"].as_bool().unwrap_or(false) {
+            assert_eq!(data["multiplier"], 3, "level 5 thief should have x3 backstab");
+            hit_verified = true;
+            break;
+        }
     }
+    assert!(hit_verified, "backstab should land at least once in 100 attempts");
 }
 
 #[test]
@@ -853,16 +885,25 @@ fn backstab_multiplier_level_9_x4() {
     }), &mut state);
     assert!(resp.success);
 
-    let resp = handle_request(&req("2", GMCommand::Backstab {
-        character: "Master Thief".to_string(),
-        monster_idx: 0,
-        weapon: "dagger".to_string(),
-    }), &mut state);
-    assert!(resp.success);
-    let data = resp.data.unwrap();
-    if data["hit"].as_bool().unwrap_or(false) {
-        assert_eq!(data["multiplier"], 4, "level 9 thief should have x4 backstab");
+    // Retry backstab until a hit to ensure multiplier is verified
+    let saved_hp = state.combat.as_ref().unwrap().monsters[0].hp;
+    let mut hit_verified = false;
+    for i in 0..100 {
+        state.combat.as_mut().unwrap().monsters[0].hp = saved_hp;
+        let resp = handle_request(&req(&format!("2_{}", i), GMCommand::Backstab {
+            character: "Master Thief".to_string(),
+            monster_idx: 0,
+            weapon: "dagger".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        if data["hit"].as_bool().unwrap_or(false) {
+            assert_eq!(data["multiplier"], 4, "level 9 thief should have x4 backstab");
+            hit_verified = true;
+            break;
+        }
     }
+    assert!(hit_verified, "backstab should land at least once in 100 attempts");
 }
 
 #[test]
@@ -1504,19 +1545,26 @@ fn session_a_dungeon_crawl() {
         assert!(state.combat.as_ref().unwrap().monsters[0].hp < pre_g0_hp);
     }
 
-    // Thief backstabs goblin 1
-    let pre_g1_hp = state.combat.as_ref().unwrap().monsters[1].hp;
-    let resp = handle_request(&req("a24", GMCommand::Backstab {
-        character: "Vex".to_string(),
-        monster_idx: 1,
-        weapon: "dagger".to_string(),
-    }), &mut state);
-    assert!(resp.success);
-    let data = resp.data.unwrap();
-    if data["hit"].as_bool().unwrap_or(false) {
-        assert_eq!(data["multiplier"], 2); // level 1 backstab = x2
-        assert!(state.combat.as_ref().unwrap().monsters[1].hp < pre_g1_hp);
+    // Thief backstabs goblin 1 — retry until hit to verify multiplier
+    let saved_g1_hp = state.combat.as_ref().unwrap().monsters[1].hp;
+    let mut backstab_hit = false;
+    for i in 0..100 {
+        state.combat.as_mut().unwrap().monsters[1].hp = saved_g1_hp;
+        let resp = handle_request(&req(&format!("a24_{}", i), GMCommand::Backstab {
+            character: "Vex".to_string(),
+            monster_idx: 1,
+            weapon: "dagger".to_string(),
+        }), &mut state);
+        assert!(resp.success);
+        let data = resp.data.unwrap();
+        if data["hit"].as_bool().unwrap_or(false) {
+            assert_eq!(data["multiplier"], 2); // level 1 backstab = x2
+            assert!(state.combat.as_ref().unwrap().monsters[1].hp < saved_g1_hp);
+            backstab_hit = true;
+            break;
+        }
     }
+    assert!(backstab_hit, "backstab should land at least once in 100 attempts");
 
     // Cleric attacks goblin 2
     let pre_g2_hp = state.combat.as_ref().unwrap().monsters[2].hp;
