@@ -352,3 +352,264 @@ fn treasure_module_command_parity_golden_scaffold_captures_snapshots() {
     // Useful with --nocapture for quick audit review.
     println!("{serialized}");
 }
+
+// ===========================================================================
+// Unified dispatch parity tests (oag-mol-jqd)
+//
+// These tests verify that CLI and API paths produce identical state mutations
+// when both call the same shared engine action.
+// ===========================================================================
+
+use crate::command::gm_cmds::AwardTreasureXpCommand;
+use crate::command::system::{NoteCommand, NoteDeleteCommand, NotesCommand};
+use crate::model::{AbilityScores, Character};
+use crate::rules::class::Class;
+
+fn state_with_fighter() -> GameState {
+    let mut state = GameState::new();
+    let mut c = Character::new("Aldric", Class::Fighter);
+    c.abilities = AbilityScores {
+        strength: 16,
+        intelligence: 10,
+        wisdom: 10,
+        dexterity: 10,
+        constitution: 14,
+        charisma: 10,
+    };
+    c.xp = 0;
+    c.gold_gp = 500;
+    c.hp = 8;
+    c.max_hp = 8;
+    state.party.add_member(c);
+    state
+}
+
+fn state_with_notes() -> GameState {
+    let mut state = GameState::new();
+    state.notes.push("Clue one".to_string());
+    state.notes.push("Clue two".to_string());
+    state.notes.push("Clue three".to_string());
+    state
+}
+
+/// Summarize state with party details for management command parity.
+fn summarize_management_state(state: &GameState) -> Value {
+    let party: Vec<Value> = state
+        .party
+        .members
+        .iter()
+        .map(|c| {
+            json!({
+                "name": c.name,
+                "xp": c.xp,
+                "level": c.level,
+                "gold_gp": c.gold_gp,
+                "hp": c.hp,
+                "max_hp": c.max_hp,
+            })
+        })
+        .collect();
+
+    json!({
+        "mode": state.mode.to_string(),
+        "party": party,
+        "notes": state.notes,
+        "notes_len": state.notes.len(),
+    })
+}
+
+fn capture_management_parity(
+    command: &'static str,
+    initial_state: GameState,
+    cli_exec: impl FnOnce(&mut GameState) -> CommandResult,
+    api_command: GMCommand,
+) -> CommandParitySnapshot {
+    let mut cli_state = initial_state.clone();
+    let cli_result = cli_exec(&mut cli_state);
+    let cli = CliSnapshot {
+        success: cli_result.success,
+        output: cli_result.output,
+        state_after: summarize_management_state(&cli_state),
+    };
+
+    let mut api_state = initial_state;
+    let api_result = run_api(api_command, &mut api_state);
+    let api = ApiSnapshot {
+        success: api_result.success,
+        message: api_result.message,
+        error: api_result.error,
+        data: api_result.data,
+        state_after: summarize_management_state(&api_state),
+    };
+
+    CommandParitySnapshot { command, cli, api }
+}
+
+/// award_treasure_xp: both CLI and API call gm::action_award_treasure_xp.
+/// State mutations must be identical.
+#[test]
+fn award_treasure_xp_parity() {
+    let snapshot = capture_management_parity(
+        "award_treasure_xp",
+        state_with_fighter(),
+        |state| AwardTreasureXpCommand.execute(&["Aldric", "500", "100"], state),
+        GMCommand::AwardTreasureXp {
+            character: "Aldric".to_string(),
+            treasure_gp: 500,
+            monster_xp: 100,
+        },
+    );
+
+    assert!(
+        snapshot.cli.success,
+        "CLI award_treasure_xp should succeed: {}",
+        snapshot.cli.output
+    );
+    assert!(
+        snapshot.api.success,
+        "API AwardTreasureXp should succeed: {}",
+        snapshot.api.message
+    );
+    assert_eq!(
+        snapshot.cli.state_after, snapshot.api.state_after,
+        "award_treasure_xp: CLI and API should produce identical state"
+    );
+
+    // Both should report the same XP values
+    assert!(
+        snapshot.cli.output.contains("500gp treasure"),
+        "CLI should mention treasure_gp"
+    );
+    assert!(
+        snapshot.cli.output.contains("100xp monsters"),
+        "CLI should mention monster_xp"
+    );
+}
+
+/// list_notes: both CLI and API call gm::action_list_notes.
+/// State is read-only, so both must succeed and see the same data.
+#[test]
+fn list_notes_parity() {
+    let snapshot = capture_management_parity(
+        "list_notes",
+        state_with_notes(),
+        |state| NotesCommand.execute(&[], state),
+        GMCommand::ListNotes,
+    );
+
+    assert!(snapshot.cli.success);
+    assert!(snapshot.api.success);
+    assert_eq!(
+        snapshot.cli.state_after, snapshot.api.state_after,
+        "list_notes: state should be unchanged by both paths"
+    );
+
+    // Both should list the notes
+    assert!(snapshot.cli.output.contains("Clue one"));
+    assert!(snapshot.api.message.contains("Clue one"));
+}
+
+/// delete_note: both CLI and API call gm::action_delete_note.
+/// State mutations must be identical.
+#[test]
+fn delete_note_parity() {
+    let snapshot = capture_management_parity(
+        "delete_note",
+        state_with_notes(),
+        |state| NoteDeleteCommand.execute(&["2"], state),
+        GMCommand::DeleteNote { index: 2 },
+    );
+
+    assert!(
+        snapshot.cli.success,
+        "CLI note_delete should succeed: {}",
+        snapshot.cli.output
+    );
+    assert!(
+        snapshot.api.success,
+        "API DeleteNote should succeed: {}",
+        snapshot.api.message
+    );
+    assert_eq!(
+        snapshot.cli.state_after, snapshot.api.state_after,
+        "delete_note: CLI and API should produce identical state"
+    );
+
+    // Both should have 2 notes remaining
+    assert_eq!(
+        snapshot.cli.state_after["notes_len"], 2,
+        "should have 2 notes after delete"
+    );
+}
+
+/// Error path: both CLI and API should fail identically for nonexistent character.
+#[test]
+fn award_treasure_xp_error_parity() {
+    let snapshot = capture_management_parity(
+        "award_treasure_xp_error",
+        GameState::new(),
+        |state| AwardTreasureXpCommand.execute(&["Nobody", "100", "50"], state),
+        GMCommand::AwardTreasureXp {
+            character: "Nobody".to_string(),
+            treasure_gp: 100,
+            monster_xp: 50,
+        },
+    );
+
+    assert!(!snapshot.cli.success, "CLI should fail for nonexistent character");
+    assert!(!snapshot.api.success, "API should fail for nonexistent character");
+    assert_eq!(
+        snapshot.cli.state_after, snapshot.api.state_after,
+        "error paths should leave state unchanged"
+    );
+}
+
+/// Error path: delete_note out of range should fail identically.
+#[test]
+fn delete_note_error_parity() {
+    let state = state_with_notes();
+    let snapshot = capture_management_parity(
+        "delete_note_error",
+        state,
+        |state| NoteDeleteCommand.execute(&["99"], state),
+        GMCommand::DeleteNote { index: 99 },
+    );
+
+    assert!(!snapshot.cli.success, "CLI should fail for out-of-range index");
+    assert!(!snapshot.api.success, "API should fail for out-of-range index");
+    assert_eq!(
+        snapshot.cli.state_after, snapshot.api.state_after,
+        "error paths should leave state unchanged"
+    );
+}
+
+/// add_note (CLI `note`) vs Ruling (API): these use DIFFERENT engine actions
+/// by design. This test documents the intentional divergence — CLI uses
+/// action_add_note (plain text) while API's Ruling uses action_ruling
+/// ([RULING] prefix). Both add to state.notes but with different content.
+#[test]
+fn note_vs_ruling_intentional_divergence() {
+    let text = "The bridge can hold 3 people";
+
+    // CLI path: note command -> action_add_note (plain text)
+    let mut cli_state = GameState::new();
+    let cli_result = NoteCommand.execute(&["The", "bridge", "can", "hold", "3", "people"], &mut cli_state);
+    assert!(cli_result.success);
+
+    // API path: Ruling -> action_ruling ([RULING] prefix)
+    let mut api_state = GameState::new();
+    let api_result = run_api(GMCommand::Ruling { text: text.to_string() }, &mut api_state);
+    assert!(api_result.success);
+
+    // Both should add exactly one note
+    assert_eq!(cli_state.notes.len(), 1);
+    assert_eq!(api_state.notes.len(), 1);
+
+    // Content diverges by design
+    assert_eq!(cli_state.notes[0], text, "CLI note: plain text");
+    assert_eq!(
+        api_state.notes[0],
+        format!("[RULING] {}", text),
+        "API ruling: prefixed"
+    );
+}

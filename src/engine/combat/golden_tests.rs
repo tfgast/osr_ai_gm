@@ -363,3 +363,98 @@ fn combat_command_parity_golden_scaffold_captures_snapshots() {
     // Useful when running with --nocapture to inspect parity drift quickly.
     println!("{serialized}");
 }
+
+// ===========================================================================
+// Unified dispatch parity tests (oag-mol-jqd)
+//
+// These verify that CLI and API paths produce identical state mutations when
+// both call the same shared engine action (combat::action_set_helpless,
+// combat::action_combat_status).
+// ===========================================================================
+
+use crate::command::combat_cmds::{CombatStatusCommand, SetHelplessCommand};
+
+/// set_helpless: both CLI and API call combat::action_set_helpless.
+/// State mutations must be identical.
+#[test]
+fn set_helpless_parity() {
+    let snapshot = capture_parity(
+        "set_helpless",
+        state_with_combat(),
+        |state| SetHelplessCommand.execute(&["0"], state),
+        GMCommand::SetHelpless {
+            monster_idx: 0,
+            helpless: true,
+        },
+    );
+
+    assert!(
+        !snapshot.cli.output.starts_with("Error"),
+        "CLI set_helpless should succeed: {}",
+        snapshot.cli.output
+    );
+    assert!(
+        snapshot.api.success,
+        "API SetHelpless should succeed: {}",
+        snapshot.api.message
+    );
+    assert_eq!(
+        snapshot.cli.state_after, snapshot.api.state_after,
+        "set_helpless: CLI and API should produce identical state"
+    );
+
+    // Both should show the monster is now helpless
+    let cli_combat = &snapshot.cli.state_after["combat"];
+    let api_combat = &snapshot.api.state_after["combat"];
+    assert!(
+        cli_combat["monsters"][0]["helpless"].as_bool().unwrap(),
+        "CLI: monster 0 should be helpless"
+    );
+    assert!(
+        api_combat["monsters"][0]["helpless"].as_bool().unwrap(),
+        "API: monster 0 should be helpless"
+    );
+}
+
+/// combat_status: CLI calls combat::action_combat_status which returns the
+/// combat status string. The API doesn't have a direct equivalent (it uses
+/// QueryCombat which goes through a different handler), so this test verifies
+/// the CLI path works correctly through the shared engine action.
+#[test]
+fn combat_status_via_shared_action() {
+    let mut state = state_with_combat();
+    let result = CombatStatusCommand.execute(&[], &mut state);
+    assert!(
+        !result.output.starts_with("Error"),
+        "combat_status should succeed: {}",
+        result.output
+    );
+    // Should contain party and monster info
+    assert!(result.output.contains("Grond"), "should show party member");
+    assert!(result.output.contains("Goblin"), "should show monsters");
+    assert!(result.output.contains("60'"), "should show distance");
+}
+
+/// set_helpless error parity: no active combat.
+#[test]
+fn set_helpless_no_combat_error_parity() {
+    let snapshot = capture_parity(
+        "set_helpless_error",
+        base_state(), // no combat active
+        |state| SetHelplessCommand.execute(&["0"], state),
+        GMCommand::SetHelpless {
+            monster_idx: 0,
+            helpless: true,
+        },
+    );
+
+    assert!(
+        snapshot.cli.output.starts_with("Error"),
+        "CLI should fail without combat"
+    );
+    assert!(!snapshot.api.success, "API should fail without combat");
+    assert_eq!(
+        snapshot.cli.state_after, snapshot.api.state_after,
+        "error paths should leave state unchanged"
+    );
+}
