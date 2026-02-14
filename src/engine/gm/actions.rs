@@ -170,7 +170,8 @@ pub fn action_heal(
     }
 
     let old_hp = character.hp;
-    character.hp = (character.hp + amount).min(character.max_hp);
+    let new_hp = (character.hp + amount).min(character.max_hp).max(character.hp);
+    character.hp = new_hp;
     let healed = character.hp - old_hp;
 
     Ok(HealResult {
