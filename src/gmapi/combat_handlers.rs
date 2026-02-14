@@ -1,4 +1,5 @@
-use crate::engine::{combat, encounter};
+use crate::engine::combat::{self, SpawnEncounterParams};
+use crate::engine::encounter;
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
 use crate::state::game::GameMode;
@@ -28,15 +29,17 @@ pub(super) fn spawn_encounter(
     let hit_dice = params.hit_dice.to_string();
     match combat::action_spawn_encounter(
         state,
-        &params.name,
-        params.count,
-        &hit_dice,
-        params.ac,
-        params.hp,
-        &params.damage,
-        params.morale,
-        params.distance,
-        params.xp_value,
+        &SpawnEncounterParams {
+            name: &params.name,
+            count: params.count,
+            hit_dice: &hit_dice,
+            ac: params.ac,
+            hp: params.hp,
+            damage: &params.damage,
+            morale: params.morale,
+            distance: params.distance,
+            xp_value: params.xp_value,
+        },
     ) {
         Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
