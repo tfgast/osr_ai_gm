@@ -5,7 +5,9 @@ use rand::Rng;
 use crate::model::CombatState;
 
 /// Roll group initiative (1d6 per side). Advances the round counter
-/// and clears spell declarations/disruptions from the previous round.
+/// and clears disruptions from the previous round. (Spell declarations
+/// and pending spells are cleared at the start of the declaration phase
+/// so they survive the Declare → Initiative → Cast sequence.)
 pub fn roll_initiative(combat: &mut CombatState) -> (i32, i32) {
     roll_initiative_with(combat, &mut rand::thread_rng())
 }
@@ -16,8 +18,6 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
     combat.party_initiative = party;
     combat.monster_initiative = monsters;
     combat.round += 1;
-    combat.spell_declarations.clear();
-    combat.pending_spells.clear();
     combat.disrupted.clear();
     combat.monsters_attacked_this_round.clear();
     combat.characters_acted.clear();

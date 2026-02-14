@@ -323,7 +323,13 @@ impl CombatState {
             CombatPhase::Missile => CombatPhase::Magic,
             CombatPhase::Magic => CombatPhase::Melee,
             CombatPhase::Melee => CombatPhase::EndOfRound,
-            CombatPhase::EndOfRound => CombatPhase::Declaration,
+            CombatPhase::EndOfRound => {
+                // Clear stale spell state from the completed round so the
+                // next declaration phase starts fresh.
+                self.spell_declarations.clear();
+                self.pending_spells.clear();
+                CombatPhase::Declaration
+            }
         };
     }
 

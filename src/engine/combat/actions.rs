@@ -1312,10 +1312,15 @@ mod tests {
         let result = action_declare_spell(&mut state, "Zara", "Sleep");
         assert!(result.is_ok());
 
-        // New round clears spell declarations
-        let _ = action_roll_initiative(&mut state);
+        // Advance through all phases to reach Declaration for the new round.
+        // EndOfRound → Declaration clears spell declarations.
+        let combat = state.combat.as_mut().unwrap();
+        while combat.phase != crate::model::CombatPhase::EndOfRound {
+            combat.advance_phase();
+        }
+        combat.advance_phase(); // EndOfRound → Declaration (clears spell state)
 
-        // Should be allowed again
+        // Should be allowed again in the new declaration phase
         let result = action_declare_spell(&mut state, "Zara", "Magic Missile");
         assert!(result.is_ok(), "declaration in new round should succeed: {:?}", result.err());
     }
@@ -1328,9 +1333,7 @@ mod tests {
         let _ = action_declare_spell(&mut state, "Zara", "Magic Missile");
         let _ = action_roll_initiative(&mut state);
 
-        // Re-declare after initiative (initiative clears declarations)
-        let _ = action_declare_spell(&mut state, "Zara", "Magic Missile");
-
+        // Declaration survives initiative — no re-declaration needed
         let result = action_cast_spell(&mut state, "Zara");
         assert!(result.is_ok(), "cast_spell should succeed: {:?}", result.err());
         let result = result.unwrap();
