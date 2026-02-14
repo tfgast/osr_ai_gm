@@ -3239,6 +3239,28 @@ fn heal_invalid_amount() {
     assert!(resp.error.unwrap().contains("positive integer"));
 }
 
+#[test]
+fn heal_above_max_hp_does_not_reduce() {
+    let mut state = GameState::new();
+    let mut c = make_fighter("Zara");
+    c.hp = 8;
+    c.max_hp = 5;
+    state.party.add_member(c);
+
+    let resp = handle_request(&req("h5", GMCommand::Heal {
+        character: "Zara".to_string(), amount: 5,
+    }), &mut state);
+    assert_response_format(&resp, "h5");
+    assert!(resp.success);
+
+    let data = resp.data.expect("Heal should have data");
+    assert_eq!(data["healed"], 0);
+    assert_eq!(data["old_hp"], 8);
+    assert_eq!(data["hp"], 8);
+    assert_eq!(data["max_hp"], 5);
+    assert_eq!(state.party.find_member("Zara").unwrap().hp, 8);
+}
+
 // ===========================================================================
 // GM Fiat: Damage
 // ===========================================================================

@@ -581,6 +581,19 @@ mod tests {
     }
 
     #[test]
+    fn heal_above_max_hp_does_not_reduce() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Zara", Class::Fighter);
+        c.hp = 8;
+        c.max_hp = 5;
+        state.party.add_member(c);
+        let cmd = HealCommand;
+        let result = cmd.execute(&["Zara", "5"], &mut state);
+        assert!(result.output.contains("healed 0 HP"));
+        assert_eq!(state.party.find_member("Zara").unwrap().hp, 8);
+    }
+
+    #[test]
     fn heal_no_character() {
         let mut state = GameState::new();
         let cmd = HealCommand;
