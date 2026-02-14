@@ -4,6 +4,7 @@ use crate::rules::module::{self as module_rules, ModuleDef, PlacedTreasure};
 use crate::state::dungeon::{
     Door, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room,
 };
+use crate::state::game::GameMode;
 use std::collections::HashMap;
 
 use super::results::LoadModuleResult;
@@ -101,6 +102,12 @@ pub fn action_load_module(
     state: &mut GameState,
     path: &str,
 ) -> Result<LoadModuleResult, EngineError> {
+    if state.mode == GameMode::Exploration || state.mode == GameMode::Combat {
+        return Err(EngineError::WrongState(
+            "Cannot load module while in Exploration mode. Save and exit exploration first."
+                .to_string(),
+        ));
+    }
     // Try DEFAULT_MODULES_DIR first; on "not found" fall back to data_dir()/modules/
     let module_def = match module_rules::load_module(path, module_rules::DEFAULT_MODULES_DIR) {
         Ok(m) => m,
@@ -446,5 +453,45 @@ mod tests {
 
         let mirror = dungeon.rooms.iter().find(|r| r.name == "Freezing Mirror").unwrap();
         assert_eq!(mirror.trap_trigger, TrapTrigger::Action, "mirror trap should be Action");
+    }
+
+    #[test]
+    fn load_module_rejects_during_exploration() {
+        let mut state = GameState::new();
+        let module = sample_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+        state.enter_exploration(dungeon, 1);
+
+        let result = action_load_module(&mut state, "data/modules/sample_crypt/module.json");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(
+            err,
+            EngineError::WrongState(
+                "Cannot load module while in Exploration mode. Save and exit exploration first."
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn load_module_rejects_during_combat() {
+        use crate::model::CombatState;
+        let mut state = GameState::new();
+        let module = sample_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+        state.enter_exploration(dungeon, 1);
+        state.enter_combat(CombatState::new(vec![], 30));
+
+        let result = action_load_module(&mut state, "data/modules/sample_crypt/module.json");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(
+            err,
+            EngineError::WrongState(
+                "Cannot load module while in Exploration mode. Save and exit exploration first."
+                    .to_string()
+            )
+        );
     }
 }
