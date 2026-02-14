@@ -280,7 +280,7 @@ fn query_party_member_data(member: &party::results::PartyMemberSummary, effects:
         alive: member.alive,
         alignment: member.alignment,
         movement_rate: member.movement_rate,
-        effects: effects.iter().map(|e| effect_to_typed(e)).collect(),
+        effects: effects.iter().map(effect_to_typed).collect(),
     }
 }
 
