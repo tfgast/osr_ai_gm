@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::pathutil::normalize_path;
-use crate::state::dungeon::DoorState;
+use crate::state::dungeon::{DoorState, TrapTrigger};
 
 /// A complete adventure module definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +34,10 @@ pub struct ModuleRoom {
     pub treasure: Vec<PlacedTreasure>,
     #[serde(default)]
     pub trap: Option<String>,
+    /// How the trap is triggered: "entry" (auto on room entry, default) or
+    /// "action" (requires character interaction).
+    #[serde(default)]
+    pub trap_trigger: TrapTrigger,
     #[serde(default)]
     pub exits: Vec<ModuleExit>,
 }
@@ -357,6 +361,7 @@ mod tests {
             monsters: Vec::new(),
             treasure: Vec::new(),
             trap: None,
+            trap_trigger: TrapTrigger::Entry,
             exits: vec![ModuleExit {
                 to: "nowhere".to_string(),
                 door: DoorState::Closed,
@@ -381,6 +386,7 @@ mod tests {
             monsters: Vec::new(),
             treasure: Vec::new(),
             trap: None,
+            trap_trigger: TrapTrigger::Entry,
             exits: Vec::new(),
         });
         let module = ModuleDef {
@@ -408,6 +414,7 @@ mod tests {
             monsters: Vec::new(),
             treasure: Vec::new(),
             trap: None,
+            trap_trigger: TrapTrigger::Entry,
             exits: vec![ModuleExit {
                 to: "room_b".to_string(),
                 door: DoorState::Locked,
@@ -419,6 +426,7 @@ mod tests {
             monsters: Vec::new(),
             treasure: Vec::new(),
             trap: None,
+            trap_trigger: TrapTrigger::Entry,
             exits: vec![ModuleExit {
                 to: "room_a".to_string(),
                 door: DoorState::Closed,
@@ -444,6 +452,7 @@ mod tests {
             monsters: Vec::new(),
             treasure: Vec::new(),
             trap: None,
+            trap_trigger: TrapTrigger::Entry,
             exits: vec![ModuleExit {
                 to: "room_b".to_string(),
                 door: DoorState::Locked,
@@ -455,6 +464,7 @@ mod tests {
             monsters: Vec::new(),
             treasure: Vec::new(),
             trap: None,
+            trap_trigger: TrapTrigger::Entry,
             exits: vec![ModuleExit {
                 to: "room_a".to_string(),
                 door: DoorState::Locked,
@@ -490,7 +500,33 @@ mod tests {
         assert!(room.monsters.is_empty());
         assert!(room.treasure.is_empty());
         assert!(room.trap.is_none());
+        assert_eq!(room.trap_trigger, TrapTrigger::Entry);
         assert!(room.exits.is_empty());
+    }
+
+    #[test]
+    fn room_with_action_trap_trigger() {
+        let json = r#"{
+            "name": "Freezing Mirror",
+            "description": "A full-length mirror of dark glass dominates the room.",
+            "trap": "Save vs paralysis or be frozen still",
+            "trap_trigger": "Action",
+            "exits": []
+        }"#;
+        let room: ModuleRoom = serde_json::from_str(json).unwrap();
+        assert_eq!(room.trap, Some("Save vs paralysis or be frozen still".to_string()));
+        assert_eq!(room.trap_trigger, TrapTrigger::Action);
+    }
+
+    #[test]
+    fn room_trap_trigger_defaults_to_entry() {
+        let json = r#"{
+            "name": "Trap Room",
+            "trap": "Pit trap (1d6 damage)",
+            "exits": []
+        }"#;
+        let room: ModuleRoom = serde_json::from_str(json).unwrap();
+        assert_eq!(room.trap_trigger, TrapTrigger::Entry);
     }
 
     #[test]
