@@ -874,6 +874,25 @@ mod tests {
         assert_eq!(state.notes.len(), 1);
         assert!(state.notes[0].starts_with("[RULING]"));
     }
+
+    // --- action_thief_skill_check dead character guard (oag-j3yu1) ---
+
+    #[test]
+    fn thief_skill_check_dead_character_rejected() {
+        let mut state = GameState::new();
+        let mut c = Character::new("Shadow", Class::Thief);
+        c.hp = -1;
+        c.max_hp = 6;
+        state.party.add_member(c);
+        let result = action_thief_skill_check(&state, "Shadow", "open_locks");
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("dead"),
+            "error should mention dead: {}",
+            err_msg
+        );
+    }
 }
 
 pub fn action_thief_skill_check(
@@ -885,6 +904,13 @@ pub fn action_thief_skill_check(
         .party
         .find_member(char_name)
         .ok_or_else(|| no_party_member_err(char_name))?;
+
+    if !character.is_alive() {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is dead and cannot perform actions.",
+            character.name
+        )));
+    }
 
     if !thief::has_thief_skills(character.class) {
         return Err(EngineError::InvalidInput(format!(
