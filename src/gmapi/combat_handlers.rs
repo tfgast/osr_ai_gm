@@ -1,9 +1,8 @@
 use crate::dice;
 use crate::engine::{combat, encounter};
 use crate::gmapi::protocol::GMResponse;
-use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
-use crate::rules::{ability, equipment, monster, thief};
+use crate::rules::{ability, equipment, thief};
 use crate::state::game::GameMode;
 use serde::Serialize;
 
@@ -282,82 +281,10 @@ pub(super) fn spawn_monster(
     count: u32,
     distance: u32,
 ) -> GMResponse {
-    if state.combat.is_some() {
-        return GMResponse::err(id, "combat already active.", state.mode.clone());
+    match combat::action_spawn_monster(state, name, count, distance) {
+        Ok(result) => ok_with_typed_data(id, &state.mode, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
     }
-    let def = match monster::find_monster(name) {
-        Some(d) => d,
-        None => {
-            return GMResponse::err(
-                id,
-                format!(
-                    "unknown monster '{}'. Use SpawnEncounter for custom monsters.",
-                    name
-                ),
-                state.mode.clone(),
-            )
-        }
-    };
-
-    let mut monsters = Vec::new();
-    for i in 0..count {
-        let monster_name = if count > 1 {
-            format!("{} {}", def.name, i + 1)
-        } else {
-            def.name.to_string()
-        };
-        let mut m = Monster::new(&monster_name, &def.hit_dice);
-        // Roll HP from hit dice
-        let hd = crate::rules::attack::parse_monster_hd(&def.hit_dice);
-        let hp = if hd == 0 {
-            // Half HD monsters (kobolds, etc): 1d4
-            match dice::roll_str("1d4") {
-                Ok(r) => r.total.max(1),
-                Err(_) => 2,
-            }
-        } else {
-            match dice::roll_str(&format!("{}d8", hd)) {
-                Ok(r) => r.total.max(1),
-                Err(_) => (hd as i32 * 4).max(1),
-            }
-        };
-        m.hp = hp;
-        m.max_hp = hp;
-        m.ac = def.ac();
-        m.damage = def.damage();
-        m.morale = def.morale;
-        m.xp_value = def.xp();
-        m.attacks = def.attack_names();
-        monsters.push(m);
-    }
-
-    let combat_state = CombatState::new(monsters, distance);
-    let status = combat::combat_status(&combat_state, &state.party.members);
-    state.combat = Some(combat_state);
-    state.pre_combat_mode = Some(state.mode.clone());
-    state.mode = GameMode::Combat;
-
-    let mut msg = format!(
-        "combat started: {} {}(s) at {}' distance.",
-        count, def.name, distance
-    );
-    let special = def.special();
-    if !special.is_empty() {
-        msg.push_str(&format!(" Special: {}", special));
-    }
-
-    GMResponse::ok_with_data(
-        id,
-        msg,
-        state.mode.clone(),
-        serde_json::json!({
-            "status": status,
-            "monster": def.name,
-            "hit_dice": def.hit_dice,
-            "ac": def.ac(),
-            "special": def.special(),
-        }),
-    )
 }
 
 pub(super) fn spawn_npc_party(

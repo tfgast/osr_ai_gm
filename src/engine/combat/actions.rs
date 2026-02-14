@@ -10,7 +10,7 @@ use super::results::{
     AttackResult, CloseResult, CombatLogResult, DeclareSpellResult, EndCombatResult,
     FightingWithdrawalResult, InitiativeResult, InitiativeWinner, MonsterAttackResult,
     MoraleResult, RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome, RetreatResult,
-    SpawnEncounterResult, TurnUndeadResult,
+    SpawnEncounterResult, SpawnMonsterResult, TurnUndeadResult,
 };
 use super::{
     check_morale, close, combat_status, coup_de_grace, declare_spell, fighting_withdrawal,
@@ -93,6 +93,85 @@ pub fn action_spawn_encounter(
         morale,
         distance,
         xp_per_monster,
+        status,
+    })
+}
+
+pub fn action_spawn_monster(
+    state: &mut GameState,
+    name: &str,
+    count: u32,
+    distance: u32,
+) -> Result<SpawnMonsterResult, EngineError> {
+    if state.combat.is_some() {
+        return Err(EngineError::WrongState(
+            "combat already active.".to_string(),
+        ));
+    }
+
+    let def = monster_db::find_monster(name).ok_or_else(|| {
+        EngineError::InvalidInput(format!(
+            "unknown monster '{}'. Use SpawnEncounter for custom monsters.",
+            name
+        ))
+    })?;
+
+    let mut monsters = Vec::new();
+    for i in 0..count {
+        let monster_name = if count > 1 {
+            format!("{} {}", def.name, i + 1)
+        } else {
+            def.name.to_string()
+        };
+        let mut m = Monster::new(&monster_name, &def.hit_dice);
+        let hd = crate::rules::attack::parse_monster_hd(&def.hit_dice);
+        let hp = if hd == 0 {
+            match crate::dice::roll_str("1d4") {
+                Ok(r) => r.total.max(1),
+                Err(_) => 2,
+            }
+        } else {
+            match crate::dice::roll_str(&format!("{}d8", hd)) {
+                Ok(r) => r.total.max(1),
+                Err(_) => (hd as i32 * 4).max(1),
+            }
+        };
+        m.hp = hp;
+        m.max_hp = hp;
+        m.ac = def.ac();
+        m.damage = def.damage();
+        m.morale = def.morale;
+        m.xp_value = def.xp();
+        m.attacks = def.attack_names();
+        monsters.push(m);
+    }
+
+    let combat_state = CombatState::new(monsters, distance);
+    let status = combat_status(&combat_state, &state.party.members);
+    state.combat = Some(combat_state);
+    state.pre_combat_mode = Some(state.mode.clone());
+    state.mode = GameMode::Combat;
+
+    let special = def.special();
+    let mut msg = format!(
+        "combat started: {} {}(s) at {}' distance.",
+        count, def.name, distance
+    );
+    if !special.is_empty() {
+        msg.push_str(&format!(" Special: {}", special));
+    }
+
+    Ok(SpawnMonsterResult {
+        message: msg,
+        monster_name: def.name.to_string(),
+        count,
+        hit_dice: def.hit_dice.clone(),
+        ac: def.ac(),
+        damage: def.damage(),
+        morale: def.morale,
+        distance,
+        xp_per_monster: def.xp(),
+        special,
         status,
     })
 }

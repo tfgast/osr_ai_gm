@@ -8,6 +8,25 @@ use super::morale::MoraleResult as CoreMoraleResult;
 use super::movement::RetreatResult as CoreRetreatResult;
 use super::turn_undead::TurnUndeadResult as CoreTurnUndeadResult;
 
+/// Typed success payload for `spawn_monster` (by bestiary name).
+#[derive(Debug, Clone, Serialize)]
+pub struct SpawnMonsterResult {
+    #[serde(skip_serializing)]
+    pub message: String,
+    #[serde(rename = "monster")]
+    pub monster_name: String,
+    pub count: u32,
+    pub hit_dice: String,
+    pub ac: i32,
+    pub damage: String,
+    pub morale: u32,
+    pub distance: u32,
+    pub xp_per_monster: u64,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub special: String,
+    pub status: String,
+}
+
 /// Typed success payload for `spawn_encounter`.
 #[derive(Debug, Clone, Serialize)]
 pub struct SpawnEncounterResult {
