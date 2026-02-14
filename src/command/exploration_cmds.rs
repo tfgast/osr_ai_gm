@@ -19,7 +19,12 @@ impl Command for EnterDungeonCommand {
         let room_name = if args.len() > 1 { args[1..].join(" ") } else { "Entrance".to_string() };
 
         match exploration::action_enter_dungeon(state, level, &room_name) {
-            Ok(result) => CommandResult::ok(result.message),
+            Ok(result) => CommandResult::ok(format!(
+                "Entered dungeon level {}. Starting room: {}.\n\
+                 Use 'light torch <carrier>' or 'light lantern <carrier>' to light the way.\n\
+                 Use 'explore' to advance a dungeon turn.",
+                result.level, result.room_name
+            )),
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
@@ -117,7 +122,7 @@ impl Command for AddRoomCommand {
         };
         let name = args[1..].join(" ");
         match exploration::action_add_room(state, id, &name) {
-            Ok(result) => CommandResult::ok(result.message),
+            Ok(result) => CommandResult::ok(format!("Added room {}: {}", result.room_id, result.name)),
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
@@ -154,7 +159,10 @@ impl Command for AddDoorCommand {
             DoorState::default()
         };
         match exploration::action_add_door(state, id, room_a, room_b, door_state) {
-            Ok(result) => CommandResult::ok(result.message),
+            Ok(result) => CommandResult::ok(format!(
+                "Added door {} between rooms {} and {} ({:?})",
+                result.door_id, result.room_a, result.room_b, result.door_state
+            )),
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
@@ -204,7 +212,7 @@ impl Command for RestCommand {
     fn help(&self) -> &str { "Rest for one turn (required after 5 turns of activity)" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
         match exploration::action_rest(state) {
-            Ok(result) => CommandResult::ok(result.message),
+            Ok(_result) => CommandResult::ok("Party rests for one turn. Activity counter reset."),
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
