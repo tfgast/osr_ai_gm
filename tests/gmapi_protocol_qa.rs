@@ -800,9 +800,13 @@ fn monster_attack_happy_path() {
     setup_combat(&mut state);
 
     let initial_hp = state.party.find_member("Aldric").unwrap().hp;
-    // Retry until a hit to ensure damage is actually verified
+    // Retry once per round until a hit to ensure damage is actually verified
     let mut hit_verified = false;
     for i in 0..100 {
+        // Each round: roll initiative, then monster attacks once
+        let resp = handle_request(&req(&format!("init_{}", i), GMCommand::RollInitiative), &mut state);
+        assert!(resp.success);
+
         state.party.find_member_mut("Aldric").unwrap().hp = initial_hp;
         let resp = handle_request(&req(&format!("ma1_{}", i), GMCommand::MonsterAttack {
             monster_idx: 0,
