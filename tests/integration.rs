@@ -1090,16 +1090,13 @@ fn monster_attack_api_damages_character() {
     }), &mut state);
     assert!(resp.success);
 
-    let resp = handle_request(&req("2", GMCommand::RollInitiative), &mut state);
-    assert!(resp.success);
-
-    let initial_hp = state.party.find_member("Bruiser").unwrap().hp;
-
-    // Monster attacks repeatedly until a hit
+    // Monster attacks once per round until a hit
     let mut hit_landed = false;
     for i in 0..100 {
-        // Reset HP for each attempt
-        state.party.find_member_mut("Bruiser").unwrap().hp = initial_hp;
+        let resp = handle_request(&req(&format!("init{}", i), GMCommand::RollInitiative), &mut state);
+        assert!(resp.success);
+
+        let initial_hp = state.party.find_member("Bruiser").unwrap().hp;
         let resp = handle_request(&req(&format!("a{}", i), GMCommand::MonsterAttack {
             monster_idx: 0,
             character: "Bruiser".to_string(),

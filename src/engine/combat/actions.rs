@@ -283,6 +283,12 @@ pub fn action_monster_attack(
                 combat.monsters[monster_idx].name
             )));
         }
+        if combat.monsters_attacked_this_round.contains(&monster_idx) {
+            return Err(EngineError::InvalidInput(format!(
+                "{} has already attacked this round.",
+                combat.monsters[monster_idx].name
+            )));
+        }
     }
 
     let character = state.party.find_member_mut(char_name).ok_or_else(|| {
@@ -297,6 +303,7 @@ pub fn action_monster_attack(
 
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
     let result = monster_attack(combat, monster_idx, character);
+    combat.monsters_attacked_this_round.insert(monster_idx);
     Ok(MonsterAttackResult::from(result))
 }
 
@@ -859,6 +866,59 @@ mod tests {
         let result = action_roll_initiative(&mut state);
         assert!(result.is_ok(), "second initiative failed: {:?}", result.err());
         assert_eq!(state.combat.as_ref().unwrap().round, 2);
+    }
+
+    // --- monster_attack duplicate guard (oag-1vpmj) ---
+
+    #[test]
+    fn monster_attack_twice_same_round_is_rejected() {
+        let mut state = state_with_melee_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        // First attack should succeed
+        let result = action_monster_attack(&mut state, 0, "Grond");
+        assert!(result.is_ok(), "first monster attack should succeed");
+
+        // Second attack by same monster in same round should fail
+        let result = action_monster_attack(&mut state, 0, "Grond");
+        assert!(result.is_err(), "second monster attack should be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("already attacked this round"),
+            "expected 'already attacked' guard, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn different_monsters_can_attack_same_round() {
+        let mut state = state_with_melee_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        // Monster 0 attacks
+        let result = action_monster_attack(&mut state, 0, "Grond");
+        assert!(result.is_ok(), "monster 0 attack should succeed");
+
+        // Monster 1 attacks (different monster, same round) — should succeed
+        let result = action_monster_attack(&mut state, 1, "Grond");
+        assert!(result.is_ok(), "monster 1 attack should succeed");
+    }
+
+    #[test]
+    fn monster_attack_allowed_after_new_round() {
+        let mut state = state_with_melee_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        // Monster attacks in round 1
+        let result = action_monster_attack(&mut state, 0, "Grond");
+        assert!(result.is_ok());
+
+        // New round
+        let _ = action_roll_initiative(&mut state);
+
+        // Same monster attacks again in round 2 — should succeed
+        let result = action_monster_attack(&mut state, 0, "Grond");
+        assert!(result.is_ok(), "monster should be allowed to attack in new round");
     }
 
     #[test]

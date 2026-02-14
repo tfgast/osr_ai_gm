@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 use crate::rules::alignment::Alignment;
 use crate::rules::attack::HitDice;
@@ -269,6 +271,9 @@ pub struct CombatState {
     /// Combat log length after the last initiative roll (to detect repeated rolls).
     #[serde(default)]
     pub log_len_at_initiative: usize,
+    /// Monsters that have already attacked this round (by index).
+    #[serde(default)]
+    pub monsters_attacked_this_round: HashSet<usize>,
 }
 
 impl CombatState {
@@ -288,6 +293,7 @@ impl CombatState {
             half_killed_checked: false,
             initial_monster_count: initial_count,
             log_len_at_initiative: 0,
+            monsters_attacked_this_round: HashSet::new(),
         }
     }
 
