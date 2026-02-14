@@ -796,7 +796,7 @@ pub fn action_backstab(
             Ok(r) => r.total.max(1),
             Err(_) => 1,
         };
-        let total_damage = (base_damage.saturating_add(str_mod)).max(1).saturating_mul(multiplier as i32);
+        let total_damage = base_damage.saturating_mul(multiplier as i32).saturating_add(str_mod).max(1);
         combat.monsters[monster_idx].hp -= total_damage;
         let monster_name = combat.monsters[monster_idx].name.clone();
         let alive = combat.monsters[monster_idx].is_alive();
@@ -1371,5 +1371,80 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("already acted"), "got: {}", err);
+    }
+
+    // --- backstab damage cap (oag-bxwm9) ---
+
+    fn test_thief(name: &str, str_score: i32) -> Character {
+        let mut c = Character::new(name, Class::Thief);
+        c.hp = 6;
+        c.max_hp = 6;
+        c.ac = 6;
+        c.level = 1;
+        c.abilities.strength = str_score;
+        c
+    }
+
+    #[test]
+    fn backstab_damage_does_not_exceed_weapon_max_times_multiplier_plus_str() {
+        // Short sword = 1d6, level 1 = x2 multiplier, STR 10 = +0 mod
+        // Max damage should be 6*2 + 0 = 12
+        let max_expected = 12;
+        let mut state = GameState::new();
+        state.party.add_member(test_thief("Stabby", 10));
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Dummy", "10", 999, 9, 7)], // high HP so it survives
+            5,
+        ));
+
+        for _ in 0..200 {
+            state.combat.as_mut().unwrap().monsters[0].hp = 999;
+            state.combat.as_mut().unwrap().characters_acted.clear();
+            let result = action_backstab(&mut state, "Stabby", 0, "Short sword");
+            assert!(result.is_ok(), "backstab failed: {:?}", result.err());
+            let result = result.unwrap();
+            if result.hit {
+                let dmg = result.damage.unwrap();
+                assert!(dmg <= max_expected,
+                    "backstab damage {} exceeds max {} (1d6 x2 + STR 10 mod 0)",
+                    dmg, max_expected);
+                assert!(dmg >= 2,
+                    "backstab damage {} below minimum 2 (1*2 + 0)", dmg);
+            }
+        }
+    }
+
+    #[test]
+    fn backstab_str_mod_not_multiplied() {
+        // Short sword = 1d6, level 1 = x2 multiplier, STR 18 = +3 mod
+        // Correct max: 6*2 + 3 = 15 (multiplier on dice only)
+        // Wrong max (old bug): (6+3)*2 = 18
+        let max_correct = 15;
+        let mut state = GameState::new();
+        state.party.add_member(test_thief("Strong Thief", 18));
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(
+            vec![mk_monster("Dummy", "10", 999, 9, 7)],
+            5,
+        ));
+
+        for _ in 0..200 {
+            state.combat.as_mut().unwrap().monsters[0].hp = 999;
+            state.combat.as_mut().unwrap().characters_acted.clear();
+            let result = action_backstab(&mut state, "Strong Thief", 0, "Short sword");
+            assert!(result.is_ok());
+            let result = result.unwrap();
+            if result.hit {
+                let dmg = result.damage.unwrap();
+                assert!(dmg <= max_correct,
+                    "backstab damage {} exceeds correct max {} — STR mod may be multiplied (1d6 x2 + STR 18 mod +3)",
+                    dmg, max_correct);
+                assert!(dmg >= 5,
+                    "backstab damage {} below minimum 5 (1*2 + 3)", dmg);
+            }
+        }
     }
 }
