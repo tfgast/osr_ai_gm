@@ -7,11 +7,11 @@ use crate::state::time::LightSourceKind;
 use super::results::{
     AddDoorResult, AddRoomResult, AdvanceDungeonTurnResult, EnterDungeonResult, ForceDoorResult,
     ExplorationStatusResult, ListenAtDoorResult, LightResult, MoveThroughDoorResult,
-    OpenDoorResult, RestResult, SearchRoomResult,
+    OpenDoorResult, PickLockResult, RestResult, SearchRoomResult,
 };
 use super::{
     advance_dungeon_turn, exploration_status, force_door, listen_at_door, move_through_door,
-    search_room,
+    pick_lock, search_room,
 };
 
 pub fn action_move_through_door(
@@ -89,6 +89,29 @@ pub fn action_force_door(
         door_id,
         character: character.name,
         forced_open,
+    })
+}
+
+pub fn action_pick_lock(
+    state: &mut GameState,
+    door_id: u32,
+    char_name: &str,
+) -> Result<PickLockResult, EngineError> {
+    let character = state.party.find_member(char_name).cloned().ok_or_else(|| {
+        EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
+    })?;
+    let dungeon = state
+        .dungeon
+        .as_mut()
+        .ok_or_else(|| EngineError::WrongState("no dungeon state.".to_string()))?;
+
+    let result = pick_lock(dungeon, door_id, &character);
+
+    Ok(PickLockResult {
+        message: result.message,
+        door_id,
+        character: character.name,
+        success: result.success,
     })
 }
 

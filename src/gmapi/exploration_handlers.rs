@@ -113,6 +113,13 @@ pub(super) fn force_door(id: &str, state: &mut GameState, door_id: u32, char_nam
     }
 }
 
+pub(super) fn pick_lock(id: &str, state: &mut GameState, door_id: u32, char_name: &str) -> GMResponse {
+    match exploration::action_pick_lock(state, door_id, char_name) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode.clone()),
+    }
+}
+
 pub(super) fn listen(id: &str, state: &mut GameState, is_demihuman: bool) -> GMResponse {
     match exploration::action_listen_at_door(state, is_demihuman) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),

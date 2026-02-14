@@ -83,6 +83,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::LoadModule { path } => exploration_handlers::load_module(id, state, path),
         GMCommand::OpenDoor { door_id } => exploration_handlers::open_door(id, state, *door_id),
         GMCommand::ForceDoor { door_id, character } => exploration_handlers::force_door(id, state, *door_id, character),
+        GMCommand::PickLock { door_id, character } => exploration_handlers::pick_lock(id, state, *door_id, character),
         GMCommand::Listen { is_demihuman } => exploration_handlers::listen(id, state, *is_demihuman),
         GMCommand::Rest => exploration_handlers::rest(id, state),
 

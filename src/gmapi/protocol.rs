@@ -159,6 +159,8 @@ pub enum GMCommand {
     OpenDoor { door_id: u32 },
     /// Force open a stuck or closed door using a party member.
     ForceDoor { door_id: u32, character: String },
+    /// Pick a locked door using thief open_locks skill.
+    PickLock { door_id: u32, character: String },
     /// Listen at a door (1-in-6, demihumans 2-in-6). Takes one turn.
     Listen {
         #[serde(default)]
@@ -502,6 +504,7 @@ impl GMCommand {
             GMCommand::Light { carrier, .. } => check_len("carrier", carrier, 128),
             GMCommand::LoadModule { path } => check_len("path", path, 512),
             GMCommand::ForceDoor { character, .. } => check_len("character", character, 128),
+            GMCommand::PickLock { character, .. } => check_len("character", character, 128),
             GMCommand::AwardXp { character, .. } => check_len("character", character, 128),
             GMCommand::AwardTreasureXp { character, .. } => check_len("character", character, 128),
             GMCommand::ThiefSkillCheck { character, skill } => {

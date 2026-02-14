@@ -108,6 +108,15 @@ pub struct OpenDoorResult {
     pub moved: bool,
 }
 
+/// Typed success payload for `pick_lock`.
+#[derive(Debug, Clone, Serialize)]
+pub struct PickLockResult {
+    pub message: String,
+    pub door_id: u32,
+    pub character: String,
+    pub success: bool,
+}
+
 /// Typed success payload for `exploration_status`.
 #[derive(Debug, Clone, Serialize)]
 pub struct ExplorationStatusResult {
