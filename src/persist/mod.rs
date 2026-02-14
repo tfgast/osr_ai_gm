@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::engine::retainer::Retainer;
 use crate::model::{Party, CombatState};
+use crate::pathutil::normalize_path;
 use crate::state::dungeon::DungeonState;
 use crate::state::game::GameMode;
 use crate::state::time::TimeTracker;
@@ -82,6 +83,11 @@ pub fn saves_dir() -> io::Result<PathBuf> {
 ///
 /// Rejects path separators and `..` components to prevent path traversal.
 /// Appends `.json` if the filename has no extension.
+///
+/// Defense-in-depth: after joining the filename to the saves directory, the
+/// resolved path is normalized and verified to still reside within the saves
+/// directory. This catches any unexpected path resolution behavior that the
+/// character-level checks might miss.
 pub fn safe_save_path(filename: &str) -> io::Result<PathBuf> {
     let filename = filename.trim();
     if filename.is_empty() {
@@ -96,12 +102,30 @@ pub fn safe_save_path(filename: &str) -> io::Result<PathBuf> {
             "filename must be a simple name, not a path",
         ));
     }
+    if filename.contains('\0') {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "filename must not contain null bytes",
+        ));
+    }
     let mut name = filename.to_string();
     if !name.ends_with(".json") {
         name.push_str(".json");
     }
     let dir = saves_dir()?;
-    Ok(dir.join(name))
+    let path = dir.join(&name);
+
+    // Defense-in-depth: verify the resolved path stays within the saves directory.
+    let normalized = normalize_path(&path);
+    let base_normalized = normalize_path(&dir);
+    if !normalized.starts_with(&base_normalized) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "resolved save path escapes the saves directory",
+        ));
+    }
+
+    Ok(path)
 }
 
 /// Save game state to a JSON file.
@@ -239,6 +263,61 @@ mod tests {
     fn safe_save_path_rejects_whitespace_only() {
         let result = safe_save_path("   ");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_save_path_rejects_null_bytes() {
+        let result = safe_save_path("save\0evil");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("null bytes"));
+    }
+
+    #[test]
+    fn safe_save_path_rejects_embedded_dotdot() {
+        // ".." anywhere in the string is rejected
+        let result = safe_save_path("foo..bar");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_save_path_rejects_absolute_unix() {
+        let result = safe_save_path("/etc/passwd");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_save_path_rejects_absolute_with_dotdot() {
+        let result = safe_save_path("/../../../etc/shadow");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn safe_save_path_trims_and_validates() {
+        let path = safe_save_path("  mycamp  ").unwrap();
+        assert!(path.ends_with("mycamp.json"));
+    }
+
+    #[test]
+    fn safe_save_path_allows_dashes_and_underscores() {
+        let path = safe_save_path("my-save_file").unwrap();
+        assert!(path.ends_with("my-save_file.json"));
+    }
+
+    #[test]
+    fn safe_save_path_allows_unicode_names() {
+        let path = safe_save_path("campagne_épée").unwrap();
+        assert!(path.ends_with("campagne_épée.json"));
+    }
+
+    #[test]
+    fn safe_save_path_result_inside_saves_dir() {
+        let path = safe_save_path("test_save").unwrap();
+        let saves = saves_dir().unwrap();
+        assert!(
+            path.starts_with(&saves),
+            "save path {:?} must be inside saves dir {:?}",
+            path, saves
+        );
     }
 
     #[test]
