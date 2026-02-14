@@ -1,4 +1,6 @@
-use crate::engine::inventory::results::{BuyResult, DropResult, EquipResult, LootResult};
+use crate::engine::inventory::results::{
+    BuyResult, DropResult, EquipResult, EquipmentEntry, ListEquipmentResult, LootResult,
+};
 use crate::engine::result::EngineError;
 use crate::model::Item;
 use crate::persist::GameState;
@@ -265,6 +267,54 @@ pub fn action_loot(
     })
 }
 
+/// List all buyable equipment from the equipment tables.
+pub fn action_list_equipment() -> ListEquipmentResult {
+    let weapons: Vec<EquipmentEntry> = equipment::weapons()
+        .iter()
+        .filter(|w| w.cost_gp() > 0)
+        .map(|w| EquipmentEntry {
+            name: w.name.clone(),
+            cost_gp: w.cost_gp(),
+            category: w.category.clone(),
+        })
+        .collect();
+
+    let armour: Vec<EquipmentEntry> = equipment::armour()
+        .iter()
+        .filter(|a| a.cost_gp() > 0)
+        .map(|a| EquipmentEntry {
+            name: a.name.clone(),
+            cost_gp: a.cost_gp(),
+            category: a.category.clone(),
+        })
+        .collect();
+
+    let gear: Vec<EquipmentEntry> = equipment::gear()
+        .iter()
+        .map(|g| EquipmentEntry {
+            name: g.name.clone(),
+            cost_gp: g.cost_gp(),
+            category: g.category.clone(),
+        })
+        .collect();
+
+    let ammunition: Vec<EquipmentEntry> = equipment::ammunition()
+        .iter()
+        .map(|a| EquipmentEntry {
+            name: a.name.clone(),
+            cost_gp: a.cost_gp(),
+            category: a.category.clone(),
+        })
+        .collect();
+
+    ListEquipmentResult {
+        weapons,
+        armour,
+        gear,
+        ammunition,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,5 +414,43 @@ mod tests {
         let err = action_loot(&mut state, "Aldric", "Diamond", None)
             .expect_err("missing room item should fail");
         assert!(err.to_string().contains("no lootable item"));
+    }
+
+    #[test]
+    fn list_equipment_has_items() {
+        let result = action_list_equipment();
+        assert!(!result.weapons.is_empty(), "should have weapons");
+        assert!(!result.armour.is_empty(), "should have armour");
+        assert!(!result.gear.is_empty(), "should have gear");
+        assert!(!result.ammunition.is_empty(), "should have ammunition");
+    }
+
+    #[test]
+    fn list_equipment_contains_sword() {
+        let result = action_list_equipment();
+        assert!(
+            result.weapons.iter().any(|w| w.name == "Sword"),
+            "weapons should contain Sword"
+        );
+    }
+
+    #[test]
+    fn list_equipment_contains_chainmail() {
+        let result = action_list_equipment();
+        assert!(
+            result.armour.iter().any(|a| a.name == "Chainmail"),
+            "armour should contain Chainmail"
+        );
+    }
+
+    #[test]
+    fn list_equipment_all_have_cost() {
+        let result = action_list_equipment();
+        for w in &result.weapons {
+            assert!(w.cost_gp > 0, "weapon {} should have cost > 0", w.name);
+        }
+        for a in &result.armour {
+            assert!(a.cost_gp > 0, "armour {} should have cost > 0", a.name);
+        }
     }
 }

@@ -69,6 +69,7 @@ fn resolve_alias(name: &str) -> &str {
         "inventory" | "i" => "party",
         "examine" => "party",
         "take" | "grab" | "pick" => "loot",
+        "equipment" | "store" | "list_equipment" => "shop",
         "level_up" | "levelup" => "train",
         _ => name,
     }

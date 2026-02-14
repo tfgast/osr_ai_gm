@@ -306,6 +306,14 @@ pub enum GMCommand {
         value_gp: Option<u32>,
     },
 
+    // -- Inventory queries --
+    /// List all available equipment for purchase (weapons, armour, gear, ammunition).
+    ListEquipment {
+        /// Optional category filter: "weapons", "armour", "gear", or "ammunition".
+        #[serde(default)]
+        category: Option<String>,
+    },
+
     // -- Lookup & reference --
     /// Look up a magic item by name.
     LookupItem { name: String },
@@ -522,6 +530,13 @@ impl GMCommand {
             GMCommand::Loot { character, item_name, .. } => {
                 check_len("character", character, 128)?;
                 check_len("item_name", item_name, 128)
+            }
+            GMCommand::ListEquipment { category } => {
+                if let Some(c) = category {
+                    check_len("category", c, 128)
+                } else {
+                    Ok(())
+                }
             }
             GMCommand::LookupItem { name } => check_len("name", name, 128),
             GMCommand::SearchItems { query } => check_len("query", query, 128),
@@ -1112,6 +1127,28 @@ mod tests {
         match &req.command {
             GMCommand::RollTreasure { letter } => assert_eq!(letter, "P"),
             _ => panic!("expected RollTreasure"),
+        }
+    }
+
+    #[test]
+    fn parse_list_equipment() {
+        let json = r#"{"id":"le1","command":{"type":"ListEquipment","params":{}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "le1");
+        match &req.command {
+            GMCommand::ListEquipment { category } => assert!(category.is_none()),
+            _ => panic!("expected ListEquipment"),
+        }
+    }
+
+    #[test]
+    fn parse_list_equipment_with_category() {
+        let json = r#"{"id":"le2","command":{"type":"ListEquipment","params":{"category":"weapons"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "le2");
+        match &req.command {
+            GMCommand::ListEquipment { category } => assert_eq!(category.as_deref(), Some("weapons")),
+            _ => panic!("expected ListEquipment"),
         }
     }
 

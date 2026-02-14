@@ -84,6 +84,68 @@ impl Command for LootCommand {
     }
 }
 
+pub struct ShopCommand;
+impl Command for ShopCommand {
+    fn name(&self) -> &str {
+        "shop"
+    }
+    fn help(&self) -> &str {
+        "List available equipment for purchase (shop [category])"
+    }
+    fn execute(&self, args: &[&str], _state: &mut GameState) -> CommandResult {
+        let result = inventory::action_list_equipment();
+        let filter = if args.is_empty() {
+            None
+        } else {
+            Some(args.join(" ").to_lowercase())
+        };
+
+        let mut output = String::new();
+
+        let show_section = |out: &mut String,
+                            title: &str,
+                            items: &[inventory::results::EquipmentEntry]| {
+            if items.is_empty() {
+                return;
+            }
+            out.push_str(&format!("=== {} ===\n", title));
+            for item in items {
+                out.push_str(&format!("  {:30} {:>4} gp\n", item.name, item.cost_gp));
+            }
+            out.push('\n');
+        };
+
+        let show_all = filter.is_none();
+        let cat = filter.as_deref().unwrap_or("");
+
+        if show_all || cat == "weapons" || cat == "weapon" {
+            show_section(&mut output, "Weapons", &result.weapons);
+        }
+        if show_all || cat == "armour" || cat == "armor" {
+            show_section(&mut output, "Armour", &result.armour);
+        }
+        if show_all || cat == "gear" || cat == "adventuring gear" {
+            show_section(&mut output, "Adventuring Gear", &result.gear);
+        }
+        if show_all || cat == "ammunition" || cat == "ammo" {
+            show_section(&mut output, "Ammunition", &result.ammunition);
+        }
+
+        if output.is_empty() {
+            return CommandResult::error(format!(
+                "unknown category '{}'. Try: weapons, armour, gear, ammunition",
+                cat
+            ));
+        }
+
+        let total =
+            result.weapons.len() + result.armour.len() + result.gear.len() + result.ammunition.len();
+        output.push_str(&format!("{} items available. Use 'buy <character> <item>' to purchase.", total));
+
+        CommandResult::ok(output)
+    }
+}
+
 pub struct EquipCommand;
 impl Command for EquipCommand {
     fn name(&self) -> &str {
@@ -365,5 +427,40 @@ mod tests {
         let result = cmd.execute(&["Aldric", "Old", "key"], &mut state);
         assert!(result.output.contains("picks up Old key"));
         assert!(!result.output.contains("gp"));
+    }
+
+    #[test]
+    fn shop_lists_all_categories() {
+        let cmd = ShopCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&[], &mut state);
+        assert!(result.success);
+        assert!(result.output.contains("Weapons"));
+        assert!(result.output.contains("Armour"));
+        assert!(result.output.contains("Adventuring Gear"));
+        assert!(result.output.contains("Ammunition"));
+        assert!(result.output.contains("Sword"));
+        assert!(result.output.contains("Chainmail"));
+        assert!(result.output.contains("items available"));
+    }
+
+    #[test]
+    fn shop_filters_by_category() {
+        let cmd = ShopCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&["weapons"], &mut state);
+        assert!(result.success);
+        assert!(result.output.contains("Weapons"));
+        assert!(!result.output.contains("Armour"));
+        assert!(result.output.contains("Sword"));
+    }
+
+    #[test]
+    fn shop_invalid_category() {
+        let cmd = ShopCommand;
+        let mut state = GameState::new();
+        let result = cmd.execute(&["potions"], &mut state);
+        assert!(!result.success);
+        assert!(result.output.contains("unknown category"));
     }
 }
