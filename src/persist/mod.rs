@@ -223,10 +223,11 @@ pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
     let parent = path.parent().unwrap_or(Path::new("."));
     fs::create_dir_all(parent)?;
     let tmp_path = parent.join(format!(
-        ".{}.tmp",
+        ".{}.{}.tmp",
         path.file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("save")
+            .unwrap_or("save"),
+        std::process::id()
     ));
     fs::write(&tmp_path, &json)?;
     if let Err(e) = fs::rename(&tmp_path, path) {
@@ -444,7 +445,7 @@ mod tests {
         // Create a directory at the target path so rename(file -> dir) fails.
         let target = dir.join("save.json");
         fs::create_dir(&target).unwrap();
-        let tmp_path = dir.join(".save.json.tmp");
+        let tmp_path = dir.join(format!(".save.json.{}.tmp", std::process::id()));
 
         let state = GameState::new();
         let result = save(&state, &target);
