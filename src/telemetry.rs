@@ -48,6 +48,7 @@ fn log_to_path(entry: &FailedCommand, path: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::lock_env;
 
     #[test]
     fn reconstruct_input_no_args() {
@@ -129,6 +130,7 @@ mod tests {
 
     #[test]
     fn telemetry_dir_respects_osr_data_dir() {
+        let _env = lock_env();
         let orig = std::env::var("OSR_DATA_DIR").ok();
         unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
 

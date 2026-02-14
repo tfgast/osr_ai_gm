@@ -115,6 +115,7 @@ fn now_iso8601() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::lock_env;
 
     #[test]
     fn generate_token_length() {
@@ -193,6 +194,7 @@ mod tests {
 
     #[test]
     fn default_path_respects_osr_data_dir() {
+        let _env = lock_env();
         let orig = std::env::var("OSR_DATA_DIR").ok();
         unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
 

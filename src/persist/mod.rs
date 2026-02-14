@@ -266,6 +266,7 @@ mod tests {
     use super::*;
     use crate::model::Character;
     use crate::rules::class::Class;
+    use crate::test_util::lock_env;
     use std::path::PathBuf;
 
     #[test]
@@ -303,13 +304,22 @@ mod tests {
 
     #[test]
     fn safe_save_path_simple_name() {
+        let _env = lock_env();
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::remove_var("OSR_DATA_DIR") };
+
         let path = safe_save_path("mycamp").unwrap();
         assert!(path.ends_with("mycamp.json"));
         assert!(path.to_str().unwrap().contains(".osr_data/saves/"));
+
+        if let Some(v) = orig {
+            unsafe { std::env::set_var("OSR_DATA_DIR", v) };
+        }
     }
 
     #[test]
     fn safe_save_path_already_has_json() {
+        let _env = lock_env();
         let path = safe_save_path("mycamp.json").unwrap();
         assert!(path.ends_with("mycamp.json"));
         // Should not double-append .json
@@ -375,24 +385,28 @@ mod tests {
 
     #[test]
     fn safe_save_path_trims_and_validates() {
+        let _env = lock_env();
         let path = safe_save_path("  mycamp  ").unwrap();
         assert!(path.ends_with("mycamp.json"));
     }
 
     #[test]
     fn safe_save_path_allows_dashes_and_underscores() {
+        let _env = lock_env();
         let path = safe_save_path("my-save_file").unwrap();
         assert!(path.ends_with("my-save_file.json"));
     }
 
     #[test]
     fn safe_save_path_allows_unicode_names() {
+        let _env = lock_env();
         let path = safe_save_path("campagne_épée").unwrap();
         assert!(path.ends_with("campagne_épée.json"));
     }
 
     #[test]
     fn safe_save_path_result_inside_saves_dir() {
+        let _env = lock_env();
         let path = safe_save_path("test_save").unwrap();
         let saves = saves_dir().unwrap();
         assert!(
@@ -404,6 +418,7 @@ mod tests {
 
     #[test]
     fn export_live_state_roundtrip() {
+        let _env = lock_env();
         // Use OSR_DATA_DIR to isolate this test from the real home directory.
         let dir = std::env::temp_dir().join("osr_live_state_test");
         let _ = fs::remove_dir_all(&dir);
@@ -588,6 +603,7 @@ mod tests {
 
     #[test]
     fn data_dir_uses_osr_data_dir_when_set() {
+        let _env = lock_env();
         let orig = std::env::var("OSR_DATA_DIR").ok();
         unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
 
@@ -602,6 +618,7 @@ mod tests {
 
     #[test]
     fn data_dir_falls_back_to_home() {
+        let _env = lock_env();
         let orig = std::env::var("OSR_DATA_DIR").ok();
         unsafe { std::env::remove_var("OSR_DATA_DIR") };
 
@@ -616,6 +633,7 @@ mod tests {
 
     #[test]
     fn saves_dir_respects_osr_data_dir() {
+        let _env = lock_env();
         let orig = std::env::var("OSR_DATA_DIR").ok();
         unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
 
@@ -630,6 +648,7 @@ mod tests {
 
     #[test]
     fn live_state_path_respects_osr_data_dir() {
+        let _env = lock_env();
         let orig = std::env::var("OSR_DATA_DIR").ok();
         unsafe { std::env::set_var("OSR_DATA_DIR", "/tmp/custom_osr") };
 
