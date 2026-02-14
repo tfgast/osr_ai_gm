@@ -253,6 +253,9 @@ pub struct CombatState {
     /// Characters who declared spells this round (for disruption tracking).
     #[serde(default)]
     pub spell_declarations: Vec<String>,
+    /// Pending spells: (character_name, spell_name) for resolution during magic phase.
+    #[serde(default)]
+    pub pending_spells: Vec<(String, String)>,
     /// Characters whose spells were disrupted this round.
     #[serde(default)]
     pub disrupted: Vec<String>,
@@ -290,6 +293,7 @@ impl CombatState {
             distance,
             log: Vec::new(),
             spell_declarations: Vec::new(),
+            pending_spells: Vec::new(),
             disrupted: Vec::new(),
             phase: CombatPhase::Declaration,
             first_death_checked: false,

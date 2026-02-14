@@ -17,6 +17,7 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
     combat.monster_initiative = monsters;
     combat.round += 1;
     combat.spell_declarations.clear();
+    combat.pending_spells.clear();
     combat.disrupted.clear();
     combat.monsters_attacked_this_round.clear();
     combat.characters_acted.clear();
@@ -40,6 +41,7 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
 /// If the caster takes damage before the magic phase, the spell is disrupted.
 pub fn declare_spell(combat: &mut CombatState, character_name: &str, spell_name: &str) {
     combat.spell_declarations.push(character_name.to_string());
+    combat.pending_spells.push((character_name.to_string(), spell_name.to_string()));
     combat.log.push(format!("{} declares: casting {}", character_name, spell_name));
 }
 
