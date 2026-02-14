@@ -2658,11 +2658,18 @@ fn playtest2c_travel_to_current_hex() {
     }), &mut state);
     assert!(resp.success);
 
-    // Travel to (0,0) — the current position
+    let rations_before = state.party.rations;
+    let day_before = state.wilderness.as_ref().unwrap().travel_day;
+
+    // Travel to (0,0) — the current position: should be a no-op
     let resp = handle_request(&req("2", GMCommand::Travel { x: 0, y: 0 }), &mut state);
-    // Behavior: should either reject or be a no-op. Document actual behavior.
-    // Not crashing is the minimum bar.
-    let _ = resp; // Don't assert success/failure — just verify no panic
+    assert!(resp.success, "travel to current hex should succeed as a no-op");
+    assert!(resp.message.contains("Already at"), "should report already at position: {}", resp.message);
+
+    // No resources consumed
+    assert_eq!(state.party.rations, rations_before, "rations should not be consumed");
+    assert_eq!(state.wilderness.as_ref().unwrap().travel_day, day_before,
+        "travel day should not advance");
 }
 
 /// oag-0knyk: Wilderness commands in dungeon mode should be rejected.

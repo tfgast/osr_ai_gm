@@ -76,6 +76,15 @@ pub fn travel_day_with<R: Rng>(
         .map(|h| h.terrain)
         .unwrap_or(Terrain::Clear);
 
+    // Early same-hex check: traveling to the current position is a no-op.
+    if dest_x == wilderness.current_x && dest_y == wilderness.current_y {
+        result.msg(format!(
+            "Already at ({}, {}). No travel needed.",
+            dest_x, dest_y
+        ));
+        return result;
+    }
+
     // Early range check: reject travel to out-of-range destinations before
     // consuming any resources (rations, day counter, etc.)
     let hexes = WildernessState::hexes_per_day(movement_rate, terrain);
@@ -1349,6 +1358,56 @@ mod tests {
         assert_eq!(party.rations, initial_rations, "rations must not be consumed");
         assert_eq!(ws.travel_day, initial_day, "day must not advance");
         assert_eq!((ws.current_x, ws.current_y), (2, 0), "position must not change");
+    }
+
+    // =========================================================================
+    // Bug fix: travel to current hex is a no-op (oag-vsjm7)
+    // =========================================================================
+
+    #[test]
+    fn travel_to_current_hex_is_noop() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 10;
+        let initial_rations = party.rations;
+        let initial_day = ws.travel_day;
+
+        // Travel to (0,0) — the starting position
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 0, 0, 120);
+
+        assert!(
+            result.messages.iter().any(|m| m.contains("Already at")),
+            "should report already at position: {:?}", result.messages
+        );
+        assert_eq!(party.rations, initial_rations, "rations must not be consumed");
+        assert_eq!(ws.travel_day, initial_day, "day must not advance");
+        assert_eq!((ws.current_x, ws.current_y), (0, 0), "position must not change");
+        assert!(result.encounters.is_empty(), "no encounters should occur");
+        assert!(!result.starving, "should not trigger starvation");
+    }
+
+    #[test]
+    fn travel_to_current_hex_after_move_is_noop() {
+        let mut rng = test_rng();
+        let mut ws = test_wilderness();
+        let mut party = test_party();
+        party.rations = 10;
+
+        // First move to (1,0) normally
+        let _ = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+        let rations_after_move = party.rations;
+        let day_after_move = ws.travel_day;
+
+        // Now travel to (1,0) again — the current position
+        let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
+
+        assert!(
+            result.messages.iter().any(|m| m.contains("Already at")),
+            "should report already at position: {:?}", result.messages
+        );
+        assert_eq!(party.rations, rations_after_move, "rations must not be consumed on same-hex travel");
+        assert_eq!(ws.travel_day, day_after_move, "day must not advance on same-hex travel");
     }
 
     // =========================================================================
