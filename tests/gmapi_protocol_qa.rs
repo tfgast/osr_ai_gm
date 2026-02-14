@@ -1417,6 +1417,30 @@ fn enter_wilderness_all_terrain_types() {
     }
 }
 
+#[test]
+fn enter_wilderness_while_already_in_wilderness_rejected() {
+    let mut state = GameState::new();
+    // First entry succeeds
+    let resp = handle_request(&req("ew-ok", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.mode, GameMode::Wilderness);
+
+    // Second entry while already in wilderness should fail
+    let resp = handle_request(&req("ew-dup", GMCommand::EnterWilderness {
+        terrain: Terrain::Hills,
+    }), &mut state);
+    assert!(!resp.success, "EnterWilderness while already in wilderness should fail");
+    assert!(resp.message.contains("already in wilderness"), "error should mention already in wilderness: {}", resp.message);
+
+    // State should be preserved (still Forest, not Hills)
+    assert_eq!(state.mode, GameMode::Wilderness);
+    let ws = state.wilderness.as_ref().unwrap();
+    let origin = ws.hexes.iter().find(|h| h.x == 0 && h.y == 0).unwrap();
+    assert_eq!(origin.terrain, Terrain::Forest, "original terrain should be preserved");
+}
+
 // ===========================================================================
 // 23. AddHex
 // ===========================================================================

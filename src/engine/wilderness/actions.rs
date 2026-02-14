@@ -34,6 +34,12 @@ pub fn action_enter_wilderness(
     state: &mut GameState,
     terrain: Terrain,
 ) -> Result<EnterWildernessResult, EngineError> {
+    if state.mode == GameMode::Wilderness {
+        return Err(EngineError::WrongState(
+            "already in wilderness mode.".to_string(),
+        ));
+    }
+
     let mut wilderness = WildernessState::new();
     wilderness
         .add_hex(HexCell::new(0, 0, terrain))
