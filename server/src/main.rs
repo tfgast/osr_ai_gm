@@ -278,7 +278,10 @@ fn handle_token_command(args: &[String]) {
                 eprintln!("error loading tokens: {}", e);
                 std::process::exit(1);
             });
-            let token = store.create_token(name);
+            let token = store.create_token(name).unwrap_or_else(|e| {
+                eprintln!("error: {}", e);
+                std::process::exit(1);
+            });
             store.save(&token_path).unwrap_or_else(|e| {
                 eprintln!("error saving tokens: {}", e);
                 std::process::exit(1);
