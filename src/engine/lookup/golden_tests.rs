@@ -397,7 +397,8 @@ fn lookup_happy_path_cli_api_and_state_parity() {
 }
 
 #[test]
-fn lookup_empty_query_regressions_are_detected() {
+fn lookup_empty_query_parity_restored() {
+    // item "" should return a successful suggestion path (browse all items)
     let item_pre = pre_item_cli_output(&[""]);
     assert!(
         !item_pre.starts_with("Error:"),
@@ -405,8 +406,8 @@ fn lookup_empty_query_regressions_are_detected() {
     );
     let item_now = ItemCommand.execute(&[""], &mut GameState::new());
     assert!(
-        item_now.output.starts_with("Error:"),
-        "post-migration item <empty> now errors"
+        !item_now.output.starts_with("Error:"),
+        "item <empty> should succeed (browse all items)"
     );
     let mut item_api_state = GameState::new();
     let item_api = run_api(
@@ -416,10 +417,11 @@ fn lookup_empty_query_regressions_are_detected() {
         &mut item_api_state,
     );
     assert!(
-        !item_api.success,
-        "post-migration API item <empty> now errors"
+        item_api.success,
+        "API item <empty> should succeed (browse all items)"
     );
 
+    // search_items "" should return full catalog
     let search_pre = pre_search_items_cli_output(&[""]);
     assert!(
         !search_pre.starts_with("Error:"),
@@ -427,8 +429,8 @@ fn lookup_empty_query_regressions_are_detected() {
     );
     let search_now = SearchItemsCommand.execute(&[""], &mut GameState::new());
     assert!(
-        search_now.output.starts_with("Error:"),
-        "post-migration search_items <empty> now errors"
+        !search_now.output.starts_with("Error:"),
+        "search_items <empty> should succeed (full catalog)"
     );
     let mut search_api_state = GameState::new();
     let search_api = run_api(
@@ -438,7 +440,7 @@ fn lookup_empty_query_regressions_are_detected() {
         &mut search_api_state,
     );
     assert!(
-        !search_api.success,
-        "post-migration API search_items <empty> now errors"
+        search_api.success,
+        "API search_items <empty> should succeed (full catalog)"
     );
 }

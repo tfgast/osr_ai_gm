@@ -15,11 +15,6 @@ use super::results::{
 
 pub fn action_lookup_item(name: &str) -> Result<LookupItemResult, EngineError> {
     let query = name.trim();
-    if query.is_empty() {
-        return Err(EngineError::InvalidInput(
-            "item name must not be empty.".to_string(),
-        ));
-    }
 
     if let Some(item) = find_magic_item(query) {
         return Ok(LookupItemResult {
@@ -57,11 +52,6 @@ pub fn action_lookup_item(name: &str) -> Result<LookupItemResult, EngineError> {
 
 pub fn action_search_items(query: &str) -> Result<SearchItemsResult, EngineError> {
     let query = query.trim();
-    if query.is_empty() {
-        return Err(EngineError::InvalidInput(
-            "search query must not be empty.".to_string(),
-        ));
-    }
 
     let mut by_category: BTreeMap<String, Vec<SearchItemEntry>> = BTreeMap::new();
     for item in search_magic_items(query) {
