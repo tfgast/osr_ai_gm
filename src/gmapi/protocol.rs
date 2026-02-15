@@ -504,6 +504,9 @@ fn check_count(field: &str, value: u32, max: u32) -> Result<(), String> {
 
 impl GMRequest {
     fn validate(&self) -> Result<(), String> {
+        if self.id.is_empty() {
+            return Err("id must not be empty".to_string());
+        }
         check_len("id", &self.id, 64)?;
         self.command.validate()
     }
@@ -1412,5 +1415,12 @@ mod tests {
             GMCommand::FightingWithdrawal { character } => assert!(character.is_none()),
             _ => panic!("expected FightingWithdrawal"),
         }
+    }
+
+    #[test]
+    fn parse_rejects_empty_id() {
+        let json = r#"{"id":"","command":{"type":"QueryState"}}"#;
+        let err = parse_request(json).unwrap_err();
+        assert!(err.contains("empty"), "should mention empty: {}", err);
     }
 }
