@@ -20,6 +20,10 @@ pub fn xp_for_level(class: Class, level: u32) -> u64 {
 /// Check if a character has enough XP to advance to the next level.
 /// Returns the new level if advancement is possible, None otherwise.
 pub fn check_level_up(class: Class, current_level: u32, xp: u64) -> Option<u32> {
+    let max = super::class::class_def(class).max_level;
+    if current_level >= max {
+        return None;
+    }
     let next = current_level + 1;
     let needed = xp_for_level(class, next);
     if needed != u64::MAX && xp >= needed {
@@ -194,6 +198,13 @@ mod tests {
     #[test]
     fn check_level_up_at_max() {
         assert_eq!(check_level_up(Class::Halfling, 8, 999_999), None);
+    }
+
+    #[test]
+    fn duergar_cannot_exceed_max_level() {
+        // Duergar max_level=10 but shares Dwarf XP table (12 levels).
+        // Should not level past 10 even with enough XP.
+        assert_eq!(check_level_up(Class::Duergar, 10, 999_999), None);
     }
 
     #[test]
