@@ -17,13 +17,30 @@ pub struct ExplorationActionResult {
     pub messages: Vec<String>,
     pub has_encounter: bool,
     pub encounter: Option<EncounterResult>,
+    /// When an encounter is present, lists the commands available to resolve it.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub next_steps: Vec<String>,
     pub placed_monsters: Option<Vec<PlacedMonsterInstance>>,
     pub placed_treasure: Option<Vec<PlacedTreasureInstance>>,
 }
 
+/// Build next-step guidance for a wandering monster encounter.
+fn encounter_next_steps(enc: &EncounterResult) -> Vec<String> {
+    vec![
+        format!(
+            "SpawnMonster {{name: \"{}\", count: <roll {}>, distance: 2d6×10}} to start combat",
+            enc.name, enc.number
+        ),
+        "RollReaction {character: \"<name>\"} to check monster attitude".to_string(),
+        "Evade {monster_count: <n>, monster_movement: <mv>} to attempt escape".to_string(),
+    ]
+}
+
 impl From<super::ExplorationResult> for ExplorationActionResult {
     fn from(value: super::ExplorationResult) -> Self {
-        let message = value.to_string();
+        // Build base message before moving fields out of value.
+        let base_message = value.to_string();
+
         let encounter = value.encounter.map(|entry| EncounterResult {
             name: entry.name,
             number: entry.number,
@@ -31,11 +48,29 @@ impl From<super::ExplorationResult> for ExplorationActionResult {
         });
         let has_encounter = encounter.is_some();
 
+        let (next_steps, guidance_msg) = match &encounter {
+            Some(enc) => {
+                let guidance = "ENCOUNTER RESOLUTION REQUIRED: Use SpawnMonster to fight, \
+                     RollReaction to parley, or Evade to flee.".to_string();
+                (encounter_next_steps(enc), Some(guidance))
+            }
+            None => (Vec::new(), None),
+        };
+
+        let mut messages = value.messages;
+        let message = if let Some(guidance) = &guidance_msg {
+            messages.push(guidance.clone());
+            format!("{}{}\n", base_message, guidance)
+        } else {
+            base_message
+        };
+
         Self {
             message,
-            messages: value.messages,
+            messages,
             has_encounter,
             encounter,
+            next_steps,
             placed_monsters: value.placed_monsters,
             placed_treasure: value.placed_treasure,
         }

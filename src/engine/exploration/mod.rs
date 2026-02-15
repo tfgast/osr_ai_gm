@@ -732,6 +732,57 @@ mod tests {
     }
 
     #[test]
+    fn encounter_result_includes_next_steps() {
+        use super::results::ExplorationActionResult;
+        // Find a seed that triggers an encounter on turn 2
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut time = TimeTracker::new();
+            let mut dungeon = test_dungeon();
+            time.light(LightSourceKind::Lantern, "Test");
+
+            advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+            let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+            if result.encounter.is_some() {
+                let api_result = ExplorationActionResult::from(result);
+                // next_steps should be populated
+                assert!(!api_result.next_steps.is_empty(), "encounter should include next_steps");
+                assert!(api_result.next_steps.iter().any(|s| s.contains("SpawnMonster")),
+                    "next_steps should mention SpawnMonster");
+                assert!(api_result.next_steps.iter().any(|s| s.contains("RollReaction")),
+                    "next_steps should mention RollReaction");
+                assert!(api_result.next_steps.iter().any(|s| s.contains("Evade")),
+                    "next_steps should mention Evade");
+                // Guidance message should be in messages
+                assert!(api_result.messages.iter().any(|m| m.contains("ENCOUNTER RESOLUTION REQUIRED")),
+                    "messages should include resolution guidance");
+                // Message text should include guidance
+                assert!(api_result.message.contains("ENCOUNTER RESOLUTION REQUIRED"),
+                    "message text should include resolution guidance");
+                return;
+            }
+        }
+        panic!("failed to trigger an encounter in 200 seeds");
+    }
+
+    #[test]
+    fn no_encounter_means_no_next_steps() {
+        use super::results::ExplorationActionResult;
+        let mut rng = StdRng::seed_from_u64(42);
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Turn 1 — odd turn, never triggers encounter
+        let result = advance_dungeon_turn_with(&mut rng, &mut time, &mut dungeon, 1);
+        assert!(result.encounter.is_none());
+        let api_result = ExplorationActionResult::from(result);
+        assert!(api_result.next_steps.is_empty(), "no encounter means no next_steps");
+        assert!(!api_result.message.contains("ENCOUNTER RESOLUTION REQUIRED"),
+            "no encounter means no guidance");
+    }
+
+    #[test]
     fn search_room_basic() {
         let mut rng = test_rng();
         let mut time = TimeTracker::new();
