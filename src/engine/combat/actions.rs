@@ -387,6 +387,13 @@ pub fn action_attack(
         && combat.monsters[monster_idx].is_alive()
         && combat.monsters[monster_idx].helpless
     {
+        // Coup de grace requires melee range (≤10')
+        if combat.distance > 10 {
+            return Err(EngineError::InvalidInput(format!(
+                "cannot dispatch helpless {} at {}' distance. Use \"close {}\" to move into melee range.",
+                combat.monsters[monster_idx].name, combat.distance, char_name
+            )));
+        }
         let result =
             coup_de_grace(combat, &character, monster_idx).map_err(EngineError::InvalidInput)?;
         combat.characters_acted.push(char_name.to_string());
@@ -434,6 +441,13 @@ pub fn action_monster_attack(
             return Err(EngineError::InvalidInput(format!(
                 "{} has already attacked this round.",
                 combat.monsters[monster_idx].name
+            )));
+        }
+        // Monsters use melee attacks — require melee distance (≤10')
+        if combat.distance > 10 {
+            return Err(EngineError::InvalidInput(format!(
+                "{} cannot melee attack at {}' distance. Monsters must be within 10' for melee.",
+                combat.monsters[monster_idx].name, combat.distance
             )));
         }
     }

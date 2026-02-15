@@ -100,6 +100,7 @@ pub fn retreat_with<R: Rng>(
     character: &mut Character,
     rng: &mut R,
 ) -> RetreatResult {
+    let pre_retreat_distance = combat.distance;
     let encounter_move = character.movement_rate / 3;
     combat.distance = combat.distance.saturating_add(encounter_move);
 
@@ -108,21 +109,23 @@ pub fn retreat_with<R: Rng>(
         character.name, encounter_move, combat.distance);
     combat.log_event(retreat_msg);
 
-    // All living monsters in melee range get a free attack at +2
+    // Only monsters in melee range (≤10') before retreat get a free attack at +2
     let mut free_attacks = Vec::new();
-    let alive_monster_indices: Vec<usize> = combat.monsters.iter()
-        .enumerate()
-        .filter(|(_, m)| m.is_alive() && !m.turned)
-        .map(|(i, _)| i)
-        .collect();
+    if pre_retreat_distance <= 10 {
+        let alive_monster_indices: Vec<usize> = combat.monsters.iter()
+            .enumerate()
+            .filter(|(_, m)| m.is_alive() && !m.turned)
+            .map(|(i, _)| i)
+            .collect();
 
-    for monster_idx in alive_monster_indices {
-        // Character may have died from a previous free attack
-        if !character.is_alive() {
-            break;
+        for monster_idx in alive_monster_indices {
+            // Character may have died from a previous free attack
+            if !character.is_alive() {
+                break;
+            }
+            let atk = monster_attack_modified_with(combat, monster_idx, character, 2, rng);
+            free_attacks.push(atk);
         }
-        let atk = monster_attack_modified_with(combat, monster_idx, character, 2, rng);
-        free_attacks.push(atk);
     }
 
     RetreatResult {

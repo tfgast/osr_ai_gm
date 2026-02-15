@@ -428,6 +428,48 @@ fn phase2_same_monster_double_attack() {
     assert_err(&resp, "same monster attacking twice in same round should be rejected");
 }
 
+/// oag-2oxnu: Monster melee attack rejected at non-melee distance.
+#[test]
+fn phase2_monster_attack_rejected_at_range() {
+    let mut state = GameState::new();
+    build_full_party(&mut state);
+
+    let goblins = vec![mk_goblin("Goblin 1")];
+    setup_combat_with_monsters(&mut state, goblins, 20); // 20' — out of melee range
+
+    let resp = handle_request(&req("ma_rng", GMCommand::MonsterAttack {
+        monster_idx: 0,
+        character: "Grond".to_string(),
+    }), &mut state);
+    assert_err(&resp, "monster melee attack should fail at 20' distance");
+    assert!(
+        resp.message.to_lowercase().contains("distance") || resp.message.to_lowercase().contains("melee"),
+        "error should mention distance/melee, got: {}", resp.message
+    );
+}
+
+/// oag-8ggit: Coup de grace rejected at non-melee distance.
+#[test]
+fn phase2_coup_de_grace_rejected_at_range() {
+    let mut state = GameState::new();
+    build_full_party(&mut state);
+
+    let mut goblin = mk_goblin("Sleeping Goblin");
+    goblin.helpless = true;
+    setup_combat_with_monsters(&mut state, vec![goblin], 20); // 20' — out of melee range
+
+    let resp = handle_request(&req("cdg_rng", GMCommand::Attack {
+        character: "Thorin".to_string(),
+        monster_idx: 0,
+        weapon: "Sword".to_string(),
+    }), &mut state);
+    assert_err(&resp, "coup de grace should fail at 20' distance");
+    assert!(
+        resp.message.to_lowercase().contains("distance") || resp.message.to_lowercase().contains("melee"),
+        "error should mention distance, got: {}", resp.message
+    );
+}
+
 /// oag-vtkww: RollInitiative spam (twice in same round) rejected.
 #[test]
 fn phase2_roll_initiative_spam() {
@@ -735,6 +777,34 @@ fn phase4_turned_monsters_no_free_attacks_on_retreat() {
         assert!(
             attacks.is_empty(),
             "turned monsters should not get free attacks, but got {} attacks",
+            attacks.len()
+        );
+    }
+}
+
+/// oag-f4kw5: Retreat at non-melee range should NOT trigger free attacks.
+#[test]
+fn phase4_retreat_no_free_attacks_at_range() {
+    let mut state = GameState::new();
+    build_full_party(&mut state);
+
+    let bandits = vec![
+        mk_bandit("Bandit 1", 6),
+        mk_bandit("Bandit 2", 6),
+    ];
+    setup_combat_with_monsters(&mut state, bandits, 20); // non-melee range
+
+    let resp = handle_request(&req("ret3", GMCommand::Retreat {
+        character: Some("Zara".to_string()),
+    }), &mut state);
+    assert_ok(&resp, "retreat at range should succeed");
+
+    // No free attacks expected at 20' (non-melee range)
+    let data = resp.data.as_ref().unwrap();
+    if let Some(attacks) = data.get("free_attacks").and_then(|v| v.as_array()) {
+        assert!(
+            attacks.is_empty(),
+            "retreat from non-melee range should not trigger free attacks, got {} attacks",
             attacks.len()
         );
     }
