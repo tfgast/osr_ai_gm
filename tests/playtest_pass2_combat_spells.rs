@@ -810,7 +810,7 @@ fn phase5_pick_lock_with_thief() {
 
     let resp = handle_request(&req("ad1", GMCommand::AddDoor {
         id: 1,
-        room_a: 1,
+        room_a: 0,
         room_b: 2,
         state: DoorState::Locked,
     }), &mut state);
@@ -846,7 +846,7 @@ fn phase5_pick_lock_with_fighter_rejected() {
     }), &mut state);
     handle_request(&req("ad2", GMCommand::AddDoor {
         id: 1,
-        room_a: 1,
+        room_a: 0,
         room_b: 2,
         state: DoorState::Locked,
     }), &mut state);
@@ -885,7 +885,7 @@ fn phase5_pick_lock_on_closed_door() {
     }), &mut state);
     handle_request(&req("ad3", GMCommand::AddDoor {
         id: 1,
-        room_a: 1,
+        room_a: 0,
         room_b: 2,
         state: DoorState::Closed,
     }), &mut state);
