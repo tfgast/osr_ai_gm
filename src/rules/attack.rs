@@ -55,9 +55,13 @@ impl HitDice {
     }
 
     /// Number of dice to roll for HP (0 for fractional — roll 1d4 instead).
+    /// For range HD ("1 to 3"), randomly picks a value in [base, range_end].
     pub fn hp_dice_count(&self) -> u32 {
         if self.fractional {
             0
+        } else if let Some(end) = self.range_end {
+            use rand::Rng;
+            rand::thread_rng().gen_range(self.base..=end)
         } else {
             self.base
         }
@@ -491,6 +495,20 @@ mod tests {
         assert_eq!(hd.specials, 2);
         assert_eq!(hd.combat_hd(), 8);
         assert_eq!(hd.to_string(), "7-9**");
+    }
+
+    #[test]
+    fn hp_dice_count_respects_range() {
+        let hd: HitDice = "1 to 3".parse().unwrap();
+        let mut saw_above_base = false;
+        for _ in 0..100 {
+            let count = hd.hp_dice_count();
+            assert!(count >= 1 && count <= 3, "hp_dice_count {} out of range 1-3", count);
+            if count > 1 {
+                saw_above_base = true;
+            }
+        }
+        assert!(saw_above_base, "100 rolls should produce at least one value above base HD");
     }
 
     #[test]
