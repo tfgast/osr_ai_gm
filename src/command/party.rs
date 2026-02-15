@@ -313,6 +313,26 @@ impl Command for PartyCommand {
                     ));
                 }
 
+                // Active effects per member (parity with GM API QueryParty)
+                let has_effects = result.members.iter().any(|m| {
+                    state.party.find_member(&m.name)
+                        .map(|c| !c.effects.is_empty())
+                        .unwrap_or(false)
+                });
+                if has_effects {
+                    out.push_str("\nActive Effects:\n");
+                    for m in &result.members {
+                        if let Some(c) = state.party.find_member(&m.name) {
+                            if !c.effects.is_empty() {
+                                out.push_str(&format!("  {} —\n", m.name));
+                                for e in &c.effects {
+                                    out.push_str(&format!("    {}\n", e.detail_lines().replace('\n', "\n    ")));
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if result.days_without_food > 0 {
                     let penalty = result.days_without_food.min(4) as i32;
                     out.push_str(&format!(

@@ -429,7 +429,40 @@ impl Command for CombatStatusCommand {
     }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
         match combat::action_combat_status(state) {
-            Ok(result) => CommandResult::ok(result.status),
+            Ok(result) => {
+                let mut out = result.status;
+                // Append active effects (parity with GM API QueryCombat)
+                let has_char_effects = state.party.members.iter().any(|c| !c.effects.is_empty());
+                let has_monster_effects = state.combat.as_ref()
+                    .map(|cs| cs.monsters.iter().any(|m| !m.effects.is_empty()))
+                    .unwrap_or(false);
+                let has_area_effects = !state.effects.is_empty();
+                if has_char_effects || has_monster_effects || has_area_effects {
+                    out.push_str("\n-- Effects --\n");
+                    for c in &state.party.members {
+                        if !c.effects.is_empty() {
+                            let summaries: Vec<String> = c.effects.iter().map(|e| e.summary_line()).collect();
+                            out.push_str(&format!("  {}: {}\n", c.name, summaries.join(", ")));
+                        }
+                    }
+                    if let Some(cs) = &state.combat {
+                        for (i, m) in cs.monsters.iter().enumerate() {
+                            if !m.effects.is_empty() {
+                                let helpless_tag = if m.is_helpless() { " [HELPLESS]" } else { "" };
+                                let summaries: Vec<String> = m.effects.iter().map(|e| e.summary_line()).collect();
+                                out.push_str(&format!("  {} #{}: {}{}\n", m.name, i, summaries.join(", "), helpless_tag));
+                            }
+                        }
+                    }
+                    if has_area_effects {
+                        out.push_str("-- Area Effects --\n");
+                        for e in &state.effects {
+                            out.push_str(&format!("  {} (source: {})\n", e.summary_line(), e.source));
+                        }
+                    }
+                }
+                CommandResult::ok(out)
+            }
             Err(e) => CommandResult::error(e.to_string()),
         }
     }

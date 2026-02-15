@@ -244,7 +244,23 @@ impl Command for ExplorationStatusCommand {
     fn help(&self) -> &str { "Show current exploration state (time, light, dungeon map)" }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
         match exploration::action_exploration_status(state) {
-            Ok(result) => CommandResult::ok(result.message),
+            Ok(result) => {
+                let mut out = result.message;
+                // Append active effects (parity with GM API QueryExploration)
+                let mut active: Vec<String> = Vec::new();
+                for c in &state.party.members {
+                    for e in &c.effects {
+                        active.push(format!("{} on {} ({})", e.name, c.name, e.duration));
+                    }
+                }
+                for e in &state.effects {
+                    active.push(format!("{} ({})", e.name, e.duration));
+                }
+                if !active.is_empty() {
+                    out.push_str(&format!("\nEffects: {}", active.join(", ")));
+                }
+                CommandResult::ok(out)
+            }
             Err(e) => CommandResult::error(e.to_string()),
         }
     }
