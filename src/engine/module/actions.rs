@@ -170,12 +170,17 @@ pub fn action_load_module(
 }
 
 /// Load monster definitions from a module's companion monsters.json file.
+/// Accepts both wrapped format `{ "monsters": [...] }` and bare array `[...]`.
 fn load_module_monsters(path: &std::path::Path) -> Result<Vec<crate::rules::monster::MonsterDef>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-    let file: crate::rules::monster::MonsterFile = serde_json::from_str(&content)
+    // Try wrapped format first, then bare array
+    if let Ok(file) = serde_json::from_str::<crate::rules::monster::MonsterFile>(&content) {
+        return Ok(file.monsters);
+    }
+    let monsters: Vec<crate::rules::monster::MonsterDef> = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
-    Ok(file.monsters)
+    Ok(monsters)
 }
 
 #[cfg(test)]
@@ -555,5 +560,60 @@ mod tests {
                     .to_string()
             )
         );
+    }
+
+    #[test]
+    fn load_module_monsters_bare_array() {
+        let json = r#"[
+            {
+                "name": "Floating Skeleton",
+                "armor_class": 8,
+                "hit_dice": "2",
+                "attacks": [{"count": 1, "name": "claws", "damage": "1d4"}],
+                "morale": 12,
+                "xp_value": 20,
+                "special_abilities": ["Undead: Unaffected by charms and mind control."]
+            }
+        ]"#;
+        let dir = std::env::temp_dir().join("osr_test_bare_array");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("monsters.json");
+        std::fs::write(&path, json).unwrap();
+
+        let monsters = load_module_monsters(&path).unwrap();
+        assert_eq!(monsters.len(), 1);
+        assert_eq!(monsters[0].name, "Floating Skeleton");
+        assert!(monsters[0].is_undead());
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn load_module_monsters_wrapped_format() {
+        let json = r#"{
+            "source": "test",
+            "count": 1,
+            "monsters": [
+                {
+                    "name": "Goblin",
+                    "armor_class": 6,
+                    "hit_dice": "1-1",
+                    "attacks": [{"count": 1, "name": "sword", "damage": "1d6"}],
+                    "morale": 7,
+                    "xp_value": 5,
+                    "special_abilities": []
+                }
+            ]
+        }"#;
+        let dir = std::env::temp_dir().join("osr_test_wrapped");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("monsters.json");
+        std::fs::write(&path, json).unwrap();
+
+        let monsters = load_module_monsters(&path).unwrap();
+        assert_eq!(monsters.len(), 1);
+        assert_eq!(monsters[0].name, "Goblin");
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
