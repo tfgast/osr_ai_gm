@@ -3237,10 +3237,18 @@ fn mode_transitions() {
     let resp = handle_request(&req("4", GMCommand::EndCombat), &mut state);
     assert_eq!(resp.mode, GameMode::Exploration);
 
-    // Exploration -> Wilderness
+    // Exploration -> Wilderness should be rejected (must leave dungeon first)
     let resp = handle_request(&req("5", GMCommand::EnterWilderness {
         terrain: Terrain::Forest,
     }), &mut state);
+    assert!(!resp.success, "EnterWilderness should fail while in Exploration mode");
+
+    // Idle -> Wilderness (fresh state)
+    let mut state2 = GameState::new();
+    state2.party.add_member(make_fighter("Bryn"));
+    let resp = handle_request(&req("6", GMCommand::EnterWilderness {
+        terrain: Terrain::Forest,
+    }), &mut state2);
     assert_eq!(resp.mode, GameMode::Wilderness);
 }
 
