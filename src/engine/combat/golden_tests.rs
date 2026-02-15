@@ -259,6 +259,7 @@ fn combat_command_parity_golden_scaffold_captures_snapshots() {
                 morale: 7,
                 distance: 60,
                 xp_value: None,
+                undead: None,
             }),
         ),
         capture_parity(

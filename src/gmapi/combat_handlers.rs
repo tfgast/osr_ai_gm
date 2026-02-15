@@ -21,6 +21,7 @@ pub(super) fn spawn_encounter(
             morale: params.morale,
             distance: params.distance,
             xp_value: params.xp_value,
+            undead: params.undead,
         },
     ) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
@@ -45,6 +46,7 @@ pub(super) fn add_monster(
             morale: params.morale,
             distance: params.distance,
             xp_value: params.xp_value,
+            undead: params.undead,
         },
     ) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),

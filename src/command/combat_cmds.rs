@@ -10,14 +10,16 @@ impl Command for StartCombatCommand {
         "start_combat"
     }
     fn help(&self) -> &str {
-        "Start combat (start_combat <name> <count> <hd> <ac> <hp> <damage> <morale> <distance> [xp])"
+        "Start combat (start_combat <name> <count> <hd> <ac> <hp> <damage> <morale> <distance> [xp] [undead])"
     }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 8 {
             return CommandResult::error(
-                "usage: start_combat <name> <count> <hd> <ac> <hp> <damage> <morale> <distance> [xp]\n  \
+                "usage: start_combat <name> <count> <hd> <ac> <hp> <damage> <morale> <distance> [xp] [undead]\n  \
                  example: start_combat goblin 3 1 6 3 1d6 7 60\n  \
-                 XP is auto-looked up from monster database if available, or specify manually."
+                 example: start_combat skeleton 2 1 5 4 1d6 12 30 0 true\n  \
+                 XP is auto-looked up from monster database if available, or specify manually.\n  \
+                 undead: true/false — overrides monster-DB lookup for Turn Undead."
             );
         }
         let name = args[0];
@@ -56,10 +58,20 @@ impl Command for StartCombatCommand {
             None
         };
 
+        let undead = if args.len() >= 10 {
+            match args[9] {
+                "true" | "yes" => Some(true),
+                "false" | "no" => Some(false),
+                _ => return CommandResult::error("undead must be true/false or yes/no"),
+            }
+        } else {
+            None
+        };
+
         match combat::action_spawn_encounter(
             state,
             &SpawnEncounterParams {
-                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value,
+                name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value, undead,
             },
         ) {
             Ok(result) => {
@@ -90,15 +102,17 @@ impl Command for AddMonsterCommand {
         "add_monster"
     }
     fn help(&self) -> &str {
-        "Add monsters to active combat (add_monster <name> <count> <hd> <ac> <hp> <damage> <morale> [xp])"
+        "Add monsters to active combat (add_monster <name> <count> <hd> <ac> <hp> <damage> <morale> [xp] [undead])"
     }
     fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
         if args.len() < 7 {
             return CommandResult::error(
-                "usage: add_monster <name> <count> <hd> <ac> <hp> <damage> <morale> [xp]\n  \
+                "usage: add_monster <name> <count> <hd> <ac> <hp> <damage> <morale> [xp] [undead]\n  \
                  example: add_monster orc 2 1 6 4 1d6 8\n  \
+                 example: add_monster ghoul 1 2 6 9 1d3+paralysis 9 29 true\n  \
                  Adds monsters to an existing combat encounter.\n  \
-                 XP is auto-looked up from monster database if available, or specify manually."
+                 XP is auto-looked up from monster database if available, or specify manually.\n  \
+                 undead: true/false — overrides monster-DB lookup for Turn Undead."
             );
         }
         let name = args[0];
@@ -133,10 +147,20 @@ impl Command for AddMonsterCommand {
             None
         };
 
+        let undead = if args.len() >= 9 {
+            match args[8] {
+                "true" | "yes" => Some(true),
+                "false" | "no" => Some(false),
+                _ => return CommandResult::error("undead must be true/false or yes/no"),
+            }
+        } else {
+            None
+        };
+
         match combat::action_add_monster(
             state,
             &SpawnEncounterParams {
-                name, count, hit_dice: &hd, ac, hp, damage, morale, distance: 0, xp_value,
+                name, count, hit_dice: &hd, ac, hp, damage, morale, distance: 0, xp_value, undead,
             },
         ) {
             Ok(result) => {
