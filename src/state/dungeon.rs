@@ -272,10 +272,16 @@ impl DungeonState {
     }
 
     /// Add a door between two rooms. Returns an error if a door with the
-    /// same ID already exists.
+    /// same ID already exists or if either room does not exist.
     pub fn add_door(&mut self, door: Door) -> Result<(), String> {
         if self.doors.iter().any(|d| d.id == door.id) {
             return Err(format!("duplicate door id {}", door.id));
+        }
+        if self.find_room(door.room_a).is_none() {
+            return Err(format!("door {} references non-existent room_a {}", door.id, door.room_a));
+        }
+        if self.find_room(door.room_b).is_none() {
+            return Err(format!("door {} references non-existent room_b {}", door.id, door.room_b));
         }
         self.doors.push(door);
         Ok(())
@@ -637,5 +643,15 @@ mod tests {
         assert_eq!(treasure.description, "Ancient sword");
         assert_eq!(treasure.gp_value, 1000);
         assert!(!treasure.taken);
+    }
+
+    #[test]
+    fn add_door_rejects_nonexistent_rooms() {
+        let mut ds = DungeonState::new(1);
+        ds.add_room(Room::new(0, "Only Room")).unwrap();
+        let err = ds.add_door(Door::new(1, 0, 99, DoorState::Open).unwrap()).unwrap_err();
+        assert!(err.contains("room_b"), "should mention room_b: {}", err);
+        let err = ds.add_door(Door::new(2, 99, 0, DoorState::Open).unwrap()).unwrap_err();
+        assert!(err.contains("room_a"), "should mention room_a: {}", err);
     }
 }
