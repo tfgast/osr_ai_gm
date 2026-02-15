@@ -607,6 +607,11 @@ impl GMCommand {
             GMCommand::LookupTreasureType { letter } => check_len("letter", letter, 16),
             GMCommand::RollTreasure { letter } => check_len("letter", letter, 16),
             GMCommand::RollReaction { character } => check_len("character", character, 128),
+            GMCommand::AddGold { character, .. } => check_len("character", character, 128),
+            GMCommand::Unequip { character, item_name } => {
+                check_len("character", character, 128)?;
+                check_len("item_name", item_name, 128)
+            }
             GMCommand::Save { path } => check_len("path", path, 512),
             GMCommand::Load { path } => check_len("path", path, 512),
             GMCommand::Roll { notation } => check_len("notation", notation, 128),
