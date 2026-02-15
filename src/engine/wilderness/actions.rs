@@ -34,10 +34,29 @@ pub fn action_enter_wilderness(
     state: &mut GameState,
     terrain: Terrain,
 ) -> Result<EnterWildernessResult, EngineError> {
-    if state.mode == GameMode::Wilderness {
-        return Err(EngineError::WrongState(
-            "already in wilderness mode.".to_string(),
-        ));
+    match state.mode {
+        GameMode::Idle | GameMode::Downtime => {}
+        GameMode::Wilderness => {
+            return Err(EngineError::WrongState(
+                "already in wilderness mode.".to_string(),
+            ));
+        }
+        GameMode::Combat => {
+            return Err(EngineError::WrongState(
+                "cannot enter wilderness during combat. Use EndCombat first.".to_string(),
+            ));
+        }
+        GameMode::Exploration => {
+            return Err(EngineError::WrongState(
+                "cannot enter wilderness while in exploration mode. Use LeaveDungeon first."
+                    .to_string(),
+            ));
+        }
+        GameMode::CharGen => {
+            return Err(EngineError::WrongState(
+                "cannot enter wilderness during character generation.".to_string(),
+            ));
+        }
     }
 
     let mut wilderness = WildernessState::new();
@@ -176,4 +195,72 @@ pub fn action_wilderness_status(state: &GameState) -> Result<WildernessStatusRes
         message,
         movement_rate,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::CombatState;
+    use crate::state::dungeon::DungeonState;
+
+    #[test]
+    fn enter_wilderness_from_idle() {
+        let mut state = GameState::new();
+        assert_eq!(state.mode, GameMode::Idle);
+        let result = action_enter_wilderness(&mut state, Terrain::Forest);
+        assert!(result.is_ok());
+        assert_eq!(state.mode, GameMode::Wilderness);
+    }
+
+    #[test]
+    fn enter_wilderness_from_downtime() {
+        let mut state = GameState::new();
+        state.mode = GameMode::Downtime;
+        let result = action_enter_wilderness(&mut state, Terrain::Clear);
+        assert!(result.is_ok());
+        assert_eq!(state.mode, GameMode::Wilderness);
+    }
+
+    #[test]
+    fn enter_wilderness_rejects_combat() {
+        let mut state = GameState::new();
+        state.enter_combat(CombatState::new(vec![], 60));
+        assert_eq!(state.mode, GameMode::Combat);
+        let result = action_enter_wilderness(&mut state, Terrain::Forest);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("combat"), "error should mention combat: {err}");
+    }
+
+    #[test]
+    fn enter_wilderness_rejects_exploration() {
+        let mut state = GameState::new();
+        state.enter_exploration(DungeonState::new(1), 1);
+        assert_eq!(state.mode, GameMode::Exploration);
+        let result = action_enter_wilderness(&mut state, Terrain::Desert);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("exploration"), "error should mention exploration: {err}");
+    }
+
+    #[test]
+    fn enter_wilderness_rejects_chargen() {
+        let mut state = GameState::new();
+        state.mode = GameMode::CharGen;
+        let result = action_enter_wilderness(&mut state, Terrain::Mountains);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("character generation"), "error should mention chargen: {err}");
+    }
+
+    #[test]
+    fn enter_wilderness_rejects_already_wilderness() {
+        let mut state = GameState::new();
+        state.enter_wilderness(WildernessState::new());
+        assert_eq!(state.mode, GameMode::Wilderness);
+        let result = action_enter_wilderness(&mut state, Terrain::Forest);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("already"), "error should mention already in wilderness: {err}");
+    }
 }
