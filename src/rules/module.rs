@@ -70,12 +70,50 @@ pub enum PlacedTreasure {
     },
 }
 
+/// Type of physical connection between rooms.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ConnectionType {
+    #[serde(alias = "door")]
+    #[default]
+    Door,
+    #[serde(alias = "stairs")]
+    Stairs,
+    #[serde(alias = "pit")]
+    Pit,
+    #[serde(alias = "ladder")]
+    Ladder,
+    #[serde(alias = "teleporter")]
+    Teleporter,
+    #[serde(alias = "custom")]
+    Custom,
+}
+
+impl std::fmt::Display for ConnectionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            ConnectionType::Door => "door",
+            ConnectionType::Stairs => "stairs",
+            ConnectionType::Pit => "pit",
+            ConnectionType::Ladder => "ladder",
+            ConnectionType::Teleporter => "teleporter",
+            ConnectionType::Custom => "custom",
+        };
+        f.write_str(name)
+    }
+}
+
 /// An exit from a module room to another room.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleExit {
     pub to: String,
     #[serde(default)]
     pub door: DoorState,
+    /// Type of physical connection (Door, Stairs, Pit, etc.). Defaults to Door.
+    #[serde(default)]
+    pub connection_type: ConnectionType,
+    /// Freeform description of the exit (e.g. "narrow spiral staircase").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 /// Expand a leading `~` to the user's home directory.
@@ -351,6 +389,56 @@ mod tests {
     }
 
     #[test]
+    fn default_connection_type_is_door() {
+        let json = r#"{"to": "somewhere"}"#;
+        let exit: ModuleExit = serde_json::from_str(json).unwrap();
+        assert_eq!(exit.connection_type, ConnectionType::Door);
+        assert!(exit.description.is_none());
+    }
+
+    #[test]
+    fn parse_exit_with_connection_type_and_description() {
+        let json = r#"{"to": "cellar", "door": "closed", "connection_type": "Stairs", "description": "narrow spiral staircase"}"#;
+        let exit: ModuleExit = serde_json::from_str(json).unwrap();
+        assert_eq!(exit.to, "cellar");
+        assert_eq!(exit.door, DoorState::Closed);
+        assert_eq!(exit.connection_type, ConnectionType::Stairs);
+        assert_eq!(exit.description, Some("narrow spiral staircase".to_string()));
+    }
+
+    #[test]
+    fn parse_all_connection_types() {
+        for (json_val, expected) in [
+            ("Door", ConnectionType::Door),
+            ("door", ConnectionType::Door),
+            ("Stairs", ConnectionType::Stairs),
+            ("stairs", ConnectionType::Stairs),
+            ("Pit", ConnectionType::Pit),
+            ("pit", ConnectionType::Pit),
+            ("Ladder", ConnectionType::Ladder),
+            ("ladder", ConnectionType::Ladder),
+            ("Teleporter", ConnectionType::Teleporter),
+            ("teleporter", ConnectionType::Teleporter),
+            ("Custom", ConnectionType::Custom),
+            ("custom", ConnectionType::Custom),
+        ] {
+            let json = format!(r#"{{"to": "x", "connection_type": "{}"}}"#, json_val);
+            let exit: ModuleExit = serde_json::from_str(&json).unwrap();
+            assert_eq!(exit.connection_type, expected, "failed for {}", json_val);
+        }
+    }
+
+    #[test]
+    fn connection_type_display() {
+        assert_eq!(format!("{}", ConnectionType::Door), "door");
+        assert_eq!(format!("{}", ConnectionType::Stairs), "stairs");
+        assert_eq!(format!("{}", ConnectionType::Pit), "pit");
+        assert_eq!(format!("{}", ConnectionType::Ladder), "ladder");
+        assert_eq!(format!("{}", ConnectionType::Teleporter), "teleporter");
+        assert_eq!(format!("{}", ConnectionType::Custom), "custom");
+    }
+
+    #[test]
     fn default_monster_count_is_one() {
         let json = r#"{"name": "goblin"}"#;
         let monster: PlacedMonster = serde_json::from_str(json).unwrap();
@@ -382,6 +470,8 @@ mod tests {
             exits: vec![ModuleExit {
                 to: "nowhere".to_string(),
                 door: DoorState::Closed,
+                connection_type: ConnectionType::default(),
+                description: None,
             }],
         });
         let module = ModuleDef {
@@ -435,6 +525,8 @@ mod tests {
             exits: vec![ModuleExit {
                 to: "room_b".to_string(),
                 door: DoorState::Locked,
+                connection_type: ConnectionType::default(),
+                description: None,
             }],
         });
         rooms.insert("room_b".to_string(), ModuleRoom {
@@ -447,6 +539,8 @@ mod tests {
             exits: vec![ModuleExit {
                 to: "room_a".to_string(),
                 door: DoorState::Closed,
+                connection_type: ConnectionType::default(),
+                description: None,
             }],
         });
         let module = ModuleDef {
@@ -473,6 +567,8 @@ mod tests {
             exits: vec![ModuleExit {
                 to: "room_b".to_string(),
                 door: DoorState::Locked,
+                connection_type: ConnectionType::default(),
+                description: None,
             }],
         });
         rooms.insert("room_b".to_string(), ModuleRoom {
@@ -485,6 +581,8 @@ mod tests {
             exits: vec![ModuleExit {
                 to: "room_a".to_string(),
                 door: DoorState::Locked,
+                connection_type: ConnectionType::default(),
+                description: None,
             }],
         });
         let module = ModuleDef {
