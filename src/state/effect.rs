@@ -178,6 +178,28 @@ pub fn tick_round_effects(effects: &mut Vec<ActiveEffect>, target_label: &str) -
     messages
 }
 
+/// Tick all Turns-based effects, removing expired ones.
+/// Returns messages describing what expired.
+pub fn tick_turn_effects(effects: &mut Vec<ActiveEffect>, target_label: &str) -> Vec<String> {
+    let mut messages = Vec::new();
+
+    for effect in effects.iter_mut() {
+        if effect.tick_turn() {
+            let mut msg = format!(
+                "Effect expired on {}: {} has worn off.",
+                target_label, effect.name
+            );
+            if !effect.notes.is_empty() {
+                msg.push_str(&format!(" ({})", effect.notes));
+            }
+            messages.push(msg);
+        }
+    }
+
+    effects.retain(|e| !e.is_expired());
+    messages
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
