@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::log_entry::LogEntry;
+use crate::rules::module::ConnectionType;
 
 /// How a trap is triggered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -90,6 +91,9 @@ pub struct Door {
     /// and do not auto-close when passed through.
     #[serde(default)]
     pub module_open: bool,
+    /// Type of physical connection (Door, Stairs, Pit, etc.).
+    #[serde(default)]
+    pub connection_type: ConnectionType,
 }
 
 impl Door {
@@ -98,7 +102,7 @@ impl Door {
             return Err(format!("door {} connects room {} to itself", id, room_a));
         }
         let discovered = state != DoorState::Secret;
-        Ok(Door { id, room_a, room_b, state, discovered, module_open: false })
+        Ok(Door { id, room_a, room_b, state, discovered, module_open: false, connection_type: ConnectionType::default() })
     }
 
     /// Whether the party can attempt to pass through this door.
@@ -394,7 +398,15 @@ impl DungeonState {
                     DoorState::Secret => "secret",
                     DoorState::Spiked => "spiked open",
                 };
-                out.push_str(&format!("\n  Door {} → {} ({}) [{}]", d.id, dest, dest_name, state));
+                let conn_label = match d.connection_type {
+                    ConnectionType::Door => "Door",
+                    ConnectionType::Stairs => "Stairs",
+                    ConnectionType::Pit => "Pit",
+                    ConnectionType::Ladder => "Ladder",
+                    ConnectionType::Teleporter => "Teleporter",
+                    ConnectionType::Custom => "Passage",
+                };
+                out.push_str(&format!("\n  {} {} → {} ({}) [{}]", conn_label, d.id, dest, dest_name, state));
             }
         }
         out
@@ -658,5 +670,47 @@ mod tests {
         assert!(err.contains("room_b"), "should mention room_b: {}", err);
         let err = ds.add_door(Door::new(2, 99, 0, DoorState::Open).unwrap()).unwrap_err();
         assert!(err.contains("room_a"), "should mention room_a: {}", err);
+    }
+
+    #[test]
+    fn door_default_connection_type_is_door() {
+        let door = Door::new(0, 0, 1, DoorState::Closed).unwrap();
+        assert_eq!(door.connection_type, ConnectionType::Door);
+    }
+
+    #[test]
+    fn door_connection_type_serializes_round_trip() {
+        let mut door = Door::new(0, 0, 1, DoorState::Closed).unwrap();
+        door.connection_type = ConnectionType::Stairs;
+        let json = serde_json::to_string(&door).unwrap();
+        assert!(json.contains("Stairs"));
+        let loaded: Door = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.connection_type, ConnectionType::Stairs);
+    }
+
+    #[test]
+    fn old_door_json_loads_with_default_connection_type() {
+        let old_json = r#"{
+            "id": 1,
+            "room_a": 0,
+            "room_b": 1,
+            "state": "Closed",
+            "discovered": true,
+            "module_open": false
+        }"#;
+        let door: Door = serde_json::from_str(old_json).unwrap();
+        assert_eq!(door.connection_type, ConnectionType::Door);
+    }
+
+    #[test]
+    fn status_shows_connection_type_label() {
+        let mut ds = DungeonState::new(1);
+        ds.add_room(Room::new(0, "Hall")).unwrap();
+        ds.add_room(Room::new(1, "Cellar")).unwrap();
+        let mut door = Door::new(0, 0, 1, DoorState::Open).unwrap();
+        door.connection_type = ConnectionType::Stairs;
+        ds.add_door(door).unwrap();
+        let s = ds.status();
+        assert!(s.contains("Stairs"), "status should show Stairs, got: {}", s);
     }
 }

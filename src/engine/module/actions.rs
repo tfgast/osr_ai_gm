@@ -88,6 +88,7 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
                 if exit.door == crate::state::dungeon::DoorState::Open {
                     door.module_open = true;
                 }
+                door.connection_type = exit.connection_type;
                 dungeon.add_door(door)?;
                 entry.insert(door_id);
                 door_id += 1;
@@ -615,5 +616,71 @@ mod tests {
         assert_eq!(monsters[0].name, "Goblin");
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn module_to_dungeon_propagates_connection_type() {
+        use crate::rules::module::ConnectionType;
+
+        let json = r#"{
+            "name": "Connection Type Test",
+            "level_range": [1, 3],
+            "entry_room": "hall",
+            "rooms": {
+                "hall": {
+                    "name": "Great Hall",
+                    "description": "A wide hall.",
+                    "exits": [
+                        {"to": "cellar", "door": "closed", "connection_type": "Stairs", "description": "narrow spiral staircase"},
+                        {"to": "pit_room", "door": "open", "connection_type": "Pit"},
+                        {"to": "tower", "door": "closed"}
+                    ]
+                },
+                "cellar": {
+                    "name": "Cellar",
+                    "description": "A dark cellar.",
+                    "exits": [{"to": "hall", "door": "closed", "connection_type": "Stairs"}]
+                },
+                "pit_room": {
+                    "name": "Pit Room",
+                    "description": "A deep pit.",
+                    "exits": [{"to": "hall", "door": "open", "connection_type": "Pit"}]
+                },
+                "tower": {
+                    "name": "Tower",
+                    "description": "A tall tower.",
+                    "exits": [{"to": "hall", "door": "closed"}]
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        // Find the cellar room ID
+        let cellar = dungeon.rooms.iter().find(|r| r.name == "Cellar").unwrap();
+        let hall = dungeon.rooms.iter().find(|r| r.name == "Great Hall").unwrap();
+        let pit_room = dungeon.rooms.iter().find(|r| r.name == "Pit Room").unwrap();
+        let tower = dungeon.rooms.iter().find(|r| r.name == "Tower").unwrap();
+
+        // Stairs to cellar
+        let stairs_door = dungeon.doors.iter().find(|d| {
+            (d.room_a == hall.id && d.room_b == cellar.id)
+                || (d.room_a == cellar.id && d.room_b == hall.id)
+        }).expect("should have stairs door");
+        assert_eq!(stairs_door.connection_type, ConnectionType::Stairs);
+
+        // Pit to pit_room
+        let pit_door = dungeon.doors.iter().find(|d| {
+            (d.room_a == hall.id && d.room_b == pit_room.id)
+                || (d.room_a == pit_room.id && d.room_b == hall.id)
+        }).expect("should have pit door");
+        assert_eq!(pit_door.connection_type, ConnectionType::Pit);
+
+        // Default Door to tower
+        let tower_door = dungeon.doors.iter().find(|d| {
+            (d.room_a == hall.id && d.room_b == tower.id)
+                || (d.room_a == tower.id && d.room_b == hall.id)
+        }).expect("should have tower door");
+        assert_eq!(tower_door.connection_type, ConnectionType::Door);
     }
 }
