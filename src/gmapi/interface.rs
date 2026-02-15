@@ -564,6 +564,7 @@ mod tests {
             morale: 7,
             distance: 60,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
@@ -587,6 +588,7 @@ mod tests {
             morale: 13,
             distance: 60,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(!resp.success);
     }
@@ -605,6 +607,7 @@ mod tests {
             morale: 8,
             distance: 30,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(!resp.success);
         assert!(resp.error.unwrap().contains("already active"));
@@ -635,6 +638,7 @@ mod tests {
             morale: 7,
             distance: 5,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(resp.success);
 
@@ -685,6 +689,7 @@ mod tests {
             morale: 7,
             distance: 10,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
@@ -735,6 +740,7 @@ mod tests {
             morale: 7,
             distance: 10,
             xp_value: Some(5),
+            undead: None,
         })), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
@@ -783,6 +789,7 @@ mod tests {
             morale: 7,
             distance: 10,
             xp_value: Some(5),
+            undead: None,
         })), &mut state);
         assert!(resp.success);
 
@@ -825,6 +832,7 @@ mod tests {
             morale: 7,
             distance: 10,
             xp_value: Some(5),
+            undead: None,
         })), &mut state);
         assert!(resp.success);
 
@@ -858,6 +866,7 @@ mod tests {
             morale: 7,
             distance: 10,
             xp_value: Some(5),
+            undead: None,
         })), &mut state);
         assert!(resp.success);
 
@@ -887,6 +896,7 @@ mod tests {
             morale: 7,
             distance: 10,
             xp_value: Some(5),
+            undead: None,
         })), &mut state);
         assert!(resp.success);
 
@@ -1070,6 +1080,7 @@ mod tests {
             morale: 7,
             distance: 5,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(resp.success);
 
@@ -1113,6 +1124,7 @@ mod tests {
             morale: 7,
             distance: 100,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(resp.success);
         assert_eq!(state.combat.as_ref().unwrap().distance, 100);
@@ -1356,6 +1368,7 @@ mod tests {
             morale: 12,
             distance: 10,
             xp_value: Some(10),
+            undead: None,
         })), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
@@ -1385,6 +1398,7 @@ mod tests {
             morale: 7,
             distance: 60,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(resp.success);
         assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
@@ -1400,6 +1414,7 @@ mod tests {
             morale: 8,
             distance: 30, // ignored for AddMonster (distance is per-combat)
             xp_value: Some(10),
+            undead: None,
         })), &mut state);
         assert!(resp.success, "add_monster should succeed: {:?}", resp.error);
         assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 5);
@@ -1431,6 +1446,7 @@ mod tests {
             morale: 8,
             distance: 30,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(!resp.success);
         assert!(resp.error.unwrap().contains("no active combat"));
@@ -1450,6 +1466,7 @@ mod tests {
             morale: 7,
             distance: 60,
             xp_value: None,
+            undead: None,
         })), &mut state);
         assert!(resp.success);
 
@@ -1464,6 +1481,7 @@ mod tests {
             morale: 10,
             distance: 30,
             xp_value: Some(125),
+            undead: None,
         })), &mut state);
         assert!(resp.success);
         assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 2);

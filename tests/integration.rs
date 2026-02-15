@@ -1209,6 +1209,7 @@ fn mode_transition_idle_exploration_combat_exploration() {
         morale: 12,
         distance: 5,
         xp_value: Some(10),
+        undead: None,
     })), &mut state);
     assert!(resp.success, "spawn encounter failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Combat);
@@ -1286,6 +1287,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
         morale: 8,
         distance: 5,
         xp_value: Some(20),
+        undead: None,
     })), &mut state);
     assert!(resp.success, "spawn encounter failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Combat);
@@ -3297,6 +3299,7 @@ fn playtest2c_wilderness_combat_distance_yards() {
         morale: 8,
         distance: 120, // 120 yards — wilderness scale
         xp_value: Some(10),
+        undead: None,
     })), &mut state);
     assert!(resp.success, "SpawnEncounter should work from wilderness: {}", resp.message);
     assert_eq!(state.mode, GameMode::Combat);
@@ -3558,6 +3561,7 @@ fn playtest2c_wilderness_combat_roundtrip() {
         morale: 7,
         distance: 20,
         xp_value: Some(75),
+        undead: None,
     })), &mut state);
     assert!(resp.success, "SpawnEncounter failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Combat);

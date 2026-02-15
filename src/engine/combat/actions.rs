@@ -33,6 +33,9 @@ pub struct SpawnEncounterParams<'a> {
     pub morale: u32,
     pub distance: u32,
     pub xp_value: Option<u64>,
+    /// If provided, overrides the monster-DB lookup for the undead flag.
+    /// Module monsters not in the core DB should set this explicitly.
+    pub undead: Option<bool>,
 }
 
 pub fn action_spawn_encounter(
@@ -67,7 +70,9 @@ pub fn action_spawn_encounter(
     let xp_per_monster = params.xp_value.unwrap_or_else(|| {
         db_entry.map(|m| m.xp()).unwrap_or(0)
     });
-    let is_undead = db_entry.map(|m| m.is_undead()).unwrap_or(false);
+    let is_undead = params.undead.unwrap_or_else(|| {
+        db_entry.map(|m| m.is_undead()).unwrap_or(false)
+    });
 
     let mut monsters = Vec::new();
     for i in 0..params.count {
@@ -219,7 +224,9 @@ pub fn action_add_monster(
     let xp_per_monster = params.xp_value.unwrap_or_else(|| {
         db_entry.map(|m| m.xp()).unwrap_or(0)
     });
-    let is_undead = db_entry.map(|m| m.is_undead()).unwrap_or(false);
+    let is_undead = params.undead.unwrap_or_else(|| {
+        db_entry.map(|m| m.is_undead()).unwrap_or(false)
+    });
 
     let combat = state.combat.as_mut().unwrap();
     let existing_count = combat.monsters.len();
