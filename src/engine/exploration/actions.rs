@@ -237,6 +237,13 @@ pub fn action_light(
         .as_mut()
         .ok_or_else(|| EngineError::WrongState("not in exploration mode.".to_string()))?;
 
+    if time.lights.iter().any(|l| l.carrier == carrier) {
+        return Err(EngineError::WrongState(format!(
+            "{} already has an active light source.",
+            carrier
+        )));
+    }
+
     time.light(source, carrier);
     Ok(LightResult {
         message: format!("{} lights a {} ({} turns).", carrier, source.name(), source.max_turns()),
