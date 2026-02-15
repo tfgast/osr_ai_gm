@@ -331,6 +331,25 @@ pub fn action_equip(
         )));
     }
 
+    // Prevent equipping a second body armour (shields are fine)
+    let is_body_armour = equipment::find_armour(&character.inventory[idx].name)
+        .map(|a| !a.is_shield())
+        .unwrap_or(false);
+    if is_body_armour {
+        let existing = character.inventory.iter().find(|i| {
+            i.equipped
+                && equipment::find_armour(&i.name)
+                    .map(|a| !a.is_shield())
+                    .unwrap_or(false)
+        });
+        if let Some(worn) = existing {
+            return Err(EngineError::InvalidInput(format!(
+                "{} already has {} equipped. Unequip it first.",
+                character.name, worn.name
+            )));
+        }
+    }
+
     character.inventory[idx].equipped = true;
     let item_display = character.inventory[idx].name.clone();
 
@@ -656,6 +675,21 @@ mod tests {
             (item.weight - 6.0).abs() < 0.01,
             "Sword weight should be 6.0 lbs, got {}",
             item.weight
+        );
+    }
+
+    #[test]
+    fn equip_second_body_armour_rejected() {
+        let mut state = state_with_fighter();
+        action_buy(&mut state, "Aldric", "Leather").expect("buy leather");
+        action_buy(&mut state, "Aldric", "Chainmail").expect("buy chainmail");
+        action_equip(&mut state, "Aldric", "Leather").expect("equip leather");
+        let err = action_equip(&mut state, "Aldric", "Chainmail")
+            .expect_err("should reject second body armour");
+        assert!(
+            err.to_string().contains("already has Leather equipped"),
+            "should mention existing armour: {}",
+            err
         );
     }
 
