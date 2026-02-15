@@ -115,6 +115,10 @@ pub struct PlacedMonsterInstance {
     /// Whether this monster group has been spawned into combat.
     #[serde(default)]
     pub spawned: bool,
+    /// Whether this monster is undead (for Turn Undead).
+    /// Propagated from the module definition so the AI GM can pass it to SpawnEncounter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undead: Option<bool>,
 }
 
 impl PlacedMonsterInstance {
@@ -123,6 +127,7 @@ impl PlacedMonsterInstance {
             name: name.to_string(),
             count,
             spawned: false,
+            undead: None,
         }
     }
 }

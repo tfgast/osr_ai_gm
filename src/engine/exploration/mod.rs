@@ -548,7 +548,8 @@ fn collect_placed_monsters(
         }
     }
     for m in &unspawned {
-        result.msg(format!("Monsters present: {} x{}", m.name, m.count));
+        let undead_tag = if m.undead == Some(true) { " [undead]" } else { "" };
+        result.msg(format!("Monsters present: {} x{}{}", m.name, m.count, undead_tag));
     }
     result.placed_monsters = Some(unspawned);
 }
@@ -1394,6 +1395,33 @@ mod tests {
         // Verify monsters are marked as spawned
         let room = dungeon.find_room(1).unwrap();
         assert!(room.placed_monsters.iter().all(|m| m.spawned), "all monsters should be marked spawned");
+    }
+
+    #[test]
+    fn placed_monsters_report_undead_tag() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = DungeonState::new(1);
+        time.light(LightSourceKind::Lantern, "Test");
+
+        dungeon.add_room(Room::new(0, "Entrance")).unwrap();
+        let mut skeleton = PlacedMonsterInstance::new("Frosted Skeleton", 4);
+        skeleton.undead = Some(true);
+        let spider = PlacedMonsterInstance::new("Ice Spider", 2);
+        let room = Room::new(1, "Bone Crypt")
+            .with_placed_monsters(vec![skeleton, spider]);
+        dungeon.add_room(room).unwrap();
+        dungeon.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0).unwrap();
+        let output = result.to_string();
+        assert!(output.contains("Frosted Skeleton x4 [undead]"), "undead monsters should be tagged: {output}");
+        assert!(output.contains("Ice Spider x2"), "non-undead should not be tagged: {output}");
+        assert!(!output.contains("Ice Spider x2 [undead]"), "non-undead must not have tag");
+
+        let monsters = result.placed_monsters.unwrap();
+        assert_eq!(monsters[0].undead, Some(true));
+        assert_eq!(monsters[1].undead, None);
     }
 
     #[test]

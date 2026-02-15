@@ -48,6 +48,10 @@ pub struct PlacedMonster {
     pub name: String,
     #[serde(default = "default_count")]
     pub count: u32,
+    /// Whether this monster is undead (for Turn Undead).
+    /// If omitted, looked up from the core monster database at spawn time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undead: Option<bool>,
 }
 
 fn default_count() -> u32 {

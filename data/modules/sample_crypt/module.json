@@ -11,7 +11,7 @@
     "guard": {
       "name": "Guard Chamber",
       "description": "Bones litter the floor. Rusted weapons hang on the walls.",
-      "monsters": [{"name": "skeleton", "count": 3}],
+      "monsters": [{"name": "skeleton", "count": 3, "undead": true}],
       "exits": [
         {"to": "entrance", "door": "closed"},
         {"to": "vault", "door": "locked"}

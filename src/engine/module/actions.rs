@@ -41,10 +41,12 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
         room.key = Some((*key).clone());
 
         for placed_monster in &module_room.monsters {
-            room.placed_monsters.push(PlacedMonsterInstance::new(
+            let mut instance = PlacedMonsterInstance::new(
                 &placed_monster.name,
                 placed_monster.count,
-            ));
+            );
+            instance.undead = placed_monster.undead;
+            room.placed_monsters.push(instance);
         }
 
         for placed_treasure in &module_room.treasure {
@@ -276,6 +278,36 @@ mod tests {
         assert_eq!(guard.placed_monsters[0].count, 3);
         assert!(!guard.placed_monsters[0].spawned);
         assert!(!guard.monsters_cleared);
+    }
+
+    #[test]
+    fn module_to_dungeon_propagates_undead() {
+        let json = r#"{
+            "name": "Undead Test",
+            "level_range": [1, 3],
+            "entry_room": "hall",
+            "rooms": {
+                "hall": {
+                    "name": "Hall",
+                    "exits": [{"to": "crypt", "door": "closed"}]
+                },
+                "crypt": {
+                    "name": "Bone Crypt",
+                    "monsters": [
+                        {"name": "Frosted Skeleton", "count": 4, "undead": true},
+                        {"name": "Ice Spider", "count": 2}
+                    ],
+                    "exits": [{"to": "hall", "door": "closed"}]
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        let crypt = dungeon.rooms.iter().find(|r| r.name == "Bone Crypt").unwrap();
+        assert_eq!(crypt.placed_monsters.len(), 2);
+        assert_eq!(crypt.placed_monsters[0].undead, Some(true));
+        assert_eq!(crypt.placed_monsters[1].undead, None);
     }
 
     #[test]
