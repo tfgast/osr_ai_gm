@@ -160,6 +160,28 @@ impl MonsterDef {
             .collect()
     }
 
+    /// Expand attacks into individual attack routines.
+    /// Attack{count:2, name:"claw", damage:"1d3"} becomes [claw/1d3, claw/1d3].
+    pub fn attack_routines(&self) -> Vec<crate::model::MonsterAttackRoutine> {
+        let mut routines = Vec::new();
+        for atk in &self.attacks {
+            let name = if atk.name.is_empty() {
+                atk.raw.clone().unwrap_or_else(|| "attack".to_string())
+            } else {
+                atk.name.clone()
+            };
+            let damage = atk.damage.clone().unwrap_or_else(|| "1d6".to_string());
+            let count = atk.count.max(1);
+            for _ in 0..count {
+                routines.push(crate::model::MonsterAttackRoutine {
+                    name: name.clone(),
+                    damage: damage.clone(),
+                });
+            }
+        }
+        routines
+    }
+
     /// Get XP value (default/first value for variable HD monsters).
     pub fn xp(&self) -> u64 {
         self.xp_value.value()

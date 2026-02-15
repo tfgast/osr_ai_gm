@@ -88,6 +88,31 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
             if m.turned {
                 s.push_str(" [TURNED]");
             }
+            // Show attack routines if the monster has multiple attacks
+            if m.attack_routines.len() > 1 {
+                s.push_str(" — Attacks: ");
+                // Group consecutive identical routines: [claw/1d3, claw/1d3, bite/1d6] → "2×claw (1d3), 1×bite (1d6)"
+                let mut groups: Vec<(String, String, usize)> = Vec::new();
+                for r in &m.attack_routines {
+                    if let Some(last) = groups.last_mut() {
+                        if last.0 == r.name && last.1 == r.damage {
+                            last.2 += 1;
+                            continue;
+                        }
+                    }
+                    groups.push((r.name.clone(), r.damage.clone(), 1));
+                }
+                let parts: Vec<String> = groups.iter()
+                    .map(|(name, dmg, count)| format!("{}×{} ({})", count, name, dmg))
+                    .collect();
+                s.push_str(&parts.join(", "));
+                // Show remaining attacks this round
+                let used = combat.monsters_attacked_this_round.get(&i).copied().unwrap_or(0);
+                let remaining = m.attack_routines.len() - used;
+                if remaining < m.attack_routines.len() {
+                    s.push_str(&format!(" [{}/{} used]", used, m.attack_routines.len()));
+                }
+            }
             s
         } else {
             "DEAD".to_string()
@@ -236,6 +261,7 @@ mod tests {
             helpless: false,
             undead: false,
             immune_to_normal_weapons: false,
+            attack_routines: vec![],
             effects: vec![],
         }
     }
@@ -255,6 +281,7 @@ mod tests {
             helpless: false,
             undead: true,
             immune_to_normal_weapons: false,
+            attack_routines: vec![],
             effects: vec![],
         }
     }
@@ -274,6 +301,7 @@ mod tests {
             helpless: false,
             undead: false,
             immune_to_normal_weapons: false,
+            attack_routines: vec![],
             effects: vec![],
         }
     }
@@ -979,6 +1007,7 @@ mod tests {
             helpless: false,
             undead: true,
             immune_to_normal_weapons: false,
+            attack_routines: vec![],
             effects: vec![],
         };
         // Also add a weak skeleton
@@ -1147,6 +1176,7 @@ mod tests {
             helpless: false,
             undead: false,
             immune_to_normal_weapons: false,
+            attack_routines: vec![],
             effects: vec![],
         };
         let mut combat = CombatState::new(vec![ogre.clone(), ogre.clone(), ogre], 10);

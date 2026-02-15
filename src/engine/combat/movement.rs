@@ -123,7 +123,7 @@ pub fn retreat_with<R: Rng>(
             if !character.is_alive() {
                 break;
             }
-            let atk = monster_attack_modified_with(combat, monster_idx, character, 2, rng);
+            let atk = monster_attack_modified_with(combat, monster_idx, character, 2, None, rng);
             free_attacks.push(atk);
         }
     }

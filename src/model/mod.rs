@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use crate::log_entry::LogEntry;
@@ -7,6 +7,15 @@ use crate::rules::attack::HitDice;
 use crate::rules::class::Class;
 use crate::rules::save::SavingThrows;
 use crate::state::effect::ActiveEffect;
+
+/// A single attack routine a monster can perform each round.
+/// For a bear with "2 claws (1d3), 1 bite (1d6)", this expands to three entries:
+/// claw/1d3, claw/1d3, bite/1d6.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonsterAttackRoutine {
+    pub name: String,
+    pub damage: String,
+}
 
 /// Character ability scores.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -119,6 +128,10 @@ pub struct Monster {
     /// Whether this monster is immune to non-magical weapons.
     #[serde(default)]
     pub immune_to_normal_weapons: bool,
+    /// Individual attack routines (e.g., claw/1d3, claw/1d3, bite/1d6).
+    /// Each entry is one attack roll the monster makes per round.
+    #[serde(default)]
+    pub attack_routines: Vec<MonsterAttackRoutine>,
     /// Active effects on this monster.
     #[serde(default)]
     pub effects: Vec<ActiveEffect>,
@@ -140,6 +153,7 @@ impl Monster {
             helpless: false,
             undead: false,
             immune_to_normal_weapons: false,
+            attack_routines: Vec::new(),
             effects: Vec::new(),
         }
     }
@@ -314,9 +328,9 @@ pub struct CombatState {
     /// Combat log length after the last initiative roll (to detect repeated rolls).
     #[serde(default)]
     pub log_len_at_initiative: usize,
-    /// Monsters that have already attacked this round (by index).
+    /// Attacks used by each monster this round (monster_idx → attacks_used).
     #[serde(default)]
-    pub monsters_attacked_this_round: HashSet<usize>,
+    pub monsters_attacked_this_round: HashMap<usize, usize>,
     /// Characters who have already acted (attacked/backstabbed) this round.
     #[serde(default)]
     pub characters_acted: Vec<String>,
@@ -341,7 +355,7 @@ impl CombatState {
             half_killed_checked: false,
             initial_monster_count: initial_count,
             log_len_at_initiative: 0,
-            monsters_attacked_this_round: HashSet::new(),
+            monsters_attacked_this_round: HashMap::new(),
             characters_acted: Vec::new(),
         }
     }

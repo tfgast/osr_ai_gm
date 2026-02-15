@@ -180,15 +180,18 @@ impl From<CoreCoupDeGraceResult> for AttackResult {
 pub struct MonsterAttackResult {
     pub message: String,
     pub attack: AttackResult,
+    pub attack_routine: String,
+    pub attacks_remaining: usize,
 }
 
-impl From<CoreAttackResult> for MonsterAttackResult {
-    fn from(value: CoreAttackResult) -> Self {
-        let attack = AttackResult::from(value);
-        Self {
-            message: attack.message.clone(),
-            attack,
+impl MonsterAttackResult {
+    pub fn new(core: CoreAttackResult, attack_routine: String, attacks_remaining: usize) -> Self {
+        let attack = AttackResult::from(core);
+        let mut message = attack.message.clone();
+        if attacks_remaining > 0 {
+            message.push_str(&format!(" ({} attack(s) remaining)", attacks_remaining));
         }
+        Self { message, attack, attack_routine, attacks_remaining }
     }
 }
 

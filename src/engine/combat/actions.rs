@@ -94,7 +94,13 @@ pub fn action_spawn_encounter(
         monster.damage = params.damage.to_string();
         monster.morale = params.morale;
         monster.xp_value = xp_per_monster;
-        monster.attacks = vec!["attack".to_string()];
+        monster.attacks = db_entry.map(|d| d.attack_names()).unwrap_or_else(|| vec!["attack".to_string()]);
+        monster.attack_routines = db_entry.map(|d| d.attack_routines()).unwrap_or_else(|| {
+            vec![crate::model::MonsterAttackRoutine {
+                name: "attack".to_string(),
+                damage: params.damage.to_string(),
+            }]
+        });
         monster.undead = is_undead;
         monster.immune_to_normal_weapons = is_immune;
         monsters.push(monster);
@@ -169,6 +175,7 @@ pub fn action_spawn_monster(
         m.morale = def.morale;
         m.xp_value = def.xp();
         m.attacks = def.attack_names();
+        m.attack_routines = def.attack_routines();
         m.undead = def.is_undead();
         m.immune_to_normal_weapons = def.immune_to_normal_weapons();
         monsters.push(m);
@@ -299,6 +306,7 @@ pub fn action_spawn_placed(
                     m.morale = def.morale;
                     m.xp_value = def.xp();
                     m.attacks = def.attack_names();
+                    m.attack_routines = def.attack_routines();
                     m.undead = is_undead;
                     m.immune_to_normal_weapons = is_immune;
                     monsters.push(m);
@@ -426,7 +434,13 @@ pub fn action_add_monster(
         monster.damage = params.damage.to_string();
         monster.morale = params.morale;
         monster.xp_value = xp_per_monster;
-        monster.attacks = vec!["attack".to_string()];
+        monster.attacks = db_entry.map(|d| d.attack_names()).unwrap_or_else(|| vec!["attack".to_string()]);
+        monster.attack_routines = db_entry.map(|d| d.attack_routines()).unwrap_or_else(|| {
+            vec![crate::model::MonsterAttackRoutine {
+                name: "attack".to_string(),
+                damage: params.damage.to_string(),
+            }]
+        });
         monster.undead = is_undead;
         monster.immune_to_normal_weapons = is_immune;
         combat.monsters.push(monster);
@@ -633,10 +647,12 @@ pub fn action_monster_attack(
                 combat.monsters[monster_idx].name
             )));
         }
-        if combat.monsters_attacked_this_round.contains(&monster_idx) {
+        let attacks_used = combat.monsters_attacked_this_round.get(&monster_idx).copied().unwrap_or(0);
+        let max_attacks = combat.monsters[monster_idx].attack_routines.len().max(1);
+        if attacks_used >= max_attacks {
             return Err(EngineError::InvalidInput(format!(
-                "{} has already attacked this round.",
-                combat.monsters[monster_idx].name
+                "{} has already used all {} attack(s) this round.",
+                combat.monsters[monster_idx].name, max_attacks
             )));
         }
         // Monsters use melee attacks — require melee distance (≤10')
@@ -659,9 +675,16 @@ pub fn action_monster_attack(
     }
 
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
-    let result = monster_attack(combat, monster_idx, character);
-    combat.monsters_attacked_this_round.insert(monster_idx);
-    Ok(MonsterAttackResult::from(result))
+    let attacks_used = combat.monsters_attacked_this_round.get(&monster_idx).copied().unwrap_or(0);
+    let max_attacks = combat.monsters[monster_idx].attack_routines.len().max(1);
+    let result = monster_attack(combat, monster_idx, character, attacks_used);
+    *combat.monsters_attacked_this_round.entry(monster_idx).or_insert(0) += 1;
+    let attacks_remaining = max_attacks - (attacks_used + 1);
+    let routine_name = combat.monsters[monster_idx].attack_routines
+        .get(attacks_used)
+        .map(|r| r.name.clone())
+        .unwrap_or_else(|| "attack".to_string());
+    Ok(MonsterAttackResult::new(result, routine_name, attacks_remaining))
 }
 
 pub fn action_morale(
@@ -1457,8 +1480,8 @@ mod tests {
         assert!(result.is_err(), "second monster attack should be rejected");
         let err = result.unwrap_err().to_string();
         assert!(
-            err.contains("already attacked this round"),
-            "expected 'already attacked' guard, got: {}",
+            err.contains("already used all"),
+            "expected 'already used all attacks' guard, got: {}",
             err
         );
     }
@@ -2477,5 +2500,101 @@ mod tests {
         assert_eq!(result.unresolved, vec!["Unknown Horror"]);
         assert!(result.message.contains("WARNING"));
         assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 2);
+    }
+
+    // --- multi-attack tests (oag-jukza) ---
+
+    fn mk_multi_attack_monster(name: &str) -> Monster {
+        let mut m = Monster::new(name, "5".parse().unwrap());
+        m.hp = 20;
+        m.max_hp = 20;
+        m.ac = 5;
+        m.damage = "1d8 / 1d8 / 2d6".to_string();
+        m.morale = 9;
+        m.xp_value = 175;
+        m.attacks = vec!["claw".to_string(), "claw".to_string(), "bite".to_string()];
+        m.attack_routines = vec![
+            crate::model::MonsterAttackRoutine { name: "claw".to_string(), damage: "1d8".to_string() },
+            crate::model::MonsterAttackRoutine { name: "claw".to_string(), damage: "1d8".to_string() },
+            crate::model::MonsterAttackRoutine { name: "bite".to_string(), damage: "2d6".to_string() },
+        ];
+        m
+    }
+
+    fn state_with_multi_attack_monster() -> GameState {
+        let mut state = GameState::new();
+        let mut fighter = test_fighter();
+        fighter.hp = 100;
+        fighter.max_hp = 100;
+        state.party.add_member(fighter);
+        state.mode = GameMode::Combat;
+        state.pre_combat_mode = Some(GameMode::Idle);
+        state.combat = Some(CombatState::new(vec![mk_multi_attack_monster("Cave Bear")], 5));
+        state
+    }
+
+    #[test]
+    fn multi_attack_monster_can_attack_three_times() {
+        let mut state = state_with_multi_attack_monster();
+        let _ = action_roll_initiative(&mut state);
+
+        // First attack (claw 1)
+        let r1 = action_monster_attack(&mut state, 0, "Grond");
+        assert!(r1.is_ok(), "first attack should succeed");
+        let r1 = r1.unwrap();
+        assert_eq!(r1.attack_routine, "claw");
+        assert_eq!(r1.attacks_remaining, 2);
+
+        // Second attack (claw 2)
+        let r2 = action_monster_attack(&mut state, 0, "Grond");
+        assert!(r2.is_ok(), "second attack should succeed");
+        let r2 = r2.unwrap();
+        assert_eq!(r2.attack_routine, "claw");
+        assert_eq!(r2.attacks_remaining, 1);
+
+        // Third attack (bite)
+        let r3 = action_monster_attack(&mut state, 0, "Grond");
+        assert!(r3.is_ok(), "third attack should succeed");
+        let r3 = r3.unwrap();
+        assert_eq!(r3.attack_routine, "bite");
+        assert_eq!(r3.attacks_remaining, 0);
+
+        // Fourth attack should be rejected
+        let r4 = action_monster_attack(&mut state, 0, "Grond");
+        assert!(r4.is_err(), "fourth attack should be rejected");
+        assert!(r4.unwrap_err().to_string().contains("already used all 3 attack(s)"));
+    }
+
+    #[test]
+    fn single_attack_monster_still_blocked_after_one() {
+        let mut state = state_with_melee_combat();
+        let _ = action_roll_initiative(&mut state);
+
+        let r1 = action_monster_attack(&mut state, 0, "Grond");
+        assert!(r1.is_ok());
+        let r1 = r1.unwrap();
+        assert_eq!(r1.attacks_remaining, 0);
+
+        let r2 = action_monster_attack(&mut state, 0, "Grond");
+        assert!(r2.is_err());
+    }
+
+    #[test]
+    fn multi_attack_resets_on_new_round() {
+        let mut state = state_with_multi_attack_monster();
+        let _ = action_roll_initiative(&mut state);
+
+        // Use all 3 attacks
+        let _ = action_monster_attack(&mut state, 0, "Grond");
+        let _ = action_monster_attack(&mut state, 0, "Grond");
+        let _ = action_monster_attack(&mut state, 0, "Grond");
+
+        // New round
+        let _ = action_roll_initiative(&mut state);
+
+        // Should be able to attack again
+        let r = action_monster_attack(&mut state, 0, "Grond");
+        assert!(r.is_ok(), "monster should attack in new round");
+        assert_eq!(r.unwrap().attacks_remaining, 2);
     }
 }

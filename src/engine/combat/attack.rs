@@ -364,14 +364,15 @@ pub fn character_missile_attack_with<R: Rng>(
 // Monster Attack
 // =============================================================================
 
-/// Resolve a monster's attack against a character.
-/// Applies damage to the character directly and handles spell disruption.
+/// Resolve a monster's attack against a character using a specific attack routine.
+/// `routine_idx` selects which attack routine to use for damage dice.
 pub fn monster_attack(
     combat: &mut CombatState,
     monster_idx: usize,
     character: &mut Character,
+    routine_idx: usize,
 ) -> AttackResult {
-    monster_attack_with(combat, monster_idx, character, &mut rand::thread_rng())
+    monster_attack_modified_with(combat, monster_idx, character, 0, Some(routine_idx), &mut rand::thread_rng())
 }
 
 pub fn monster_attack_with<R: Rng>(
@@ -380,16 +381,19 @@ pub fn monster_attack_with<R: Rng>(
     character: &mut Character,
     rng: &mut R,
 ) -> AttackResult {
-    monster_attack_modified_with(combat, monster_idx, character, 0, rng)
+    monster_attack_modified_with(combat, monster_idx, character, 0, None, rng)
 }
 
 /// Resolve a monster's attack against a character with an explicit hit modifier.
 /// Used for normal attacks (modifier=0) and free attacks on retreat (modifier=+2).
+/// When `routine_idx` is Some, uses that attack routine's damage dice; otherwise
+/// falls back to the monster's default damage string.
 pub(super) fn monster_attack_modified_with<R: Rng>(
     combat: &mut CombatState,
     monster_idx: usize,
     character: &mut Character,
     modifier: i32,
+    routine_idx: Option<usize>,
     rng: &mut R,
 ) -> AttackResult {
     assert!(
@@ -402,7 +406,11 @@ pub(super) fn monster_attack_modified_with<R: Rng>(
     let hd = monster.hit_dice.combat_hd();
     let thac0 = attack::monster_thac0(hd);
     let target_ac = character.ac;
-    let damage_dice = if monster.damage.is_empty() { "1d6" } else { &monster.damage };
+    let routine_damage = routine_idx.and_then(|i| monster.attack_routines.get(i).map(|r| r.damage.clone()));
+    let damage_dice: &str = match &routine_damage {
+        Some(d) => d,
+        None => if monster.damage.is_empty() { "1d6" } else { &monster.damage },
+    };
 
     let roll = rng.gen_range(1..=20u32);
     let modifiers = modifier;
