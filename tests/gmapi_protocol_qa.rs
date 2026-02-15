@@ -1471,6 +1471,35 @@ fn light_not_exploring() {
     assert!(!resp.success);
 }
 
+#[test]
+fn light_duplicate_carrier_rejected() {
+    let mut state = GameState::new();
+    setup_exploration(&mut state);
+
+    // First light succeeds
+    let resp = handle_request(&req("l5", GMCommand::Light {
+        source: LightSourceKind::Torch,
+        carrier: "Aldric".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    // Second light on same carrier fails
+    let resp = handle_request(&req("l6", GMCommand::Light {
+        source: LightSourceKind::Torch,
+        carrier: "Aldric".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.message.contains("already has an active light source"));
+
+    // Different carrier still works
+    let resp = handle_request(&req("l7", GMCommand::Light {
+        source: LightSourceKind::Lantern,
+        carrier: "Berta".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+    assert_eq!(state.time.as_ref().unwrap().lights.len(), 2);
+}
+
 // ===========================================================================
 // 22. EnterWilderness
 // ===========================================================================
