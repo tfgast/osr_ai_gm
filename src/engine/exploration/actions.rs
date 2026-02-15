@@ -41,6 +41,14 @@ pub fn action_move_through_door(
         .ok_or_else(|| EngineError::WrongState("no dungeon state.".to_string()))?;
 
     let result = move_through_door(time, dungeon, level, door_id).map_err(EngineError::InvalidInput)?;
+
+    // Sync GameState.dungeon_level after cross-level transition
+    if let Some(ref dungeon) = state.dungeon {
+        if dungeon.level != state.dungeon_level {
+            state.dungeon_level = dungeon.level;
+        }
+    }
+
     Ok(MoveThroughDoorResult::from(result))
 }
 

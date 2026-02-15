@@ -2,7 +2,7 @@
 //! Modules are prewritten dungeon adventures with rooms, monsters, treasure, and exits.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -20,6 +20,21 @@ pub struct ModuleDef {
     #[serde(default)]
     pub sections: HashMap<String, String>,
     pub rooms: HashMap<String, ModuleRoom>,
+    /// Dungeon levels. Keys are level identifiers (e.g. "surface", "depths").
+    /// When defined, every room must be assigned to exactly one level.
+    #[serde(default)]
+    pub levels: HashMap<String, ModuleLevel>,
+}
+
+/// A dungeon level within a multi-level module.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleLevel {
+    pub name: String,
+    pub dungeon_level: u32,
+    /// Optional reference to a wandering monster table for this level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wandering_table: Option<String>,
+    pub rooms: Vec<String>,
 }
 
 /// A room within an adventure module.
@@ -270,6 +285,36 @@ fn validate_module(module: &ModuleDef) -> Result<(), String> {
         ));
     }
 
+    // Validate levels if defined
+    if !module.levels.is_empty() {
+        let mut assigned_rooms: HashSet<&str> = HashSet::new();
+        for (level_key, level) in &module.levels {
+            for room_key in &level.rooms {
+                if !module.rooms.contains_key(room_key) {
+                    return Err(format!(
+                        "Module '{}': level '{}' references non-existent room '{}'",
+                        module.name, level_key, room_key
+                    ));
+                }
+                if !assigned_rooms.insert(room_key.as_str()) {
+                    return Err(format!(
+                        "Module '{}': room '{}' assigned to multiple levels",
+                        module.name, room_key
+                    ));
+                }
+            }
+        }
+        // All rooms must be assigned to exactly one level
+        for room_key in module.rooms.keys() {
+            if !assigned_rooms.contains(room_key.as_str()) {
+                return Err(format!(
+                    "Module '{}': room '{}' not assigned to any level",
+                    module.name, room_key
+                ));
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -453,6 +498,7 @@ mod tests {
             entry_room: "nonexistent".to_string(),
             sections: HashMap::new(),
             rooms: HashMap::new(),
+            levels: HashMap::new(),
         };
         assert!(validate_module(&module).is_err());
     }
@@ -480,6 +526,7 @@ mod tests {
             entry_room: "start".to_string(),
             sections: HashMap::new(),
             rooms,
+            levels: HashMap::new(),
         };
         assert!(validate_module(&module).is_err());
     }
@@ -502,6 +549,7 @@ mod tests {
             entry_room: "start".to_string(),
             sections: HashMap::new(),
             rooms,
+            levels: HashMap::new(),
         };
         assert!(validate_module(&module).is_err());
     }
@@ -549,6 +597,7 @@ mod tests {
             entry_room: "room_a".to_string(),
             sections: HashMap::new(),
             rooms,
+            levels: HashMap::new(),
         };
         let err = validate_module(&module).unwrap_err();
         assert!(err.contains("conflicting door states"), "expected conflict error, got: {}", err);
@@ -591,6 +640,7 @@ mod tests {
             entry_room: "room_a".to_string(),
             sections: HashMap::new(),
             rooms,
+            levels: HashMap::new(),
         };
         assert!(validate_module(&module).is_ok());
     }
@@ -830,5 +880,203 @@ mod tests {
         assert!(result.is_err());
 
         std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn parse_module_with_levels() {
+        let json = r#"{
+            "name": "Multi-Level Dungeon",
+            "level_range": [1, 3],
+            "entry_room": "entrance",
+            "levels": {
+                "surface": {
+                    "name": "Surface Level",
+                    "dungeon_level": 1,
+                    "rooms": ["entrance", "guard"]
+                },
+                "depths": {
+                    "name": "The Depths",
+                    "dungeon_level": 2,
+                    "wandering_table": "depths_wandering",
+                    "rooms": ["vault"]
+                }
+            },
+            "rooms": {
+                "entrance": {
+                    "name": "Cave Mouth",
+                    "exits": [{"to": "guard", "door": "open"}]
+                },
+                "guard": {
+                    "name": "Guard Post",
+                    "exits": [
+                        {"to": "entrance", "door": "open"},
+                        {"to": "vault", "door": "closed", "connection_type": "Stairs"}
+                    ]
+                },
+                "vault": {
+                    "name": "Deep Vault",
+                    "exits": [{"to": "guard", "door": "closed", "connection_type": "Stairs"}]
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        assert_eq!(module.levels.len(), 2);
+        let surface = &module.levels["surface"];
+        assert_eq!(surface.name, "Surface Level");
+        assert_eq!(surface.dungeon_level, 1);
+        assert_eq!(surface.rooms, vec!["entrance", "guard"]);
+        assert!(surface.wandering_table.is_none());
+        let depths = &module.levels["depths"];
+        assert_eq!(depths.name, "The Depths");
+        assert_eq!(depths.dungeon_level, 2);
+        assert_eq!(depths.wandering_table, Some("depths_wandering".to_string()));
+        assert_eq!(depths.rooms, vec!["vault"]);
+    }
+
+    #[test]
+    fn levels_default_to_empty() {
+        let module: ModuleDef = serde_json::from_str(sample_module_json()).unwrap();
+        assert!(module.levels.is_empty());
+    }
+
+    #[test]
+    fn validate_level_references_nonexistent_room() {
+        let mut rooms = HashMap::new();
+        rooms.insert("start".to_string(), ModuleRoom {
+            name: "Start".to_string(),
+            description: String::new(),
+            monsters: Vec::new(),
+            treasure: Vec::new(),
+            trap: None,
+            trap_trigger: TrapTrigger::Entry,
+            exits: Vec::new(),
+        });
+        let mut levels = HashMap::new();
+        levels.insert("floor1".to_string(), ModuleLevel {
+            name: "Floor 1".to_string(),
+            dungeon_level: 1,
+            wandering_table: None,
+            rooms: vec!["start".to_string(), "nonexistent".to_string()],
+        });
+        let module = ModuleDef {
+            name: "Bad Level Ref".to_string(),
+            level_range: (1, 2),
+            entry_room: "start".to_string(),
+            sections: HashMap::new(),
+            rooms,
+            levels,
+        };
+        let err = validate_module(&module).unwrap_err();
+        assert!(err.contains("non-existent room"), "expected non-existent room error, got: {}", err);
+    }
+
+    #[test]
+    fn validate_room_in_multiple_levels() {
+        let mut rooms = HashMap::new();
+        rooms.insert("shared".to_string(), ModuleRoom {
+            name: "Shared Room".to_string(),
+            description: String::new(),
+            monsters: Vec::new(),
+            treasure: Vec::new(),
+            trap: None,
+            trap_trigger: TrapTrigger::Entry,
+            exits: Vec::new(),
+        });
+        let mut levels = HashMap::new();
+        levels.insert("floor1".to_string(), ModuleLevel {
+            name: "Floor 1".to_string(),
+            dungeon_level: 1,
+            wandering_table: None,
+            rooms: vec!["shared".to_string()],
+        });
+        levels.insert("floor2".to_string(), ModuleLevel {
+            name: "Floor 2".to_string(),
+            dungeon_level: 2,
+            wandering_table: None,
+            rooms: vec!["shared".to_string()],
+        });
+        let module = ModuleDef {
+            name: "Multi Assign".to_string(),
+            level_range: (1, 2),
+            entry_room: "shared".to_string(),
+            sections: HashMap::new(),
+            rooms,
+            levels,
+        };
+        let err = validate_module(&module).unwrap_err();
+        assert!(err.contains("multiple levels"), "expected multiple levels error, got: {}", err);
+    }
+
+    #[test]
+    fn validate_room_not_assigned_to_level() {
+        let mut rooms = HashMap::new();
+        rooms.insert("assigned".to_string(), ModuleRoom {
+            name: "Assigned".to_string(),
+            description: String::new(),
+            monsters: Vec::new(),
+            treasure: Vec::new(),
+            trap: None,
+            trap_trigger: TrapTrigger::Entry,
+            exits: Vec::new(),
+        });
+        rooms.insert("orphan".to_string(), ModuleRoom {
+            name: "Orphan".to_string(),
+            description: String::new(),
+            monsters: Vec::new(),
+            treasure: Vec::new(),
+            trap: None,
+            trap_trigger: TrapTrigger::Entry,
+            exits: Vec::new(),
+        });
+        let mut levels = HashMap::new();
+        levels.insert("floor1".to_string(), ModuleLevel {
+            name: "Floor 1".to_string(),
+            dungeon_level: 1,
+            wandering_table: None,
+            rooms: vec!["assigned".to_string()],
+        });
+        let module = ModuleDef {
+            name: "Missing Room".to_string(),
+            level_range: (1, 2),
+            entry_room: "assigned".to_string(),
+            sections: HashMap::new(),
+            rooms,
+            levels,
+        };
+        let err = validate_module(&module).unwrap_err();
+        assert!(err.contains("not assigned to any level"), "expected unassigned error, got: {}", err);
+    }
+
+    #[test]
+    fn validate_module_with_valid_levels() {
+        let json = r#"{
+            "name": "Valid Multi-Level",
+            "level_range": [1, 3],
+            "entry_room": "entrance",
+            "levels": {
+                "surface": {
+                    "name": "Surface",
+                    "dungeon_level": 1,
+                    "rooms": ["entrance"]
+                },
+                "depths": {
+                    "name": "Depths",
+                    "dungeon_level": 2,
+                    "rooms": ["vault"]
+                }
+            },
+            "rooms": {
+                "entrance": {
+                    "name": "Entrance",
+                    "exits": [{"to": "vault", "door": "closed", "connection_type": "Stairs"}]
+                },
+                "vault": {
+                    "name": "Vault",
+                    "exits": [{"to": "entrance", "door": "closed", "connection_type": "Stairs"}]
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        assert!(validate_module(&module).is_ok());
     }
 }

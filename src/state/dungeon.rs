@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::log_entry::LogEntry;
 use crate::rules::module::ConnectionType;
@@ -171,6 +171,9 @@ pub struct Room {
     /// Module room key for cross-referencing (e.g., "entrance", "guard").
     #[serde(default)]
     pub key: Option<String>,
+    /// Level key this room belongs to (for multi-level modules).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_key: Option<String>,
     /// Monsters placed by module definition.
     #[serde(default)]
     pub placed_monsters: Vec<PlacedMonsterInstance>,
@@ -196,6 +199,7 @@ impl Room {
             trap_triggered: false,
             trap_trigger: TrapTrigger::Entry,
             key: None,
+            level_key: None,
             placed_monsters: Vec::new(),
             placed_treasure: Vec::new(),
             monsters_cleared: false,
@@ -234,6 +238,13 @@ impl Room {
     }
 }
 
+/// Result of a cross-level movement (e.g., going down stairs to a deeper level).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LevelTransition {
+    pub from_level: u32,
+    pub to_level: u32,
+}
+
 /// Tracks the dungeon map: rooms, doors, exploration state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DungeonState {
@@ -249,6 +260,12 @@ pub struct DungeonState {
     /// Monotonic sequence counter for log entry ordering.
     #[serde(default)]
     pub log_seq: u64,
+    /// Current level key in a multi-level module (e.g., "surface", "depths").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_level_key: Option<String>,
+    /// Maps level keys to dungeon level numbers for cross-level transitions.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub level_map: HashMap<String, u32>,
 }
 
 impl DungeonState {
@@ -264,6 +281,8 @@ impl DungeonState {
             current_room: None,
             log: Vec::new(),
             log_seq: 0,
+            current_level_key: None,
+            level_map: HashMap::new(),
         }
     }
 
@@ -305,7 +324,9 @@ impl DungeonState {
 
     /// Move to a room by ID. Requires a passable door connecting the
     /// current room to the destination (prevents teleportation).
-    pub fn move_to(&mut self, room_id: u32) -> Result<(), String> {
+    /// If the destination room is on a different level, updates
+    /// `current_level_key` and `level` accordingly.
+    pub fn move_to(&mut self, room_id: u32) -> Result<Option<LevelTransition>, String> {
         let current = self.current_room
             .ok_or_else(|| "no current room set".to_string())?;
         if !self.rooms.iter().any(|r| r.id == room_id) {
@@ -323,9 +344,31 @@ impl DungeonState {
                 current, room_id
             ));
         }
+
+        // Check for cross-level transition
+        let dest_level_key = self.rooms.iter()
+            .find(|r| r.id == room_id)
+            .and_then(|r| r.level_key.clone());
+        let transition = if let Some(ref dlk) = dest_level_key {
+            if self.current_level_key.as_ref() != Some(dlk) {
+                if let Some(&new_dl) = self.level_map.get(dlk) {
+                    let old_level = self.level;
+                    self.level = new_dl;
+                    self.current_level_key = Some(dlk.clone());
+                    Some(LevelTransition { from_level: old_level, to_level: new_dl })
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         self.current_room = Some(room_id);
         self.explored.insert(room_id);
-        Ok(())
+        Ok(transition)
     }
 
     /// Find a room by ID.
@@ -377,9 +420,13 @@ impl DungeonState {
             }
             None => ("none".to_string(), "no rooms"),
         };
+        let level_label = match &self.current_level_key {
+            Some(key) => format!("Dungeon Level: {} ({})", self.level, key),
+            None => format!("Dungeon Level: {}", self.level),
+        };
         let mut out = format!(
-            "Dungeon Level: {}  Room: {} ({})\nExplored: {} rooms",
-            self.level, room_id_str, room_name, self.explored.len()
+            "{}  Room: {} ({})\nExplored: {} rooms",
+            level_label, room_id_str, room_name, self.explored.len()
         );
         let doors = self.doors_from_current();
         if !doors.is_empty() {
@@ -600,6 +647,7 @@ mod tests {
         assert_eq!(room.id, 1);
         assert_eq!(room.name, "Old Room");
         assert!(room.key.is_none());
+        assert!(room.level_key.is_none());
         assert!(room.placed_monsters.is_empty());
         assert!(room.placed_treasure.is_empty());
         assert!(!room.monsters_cleared);
@@ -712,5 +760,99 @@ mod tests {
         ds.add_door(door).unwrap();
         let s = ds.status();
         assert!(s.contains("Stairs"), "status should show Stairs, got: {}", s);
+    }
+
+    #[test]
+    fn move_to_cross_level_returns_transition() {
+        let mut ds = DungeonState::new(1);
+        let mut r0 = Room::new(0, "Surface");
+        r0.level_key = Some("surface".to_string());
+        ds.add_room(r0).unwrap();
+        let mut r1 = Room::new(1, "Deep");
+        r1.level_key = Some("depths".to_string());
+        ds.add_room(r1).unwrap();
+        ds.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+        ds.level_map.insert("surface".to_string(), 1);
+        ds.level_map.insert("depths".to_string(), 2);
+        ds.current_level_key = Some("surface".to_string());
+
+        let transition = ds.move_to(1).unwrap();
+        assert_eq!(transition, Some(LevelTransition { from_level: 1, to_level: 2 }));
+        assert_eq!(ds.level, 2);
+        assert_eq!(ds.current_level_key, Some("depths".to_string()));
+    }
+
+    #[test]
+    fn move_to_same_level_returns_none() {
+        let mut ds = DungeonState::new(1);
+        let mut r0 = Room::new(0, "Hall A");
+        r0.level_key = Some("surface".to_string());
+        ds.add_room(r0).unwrap();
+        let mut r1 = Room::new(1, "Hall B");
+        r1.level_key = Some("surface".to_string());
+        ds.add_room(r1).unwrap();
+        ds.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+        ds.level_map.insert("surface".to_string(), 1);
+        ds.current_level_key = Some("surface".to_string());
+
+        let transition = ds.move_to(1).unwrap();
+        assert_eq!(transition, None);
+        assert_eq!(ds.level, 1);
+    }
+
+    #[test]
+    fn move_to_without_level_keys_returns_none() {
+        let mut ds = sample_dungeon();
+        ds.find_door_mut(0).unwrap().state = DoorState::Open;
+        let transition = ds.move_to(1).unwrap();
+        assert_eq!(transition, None);
+    }
+
+    #[test]
+    fn old_dungeon_json_loads_without_level_fields() {
+        let old_json = r#"{
+            "level": 1,
+            "rooms": [],
+            "doors": [],
+            "explored": [],
+            "current_room": null,
+            "log": [],
+            "log_seq": 0
+        }"#;
+        let ds: DungeonState = serde_json::from_str(old_json).unwrap();
+        assert!(ds.current_level_key.is_none());
+        assert!(ds.level_map.is_empty());
+    }
+
+    #[test]
+    fn dungeon_level_fields_round_trip() {
+        let mut ds = DungeonState::new(1);
+        ds.current_level_key = Some("depths".to_string());
+        ds.level_map.insert("surface".to_string(), 1);
+        ds.level_map.insert("depths".to_string(), 2);
+
+        let json = serde_json::to_string(&ds).unwrap();
+        let loaded: DungeonState = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.current_level_key, Some("depths".to_string()));
+        assert_eq!(loaded.level_map["surface"], 1);
+        assert_eq!(loaded.level_map["depths"], 2);
+    }
+
+    #[test]
+    fn status_shows_level_key() {
+        let mut ds = DungeonState::new(1);
+        ds.current_level_key = Some("surface".to_string());
+        ds.add_room(Room::new(0, "Hall")).unwrap();
+        let s = ds.status();
+        assert!(s.contains("Level: 1 (surface)"), "status should show level key, got: {}", s);
+    }
+
+    #[test]
+    fn status_without_level_key() {
+        let mut ds = DungeonState::new(1);
+        ds.add_room(Room::new(0, "Hall")).unwrap();
+        let s = ds.status();
+        assert!(s.contains("Dungeon Level: 1  Room:"), "status should show level without key: {}", s);
+        assert!(!s.contains("Level: 1 ("), "should not have level key parenthetical: {}", s);
     }
 }

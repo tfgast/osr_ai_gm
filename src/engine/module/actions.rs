@@ -65,6 +65,26 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
     dungeon.current_room = Some(entry_id);
     dungeon.explored.insert(entry_id);
 
+    // Set up multi-level info if levels are defined
+    if !module.levels.is_empty() {
+        // Build room-to-level mapping and assign level_key to each room
+        for (level_key, level) in &module.levels {
+            dungeon.level_map.insert(level_key.clone(), level.dungeon_level);
+            for room_key in &level.rooms {
+                if let Some(&room_id) = room_id_map.get(room_key) {
+                    if let Some(room) = dungeon.find_room_mut(room_id) {
+                        room.level_key = Some(level_key.clone());
+                    }
+                }
+            }
+        }
+        // Set current_level_key based on entry room's level
+        let entry_room = dungeon.find_room(entry_id);
+        if let Some(room) = entry_room {
+            dungeon.current_level_key = room.level_key.clone();
+        }
+    }
+
     let mut door_id: u32 = 0;
     let mut created_doors: HashMap<(u32, u32), u32> = HashMap::new();
 
@@ -682,5 +702,113 @@ mod tests {
                 || (d.room_a == tower.id && d.room_b == hall.id)
         }).expect("should have tower door");
         assert_eq!(tower_door.connection_type, ConnectionType::Door);
+    }
+
+    fn multi_level_module() -> ModuleDef {
+        let json = r#"{
+            "name": "Multi-Level Crypt",
+            "level_range": [1, 3],
+            "entry_room": "entrance",
+            "levels": {
+                "surface": {
+                    "name": "Surface Level",
+                    "dungeon_level": 1,
+                    "rooms": ["entrance", "guard"]
+                },
+                "depths": {
+                    "name": "The Depths",
+                    "dungeon_level": 2,
+                    "wandering_table": "depths_wandering",
+                    "rooms": ["deep_hall", "deep_vault"]
+                }
+            },
+            "rooms": {
+                "entrance": {
+                    "name": "Cave Mouth",
+                    "exits": [{"to": "guard", "door": "open"}]
+                },
+                "guard": {
+                    "name": "Guard Post",
+                    "exits": [
+                        {"to": "entrance", "door": "open"},
+                        {"to": "deep_hall", "door": "closed", "connection_type": "Stairs"}
+                    ]
+                },
+                "deep_hall": {
+                    "name": "Deep Hall",
+                    "exits": [
+                        {"to": "guard", "door": "closed", "connection_type": "Stairs"},
+                        {"to": "deep_vault", "door": "locked"}
+                    ]
+                },
+                "deep_vault": {
+                    "name": "Deep Vault",
+                    "exits": [{"to": "deep_hall", "door": "locked"}]
+                }
+            }
+        }"#;
+        serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn module_to_dungeon_sets_level_keys() {
+        let module = multi_level_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        let entrance = dungeon.rooms.iter().find(|r| r.name == "Cave Mouth").unwrap();
+        assert_eq!(entrance.level_key, Some("surface".to_string()));
+
+        let guard = dungeon.rooms.iter().find(|r| r.name == "Guard Post").unwrap();
+        assert_eq!(guard.level_key, Some("surface".to_string()));
+
+        let deep_hall = dungeon.rooms.iter().find(|r| r.name == "Deep Hall").unwrap();
+        assert_eq!(deep_hall.level_key, Some("depths".to_string()));
+
+        let deep_vault = dungeon.rooms.iter().find(|r| r.name == "Deep Vault").unwrap();
+        assert_eq!(deep_vault.level_key, Some("depths".to_string()));
+    }
+
+    #[test]
+    fn module_to_dungeon_sets_current_level_key() {
+        let module = multi_level_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        assert_eq!(dungeon.current_level_key, Some("surface".to_string()));
+        assert_eq!(dungeon.level, 1);
+    }
+
+    #[test]
+    fn module_to_dungeon_builds_level_map() {
+        let module = multi_level_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        assert_eq!(dungeon.level_map.len(), 2);
+        assert_eq!(dungeon.level_map["surface"], 1);
+        assert_eq!(dungeon.level_map["depths"], 2);
+    }
+
+    #[test]
+    fn module_to_dungeon_no_levels_has_no_level_keys() {
+        let module = sample_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        assert!(dungeon.current_level_key.is_none());
+        assert!(dungeon.level_map.is_empty());
+        for room in &dungeon.rooms {
+            assert!(room.level_key.is_none());
+        }
+    }
+
+    #[test]
+    fn module_to_dungeon_status_shows_level_key() {
+        let module = multi_level_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        let status = dungeon.status();
+        assert!(
+            status.contains("Level: 1 (surface)"),
+            "status should show level key, got: {}",
+            status
+        );
     }
 }

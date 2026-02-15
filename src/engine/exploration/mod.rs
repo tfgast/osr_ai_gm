@@ -585,7 +585,7 @@ pub fn move_through_door_with<R: Rng>(
         return Err(format!("Door {} is not connected to the current room.", door_id));
     };
 
-    dungeon.move_to(dest).map_err(|e| e.to_string())?;
+    let transition = dungeon.move_to(dest).map_err(|e| e.to_string())?;
 
     // Per OSE, doors close automatically after passing through (unless spiked
     // or permanently open per module definition)
@@ -596,6 +596,15 @@ pub fn move_through_door_with<R: Rng>(
     }
 
     let mut result = ExplorationResult::new();
+
+    // Report level transition if crossing between dungeon levels
+    if let Some(ref t) = transition {
+        if t.to_level > t.from_level {
+            result.msg(format!("Descended to dungeon level {}.", t.to_level));
+        } else {
+            result.msg(format!("Ascended to dungeon level {}.", t.to_level));
+        }
+    }
 
     check_room_trap(rng, dungeon, dest, &mut result);
 
@@ -616,7 +625,9 @@ pub fn move_through_door_with<R: Rng>(
 
     collect_placed_monsters(dungeon, dest, &mut result);
 
-    if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
+    // Use updated dungeon level after transition for wandering monster check
+    let effective_level = if transition.is_some() { dungeon.level } else { dungeon_level };
+    if let Some(entry) = check_wandering_monster(rng, time, effective_level) {
         result.msg(format!(
             "Wandering monster! {} ({} appearing)",
             entry.name, entry.number
@@ -1672,5 +1683,142 @@ mod tests {
             }
         }
         assert!(triggered, "entry trap should eventually trigger on room entry");
+    }
+
+    // =========================================================================
+    // Multi-level dungeon tests
+    // =========================================================================
+
+    fn multi_level_dungeon() -> DungeonState {
+        let mut ds = DungeonState::new(1);
+
+        // Surface rooms
+        let mut r0 = Room::new(0, "Surface Hall");
+        r0.level_key = Some("surface".to_string());
+        ds.add_room(r0).unwrap();
+
+        let mut r1 = Room::new(1, "Surface Guard");
+        r1.level_key = Some("surface".to_string());
+        ds.add_room(r1).unwrap();
+
+        // Deep rooms
+        let mut r2 = Room::new(2, "Deep Hall");
+        r2.level_key = Some("depths".to_string());
+        ds.add_room(r2).unwrap();
+
+        let mut r3 = Room::new(3, "Deep Vault");
+        r3.level_key = Some("depths".to_string());
+        ds.add_room(r3).unwrap();
+
+        // Doors: surface internal, cross-level stairs, deep internal
+        ds.add_door(Door::new(0, 0, 1, DoorState::Open).unwrap()).unwrap();
+        let mut stairs = Door::new(1, 1, 2, DoorState::Open).unwrap();
+        stairs.module_open = true;
+        stairs.connection_type = crate::rules::module::ConnectionType::Stairs;
+        ds.add_door(stairs).unwrap();
+        ds.add_door(Door::new(2, 2, 3, DoorState::Open).unwrap()).unwrap();
+
+        // Level map
+        ds.level_map.insert("surface".to_string(), 1);
+        ds.level_map.insert("depths".to_string(), 2);
+        ds.current_level_key = Some("surface".to_string());
+
+        ds
+    }
+
+    #[test]
+    fn move_cross_level_updates_dungeon_level() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = multi_level_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Move from surface (room 0) to surface guard (room 1)
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        assert_eq!(dungeon.level, 1, "same-level move should not change dungeon level");
+        assert_eq!(dungeon.current_level_key, Some("surface".to_string()));
+
+        // Move from surface guard (room 1) to deep hall (room 2) via stairs
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 1);
+        assert!(result.is_ok());
+        let output = result.unwrap().to_string();
+        assert_eq!(dungeon.level, 2, "cross-level move should update dungeon level");
+        assert_eq!(dungeon.current_level_key, Some("depths".to_string()));
+        assert!(output.contains("Descended to dungeon level 2"), "should report descent: {}", output);
+    }
+
+    #[test]
+    fn move_back_up_ascends_level() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = multi_level_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Go to surface guard
+        let _ = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        // Descend to deep hall
+        let _ = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 1);
+        assert_eq!(dungeon.level, 2);
+
+        // Ascend back to surface guard (door 1 is module_open so stays open)
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 2, 1);
+        assert!(result.is_ok());
+        let output = result.unwrap().to_string();
+        assert_eq!(dungeon.level, 1, "ascending should restore dungeon level");
+        assert_eq!(dungeon.current_level_key, Some("surface".to_string()));
+        assert!(output.contains("Ascended to dungeon level 1"), "should report ascent: {}", output);
+    }
+
+    #[test]
+    fn same_level_move_no_transition_message() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = multi_level_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Move within surface level
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        let output = result.unwrap().to_string();
+        assert!(!output.contains("Descended"), "same-level move should not mention descent");
+        assert!(!output.contains("Ascended"), "same-level move should not mention ascent");
+    }
+
+    #[test]
+    fn status_shows_level_key_after_transition() {
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = multi_level_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+
+        // Initially on surface
+        let status = dungeon.status();
+        assert!(status.contains("Level: 1 (surface)"), "initial status: {}", status);
+
+        // Move to guard, then descend
+        let _ = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        let _ = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 1);
+
+        let status = dungeon.status();
+        assert!(status.contains("Level: 2 (depths)"), "after descent: {}", status);
+    }
+
+    #[test]
+    fn no_level_keys_means_no_transition() {
+        // Standard dungeon without levels — no transition logic fires
+        let mut rng = test_rng();
+        let mut time = TimeTracker::new();
+        let mut dungeon = test_dungeon();
+        time.light(LightSourceKind::Lantern, "Test");
+        dungeon.find_door_mut(0).unwrap().state = DoorState::Open;
+
+        let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
+        assert!(result.is_ok());
+        assert_eq!(dungeon.level, 1);
+        assert!(dungeon.current_level_key.is_none());
+        let output = result.unwrap().to_string();
+        assert!(!output.contains("Descended"));
+        assert!(!output.contains("Ascended"));
     }
 }
