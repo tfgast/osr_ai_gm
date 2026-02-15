@@ -12,6 +12,7 @@ pub struct App {
     pub show_log: bool,
     pub show_image: bool,
     pub log_scroll: u16,
+    pub auto_scroll: bool,
     pub last_update: Option<Instant>,
     pub picker: Option<Picker>,
     pub image_state: Option<StatefulProtocol>,
@@ -27,6 +28,7 @@ impl App {
             show_log: true,
             show_image: true,
             log_scroll: 0,
+            auto_scroll: true,
             last_update: None,
             picker,
             image_state: None,
@@ -71,6 +73,7 @@ mod tests {
         assert!(app.show_log);
         assert!(app.show_image);
         assert_eq!(app.log_scroll, 0);
+        assert!(app.auto_scroll);
     }
 
     #[test]

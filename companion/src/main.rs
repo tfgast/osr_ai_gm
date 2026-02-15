@@ -55,6 +55,11 @@ fn main() -> io::Result<()> {
             }
         }
 
+        // Auto-scroll: snap to bottom before drawing
+        if app.auto_scroll {
+            app.log_scroll = u16::MAX;
+        }
+
         // Draw
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
@@ -70,7 +75,18 @@ fn main() -> io::Result<()> {
                         app.log_scroll = app.log_scroll.saturating_add(1);
                     }
                     KeyCode::Char('k') | KeyCode::Up => {
+                        app.auto_scroll = false;
                         app.log_scroll = app.log_scroll.saturating_sub(1);
+                    }
+                    KeyCode::Char('s') => {
+                        app.auto_scroll = !app.auto_scroll;
+                        if app.auto_scroll {
+                            app.log_scroll = u16::MAX;
+                        }
+                    }
+                    KeyCode::Char('G') => {
+                        app.auto_scroll = true;
+                        app.log_scroll = u16::MAX;
                     }
                     KeyCode::Esc => {
                         if app.show_help {

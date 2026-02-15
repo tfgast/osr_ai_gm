@@ -132,6 +132,7 @@ pub fn render_log(f: &mut Frame, area: Rect, state: &GameState, scroll: u16) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use osr_ai_gm::log_entry::LogEntry;
     use osr_ai_gm::model::CombatState;
     use osr_ai_gm::state::dungeon::DungeonState;
     use osr_ai_gm::state::wilderness::WildernessState;
@@ -147,8 +148,8 @@ mod tests {
     fn collect_logs_combat_entries() {
         let mut state = GameState::new();
         let mut combat = CombatState::new(vec![], 30);
-        combat.log.push("Aldric attacks Goblin".to_string());
-        combat.log.push("Goblin takes 5 damage".to_string());
+        combat.log.push(LogEntry::new(1, "Aldric attacks Goblin".to_string()));
+        combat.log.push(LogEntry::new(2, "Goblin takes 5 damage".to_string()));
         state.combat = Some(combat);
 
         let logs = collect_logs(&state);
@@ -161,7 +162,7 @@ mod tests {
     fn collect_logs_dungeon_entries() {
         let mut state = GameState::new();
         let mut dungeon = DungeonState::new(1);
-        dungeon.log.push("Entered room 3".to_string());
+        dungeon.log.push(LogEntry::new(1, "Entered room 3".to_string()));
         state.dungeon = Some(dungeon);
 
         let logs = collect_logs(&state);
@@ -173,7 +174,7 @@ mod tests {
     fn collect_logs_wilderness_entries() {
         let mut state = GameState::new();
         let mut wild = WildernessState::new();
-        wild.log.push("Day 1 travel begins".to_string());
+        wild.log.push(LogEntry::new(1, "Day 1 travel begins".to_string()));
         state.wilderness = Some(wild);
 
         let logs = collect_logs(&state);
@@ -196,15 +197,15 @@ mod tests {
         let mut state = GameState::new();
 
         let mut combat = CombatState::new(vec![], 30);
-        combat.log.push("combat entry".to_string());
+        combat.log.push(LogEntry::new(1, "combat entry".to_string()));
         state.combat = Some(combat);
 
         let mut dungeon = DungeonState::new(1);
-        dungeon.log.push("dungeon entry".to_string());
+        dungeon.log.push(LogEntry::new(2, "dungeon entry".to_string()));
         state.dungeon = Some(dungeon);
 
         let mut wild = WildernessState::new();
-        wild.log.push("wilderness entry".to_string());
+        wild.log.push(LogEntry::new(3, "wilderness entry".to_string()));
         state.wilderness = Some(wild);
 
         state.notes.push("a note".to_string());

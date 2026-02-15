@@ -148,6 +148,12 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
         None => "—".to_string(),
     };
 
+    let (scroll_label, scroll_color) = if app.auto_scroll {
+        ("AUTO", Color::Green)
+    } else {
+        ("MANUAL", Color::Yellow)
+    };
+
     let footer = Line::from(vec![
         Span::styled(" [Watching: state.json] ", Style::default().fg(Color::DarkGray)),
         Span::styled(
@@ -157,6 +163,10 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
         Span::styled(
             format!("[Mode: {}] ", mode_str),
             Style::default().fg(Color::Yellow),
+        ),
+        Span::styled(
+            format!("[s=Scroll:{}] ", scroll_label),
+            Style::default().fg(scroll_color),
         ),
         Span::styled("[i=Image ?=Help q=Quit]", Style::default().fg(Color::DarkGray)),
     ]);
@@ -187,6 +197,8 @@ fn render_help_overlay(f: &mut Frame, area: Rect) {
         Line::raw("  l        Toggle log panel"),
         Line::raw("  j / Down Scroll log down"),
         Line::raw("  k / Up   Scroll log up"),
+        Line::raw("  s        Toggle auto-scroll"),
+        Line::raw("  G        Jump to bottom (auto-scroll on)"),
         Line::raw(""),
         Line::styled(
             "  OSR AI GM Companion TUI",
