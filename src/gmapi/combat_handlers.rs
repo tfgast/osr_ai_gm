@@ -59,6 +59,13 @@ pub(super) fn roll_initiative(id: &str, state: &mut GameState) -> GMResponse {
     }
 }
 
+pub(super) fn next_phase(id: &str, state: &mut GameState) -> GMResponse {
+    match combat::action_next_phase(state) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
+    }
+}
+
 pub(super) fn attack(
     id: &str,
     state: &mut GameState,

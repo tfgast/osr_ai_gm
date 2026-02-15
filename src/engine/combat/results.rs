@@ -341,6 +341,15 @@ pub struct CombatXpAward {
     pub ready_to_train: bool,
 }
 
+/// Typed success payload for `next_phase`.
+#[derive(Debug, Clone, Serialize)]
+pub struct NextPhaseResult {
+    pub message: String,
+    pub previous_phase: String,
+    pub current_phase: String,
+    pub round: u32,
+}
+
 /// Typed success payload for `end_combat`.
 #[derive(Debug, Clone, Serialize)]
 pub struct EndCombatResult {

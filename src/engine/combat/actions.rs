@@ -11,8 +11,8 @@ use super::results::{
     AddMonsterResult, AttackResult, BackstabResult, CastSpellResult, CloseResult, CombatLogResult,
     CombatStatusResult, CombatXpAward, DeclareSpellResult, EndCombatResult,
     FightingWithdrawalResult, InitiativeResult, InitiativeWinner, MonsterAttackResult,
-    MoraleResult, RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome, RetreatResult,
-    SetHelplessResult, SpawnEncounterResult, SpawnMonsterResult, TurnUndeadResult,
+    MoraleResult, NextPhaseResult, RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome,
+    RetreatResult, SetHelplessResult, SpawnEncounterResult, SpawnMonsterResult, TurnUndeadResult,
 };
 use super::{
     check_morale, close, combat_status, coup_de_grace, declare_spell, fighting_withdrawal,
@@ -854,6 +854,22 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
         retainer_xp_each,
         retainer_xp_recipients,
         retainer_loyalty_checks,
+    })
+}
+
+pub fn action_next_phase(state: &mut GameState) -> Result<NextPhaseResult, EngineError> {
+    let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
+    let previous = combat.phase;
+    combat.advance_phase();
+    let current = combat.phase;
+    let msg = format!("Phase: {} → {}", previous, current);
+    combat.log_event(msg.clone());
+
+    Ok(NextPhaseResult {
+        message: msg,
+        previous_phase: previous.to_string(),
+        current_phase: current.to_string(),
+        round: combat.round,
     })
 }
 
