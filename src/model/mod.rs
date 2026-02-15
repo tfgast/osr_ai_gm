@@ -219,12 +219,12 @@ impl Default for Party {
 pub struct Item {
     pub name: String,
     pub weight: f32,
-    pub value_gp: u32,
+    pub value_gp: u64,
     pub equipped: bool,
 }
 
 impl Item {
-    pub fn new(name: &str, weight: f32, value_gp: u32) -> Self {
+    pub fn new(name: &str, weight: f32, value_gp: u64) -> Self {
         Item {
             name: name.to_string(),
             weight,

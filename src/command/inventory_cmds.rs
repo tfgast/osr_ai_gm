@@ -63,7 +63,7 @@ impl Command for LootCommand {
         let char_name = args[0];
 
         let (item_parts, explicit_gp) = if args.len() >= 3 {
-            if let Ok(v) = args[args.len() - 1].parse::<u32>() {
+            if let Ok(v) = args[args.len() - 1].parse::<u64>() {
                 (&args[1..args.len() - 1], Some(v))
             } else {
                 (&args[1..], None)

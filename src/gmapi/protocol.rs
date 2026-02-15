@@ -349,7 +349,7 @@ pub enum GMCommand {
         character: String,
         item_name: String,
         #[serde(default)]
-        value_gp: Option<u32>,
+        value_gp: Option<u64>,
     },
 
     // -- Inventory queries --

@@ -34,7 +34,7 @@ pub struct LootResult {
     pub message: String,
     pub character: String,
     pub item: String,
-    pub value_gp: u32,
+    pub value_gp: u64,
 }
 
 /// An item entry in the equipment listing.

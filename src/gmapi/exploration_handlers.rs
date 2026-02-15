@@ -251,7 +251,7 @@ pub(super) fn list_equipment(id: &str, state: &GameState, category: &Option<Stri
     )
 }
 
-pub(super) fn loot(id: &str, state: &mut GameState, character: &str, item_name: &str, explicit_gp: Option<u32>) -> GMResponse {
+pub(super) fn loot(id: &str, state: &mut GameState, character: &str, item_name: &str, explicit_gp: Option<u64>) -> GMResponse {
     match crate::engine::inventory::action_loot(state, character, item_name, explicit_gp) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode),

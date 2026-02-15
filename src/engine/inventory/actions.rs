@@ -258,7 +258,7 @@ pub fn action_buy(
     character.gold_gp -= cost;
     character
         .inventory
-        .push(Item::new(&canonical_name, weight, cost));
+        .push(Item::new(&canonical_name, weight, cost.into()));
 
     let message = format!(
         "{} buys {} for {} gp. ({} gp remaining)",
@@ -438,7 +438,7 @@ pub fn action_loot(
     state: &mut GameState,
     char_name: &str,
     item_name: &str,
-    explicit_gp: Option<u32>,
+    explicit_gp: Option<u64>,
 ) -> Result<LootResult, EngineError> {
     // Step 1: Try fuzzy matching against placed treasure in the current room
     let treasure_match = if let Some(dungeon) = &state.dungeon {
@@ -481,7 +481,7 @@ pub fn action_loot(
         (None, None)
     };
 
-    let value_gp = explicit_gp.unwrap_or(room_gp.unwrap_or(0) as u32);
+    let value_gp = explicit_gp.unwrap_or_else(|| room_gp.unwrap_or(0));
     let display_name = canonical_name.as_deref().unwrap_or(item_name);
 
     let character = state
