@@ -550,6 +550,23 @@ mod tests {
     }
 
     #[test]
+    fn save_creates_missing_directory() {
+        let dir = std::env::temp_dir().join("osr_persist_test_missing_dir/saves");
+        let _ = fs::remove_dir_all(dir.parent().unwrap());
+        assert!(!dir.exists(), "directory should not exist before save");
+
+        let target = dir.join("test.json");
+        let state = GameState::new();
+        save(&state, &target).unwrap();
+        assert!(target.exists(), "save should create directory and file");
+
+        let loaded = load(&target).unwrap();
+        assert_eq!(loaded.version, SAVE_VERSION);
+
+        let _ = fs::remove_dir_all(dir.parent().unwrap());
+    }
+
+    #[test]
     fn save_cleans_up_temp_on_rename_failure() {
         let dir = std::env::temp_dir().join("osr_persist_test_rename_fail");
         let _ = fs::remove_dir_all(&dir);

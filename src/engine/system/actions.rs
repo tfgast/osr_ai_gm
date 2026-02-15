@@ -49,6 +49,26 @@ pub fn action_help(commands: &[(&str, &str)]) -> Result<HelpResult, EngineError>
 mod tests {
     use super::{action_help, action_load_game, action_quit, action_roll_dice, action_save_game};
     use crate::persist::GameState;
+    use crate::test_util::lock_env;
+
+    #[test]
+    fn action_save_game_creates_missing_saves_dir() {
+        let _env = lock_env();
+        let dir = std::env::temp_dir().join("osr_action_save_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        let orig = std::env::var("OSR_DATA_DIR").ok();
+        unsafe { std::env::set_var("OSR_DATA_DIR", &dir) };
+
+        let state = GameState::new();
+        let result = action_save_game(&state, "test_save").unwrap();
+        assert!(result.path.exists(), "save file should exist after action_save_game");
+
+        match orig {
+            Some(v) => unsafe { std::env::set_var("OSR_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("OSR_DATA_DIR") },
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn action_roll_dice_valid() {
