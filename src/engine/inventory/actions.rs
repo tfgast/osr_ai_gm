@@ -444,7 +444,12 @@ pub fn action_loot(
         ))
     })?;
 
-    // Step 3: If matched, mark taken and get canonical values
+    // Step 3: Validate actor exists before mutating any state
+    if state.party.find_member(char_name).is_none() {
+        return Err(no_party_member_err(char_name));
+    }
+
+    // Step 4: If matched, mark taken and get canonical values
     let (room_gp, canonical_name) = if let Some(idx) = treasure_match {
         let dungeon = state.dungeon.as_mut().unwrap();
         let room = dungeon.find_room_mut(dungeon.current_room.unwrap()).unwrap();
@@ -866,5 +871,20 @@ mod tests {
             .expect("ad-hoc should succeed when treasure taken");
         assert_eq!(result.item, "ruby");
         assert_eq!(result.value_gp, 0);
+    }
+
+    #[test]
+    fn loot_invalid_character_does_not_consume_treasure() {
+        let mut state = state_with_dungeon_treasure();
+        let err = action_loot(&mut state, "Bogus", "Ruby gem", None)
+            .expect_err("loot with invalid character should fail");
+        assert!(err.to_string().contains("Bogus"));
+
+        // Treasure must NOT be marked as taken
+        let room = state.dungeon.as_ref().unwrap().find_room(0).unwrap();
+        assert!(
+            !room.placed_treasure[0].taken,
+            "treasure should not be consumed when character name is invalid"
+        );
     }
 }
