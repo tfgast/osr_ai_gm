@@ -229,6 +229,18 @@ pub(super) fn spawn_monster(
     }
 }
 
+pub(super) fn spawn_placed(
+    id: &str,
+    state: &mut GameState,
+    distance: u32,
+    name: Option<&str>,
+) -> GMResponse {
+    match combat::action_spawn_placed(state, distance, name) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
+    }
+}
+
 pub(super) fn spawn_npc_party(
     id: &str,
     state: &mut GameState,

@@ -12,7 +12,8 @@ use super::results::{
     CombatStatusResult, CombatXpAward, DeclareSpellResult, EndCombatResult,
     FightingWithdrawalResult, InitiativeResult, InitiativeWinner, MonsterAttackResult,
     MoraleResult, NextPhaseResult, RetainerLoyaltyCheckResult, RetainerLoyaltyOutcome,
-    RetreatResult, SetHelplessResult, SpawnEncounterResult, SpawnMonsterResult, TurnUndeadResult,
+    RetreatResult, SetHelplessResult, SpawnEncounterResult, SpawnMonsterResult,
+    SpawnPlacedDetail, SpawnPlacedResult, TurnUndeadResult,
 };
 use super::{
     check_morale, close, combat_status, coup_de_grace, declare_spell, fighting_withdrawal,
@@ -197,6 +198,177 @@ pub fn action_spawn_monster(
         distance,
         xp_per_monster: def.xp(),
         special,
+        status,
+    })
+}
+
+/// Spawn placed module monsters from the current room into combat.
+///
+/// Resolves monster definitions from module_monsters (loaded from companion
+/// monsters.json) first, then falls back to the core monster database.
+/// HP is rolled from hit dice per B/X rules.
+pub fn action_spawn_placed(
+    state: &mut GameState,
+    distance: u32,
+    name_filter: Option<&str>,
+) -> Result<SpawnPlacedResult, EngineError> {
+    if state.combat.is_some() {
+        return Err(EngineError::WrongState(
+            "combat already active. Use 'end_combat' first.".to_string(),
+        ));
+    }
+
+    let dungeon = state.dungeon.as_ref().ok_or_else(|| {
+        EngineError::WrongState("not in exploration mode.".to_string())
+    })?;
+
+    let room_id = dungeon.current_room.ok_or_else(|| {
+        EngineError::WrongState("no current room.".to_string())
+    })?;
+
+    let room = dungeon.find_room(room_id).ok_or_else(|| {
+        EngineError::InvalidInput(format!("room {} not found.", room_id))
+    })?;
+
+    // Collect unspawned placed monsters (optionally filtered by name)
+    let targets: Vec<_> = room.placed_monsters.iter()
+        .filter(|m| !m.spawned)
+        .filter(|m| match name_filter {
+            Some(filter) => m.name.eq_ignore_ascii_case(filter),
+            None => true,
+        })
+        .cloned()
+        .collect();
+
+    if targets.is_empty() {
+        return Err(EngineError::InvalidInput(
+            match name_filter {
+                Some(name) => format!("no unspawned placed monster named '{}' in this room.", name),
+                None => "no unspawned placed monsters in this room.".to_string(),
+            }
+        ));
+    }
+
+    // Resolve monster definitions and build Monster objects
+    let mut monsters = Vec::new();
+    let mut spawn_details = Vec::new();
+    let mut unresolved = Vec::new();
+
+    for target in &targets {
+        let key = target.name.to_lowercase();
+        let def = state.module_monsters.get(&key)
+            .or_else(|| monster_db::find_monster(&target.name));
+
+        match def {
+            Some(def) => {
+                let is_undead = target.undead.unwrap_or_else(|| def.is_undead());
+                let is_immune = def.immune_to_normal_weapons();
+                let source = if state.module_monsters.contains_key(&key) {
+                    "module"
+                } else {
+                    "core"
+                };
+
+                for i in 0..target.count {
+                    let monster_name = if target.count > 1 {
+                        format!("{} {}", def.name, i + 1)
+                    } else {
+                        def.name.to_string()
+                    };
+
+                    // Roll HP from HD (same logic as action_spawn_monster)
+                    let dice_count = def.hit_dice.hp_dice_count();
+                    let hp_mod = def.hit_dice.hp_modifier();
+                    let hp = if dice_count == 0 {
+                        match dice::roll_str("1d4") {
+                            Ok(r) => (r.total + hp_mod).max(1),
+                            Err(_) => 2,
+                        }
+                    } else {
+                        match dice::roll_str(&format!("{}d8", dice_count)) {
+                            Ok(r) => (r.total + hp_mod).max(1),
+                            Err(_) => (dice_count as i32 * 4 + hp_mod).max(1),
+                        }
+                    };
+
+                    let mut m = Monster::new(&monster_name, def.hit_dice.clone());
+                    m.hp = hp;
+                    m.max_hp = hp;
+                    m.ac = def.ac();
+                    m.damage = def.damage();
+                    m.morale = def.morale;
+                    m.xp_value = def.xp();
+                    m.attacks = def.attack_names();
+                    m.undead = is_undead;
+                    m.immune_to_normal_weapons = is_immune;
+                    monsters.push(m);
+                }
+
+                spawn_details.push(SpawnPlacedDetail {
+                    name: def.name.clone(),
+                    count: target.count,
+                    hit_dice: def.hit_dice.clone(),
+                    ac: def.ac(),
+                    morale: def.morale,
+                    xp_per_monster: def.xp(),
+                    special: def.special(),
+                    source: source.to_string(),
+                });
+            }
+            None => {
+                unresolved.push(target.name.clone());
+            }
+        }
+    }
+
+    if monsters.is_empty() {
+        return Err(EngineError::InvalidInput(format!(
+            "no monster definitions found for: {}. Use SpawnEncounter with manual stats.",
+            unresolved.join(", ")
+        )));
+    }
+
+    // Mark placed monsters as spawned
+    let dungeon = state.dungeon.as_mut().unwrap();
+    if let Some(room) = dungeon.find_room_mut(room_id) {
+        for pm in &mut room.placed_monsters {
+            if targets.iter().any(|t| t.name == pm.name) && !pm.spawned {
+                pm.spawned = true;
+            }
+        }
+    }
+
+    // Enter combat
+    let combat = CombatState::new(monsters, distance);
+    let status = combat_status(&combat, &state.party.members);
+    state.enter_combat(combat);
+
+    let mut msg = format!(
+        "combat started: placed monsters at {}' distance.",
+        distance
+    );
+    for detail in &spawn_details {
+        msg.push_str(&format!(
+            " {} x{} (HD {}, AC {}, Morale {}, {} XP) [{}].",
+            detail.name, detail.count, detail.hit_dice, detail.ac,
+            detail.morale, detail.xp_per_monster, detail.source
+        ));
+        if !detail.special.is_empty() {
+            msg.push_str(&format!(" Special: {}", detail.special));
+        }
+    }
+    if !unresolved.is_empty() {
+        msg.push_str(&format!(
+            " WARNING: {} not found in DB, skipped. Use AddMonster for them.",
+            unresolved.join(", ")
+        ));
+    }
+
+    Ok(SpawnPlacedResult {
+        message: msg,
+        distance,
+        spawned: spawn_details,
+        unresolved,
         status,
     })
 }
@@ -2137,5 +2309,173 @@ mod tests {
         assert!(state.combat.as_ref().unwrap().monsters[0].effects.is_empty(), "Slow should have expired");
         assert_eq!(state.combat.as_ref().unwrap().monsters[1].effects[0].duration, EffectDuration::Rounds(1));
         assert!(state.party.members[0].effects.is_empty(), "Shield should have expired");
+    }
+
+    // --- action_spawn_placed tests ---
+
+    use crate::state::dungeon::{DungeonState, PlacedMonsterInstance, Room};
+
+    fn exploration_state_with_placed(
+        monsters: Vec<PlacedMonsterInstance>,
+    ) -> GameState {
+        let mut state = GameState::new();
+        state.party.add_member(test_fighter());
+
+        let mut dungeon = DungeonState::new(1);
+        let mut room = Room::new(0, "Guard Chamber");
+        room.placed_monsters = monsters;
+        dungeon.add_room(room).unwrap();
+        dungeon.current_room = Some(0);
+
+        state.enter_exploration(dungeon, 1);
+        state
+    }
+
+    #[test]
+    fn spawn_placed_core_db_monster() {
+        if monster_db::find_monster("Skeleton").is_none() {
+            return; // skip if no data
+        }
+        let placed = vec![PlacedMonsterInstance::new("Skeleton", 3)];
+        let mut state = exploration_state_with_placed(placed);
+
+        let result = action_spawn_placed(&mut state, 10, None).unwrap();
+        assert_eq!(result.distance, 10);
+        assert_eq!(result.spawned.len(), 1);
+        assert_eq!(result.spawned[0].name, "Skeleton");
+        assert_eq!(result.spawned[0].count, 3);
+        assert_eq!(result.spawned[0].source, "core");
+        assert!(result.unresolved.is_empty());
+        assert_eq!(state.mode, GameMode::Combat);
+        assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
+    }
+
+    #[test]
+    fn spawn_placed_module_monster() {
+        let placed = vec![PlacedMonsterInstance::new("Frost Giant", 2)];
+        let mut state = exploration_state_with_placed(placed);
+
+        // Add module monster definition
+        let def = crate::rules::monster::MonsterDef::test_def("Frost Giant", 10, 4, 12);
+        state.module_monsters.insert("frost giant".to_string(), def);
+
+        let result = action_spawn_placed(&mut state, 20, None).unwrap();
+        assert_eq!(result.spawned[0].source, "module");
+        assert_eq!(result.spawned[0].count, 2);
+        assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 2);
+    }
+
+    #[test]
+    fn spawn_placed_no_dungeon_error() {
+        let mut state = GameState::new();
+        state.party.add_member(test_fighter());
+
+        let result = action_spawn_placed(&mut state, 10, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not in exploration"));
+    }
+
+    #[test]
+    fn spawn_placed_combat_active_error() {
+        let placed = vec![PlacedMonsterInstance::new("Skeleton", 1)];
+        let mut state = exploration_state_with_placed(placed);
+        state.enter_combat(CombatState::new(vec![mk_monster("Orc", "1", 4, 6, 8)], 30));
+
+        let result = action_spawn_placed(&mut state, 10, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("combat already active"));
+    }
+
+    #[test]
+    fn spawn_placed_no_unspawned_error() {
+        let mut placed = PlacedMonsterInstance::new("Skeleton", 1);
+        placed.spawned = true;
+        let mut state = exploration_state_with_placed(vec![placed]);
+
+        let result = action_spawn_placed(&mut state, 10, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("no unspawned"));
+    }
+
+    #[test]
+    fn spawn_placed_unresolved_monster_error() {
+        let placed = vec![PlacedMonsterInstance::new("Unknown Beast", 1)];
+        let mut state = exploration_state_with_placed(placed);
+
+        let result = action_spawn_placed(&mut state, 10, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unknown Beast"));
+    }
+
+    #[test]
+    fn spawn_placed_name_filter() {
+        if monster_db::find_monster("Skeleton").is_none() {
+            return;
+        }
+        let placed = vec![
+            PlacedMonsterInstance::new("Skeleton", 3),
+            PlacedMonsterInstance::new("Zombie", 2),
+        ];
+        let mut state = exploration_state_with_placed(placed);
+
+        // Only spawn skeletons
+        let result = action_spawn_placed(&mut state, 10, Some("Skeleton")).unwrap();
+        assert_eq!(result.spawned.len(), 1);
+        assert_eq!(result.spawned[0].name, "Skeleton");
+        assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 3);
+
+        // Check that Zombie is still unspawned
+        let dungeon = state.dungeon.as_ref().unwrap();
+        let room = dungeon.find_room(0).unwrap();
+        let zombie = room.placed_monsters.iter().find(|m| m.name == "Zombie").unwrap();
+        assert!(!zombie.spawned);
+    }
+
+    #[test]
+    fn spawn_placed_marks_spawned() {
+        if monster_db::find_monster("Skeleton").is_none() {
+            return;
+        }
+        let placed = vec![PlacedMonsterInstance::new("Skeleton", 3)];
+        let mut state = exploration_state_with_placed(placed);
+
+        let _ = action_spawn_placed(&mut state, 10, None).unwrap();
+
+        let dungeon = state.dungeon.as_ref().unwrap();
+        let room = dungeon.find_room(0).unwrap();
+        assert!(room.placed_monsters[0].spawned);
+    }
+
+    #[test]
+    fn spawn_placed_undead_from_placed_monster() {
+        let mut placed = PlacedMonsterInstance::new("Custom Undead", 2);
+        placed.undead = Some(true);
+        let mut state = exploration_state_with_placed(vec![placed]);
+
+        let def = crate::rules::monster::MonsterDef::test_def("Custom Undead", 3, 7, 12);
+        state.module_monsters.insert("custom undead".to_string(), def);
+
+        let _result = action_spawn_placed(&mut state, 10, None).unwrap();
+        let combat = state.combat.as_ref().unwrap();
+        assert!(combat.monsters[0].undead, "should be undead from placed monster flag");
+    }
+
+    #[test]
+    fn spawn_placed_partial_success_with_unresolved() {
+        if monster_db::find_monster("Skeleton").is_none() {
+            return;
+        }
+        let placed = vec![
+            PlacedMonsterInstance::new("Skeleton", 2),
+            PlacedMonsterInstance::new("Unknown Horror", 1),
+        ];
+        let mut state = exploration_state_with_placed(placed);
+
+        let result = action_spawn_placed(&mut state, 10, None).unwrap();
+        assert_eq!(result.spawned.len(), 1);
+        assert_eq!(result.spawned[0].name, "Skeleton");
+        assert_eq!(result.unresolved, vec!["Unknown Horror"]);
+        assert!(result.message.contains("WARNING"));
+        assert_eq!(state.combat.as_ref().unwrap().monsters.len(), 2);
     }
 }

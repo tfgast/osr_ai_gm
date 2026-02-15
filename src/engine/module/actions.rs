@@ -110,30 +110,51 @@ pub fn action_load_module(
                 .to_string(),
         ));
     }
-    // Try DEFAULT_MODULES_DIR first; on "not found" fall back to data_dir()/modules/
-    let module_def = match module_rules::load_module(path, module_rules::DEFAULT_MODULES_DIR) {
-        Ok(m) => m,
-        Err(e) if e.contains("not found") => {
-            // Strip the default modules dir prefix to get the module-relative path,
-            // then reconstruct it under data_dir()/modules/.
-            let prefix = format!("{}/", module_rules::DEFAULT_MODULES_DIR);
-            let relative = path.strip_prefix(&prefix).unwrap_or(path);
-            let data_modules = crate::persist::data_dir()
-                .map(|d| d.join("modules"))
-                .map_err(|_| EngineError::InvalidInput(e.clone()))?;
-            let full_path = data_modules.join(relative);
-            let dir_str = data_modules.to_string_lossy().to_string();
-            let path_str = full_path.to_string_lossy().to_string();
-            module_rules::load_module(&path_str, &dir_str)
-                .map_err(EngineError::InvalidInput)?
-        }
-        Err(e) => return Err(EngineError::InvalidInput(e)),
-    };
+    // Resolve the validated filesystem path (try DEFAULT_MODULES_DIR, then data_dir fallback)
+    let safe_path = module_rules::resolve_module_path(path, module_rules::DEFAULT_MODULES_DIR)
+        .or_else(|e| {
+            if e.contains("not found") {
+                let prefix = format!("{}/", module_rules::DEFAULT_MODULES_DIR);
+                let relative = path.strip_prefix(&prefix).unwrap_or(path);
+                let data_modules = crate::persist::data_dir()
+                    .map(|d| d.join("modules"))
+                    .map_err(|_| e.clone())?;
+                let full_path = data_modules.join(relative);
+                let dir_str = data_modules.to_string_lossy().to_string();
+                let path_str = full_path.to_string_lossy().to_string();
+                module_rules::resolve_module_path(&path_str, &dir_str)
+            } else {
+                Err(e)
+            }
+        })
+        .map_err(EngineError::InvalidInput)?;
+
+    let module_def = module_rules::load_module_from_path(&safe_path)
+        .map_err(EngineError::InvalidInput)?;
     let dungeon = module_to_dungeon(&module_def).map_err(EngineError::InvalidInput)?;
 
     let module_name = module_def.name.clone();
     let level_range = module_def.level_range;
     let room_count = dungeon.rooms.len();
+
+    // Load companion monsters.json from the module directory (if present)
+    state.module_monsters.clear();
+    if let Some(dir) = safe_path.parent() {
+        let monsters_path = dir.join("monsters.json");
+        if monsters_path.exists() {
+            match load_module_monsters(&monsters_path) {
+                Ok(monsters) => {
+                    for monster in monsters {
+                        let key = monster.name.to_lowercase();
+                        state.module_monsters.insert(key, monster);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to load module monsters: {}", e);
+                }
+            }
+        }
+    }
 
     state.enter_exploration(dungeon, level_range.0);
 
@@ -146,6 +167,15 @@ pub fn action_load_module(
         level_range,
         room_count,
     })
+}
+
+/// Load monster definitions from a module's companion monsters.json file.
+fn load_module_monsters(path: &std::path::Path) -> Result<Vec<crate::rules::monster::MonsterDef>, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+    let file: crate::rules::monster::MonsterFile = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
+    Ok(file.monsters)
 }
 
 #[cfg(test)]

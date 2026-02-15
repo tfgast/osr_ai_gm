@@ -44,6 +44,34 @@ pub struct SpawnEncounterResult {
     pub status: String,
 }
 
+/// Detail for each monster group spawned by SpawnPlaced.
+#[derive(Debug, Clone, Serialize)]
+pub struct SpawnPlacedDetail {
+    pub name: String,
+    pub count: u32,
+    pub hit_dice: HitDice,
+    pub ac: i32,
+    pub morale: u32,
+    pub xp_per_monster: u64,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub special: String,
+    /// Where the definition came from: "module" or "core".
+    pub source: String,
+}
+
+/// Typed success payload for `spawn_placed`.
+#[derive(Debug, Clone, Serialize)]
+pub struct SpawnPlacedResult {
+    #[serde(skip_serializing)]
+    pub message: String,
+    pub distance: u32,
+    pub spawned: Vec<SpawnPlacedDetail>,
+    /// Monster names that were in placed_monsters but had no definition.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unresolved: Vec<String>,
+    pub status: String,
+}
+
 /// Typed success payload for `add_monster`.
 #[derive(Debug, Clone, Serialize)]
 pub struct AddMonsterResult {

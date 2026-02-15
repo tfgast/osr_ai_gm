@@ -171,6 +171,33 @@ impl MonsterDef {
         self.special_abilities.iter().any(|s| s.starts_with("Undead:"))
     }
 
+    /// Create a minimal MonsterDef for testing.
+    #[cfg(test)]
+    pub fn test_def(name: &str, ac: i32, morale: u32, xp: u64) -> MonsterDef {
+        MonsterDef {
+            name: name.to_string(),
+            description: None,
+            armor_class: ac,
+            armor_class_ascending: None,
+            hit_dice: "1".parse().unwrap(),
+            hp_typical: None,
+            attacks: vec![Attack { count: 1, name: "attack".to_string(), damage: Some("1d6".to_string()), raw: None }],
+            thac0: None,
+            thac0_bonus: None,
+            movement: Movement::default(),
+            saves: None,
+            morale,
+            alignment: None,
+            xp_value: XpValue::Single(xp),
+            num_appearing: None,
+            treasure_type: None,
+            special_abilities: Vec::new(),
+            legacy_damage: None,
+            legacy_special: None,
+            legacy_attacks: None,
+        }
+    }
+
     /// Check if this monster is immune to non-magical weapons.
     /// Detected from special abilities mentioning magical attack requirements.
     pub fn immune_to_normal_weapons(&self) -> bool {
@@ -188,12 +215,12 @@ impl MonsterDef {
 /// Container for loaded monster data.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-struct MonsterFile {
+pub(crate) struct MonsterFile {
     #[serde(default)]
-    source: Option<String>,
+    pub(crate) source: Option<String>,
     #[serde(default)]
-    count: usize,
-    monsters: Vec<MonsterDef>,
+    pub(crate) count: usize,
+    pub(crate) monsters: Vec<MonsterDef>,
 }
 
 /// Monster registry - holds all loaded monsters.

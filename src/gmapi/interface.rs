@@ -106,6 +106,9 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::SpawnMonster { name, count, distance } => {
             combat_handlers::spawn_monster(id, state, name, *count, *distance)
         }
+        GMCommand::SpawnPlaced { distance, name } => {
+            combat_handlers::spawn_placed(id, state, *distance, name.as_deref())
+        }
         GMCommand::SpawnNpcParty { party_type, distance } => {
             combat_handlers::spawn_npc_party(id, state, party_type, *distance)
         }

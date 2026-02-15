@@ -257,6 +257,16 @@ pub enum GMCommand {
         #[serde(default = "default_distance")]
         distance: u32,
     },
+    /// Spawn placed module monsters from the current room into combat.
+    /// Looks up stats from module monsters.json or core DB, rolls HP from HD.
+    SpawnPlaced {
+        #[serde(default = "default_distance")]
+        distance: u32,
+        /// Optional: spawn only this monster group by name.
+        /// If omitted, spawns all unspawned monsters in the current room.
+        #[serde(default)]
+        name: Option<String>,
+    },
     /// Spawn a random NPC adventuring party.
     SpawnNpcParty {
         party_type: String,
@@ -569,6 +579,9 @@ impl GMCommand {
                 check_len("weapon", weapon, 128)
             }
             GMCommand::QueryEncumbrance { character } => check_len("character", character, 128),
+            GMCommand::SpawnPlaced { name, .. } => {
+                if let Some(n) = name { check_len("name", n, 128) } else { Ok(()) }
+            }
             GMCommand::SpawnMonster { name, count, .. } => {
                 check_len("name", name, 128)?;
                 check_count("count", *count, 100)
@@ -1432,6 +1445,34 @@ mod tests {
         match &req.command {
             GMCommand::FightingWithdrawal { character } => assert!(character.is_none()),
             _ => panic!("expected FightingWithdrawal"),
+        }
+    }
+
+    #[test]
+    fn parse_spawn_placed_defaults() {
+        let json = r#"{"id":"sp1","command":{"type":"SpawnPlaced","params":{}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "sp1");
+        match &req.command {
+            GMCommand::SpawnPlaced { distance, name } => {
+                assert_eq!(*distance, 60); // default_distance
+                assert!(name.is_none());
+            }
+            _ => panic!("expected SpawnPlaced"),
+        }
+    }
+
+    #[test]
+    fn parse_spawn_placed_with_params() {
+        let json = r#"{"id":"sp2","command":{"type":"SpawnPlaced","params":{"distance":10,"name":"skeleton"}}}"#;
+        let req = parse_request(json).unwrap();
+        assert_eq!(req.id, "sp2");
+        match &req.command {
+            GMCommand::SpawnPlaced { distance, name } => {
+                assert_eq!(*distance, 10);
+                assert_eq!(name.as_deref(), Some("skeleton"));
+            }
+            _ => panic!("expected SpawnPlaced"),
         }
     }
 

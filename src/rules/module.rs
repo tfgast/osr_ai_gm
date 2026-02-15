@@ -154,6 +154,14 @@ fn validate_module_path(user_path: &str, modules_dir: &str) -> Result<PathBuf, S
 }
 
 
+/// Resolve and validate a module path, returning the canonical filesystem path.
+///
+/// Wraps the internal `validate_module_path` for use by callers that need
+/// the resolved path (e.g. to locate companion files like `monsters.json`).
+pub fn resolve_module_path(path: &str, modules_dir: &str) -> Result<PathBuf, String> {
+    validate_module_path(path, modules_dir)
+}
+
 /// Load a module definition from a JSON file.
 ///
 /// The path is validated to resolve within `modules_dir` to prevent
@@ -161,7 +169,12 @@ fn validate_module_path(user_path: &str, modules_dir: &str) -> Result<PathBuf, S
 /// location.
 pub fn load_module(path: &str, modules_dir: &str) -> Result<ModuleDef, String> {
     let safe_path = validate_module_path(path, modules_dir)?;
-    let content = fs::read_to_string(&safe_path)
+    load_module_from_path(&safe_path)
+}
+
+/// Load a module definition from an already-validated filesystem path.
+pub fn load_module_from_path(safe_path: &Path) -> Result<ModuleDef, String> {
+    let content = fs::read_to_string(safe_path)
         .map_err(|_| "Failed to read module file.".to_string())?;
     let module: ModuleDef = serde_json::from_str(&content)
         .map_err(|_| "Module file contains invalid JSON.".to_string())?;

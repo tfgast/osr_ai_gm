@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,6 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::engine::retainer::Retainer;
 use crate::model::{Party, CombatState};
 use crate::pathutil::normalize_path;
+use crate::rules::monster::MonsterDef;
 use crate::state::dungeon::DungeonState;
 use crate::state::effect::ActiveEffect;
 use crate::state::game::GameMode;
@@ -49,6 +51,10 @@ pub struct GameState {
     /// companion TUI can merge them in chronological order.
     #[serde(default)]
     pub log_seq: u64,
+    /// Module-specific monster definitions loaded alongside the active module.
+    /// Keyed by lowercase monster name for case-insensitive lookup.
+    #[serde(default)]
+    pub module_monsters: HashMap<String, MonsterDef>,
 }
 
 fn default_version() -> u32 { 0 }
@@ -69,6 +75,7 @@ impl GameState {
             retainers: Vec::new(),
             effects: Vec::new(),
             log_seq: 0,
+            module_monsters: HashMap::new(),
         }
     }
 

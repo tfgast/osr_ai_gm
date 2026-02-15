@@ -660,3 +660,43 @@ impl Command for KillCommand {
         }
     }
 }
+
+pub struct SpawnPlacedCommand;
+impl Command for SpawnPlacedCommand {
+    fn name(&self) -> &str {
+        "spawn_placed"
+    }
+    fn help(&self) -> &str {
+        "Spawn placed module monsters into combat (spawn_placed [distance] [name])"
+    }
+    fn execute(&self, args: &[&str], state: &mut GameState) -> CommandResult {
+        let distance: u32 = if !args.is_empty() {
+            match args[0].parse() {
+                Ok(n) => n,
+                _ => return CommandResult::error(
+                    "usage: spawn_placed [distance] [name]\n  \
+                     distance: encounter distance in feet (default 10)\n  \
+                     name: optional monster name filter"
+                ),
+            }
+        } else {
+            10
+        };
+        let name_filter = if args.len() >= 2 {
+            Some(args[1..].join(" "))
+        } else {
+            None
+        };
+
+        match combat::action_spawn_placed(state, distance, name_filter.as_deref()) {
+            Ok(result) => {
+                let mut out = result.message.clone();
+                out.push_str("\n\n");
+                out.push_str(&result.status);
+                out.push_str("\nUse 'initiative' to roll for the first round.");
+                CommandResult::ok(out)
+            }
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}

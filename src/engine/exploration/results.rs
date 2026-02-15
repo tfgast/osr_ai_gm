@@ -40,19 +40,15 @@ fn encounter_next_steps(enc: &EncounterResult) -> Vec<String> {
 fn placed_monster_next_steps(monsters: &[PlacedMonsterInstance]) -> Vec<String> {
     use crate::rules::monster as monster_db;
 
-    let mut steps = Vec::new();
+    let mut steps = vec![
+        "SpawnPlaced {distance: 10} — spawn all placed monsters (auto-resolves stats from module/core DB)".to_string(),
+    ];
     for m in monsters {
-        if monster_db::find_monster(&m.name).is_some() {
+        if monster_db::find_monster(&m.name).is_none() {
             steps.push(format!(
-                "SpawnMonster {{name: \"{}\", count: {}, distance: 10}} to start combat",
-                m.name, m.count
-            ));
-        } else {
-            steps.push(format!(
-                "SpawnEncounter {{name: \"{}\", count: {}, hit_dice: <HD>, ac: <AC>, hp: <HP>, \
-                damage: \"<dmg>\", morale: <M>, distance: 10}} — \
-                not in core DB, provide stats from module",
-                m.name, m.count
+                "Note: \"{}\" not in core DB — SpawnPlaced uses module monsters.json if available, \
+                otherwise use SpawnEncounter with manual stats",
+                m.name
             ));
         }
     }
@@ -84,7 +80,7 @@ impl From<super::ExplorationResult> for ExplorationActionResult {
         let placed_guidance = if let Some(ref placed) = value.placed_monsters {
             if !placed.is_empty() {
                 next_steps.extend(placed_monster_next_steps(placed));
-                Some("PLACED MONSTERS: Use SpawnMonster to fight, or RollReaction to parley.".to_string())
+                Some("PLACED MONSTERS: Use SpawnPlaced to start combat (auto-resolves stats from module/core DB).".to_string())
             } else {
                 None
             }
