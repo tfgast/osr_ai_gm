@@ -353,7 +353,7 @@ mod tests {
             assert!(!m.name.is_empty(), "monster has empty name");
             assert!(m.hit_dice.base > 0 || m.hit_dice.fractional, "{} has invalid hit_dice", m.name);
             // xp_value can be 0 for special monsters, but morale should be set
-            assert!(m.morale > 0 || m.morale <= 12, "{} has invalid morale", m.name);
+            assert!(m.morale >= 1 && m.morale <= 12, "{} has invalid morale: {}", m.name, m.morale);
         }
     }
 

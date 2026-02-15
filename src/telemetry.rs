@@ -111,6 +111,7 @@ mod tests {
 
     #[test]
     fn log_does_not_panic_on_missing_home() {
+        let _env = lock_env();
         let original = std::env::var("HOME").ok();
         unsafe { std::env::remove_var("HOME") };
 

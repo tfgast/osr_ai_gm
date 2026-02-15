@@ -164,6 +164,14 @@ pub fn search_room_with<R: Rng>(
     is_elf: bool,
 ) -> ExplorationResult {
     let mut result = ExplorationResult::new();
+
+    // Cannot search in darkness
+    if !time.has_light() {
+        result.msg("The party is in DARKNESS! Cannot search without light.");
+        result.msg("Light a torch or lantern before searching.");
+        return result;
+    }
+
     let light_msgs = time.advance_turn();
     for msg in light_msgs {
         result.msg(msg);
@@ -258,11 +266,17 @@ pub fn listen_at_door(
 pub fn listen_at_door_with<R: Rng>(
     rng: &mut R,
     time: &mut TimeTracker,
-    _dungeon: &DungeonState,
+    dungeon: &DungeonState,
     dungeon_level: u32,
     is_elf_or_halfling: bool,
 ) -> ExplorationResult {
     let mut result = ExplorationResult::new();
+
+    // Validate that there is at least one door in the current room
+    if dungeon.doors_from_current().is_empty() {
+        result.msg("There are no doors to listen at in this room.");
+        return result;
+    }
 
     // Listening consumes one turn
     let light_msgs = time.advance_turn();
