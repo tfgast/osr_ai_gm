@@ -308,6 +308,15 @@ pub fn load(path: &Path) -> io::Result<GameState> {
     let data = fs::read_to_string(path)?;
     let state: GameState = serde_json::from_str(&data)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    if state.version > SAVE_VERSION {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "save version {} is newer than supported version {}",
+                state.version, SAVE_VERSION
+            ),
+        ));
+    }
     Ok(state)
 }
 
@@ -350,6 +359,25 @@ mod tests {
     fn load_missing_file() {
         let result = load(&PathBuf::from("/nonexistent/save.json"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_rejects_future_save_version() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("osr_ai_gm_test_future_version.json");
+        let mut state = GameState::new();
+        save(&state, &path).unwrap();
+        // Patch version to a future value
+        let mut data: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        data["version"] = serde_json::json!(999);
+        fs::write(&path, serde_json::to_string(&data).unwrap()).unwrap();
+        let result = load(&path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(err.to_string().contains("999"));
+        let _ = fs::remove_file(&path);
     }
 
     #[test]
