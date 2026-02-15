@@ -1,6 +1,7 @@
 use crate::engine::result::EngineError;
 use crate::persist::GameState;
 use crate::state::dungeon::{Door, DoorState, DungeonState, Room};
+use crate::state::effect;
 use crate::state::game::GameMode;
 use crate::state::time::LightSourceKind;
 
@@ -13,6 +14,17 @@ use super::{
     advance_dungeon_turn, exploration_status, force_door, listen_at_door, move_through_door,
     pick_lock, search_room,
 };
+
+/// Tick turn-based effects on all party members and global state.
+/// Returns expiry messages to append to the action result.
+fn tick_turn_effects(state: &mut GameState) -> Vec<String> {
+    let mut messages = Vec::new();
+    for member in &mut state.party.members {
+        messages.extend(effect::tick_turn_effects(&mut member.effects, &member.name));
+    }
+    messages.extend(effect::tick_turn_effects(&mut state.effects, "the area"));
+    messages
+}
 
 pub fn action_move_through_door(
     state: &mut GameState,
@@ -47,7 +59,15 @@ pub fn action_search_room(
         .ok_or_else(|| EngineError::WrongState("no dungeon state.".to_string()))?;
 
     let result = search_room(time, dungeon, level, is_elf);
-    Ok(SearchRoomResult::from(result))
+    let mut result = SearchRoomResult::from(result);
+    let expiry_msgs = tick_turn_effects(state);
+    if !expiry_msgs.is_empty() {
+        for msg in &expiry_msgs {
+            result.messages.push(msg.clone());
+        }
+        result.message = result.messages.join("\n");
+    }
+    Ok(result)
 }
 
 pub fn action_listen_at_door(
@@ -65,7 +85,15 @@ pub fn action_listen_at_door(
         .ok_or_else(|| EngineError::WrongState("no dungeon state.".to_string()))?;
 
     let result = listen_at_door(time, dungeon, level, is_demihuman);
-    Ok(ListenAtDoorResult::from(result))
+    let mut result = ListenAtDoorResult::from(result);
+    let expiry_msgs = tick_turn_effects(state);
+    if !expiry_msgs.is_empty() {
+        for msg in &expiry_msgs {
+            result.messages.push(msg.clone());
+        }
+        result.message = result.messages.join("\n");
+    }
+    Ok(result)
 }
 
 pub fn action_force_door(
@@ -134,7 +162,15 @@ pub fn action_advance_dungeon_turn(
         .ok_or_else(|| EngineError::WrongState("no dungeon state.".to_string()))?;
 
     let result = advance_dungeon_turn(time, dungeon, level);
-    Ok(AdvanceDungeonTurnResult::from(result))
+    let mut result = AdvanceDungeonTurnResult::from(result);
+    let expiry_msgs = tick_turn_effects(state);
+    if !expiry_msgs.is_empty() {
+        for msg in &expiry_msgs {
+            result.messages.push(msg.clone());
+        }
+        result.message = result.messages.join("\n");
+    }
+    Ok(result)
 }
 
 pub fn action_enter_dungeon(
@@ -217,9 +253,16 @@ pub fn action_rest(state: &mut GameState) -> Result<RestResult, EngineError> {
         .ok_or_else(|| EngineError::WrongState("not in exploration mode.".to_string()))?;
 
     time.rest();
+    let total_turns = time.total_turns;
+    let expiry_msgs = tick_turn_effects(state);
+    let mut message = "party rests for one turn. activity counter reset.".to_string();
+    for msg in &expiry_msgs {
+        message.push('\n');
+        message.push_str(msg);
+    }
     Ok(RestResult {
-        message: "party rests for one turn. activity counter reset.".to_string(),
-        total_turns: time.total_turns,
+        message,
+        total_turns,
     })
 }
 
@@ -426,4 +469,120 @@ pub fn action_look(state: &GameState) -> Result<LookResult, EngineError> {
         room_name: room.name.clone(),
         description: room.description.clone(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Character;
+    use crate::rules::class::Class;
+    use crate::state::dungeon::{DungeonState, Room};
+    use crate::state::effect::{ActiveEffect, EffectDuration};
+    use crate::state::time::LightSourceKind;
+
+    /// Build a minimal GameState in Exploration mode with one party member.
+    fn exploration_state() -> GameState {
+        let mut state = GameState::new();
+        let mut ch = Character::new("Arden", Class::Fighter);
+        ch.hp = 8;
+        ch.max_hp = 8;
+        state.party.add_member(ch);
+
+        let mut dungeon = DungeonState::new(1);
+        dungeon.add_room(Room::new(0, "Hall")).unwrap();
+        state.enter_exploration(dungeon, 1);
+
+        // Light a lantern so exploration isn't blocked by darkness.
+        state.time.as_mut().unwrap().light(LightSourceKind::Lantern, "Arden");
+        state
+    }
+
+    fn test_effect(name: &str, turns: u32) -> ActiveEffect {
+        ActiveEffect {
+            id: 1,
+            name: name.to_string(),
+            source: "test".to_string(),
+            duration: EffectDuration::Turns(turns),
+            modifiers: Vec::new(),
+            notes: String::new(),
+        }
+    }
+
+    #[test]
+    fn advance_turn_ticks_turn_effects() {
+        let mut state = exploration_state();
+        state.party.members[0].effects.push(test_effect("Shield", 2));
+
+        // First advance: Turns(2) → Turns(1)
+        let r = action_advance_dungeon_turn(&mut state).unwrap();
+        assert_eq!(state.party.members[0].effects.len(), 1);
+        assert_eq!(state.party.members[0].effects[0].duration, EffectDuration::Turns(1));
+        assert!(!r.message.contains("worn off"));
+
+        // Second advance: Turns(1) → expired & removed
+        let r = action_advance_dungeon_turn(&mut state).unwrap();
+        assert!(state.party.members[0].effects.is_empty());
+        assert!(r.message.contains("Shield has worn off"));
+    }
+
+    #[test]
+    fn search_room_ticks_turn_effects() {
+        let mut state = exploration_state();
+        state.party.members[0].effects.push(test_effect("Light", 1));
+
+        let r = action_search_room(&mut state, false).unwrap();
+        assert!(state.party.members[0].effects.is_empty());
+        assert!(r.message.contains("Light has worn off"));
+    }
+
+    #[test]
+    fn listen_at_door_ticks_turn_effects() {
+        let mut state = exploration_state();
+        state.party.members[0].effects.push(test_effect("Detect Magic", 1));
+
+        let r = action_listen_at_door(&mut state, false).unwrap();
+        assert!(state.party.members[0].effects.is_empty());
+        assert!(r.message.contains("Detect Magic has worn off"));
+    }
+
+    #[test]
+    fn rest_ticks_turn_effects() {
+        let mut state = exploration_state();
+        state.party.members[0].effects.push(test_effect("Bless", 1));
+
+        let r = action_rest(&mut state).unwrap();
+        assert!(state.party.members[0].effects.is_empty());
+        assert!(r.message.contains("Bless has worn off"));
+    }
+
+    #[test]
+    fn global_effects_tick_during_exploration() {
+        let mut state = exploration_state();
+        state.effects.push(test_effect("Zone of Silence", 1));
+
+        let r = action_advance_dungeon_turn(&mut state).unwrap();
+        assert!(state.effects.is_empty());
+        assert!(r.message.contains("Zone of Silence has worn off"));
+    }
+
+    #[test]
+    fn round_effects_not_ticked_by_exploration() {
+        let mut state = exploration_state();
+        state.party.members[0].effects.push(ActiveEffect {
+            id: 1,
+            name: "Haste".to_string(),
+            source: "test".to_string(),
+            duration: EffectDuration::Rounds(3),
+            modifiers: Vec::new(),
+            notes: String::new(),
+        });
+
+        action_advance_dungeon_turn(&mut state).unwrap();
+        // Round-based effect should be untouched by turn ticking.
+        assert_eq!(state.party.members[0].effects.len(), 1);
+        assert_eq!(
+            state.party.members[0].effects[0].duration,
+            EffectDuration::Rounds(3)
+        );
+    }
 }
