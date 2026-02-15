@@ -36,6 +36,29 @@ fn encounter_next_steps(enc: &EncounterResult) -> Vec<String> {
     ]
 }
 
+/// Build next-step guidance for placed module monsters.
+fn placed_monster_next_steps(monsters: &[PlacedMonsterInstance]) -> Vec<String> {
+    use crate::rules::monster as monster_db;
+
+    let mut steps = Vec::new();
+    for m in monsters {
+        if monster_db::find_monster(&m.name).is_some() {
+            steps.push(format!(
+                "SpawnMonster {{name: \"{}\", count: {}, distance: 10}} to start combat",
+                m.name, m.count
+            ));
+        } else {
+            steps.push(format!(
+                "SpawnEncounter {{name: \"{}\", count: {}, hit_dice: <HD>, ac: <AC>, hp: <HP>, \
+                damage: \"<dmg>\", morale: <M>, distance: 10}} — \
+                not in core DB, provide stats from module",
+                m.name, m.count
+            ));
+        }
+    }
+    steps
+}
+
 impl From<super::ExplorationResult> for ExplorationActionResult {
     fn from(value: super::ExplorationResult) -> Self {
         // Build base message before moving fields out of value.
@@ -48,7 +71,7 @@ impl From<super::ExplorationResult> for ExplorationActionResult {
         });
         let has_encounter = encounter.is_some();
 
-        let (next_steps, guidance_msg) = match &encounter {
+        let (mut next_steps, guidance_msg) = match &encounter {
             Some(enc) => {
                 let guidance = "ENCOUNTER RESOLUTION REQUIRED: Use SpawnMonster to fight, \
                      RollReaction to parley, or Evade to flee.".to_string();
@@ -57,10 +80,25 @@ impl From<super::ExplorationResult> for ExplorationActionResult {
             None => (Vec::new(), None),
         };
 
+        // Add guidance for placed module monsters
+        let placed_guidance = if let Some(ref placed) = value.placed_monsters {
+            if !placed.is_empty() {
+                next_steps.extend(placed_monster_next_steps(placed));
+                Some("PLACED MONSTERS: Use SpawnMonster to fight, or RollReaction to parley.".to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let mut messages = value.messages;
         let message = if let Some(guidance) = &guidance_msg {
             messages.push(guidance.clone());
             format!("{}{}\n", base_message, guidance)
+        } else if let Some(placed_msg) = &placed_guidance {
+            messages.push(placed_msg.clone());
+            format!("{}{}\n", base_message, placed_msg)
         } else {
             base_message
         };
