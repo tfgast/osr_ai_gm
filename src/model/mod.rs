@@ -259,6 +259,21 @@ pub enum CombatPhase {
     EndOfRound,
 }
 
+impl std::fmt::Display for CombatPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CombatPhase::Declaration => write!(f, "Declaration"),
+            CombatPhase::Initiative => write!(f, "Initiative"),
+            CombatPhase::Morale => write!(f, "Morale"),
+            CombatPhase::Movement => write!(f, "Movement"),
+            CombatPhase::Missile => write!(f, "Missile"),
+            CombatPhase::Magic => write!(f, "Magic"),
+            CombatPhase::Melee => write!(f, "Melee"),
+            CombatPhase::EndOfRound => write!(f, "End of Round"),
+        }
+    }
+}
+
 /// State of an active combat encounter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {

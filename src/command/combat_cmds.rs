@@ -172,6 +172,22 @@ impl Command for InitiativeCommand {
     }
 }
 
+pub struct NextPhaseCommand;
+impl Command for NextPhaseCommand {
+    fn name(&self) -> &str {
+        "next_phase"
+    }
+    fn help(&self) -> &str {
+        "Advance to the next combat phase"
+    }
+    fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
+        match combat::action_next_phase(state) {
+            Ok(result) => CommandResult::ok(result.message),
+            Err(e) => CommandResult::error(e.to_string()),
+        }
+    }
+}
+
 pub struct AttackCommand;
 impl Command for AttackCommand {
     fn name(&self) -> &str {

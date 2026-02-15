@@ -125,6 +125,8 @@ pub enum GMCommand {
     CastSpell {
         character: String,
     },
+    /// Advance to the next combat phase (GM controls round pacing).
+    NextPhase,
     /// End the current combat.
     EndCombat,
 
