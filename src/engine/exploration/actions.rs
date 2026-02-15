@@ -345,6 +345,13 @@ pub fn action_open_door(
         )));
     }
 
+    if door.state == DoorState::Stuck {
+        return Err(EngineError::InvalidInput(format!(
+            "door {} is stuck. Use ForceDoor to attempt to force it open.",
+            door_id
+        )));
+    }
+
     let mut output = Vec::new();
 
     if !door.is_passable() {
