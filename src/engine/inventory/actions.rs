@@ -119,14 +119,15 @@ fn find_placed_treasure(
 /// and "Thieves tools" finds "Thieves' tools".
 fn find_buyable(name: &str) -> Option<(String, u32, f32)> {
     // Pass 1: exact case-insensitive lookup via HashMap
+    // weight() returns coins; Item.weight is pounds (cn / 10)
     if let Some(w) = equipment::find_weapon(name) {
         if w.cost_gp() > 0 {
-            return Some((w.name.clone(), w.cost_gp(), w.weight() as f32));
+            return Some((w.name.clone(), w.cost_gp(), w.weight() as f32 / 10.0));
         }
     }
     if let Some(a) = equipment::find_armour(name) {
         if a.cost_gp() > 0 {
-            return Some((a.name.clone(), a.cost_gp(), a.weight() as f32));
+            return Some((a.name.clone(), a.cost_gp(), a.weight() as f32 / 10.0));
         }
     }
     if let Some(g) = equipment::find_gear(name) {
@@ -146,12 +147,12 @@ fn find_buyable(name: &str) -> Option<(String, u32, f32)> {
     }
     for w in equipment::weapons() {
         if w.cost_gp() > 0 && normalize_for_matching(&w.name) == query_norm {
-            return Some((w.name.clone(), w.cost_gp(), w.weight() as f32));
+            return Some((w.name.clone(), w.cost_gp(), w.weight() as f32 / 10.0));
         }
     }
     for a in equipment::armour() {
         if a.cost_gp() > 0 && normalize_for_matching(&a.name) == query_norm {
-            return Some((a.name.clone(), a.cost_gp(), a.weight() as f32));
+            return Some((a.name.clone(), a.cost_gp(), a.weight() as f32 / 10.0));
         }
     }
     for g in equipment::gear() {
@@ -646,6 +647,19 @@ mod tests {
     }
 
     #[test]
+    fn buy_stores_weight_in_pounds() {
+        let mut state = state_with_fighter();
+        action_buy(&mut state, "Aldric", "Sword").expect("buy should succeed");
+        let item = &state.party.find_member("Aldric").unwrap().inventory[0];
+        // Sword weight_coins=60 → Item.weight should be 6.0 lbs (not 60.0)
+        assert!(
+            (item.weight - 6.0).abs() < 0.01,
+            "Sword weight should be 6.0 lbs, got {}",
+            item.weight
+        );
+    }
+
+    #[test]
     fn drop_item() {
         let mut state = state_with_fighter();
         state
@@ -653,7 +667,7 @@ mod tests {
             .find_member_mut("Aldric")
             .unwrap()
             .inventory
-            .push(Item::new("Sword", 60.0, 10));
+            .push(Item::new("Sword", 6.0, 10));
         let result = action_drop(&mut state, "Aldric", "Sword").expect("drop should succeed");
         assert!(result.message.contains("drops Sword"));
         assert!(state

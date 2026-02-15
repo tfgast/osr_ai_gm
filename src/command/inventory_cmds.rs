@@ -256,7 +256,7 @@ mod tests {
             .find_member_mut("Aldric")
             .unwrap()
             .inventory
-            .push(Item::new("Sword", 60.0, 10));
+            .push(Item::new("Sword", 6.0, 10));
         let result = cmd.execute(&["Aldric", "Sword"], &mut state);
         assert!(result.output.contains("drops Sword"));
         assert!(state

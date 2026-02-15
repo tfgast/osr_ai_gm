@@ -163,7 +163,7 @@ fn state_for_drop() -> GameState {
         .find_member_mut("Aldric")
         .expect("Aldric should exist")
         .inventory
-        .push(Item::new("Sword", 60.0, 10));
+        .push(Item::new("Sword", 6.0, 10));
     state
 }
 
@@ -174,7 +174,7 @@ fn state_for_equip() -> GameState {
         .find_member_mut("Aldric")
         .expect("Aldric should exist")
         .inventory
-        .push(Item::new("Leather", 150.0, 20));
+        .push(Item::new("Leather", 20.0, 20));
     state
 }
 
