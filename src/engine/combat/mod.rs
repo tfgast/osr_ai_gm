@@ -1022,6 +1022,29 @@ mod tests {
         assert!(newly_turned > 0, "should turn additional skeletons");
     }
 
+    #[test]
+    fn turn_undead_skips_non_undead_in_mixed_encounter() {
+        // Regression: turn should only affect undead monsters, not living ones
+        let goblin = test_goblin(); // undead: false
+        let skeleton = test_skeleton(); // undead: true
+        let mut combat = CombatState::new(vec![goblin, skeleton], 10);
+        let cleric = test_cleric();
+        // Level 3 vs skeleton (rank 1): auto turn
+        let result = resolve_turn_undead_with(&mut combat, &cleric, 3, 1, &mut test_rng());
+        assert!(result.success);
+        // Goblin (index 0) must NOT be turned — it's not undead
+        assert!(
+            !combat.monsters[0].turned,
+            "non-undead goblin should not be turned"
+        );
+        assert!(combat.monsters[0].hp > 0, "non-undead goblin should not be destroyed");
+        // Skeleton (index 1) should be turned
+        assert!(
+            combat.monsters[1].turned,
+            "undead skeleton should be turned"
+        );
+    }
+
     // --- Retreat & fighting withdrawal ---
 
     #[test]

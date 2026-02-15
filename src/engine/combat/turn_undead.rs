@@ -111,7 +111,7 @@ pub fn resolve_turn_undead_with<R: Rng>(
             if remaining_hd == 0 {
                 break;
             }
-            if !m.is_alive() || m.turned {
+            if !m.is_alive() || m.turned || !m.undead {
                 continue;
             }
             let m_hd = m.hit_dice.combat_hd().max(1);
