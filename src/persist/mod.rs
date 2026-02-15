@@ -271,7 +271,12 @@ pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
     // This ensures the save is atomic — either the old file remains or
     // the new one replaces it; a crash mid-write won't corrupt data.
     let parent = path.parent().unwrap_or(Path::new("."));
-    fs::create_dir_all(parent)?;
+    fs::create_dir_all(parent).map_err(|e| {
+        io::Error::new(
+            e.kind(),
+            format!("cannot create saves directory '{}': {}. Set OSR_DATA_DIR to override.", parent.display(), e),
+        )
+    })?;
     let tmp_path = parent.join(format!(
         ".{}.{}.tmp",
         path.file_name()
@@ -279,10 +284,18 @@ pub fn save(state: &GameState, path: &Path) -> io::Result<()> {
             .unwrap_or("save"),
         std::process::id()
     ));
-    fs::write(&tmp_path, &json)?;
+    fs::write(&tmp_path, &json).map_err(|e| {
+        io::Error::new(
+            e.kind(),
+            format!("cannot write save file '{}': {}", tmp_path.display(), e),
+        )
+    })?;
     if let Err(e) = fs::rename(&tmp_path, path) {
         let _ = fs::remove_file(&tmp_path);
-        return Err(e);
+        return Err(io::Error::new(
+            e.kind(),
+            format!("cannot finalize save file '{}': {}", path.display(), e),
+        ));
     }
     Ok(())
 }
