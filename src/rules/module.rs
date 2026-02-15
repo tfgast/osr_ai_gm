@@ -24,6 +24,15 @@ pub struct ModuleDef {
     /// When defined, every room must be assigned to exactly one level.
     #[serde(default)]
     pub levels: HashMap<String, ModuleLevel>,
+    /// Module-specific wandering monster tables keyed by area/level.
+    #[serde(default)]
+    pub wandering_monsters: HashMap<String, WanderingMonsterTable>,
+    /// Module-specific custom rules (defilement zones, special mechanics, etc.).
+    #[serde(default)]
+    pub rules: HashMap<String, ModuleRule>,
+    /// Rollable tables for module-specific mechanics (random events, treasure, etc.).
+    #[serde(default)]
+    pub tables: HashMap<String, CustomTable>,
 }
 
 /// A dungeon level within a multi-level module.
@@ -35,6 +44,72 @@ pub struct ModuleLevel {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wandering_table: Option<String>,
     pub rooms: Vec<String>,
+}
+
+/// A wandering monster table with dice expression and entries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WanderingMonsterTable {
+    /// Dice expression for the table (e.g., "2d6", "1d8", "1d100").
+    pub dice: String,
+    /// Frequency of checks: every N turns (default 2, matching OSE standard).
+    #[serde(default = "default_frequency")]
+    pub frequency: u32,
+    /// Chance of encounter on each check as X-in-6 (default 1).
+    #[serde(default = "default_chance")]
+    pub chance: u32,
+    pub entries: Vec<WanderingMonsterEntry>,
+}
+
+fn default_frequency() -> u32 {
+    2
+}
+
+fn default_chance() -> u32 {
+    1
+}
+
+/// A single entry in a wandering monster table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WanderingMonsterEntry {
+    /// Inclusive range for matching the dice roll (e.g., [2, 5] matches rolls 2-5).
+    pub range: (u32, u32),
+    /// Monster name.
+    pub name: String,
+    /// Number appearing (dice expression or fixed, e.g., "1d6" or "3").
+    #[serde(default = "default_count_str")]
+    pub count: String,
+}
+
+fn default_count_str() -> String {
+    "1".to_string()
+}
+
+/// A module-specific custom rule.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleRule {
+    pub name: String,
+    pub description: String,
+}
+
+/// A rollable table for module-specific mechanics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomTable {
+    pub name: String,
+    /// Dice expression (e.g., "1d6", "1d20", "1d100").
+    pub dice: String,
+    pub entries: Vec<CustomTableEntry>,
+}
+
+/// A single entry in a custom rollable table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomTableEntry {
+    /// Inclusive range for matching the dice roll.
+    pub range: (u32, u32),
+    /// Result text.
+    pub result: String,
+    /// Optional mechanical effect description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect: Option<String>,
 }
 
 /// A room within an adventure module.
@@ -55,6 +130,49 @@ pub struct ModuleRoom {
     pub trap_trigger: TrapTrigger,
     #[serde(default)]
     pub exits: Vec<ModuleExit>,
+    /// Interactive or notable features in the room (altars, statues, mechanisms, etc.).
+    #[serde(default)]
+    pub features: Vec<RoomFeature>,
+    /// Descriptive tags for the room (e.g., "dark", "flooded", "sacred").
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Boxed text to read aloud to players when entering the room.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_aloud: Option<String>,
+    /// Private notes for the GM about this room.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gm_notes: Option<String>,
+}
+
+/// Kind of room feature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum RoomFeatureKind {
+    /// Purely descriptive element.
+    #[serde(alias = "description")]
+    #[default]
+    Description,
+    /// Something dangerous (pit, lava, unstable floor).
+    #[serde(alias = "hazard")]
+    Hazard,
+    /// Writing or runes that can be read/deciphered.
+    #[serde(alias = "inscription")]
+    Inscription,
+    /// Interactive mechanism (lever, wheel, pressure plate).
+    #[serde(alias = "mechanism")]
+    Mechanism,
+}
+
+/// A notable feature within a room that the GM can describe or players can interact with.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoomFeature {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub kind: RoomFeatureKind,
+    /// What happens when players interact with this feature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interaction: Option<String>,
 }
 
 /// A monster placement within a module room.
@@ -499,6 +617,9 @@ mod tests {
             sections: HashMap::new(),
             rooms: HashMap::new(),
             levels: HashMap::new(),
+            wandering_monsters: HashMap::new(),
+            rules: HashMap::new(),
+            tables: HashMap::new(),
         };
         assert!(validate_module(&module).is_err());
     }
@@ -513,6 +634,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: vec![ModuleExit {
                 to: "nowhere".to_string(),
                 door: DoorState::Closed,
@@ -527,6 +652,9 @@ mod tests {
             sections: HashMap::new(),
             rooms,
             levels: HashMap::new(),
+            wandering_monsters: HashMap::new(),
+            rules: HashMap::new(),
+            tables: HashMap::new(),
         };
         assert!(validate_module(&module).is_err());
     }
@@ -541,6 +669,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: Vec::new(),
         });
         let module = ModuleDef {
@@ -550,6 +682,9 @@ mod tests {
             sections: HashMap::new(),
             rooms,
             levels: HashMap::new(),
+            wandering_monsters: HashMap::new(),
+            rules: HashMap::new(),
+            tables: HashMap::new(),
         };
         assert!(validate_module(&module).is_err());
     }
@@ -570,6 +705,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: vec![ModuleExit {
                 to: "room_b".to_string(),
                 door: DoorState::Locked,
@@ -584,6 +723,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: vec![ModuleExit {
                 to: "room_a".to_string(),
                 door: DoorState::Closed,
@@ -598,6 +741,9 @@ mod tests {
             sections: HashMap::new(),
             rooms,
             levels: HashMap::new(),
+            wandering_monsters: HashMap::new(),
+            rules: HashMap::new(),
+            tables: HashMap::new(),
         };
         let err = validate_module(&module).unwrap_err();
         assert!(err.contains("conflicting door states"), "expected conflict error, got: {}", err);
@@ -613,6 +759,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: vec![ModuleExit {
                 to: "room_b".to_string(),
                 door: DoorState::Locked,
@@ -627,6 +777,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: vec![ModuleExit {
                 to: "room_a".to_string(),
                 door: DoorState::Locked,
@@ -641,6 +795,9 @@ mod tests {
             sections: HashMap::new(),
             rooms,
             levels: HashMap::new(),
+            wandering_monsters: HashMap::new(),
+            rules: HashMap::new(),
+            tables: HashMap::new(),
         };
         assert!(validate_module(&module).is_ok());
     }
@@ -949,6 +1106,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: Vec::new(),
         });
         let mut levels = HashMap::new();
@@ -965,6 +1126,9 @@ mod tests {
             sections: HashMap::new(),
             rooms,
             levels,
+            wandering_monsters: HashMap::new(),
+            rules: HashMap::new(),
+            tables: HashMap::new(),
         };
         let err = validate_module(&module).unwrap_err();
         assert!(err.contains("non-existent room"), "expected non-existent room error, got: {}", err);
@@ -980,6 +1144,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: Vec::new(),
         });
         let mut levels = HashMap::new();
@@ -1002,6 +1170,9 @@ mod tests {
             sections: HashMap::new(),
             rooms,
             levels,
+            wandering_monsters: HashMap::new(),
+            rules: HashMap::new(),
+            tables: HashMap::new(),
         };
         let err = validate_module(&module).unwrap_err();
         assert!(err.contains("multiple levels"), "expected multiple levels error, got: {}", err);
@@ -1017,6 +1188,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: Vec::new(),
         });
         rooms.insert("orphan".to_string(), ModuleRoom {
@@ -1026,6 +1201,10 @@ mod tests {
             treasure: Vec::new(),
             trap: None,
             trap_trigger: TrapTrigger::Entry,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
             exits: Vec::new(),
         });
         let mut levels = HashMap::new();
@@ -1042,6 +1221,9 @@ mod tests {
             sections: HashMap::new(),
             rooms,
             levels,
+            wandering_monsters: HashMap::new(),
+            rules: HashMap::new(),
+            tables: HashMap::new(),
         };
         let err = validate_module(&module).unwrap_err();
         assert!(err.contains("not assigned to any level"), "expected unassigned error, got: {}", err);
@@ -1078,5 +1260,144 @@ mod tests {
         }"#;
         let module: ModuleDef = serde_json::from_str(json).unwrap();
         assert!(validate_module(&module).is_ok());
+    }
+
+    #[test]
+    fn parse_room_with_rich_content() {
+        let json = r#"{
+            "name": "Shrine of the Moon",
+            "description": "A circular chamber with a domed ceiling.",
+            "read_aloud": "Moonlight streams through a crack in the dome above.",
+            "gm_notes": "The altar radiates faint magic if Detect Magic is cast.",
+            "tags": ["sacred", "moonlit"],
+            "features": [
+                {
+                    "name": "Moon Altar",
+                    "description": "A silver altar shaped like a crescent moon.",
+                    "kind": "Mechanism",
+                    "interaction": "Placing a silver coin on the altar opens the secret door."
+                },
+                {
+                    "name": "Faded Mural",
+                    "description": "A painting of a fairy court, barely visible.",
+                    "kind": "Description"
+                }
+            ],
+            "exits": []
+        }"#;
+        let room: ModuleRoom = serde_json::from_str(json).unwrap();
+        assert_eq!(room.read_aloud.as_deref(), Some("Moonlight streams through a crack in the dome above."));
+        assert_eq!(room.gm_notes.as_deref(), Some("The altar radiates faint magic if Detect Magic is cast."));
+        assert_eq!(room.tags, vec!["sacred", "moonlit"]);
+        assert_eq!(room.features.len(), 2);
+        assert_eq!(room.features[0].name, "Moon Altar");
+        assert_eq!(room.features[0].kind, RoomFeatureKind::Mechanism);
+        assert_eq!(room.features[0].interaction.as_deref(), Some("Placing a silver coin on the altar opens the secret door."));
+        assert_eq!(room.features[1].kind, RoomFeatureKind::Description);
+    }
+
+    #[test]
+    fn rich_content_defaults_to_empty() {
+        let json = r#"{"name": "Plain Room"}"#;
+        let room: ModuleRoom = serde_json::from_str(json).unwrap();
+        assert!(room.features.is_empty());
+        assert!(room.tags.is_empty());
+        assert!(room.read_aloud.is_none());
+        assert!(room.gm_notes.is_none());
+    }
+
+    #[test]
+    fn parse_wandering_monster_table() {
+        let json = r#"{
+            "name": "Wandering Table Test",
+            "level_range": [1, 3],
+            "entry_room": "start",
+            "wandering_monsters": {
+                "level_1": {
+                    "dice": "2d6",
+                    "frequency": 3,
+                    "chance": 2,
+                    "entries": [
+                        {"range": [2, 5], "name": "Giant Rat", "count": "1d6"},
+                        {"range": [6, 9], "name": "Skeleton", "count": "1d4"},
+                        {"range": [10, 12], "name": "Gelatinous Cube", "count": "1"}
+                    ]
+                }
+            },
+            "rooms": {
+                "start": {"name": "Start", "exits": []}
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        assert_eq!(module.wandering_monsters.len(), 1);
+        let table = &module.wandering_monsters["level_1"];
+        assert_eq!(table.dice, "2d6");
+        assert_eq!(table.frequency, 3);
+        assert_eq!(table.chance, 2);
+        assert_eq!(table.entries.len(), 3);
+        assert_eq!(table.entries[0].name, "Giant Rat");
+        assert_eq!(table.entries[0].range, (2, 5));
+        assert_eq!(table.entries[0].count, "1d6");
+    }
+
+    #[test]
+    fn wandering_monster_table_defaults() {
+        let json = r#"{
+            "dice": "1d8",
+            "entries": [
+                {"range": [1, 4], "name": "Goblin"},
+                {"range": [5, 8], "name": "Orc"}
+            ]
+        }"#;
+        let table: WanderingMonsterTable = serde_json::from_str(json).unwrap();
+        assert_eq!(table.frequency, 2);
+        assert_eq!(table.chance, 1);
+        assert_eq!(table.entries[0].count, "1");
+    }
+
+    #[test]
+    fn parse_custom_rules_and_tables() {
+        let json = r#"{
+            "name": "Rules Test",
+            "level_range": [1, 5],
+            "entry_room": "start",
+            "rules": {
+                "defilement": {
+                    "name": "Zone of Defilement",
+                    "description": "Clerics cannot turn undead in this area."
+                }
+            },
+            "tables": {
+                "chaos_surge": {
+                    "name": "Chaos Surge Table",
+                    "dice": "1d6",
+                    "entries": [
+                        {"range": [1, 2], "result": "Nothing happens"},
+                        {"range": [3, 4], "result": "Lights flicker", "effect": "Torches extinguish"},
+                        {"range": [5, 6], "result": "Tremor", "effect": "Save vs paralysis or fall prone"}
+                    ]
+                }
+            },
+            "rooms": {
+                "start": {"name": "Start", "exits": []}
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        assert_eq!(module.rules.len(), 1);
+        assert_eq!(module.rules["defilement"].name, "Zone of Defilement");
+        assert_eq!(module.tables.len(), 1);
+        let table = &module.tables["chaos_surge"];
+        assert_eq!(table.dice, "1d6");
+        assert_eq!(table.entries.len(), 3);
+        assert_eq!(table.entries[1].effect.as_deref(), Some("Torches extinguish"));
+        assert!(table.entries[0].effect.is_none());
+    }
+
+    #[test]
+    fn module_defaults_empty_new_fields() {
+        let module: ModuleDef = serde_json::from_str(sample_module_json()).unwrap();
+        assert!(module.wandering_monsters.is_empty());
+        assert!(module.rules.is_empty());
+        assert!(module.tables.is_empty());
     }
 }

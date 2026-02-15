@@ -186,6 +186,29 @@ pub struct Room {
     /// Whether placed treasure has been looted.
     #[serde(default)]
     pub treasure_looted: bool,
+    /// Notable features in the room (from module definition).
+    #[serde(default)]
+    pub features: Vec<RoomFeatureInstance>,
+    /// Descriptive tags (e.g., "dark", "flooded", "sacred").
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Boxed text to read aloud when first entering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_aloud: Option<String>,
+    /// Private GM notes about this room.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gm_notes: Option<String>,
+}
+
+/// A room feature instance in the runtime dungeon state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoomFeatureInstance {
+    pub name: String,
+    pub description: String,
+    pub kind: String,
+    /// What happens when players interact with this feature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interaction: Option<String>,
 }
 
 impl Room {
@@ -204,6 +227,10 @@ impl Room {
             placed_treasure: Vec::new(),
             monsters_cleared: false,
             treasure_looted: false,
+            features: Vec::new(),
+            tags: Vec::new(),
+            read_aloud: None,
+            gm_notes: None,
         }
     }
 

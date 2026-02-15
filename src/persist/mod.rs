@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::engine::retainer::Retainer;
 use crate::model::{Party, CombatState};
 use crate::pathutil::normalize_path;
+use crate::rules::module::{CustomTable, ModuleRule, WanderingMonsterTable};
 use crate::rules::monster::MonsterDef;
 use crate::state::dungeon::DungeonState;
 use crate::state::effect::ActiveEffect;
@@ -55,6 +56,15 @@ pub struct GameState {
     /// Keyed by lowercase monster name for case-insensitive lookup.
     #[serde(default)]
     pub module_monsters: HashMap<String, MonsterDef>,
+    /// Module-specific wandering monster tables keyed by area/level.
+    #[serde(default)]
+    pub wandering_monster_tables: HashMap<String, WanderingMonsterTable>,
+    /// Module-specific custom rules (defilement zones, special mechanics, etc.).
+    #[serde(default)]
+    pub module_rules: HashMap<String, ModuleRule>,
+    /// Module-specific rollable tables (random events, treasure, etc.).
+    #[serde(default)]
+    pub module_tables: HashMap<String, CustomTable>,
 }
 
 fn default_version() -> u32 { 0 }
@@ -76,6 +86,9 @@ impl GameState {
             effects: Vec::new(),
             log_seq: 0,
             module_monsters: HashMap::new(),
+            wandering_monster_tables: HashMap::new(),
+            module_rules: HashMap::new(),
+            module_tables: HashMap::new(),
         }
     }
 

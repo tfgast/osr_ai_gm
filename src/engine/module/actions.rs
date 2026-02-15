@@ -3,6 +3,7 @@ use crate::persist::GameState;
 use crate::rules::module::{self as module_rules, ModuleDef, PlacedTreasure};
 use crate::state::dungeon::{
     Door, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, Room,
+    RoomFeatureInstance,
 };
 use crate::state::game::GameMode;
 use std::collections::HashMap;
@@ -48,6 +49,19 @@ pub fn module_to_dungeon(module: &ModuleDef) -> Result<DungeonState, String> {
             instance.undead = placed_monster.undead;
             room.placed_monsters.push(instance);
         }
+
+        // Propagate rich room content from module definition
+        for feature in &module_room.features {
+            room.features.push(RoomFeatureInstance {
+                name: feature.name.clone(),
+                description: feature.description.clone(),
+                kind: format!("{:?}", feature.kind),
+                interaction: feature.interaction.clone(),
+            });
+        }
+        room.tags = module_room.tags.clone();
+        room.read_aloud = module_room.read_aloud.clone();
+        room.gm_notes = module_room.gm_notes.clone();
 
         for placed_treasure in &module_room.treasure {
             let (description, gp_value) = match placed_treasure {
@@ -176,6 +190,11 @@ pub fn action_load_module(
             }
         }
     }
+
+    // Store module wandering monster tables, rules, and custom tables on GameState
+    state.wandering_monster_tables = module_def.wandering_monsters.clone();
+    state.module_rules = module_def.rules.clone();
+    state.module_tables = module_def.tables.clone();
 
     state.enter_exploration(dungeon, level_range.0);
 
@@ -810,5 +829,56 @@ mod tests {
             "status should show level key, got: {}",
             status
         );
+    }
+
+    #[test]
+    fn module_to_dungeon_propagates_rich_content() {
+        let json = r#"{
+            "name": "Rich Content Test",
+            "level_range": [1, 3],
+            "entry_room": "shrine",
+            "rooms": {
+                "shrine": {
+                    "name": "Moonlit Shrine",
+                    "description": "A circular chamber.",
+                    "read_aloud": "Moonlight streams through a crack above.",
+                    "gm_notes": "Detect Magic reveals faint abjuration.",
+                    "tags": ["sacred", "moonlit"],
+                    "features": [
+                        {
+                            "name": "Silver Altar",
+                            "description": "A crescent-shaped altar.",
+                            "kind": "Mechanism",
+                            "interaction": "Place a silver coin to open the secret door."
+                        }
+                    ],
+                    "exits": []
+                }
+            }
+        }"#;
+        let module: ModuleDef = serde_json::from_str(json).unwrap();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        let shrine = &dungeon.rooms[0];
+        assert_eq!(shrine.read_aloud.as_deref(), Some("Moonlight streams through a crack above."));
+        assert_eq!(shrine.gm_notes.as_deref(), Some("Detect Magic reveals faint abjuration."));
+        assert_eq!(shrine.tags, vec!["sacred", "moonlit"]);
+        assert_eq!(shrine.features.len(), 1);
+        assert_eq!(shrine.features[0].name, "Silver Altar");
+        assert_eq!(shrine.features[0].kind, "Mechanism");
+        assert_eq!(shrine.features[0].interaction.as_deref(), Some("Place a silver coin to open the secret door."));
+    }
+
+    #[test]
+    fn module_to_dungeon_rich_content_defaults_empty() {
+        let module = sample_module();
+        let dungeon = module_to_dungeon(&module).unwrap();
+
+        for room in &dungeon.rooms {
+            assert!(room.features.is_empty());
+            assert!(room.tags.is_empty());
+            assert!(room.read_aloud.is_none());
+            assert!(room.gm_notes.is_none());
+        }
     }
 }
