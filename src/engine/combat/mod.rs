@@ -234,6 +234,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: false,
+            immune_to_normal_weapons: false,
             effects: vec![],
         }
     }
@@ -252,6 +253,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: true,
+            immune_to_normal_weapons: false,
             effects: vec![],
         }
     }
@@ -270,6 +272,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: false,
+            immune_to_normal_weapons: false,
             effects: vec![],
         }
     }
@@ -974,6 +977,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: true,
+            immune_to_normal_weapons: false,
             effects: vec![],
         };
         // Also add a weak skeleton
@@ -1141,6 +1145,7 @@ mod tests {
             turned: false,
             helpless: false,
             undead: false,
+            immune_to_normal_weapons: false,
             effects: vec![],
         };
         let mut combat = CombatState::new(vec![ogre.clone(), ogre.clone(), ogre], 10);

@@ -72,6 +72,7 @@ impl Command for StartCombatCommand {
             state,
             &SpawnEncounterParams {
                 name, count, hit_dice: &hd, ac, hp, damage, morale, distance, xp_value, undead,
+                immune_to_normal_weapons: None,
             },
         ) {
             Ok(result) => {
@@ -161,6 +162,7 @@ impl Command for AddMonsterCommand {
             state,
             &SpawnEncounterParams {
                 name, count, hit_dice: &hd, ac, hp, damage, morale, distance: 0, xp_value, undead,
+                immune_to_normal_weapons: None,
             },
         ) {
             Ok(result) => {

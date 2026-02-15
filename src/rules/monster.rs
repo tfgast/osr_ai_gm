@@ -170,6 +170,19 @@ impl MonsterDef {
     pub fn is_undead(&self) -> bool {
         self.special_abilities.iter().any(|s| s.starts_with("Undead:"))
     }
+
+    /// Check if this monster is immune to non-magical weapons.
+    /// Detected from special abilities mentioning magical attack requirements.
+    pub fn immune_to_normal_weapons(&self) -> bool {
+        self.special_abilities.iter().any(|s| {
+            let lower = s.to_lowercase();
+            lower.contains("only be harmed by magical")
+                || lower.contains("only be hit by magical")
+                || lower.contains("mundane damage immunity")
+                || lower.contains("immune to non-magical")
+                || lower.contains("immune to normal weapons")
+        })
+    }
 }
 
 /// Container for loaded monster data.
@@ -400,6 +413,25 @@ mod tests {
         for name in &["Goblin", "Orc", "Basilisk", "Ogre", "Dragon, Red"] {
             if let Some(m) = find_monster(name) {
                 assert!(!m.is_undead(), "{} should NOT be detected as undead", name);
+            }
+        }
+    }
+
+    #[test]
+    fn immune_to_normal_weapons_detection() {
+        if !has_data() {
+            return;
+        }
+        // Known immune monsters
+        for name in &["Gargoyle", "Wraith", "Spectre", "Shadow", "Will-o'-the-Wisp"] {
+            if let Some(m) = find_monster(name) {
+                assert!(m.immune_to_normal_weapons(), "{} should be immune to normal weapons", name);
+            }
+        }
+        // Known non-immune monsters
+        for name in &["Goblin", "Orc", "Skeleton", "Zombie", "Ogre"] {
+            if let Some(m) = find_monster(name) {
+                assert!(!m.immune_to_normal_weapons(), "{} should NOT be immune to normal weapons", name);
             }
         }
     }

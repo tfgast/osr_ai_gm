@@ -38,6 +38,10 @@ pub struct EncounterParams {
     /// If omitted, auto-looked up from monster database.
     #[serde(default)]
     pub undead: Option<bool>,
+    /// Whether these monsters are immune to non-magical weapons.
+    /// If omitted, auto-looked up from monster database.
+    #[serde(default)]
+    pub immune_to_normal_weapons: Option<bool>,
 }
 
 /// All commands an AI GM can issue through the JSON protocol.

@@ -116,6 +116,9 @@ pub struct Monster {
     /// Whether this monster is undead (eligible for turn undead).
     #[serde(default)]
     pub undead: bool,
+    /// Whether this monster is immune to non-magical weapons.
+    #[serde(default)]
+    pub immune_to_normal_weapons: bool,
     /// Active effects on this monster.
     #[serde(default)]
     pub effects: Vec<ActiveEffect>,
@@ -136,6 +139,7 @@ impl Monster {
             turned: false,
             helpless: false,
             undead: false,
+            immune_to_normal_weapons: false,
             effects: Vec::new(),
         }
     }

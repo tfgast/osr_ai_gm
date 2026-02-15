@@ -22,6 +22,7 @@ pub(super) fn spawn_encounter(
             distance: params.distance,
             xp_value: params.xp_value,
             undead: params.undead,
+            immune_to_normal_weapons: params.immune_to_normal_weapons,
         },
     ) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
@@ -47,6 +48,7 @@ pub(super) fn add_monster(
             distance: params.distance,
             xp_value: params.xp_value,
             undead: params.undead,
+            immune_to_normal_weapons: params.immune_to_normal_weapons,
         },
     ) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),

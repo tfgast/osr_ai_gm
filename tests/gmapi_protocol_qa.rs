@@ -495,6 +495,7 @@ fn spawn_encounter_happy_path() {
         distance: 30,
         xp_value: Some(10),
         undead: None,
+        immune_to_normal_weapons: None,
     })), &mut state);
     assert_response_format(&resp, "se1");
     assert!(resp.success);
@@ -522,6 +523,7 @@ fn spawn_encounter_combat_already_active() {
         distance: 30,
         xp_value: None,
         undead: None,
+        immune_to_normal_weapons: None,
     })), &mut state);
     assert_response_format(&resp, "se2");
     assert!(!resp.success);
@@ -542,6 +544,7 @@ fn spawn_encounter_invalid_morale_low() {
         distance: 60,
         xp_value: None,
         undead: None,
+        immune_to_normal_weapons: None,
     })), &mut state);
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("morale"));
@@ -561,6 +564,7 @@ fn spawn_encounter_invalid_morale_high() {
         distance: 60,
         xp_value: None,
         undead: None,
+        immune_to_normal_weapons: None,
     })), &mut state);
     assert!(!resp.success);
 }
@@ -580,6 +584,7 @@ fn spawn_encounter_morale_boundary_valid() {
         distance: 60,
         xp_value: None,
         undead: None,
+        immune_to_normal_weapons: None,
     })), &mut state);
     assert!(resp.success, "morale=2 should be valid");
 
@@ -597,6 +602,7 @@ fn spawn_encounter_morale_boundary_valid() {
         distance: 120,
         xp_value: Some(1200),
         undead: None,
+        immune_to_normal_weapons: None,
     })), &mut state2);
     assert!(resp.success, "morale=12 should be valid");
 }
@@ -615,6 +621,7 @@ fn spawn_encounter_explicit_xp_value() {
         distance: 40,
         xp_value: Some(500),
         undead: None,
+        immune_to_normal_weapons: None,
     })), &mut state);
     assert!(resp.success);
     let combat = state.combat.as_ref().unwrap();
@@ -635,6 +642,7 @@ fn spawn_encounter_single_monster_no_numbering() {
         distance: 60,
         xp_value: Some(275),
         undead: None,
+        immune_to_normal_weapons: None,
     })), &mut state);
     assert!(resp.success);
     let combat = state.combat.as_ref().unwrap();

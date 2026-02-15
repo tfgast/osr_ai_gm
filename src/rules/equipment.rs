@@ -116,6 +116,25 @@ impl WeaponDef {
     }
 }
 
+/// Check if a weapon name indicates a magical weapon.
+///
+/// Detects "+N" patterns (e.g., "Sword +1", "Dagger +2") and
+/// "silver" material weapons (e.g., "Silver Dagger").
+pub fn is_magical_weapon(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    // Check for +N bonus pattern
+    if lower.contains("+1") || lower.contains("+2") || lower.contains("+3")
+        || lower.contains("+4") || lower.contains("+5")
+    {
+        return true;
+    }
+    // Silver weapons can harm some immune monsters
+    if lower.contains("silver") {
+        return true;
+    }
+    false
+}
+
 /// Armour class definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArmourClass {
@@ -701,5 +720,18 @@ mod tests {
         // Exact match still works
         let w = find_weapon("Sword").unwrap();
         assert_eq!(w.name, "Sword");
+    }
+
+    #[test]
+    fn is_magical_weapon_detection() {
+        assert!(is_magical_weapon("Sword +1"));
+        assert!(is_magical_weapon("Dagger +2"));
+        assert!(is_magical_weapon("Mace +3"));
+        assert!(is_magical_weapon("Silver Dagger"));
+        assert!(is_magical_weapon("silver dagger"));
+        assert!(!is_magical_weapon("Sword"));
+        assert!(!is_magical_weapon("Dagger"));
+        assert!(!is_magical_weapon("Mace"));
+        assert!(!is_magical_weapon("Short Bow"));
     }
 }

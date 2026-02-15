@@ -36,6 +36,8 @@ pub struct SpawnEncounterParams<'a> {
     /// If provided, overrides the monster-DB lookup for the undead flag.
     /// Module monsters not in the core DB should set this explicitly.
     pub undead: Option<bool>,
+    /// If provided, overrides the monster-DB lookup for weapon immunity.
+    pub immune_to_normal_weapons: Option<bool>,
 }
 
 pub fn action_spawn_encounter(
@@ -73,6 +75,9 @@ pub fn action_spawn_encounter(
     let is_undead = params.undead.unwrap_or_else(|| {
         db_entry.map(|m| m.is_undead()).unwrap_or(false)
     });
+    let is_immune = params.immune_to_normal_weapons.unwrap_or_else(|| {
+        db_entry.map(|m| m.immune_to_normal_weapons()).unwrap_or(false)
+    });
 
     let mut monsters = Vec::new();
     for i in 0..params.count {
@@ -90,6 +95,7 @@ pub fn action_spawn_encounter(
         monster.xp_value = xp_per_monster;
         monster.attacks = vec!["attack".to_string()];
         monster.undead = is_undead;
+        monster.immune_to_normal_weapons = is_immune;
         monsters.push(monster);
     }
 
@@ -163,6 +169,7 @@ pub fn action_spawn_monster(
         m.xp_value = def.xp();
         m.attacks = def.attack_names();
         m.undead = def.is_undead();
+        m.immune_to_normal_weapons = def.immune_to_normal_weapons();
         monsters.push(m);
     }
 
@@ -227,6 +234,9 @@ pub fn action_add_monster(
     let is_undead = params.undead.unwrap_or_else(|| {
         db_entry.map(|m| m.is_undead()).unwrap_or(false)
     });
+    let is_immune = params.immune_to_normal_weapons.unwrap_or_else(|| {
+        db_entry.map(|m| m.immune_to_normal_weapons()).unwrap_or(false)
+    });
 
     let combat = state.combat.as_mut().unwrap();
     let existing_count = combat.monsters.len();
@@ -246,6 +256,7 @@ pub fn action_add_monster(
         monster.xp_value = xp_per_monster;
         monster.attacks = vec!["attack".to_string()];
         monster.undead = is_undead;
+        monster.immune_to_normal_weapons = is_immune;
         combat.monsters.push(monster);
     }
 
@@ -380,6 +391,19 @@ pub fn action_attack(
         return Err(EngineError::InvalidInput(format!(
             "{} has already acted this round.",
             char_name
+        )));
+    }
+
+    // Check weapon immunity: monsters immune to normal weapons cannot be harmed
+    // by non-magical weapons.
+    if monster_idx < combat.monsters.len()
+        && combat.monsters[monster_idx].is_alive()
+        && combat.monsters[monster_idx].immune_to_normal_weapons
+        && !equipment::is_magical_weapon(weapon_name)
+    {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is immune to normal weapons! {} has no effect. Use a magical weapon.",
+            combat.monsters[monster_idx].name, weapon_name
         )));
     }
 
@@ -936,6 +960,16 @@ pub fn action_backstab(
         return Err(EngineError::InvalidInput(format!(
             "{} is already dead.",
             combat.monsters[monster_idx].name
+        )));
+    }
+
+    // Check weapon immunity
+    if combat.monsters[monster_idx].immune_to_normal_weapons
+        && !equipment::is_magical_weapon(weapon_name)
+    {
+        return Err(EngineError::InvalidInput(format!(
+            "{} is immune to normal weapons! {} has no effect.",
+            combat.monsters[monster_idx].name, weapon_name
         )));
     }
 
