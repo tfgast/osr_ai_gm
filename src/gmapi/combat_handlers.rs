@@ -194,8 +194,8 @@ pub(super) fn cast_spell(id: &str, state: &mut GameState, char_name: &str) -> GM
     }
 }
 
-pub(super) fn end_combat(id: &str, state: &mut GameState) -> GMResponse {
-    match combat::action_end_combat(state) {
+pub(super) fn end_combat(id: &str, state: &mut GameState, skip_xp: bool) -> GMResponse {
+    match combat::action_end_combat(state, skip_xp) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }

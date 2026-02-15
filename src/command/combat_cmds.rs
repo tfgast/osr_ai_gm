@@ -501,7 +501,7 @@ impl Command for EndCombatCommand {
         "End the current combat encounter"
     }
     fn execute(&self, _args: &[&str], state: &mut GameState) -> CommandResult {
-        match combat::action_end_combat(state) {
+        match combat::action_end_combat(state, false) {
             Ok(result) => {
                 let mut out = format!(
                     "Combat ended after {} rounds.\n{} of {} monsters defeated.",

@@ -53,7 +53,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
             combat_handlers::cast_spell(id, state, character)
         }
         GMCommand::NextPhase => combat_handlers::next_phase(id, state),
-        GMCommand::EndCombat => combat_handlers::end_combat(id, state),
+        GMCommand::EndCombat { skip_xp } => combat_handlers::end_combat(id, state, *skip_xp),
 
         // -- Exploration --
         GMCommand::EnterDungeon { level, room_name } => {
@@ -654,7 +654,7 @@ mod tests {
     #[test]
     fn end_combat_no_combat() {
         let mut state = GameState::new();
-        let resp = handle_request(&make_req("1", GMCommand::EndCombat), &mut state);
+        let resp = handle_request(&make_req("1", GMCommand::EndCombat { skip_xp: false }), &mut state);
         assert!(!resp.success);
     }
 
@@ -694,12 +694,12 @@ mod tests {
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Combat);
 
-        let resp = handle_request(&make_req("2", GMCommand::EndCombat), &mut state);
+        let resp = handle_request(&make_req("2", GMCommand::EndCombat { skip_xp: false }), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Exploration, "after first EndCombat mode should be Exploration");
 
         // Now call EndCombat again with no active combat
-        let resp = handle_request(&make_req("3", GMCommand::EndCombat), &mut state);
+        let resp = handle_request(&make_req("3", GMCommand::EndCombat { skip_xp: false }), &mut state);
         assert!(!resp.success, "EndCombat with no combat should fail");
         assert_eq!(
             state.mode, GameMode::Exploration,
@@ -1097,7 +1097,7 @@ mod tests {
         assert!(resp.success);
 
         // End combat
-        let resp = handle_request(&make_req("4", GMCommand::EndCombat), &mut state);
+        let resp = handle_request(&make_req("4", GMCommand::EndCombat { skip_xp: false }), &mut state);
         assert!(resp.success);
         assert_eq!(state.mode, GameMode::Idle);
     }
@@ -1374,7 +1374,7 @@ mod tests {
         assert_eq!(state.mode, GameMode::Combat);
 
         // End combat
-        let resp = handle_request(&make_req("2", GMCommand::EndCombat), &mut state);
+        let resp = handle_request(&make_req("2", GMCommand::EndCombat { skip_xp: false }), &mut state);
         assert!(resp.success);
 
         // Verify monsters_cleared is now true

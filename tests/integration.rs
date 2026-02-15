@@ -224,7 +224,7 @@ fn full_dungeon_session() {
     assert!(!resp.message.is_empty(), "morale check should have result message");
 
     // -- STEP 12: End combat --
-    let resp = handle_request(&req("25", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("25", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success, "end combat failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Exploration);
     let data = resp.data.unwrap();
@@ -703,7 +703,7 @@ fn complete_ose_session() {
     assert!(!resp.message.is_empty(), "morale check should have result");
 
     // End combat
-    let resp = handle_request(&req("c9", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("c9", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Exploration);
     let data = resp.data.unwrap();
@@ -1088,7 +1088,7 @@ fn multi_round_combat_api() {
     }
 
     // End combat
-    let resp = handle_request(&req("9", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("9", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Idle);
 }
@@ -1233,7 +1233,7 @@ fn mode_transition_idle_exploration_combat_exploration() {
     assert!(resp.success);
 
     // Combat -> Exploration (EndCombat restores pre-combat mode)
-    let resp = handle_request(&req("7", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("7", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Exploration);
 
@@ -1306,7 +1306,7 @@ fn mode_transition_idle_wilderness_combat_wilderness() {
     assert!(resp.success);
 
     // Combat -> Wilderness (EndCombat restores pre-combat mode)
-    let resp = handle_request(&req("7", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("7", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Wilderness);
 
@@ -1640,7 +1640,7 @@ fn session_a_dungeon_crawl() {
     assert!(!resp.message.is_empty(), "morale check should have result");
 
     // End combat — restores Exploration mode and auto-distributes monster XP
-    let resp = handle_request(&req("a29", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("a29", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Exploration);
     let combat_data = resp.data.unwrap();
@@ -1881,7 +1881,7 @@ fn session_b_wilderness_travel() {
     assert!(!reaction.is_empty());
 
     // End combat — restores Wilderness mode
-    let resp = handle_request(&req("b10", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("b10", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Wilderness);
 }
@@ -2004,7 +2004,7 @@ fn session_c_retainers() {
     assert!(!resp.message.is_empty(), "morale check should have result");
 
     // End combat
-    let resp = handle_request(&req("c12", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("c12", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     let combat_data = resp.data.unwrap();
     let total_monster_xp = combat_data["total_xp"].as_u64().unwrap();
@@ -2285,7 +2285,7 @@ fn character_progression_multi_level() {
         character: "Amara".to_string(), monster_idx: 1, weapon: "mace".to_string(),
     }), &mut state);
 
-    let resp = handle_request(&req("p5", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("p5", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     let combat1_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
 
@@ -2312,7 +2312,7 @@ fn character_progression_multi_level() {
         character: "Bjorn".to_string(), monster_idx: 0, weapon: "sword".to_string(),
     }), &mut state);
 
-    let resp = handle_request(&req("p13", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("p13", GMCommand::EndCombat { skip_xp: false }), &mut state);
     let combat2_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
 
     // Award combat 2 treasure (monster XP was auto-distributed by end_combat)
@@ -2919,7 +2919,7 @@ fn playtest2c_spawn_encounter_in_wilderness() {
     assert_eq!(state.mode, GameMode::Combat);
 
     // End combat should return to wilderness
-    let resp = handle_request(&req("3", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("3", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Wilderness);
 }
@@ -3331,7 +3331,7 @@ fn playtest2c_wilderness_combat_distance_yards() {
     assert!(resp.success, "attack should work at melee range: {}", resp.message);
 
     // End combat — should return to Wilderness
-    let resp = handle_request(&req("6", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("6", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Wilderness, "should return to wilderness after combat");
 }
@@ -3371,7 +3371,7 @@ fn playtest2c_wilderness_retreat() {
     assert!(resp.success, "retreat should work: {}", resp.message);
 
     // End combat, verify return to wilderness
-    let resp = handle_request(&req("5", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("5", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Wilderness);
 }
@@ -3573,7 +3573,7 @@ fn playtest2c_wilderness_combat_roundtrip() {
     }), &mut state);
 
     // End combat
-    let resp = handle_request(&req("7", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("7", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Wilderness, "should return to wilderness");
 

@@ -346,7 +346,7 @@ fn combat_command_parity_golden_scaffold_captures_snapshots() {
             "end_combat",
             state_for_end_combat(),
             |state| EndCombatCommand.execute(&[], state),
-            GMCommand::EndCombat,
+            GMCommand::EndCombat { skip_xp: false },
         ),
     ];
 

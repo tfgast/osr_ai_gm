@@ -765,7 +765,7 @@ pub fn action_cast_spell(
     Ok(result)
 }
 
-pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, EngineError> {
+pub fn action_end_combat(state: &mut GameState, skip_xp: bool) -> Result<EndCombatResult, EngineError> {
     if state.combat.is_none() {
         return Err(no_active_combat());
     }
@@ -791,6 +791,7 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
     }
 
     // Auto-distribute monster XP equally among surviving party members (B/X rules).
+    // skip_xp allows the GM to handle XP manually via AwardTreasureXp (avoids double-award).
     let survivors: Vec<usize> = state
         .party
         .members
@@ -800,7 +801,7 @@ pub fn action_end_combat(state: &mut GameState) -> Result<EndCombatResult, Engin
         .map(|(i, _)| i)
         .collect();
     let survivor_count = survivors.len() as u64;
-    let xp_per_survivor = if total_xp > 0 && survivor_count > 0 {
+    let xp_per_survivor = if !skip_xp && total_xp > 0 && survivor_count > 0 {
         total_xp / survivor_count
     } else {
         0
@@ -1868,7 +1869,7 @@ mod tests {
         m2.hp = 0; // dead
         state.combat = Some(CombatState::new(vec![m1, m2], 5));
 
-        let result = action_end_combat(&mut state).unwrap();
+        let result = action_end_combat(&mut state, false).unwrap();
         assert_eq!(result.total_xp, 20);
         assert_eq!(result.xp_per_survivor, 10); // 20 / 2 survivors
         assert_eq!(result.xp_awards.len(), 2);
@@ -1901,7 +1902,7 @@ mod tests {
         m.hp = 0;
         state.combat = Some(CombatState::new(vec![m], 5));
 
-        let result = action_end_combat(&mut state).unwrap();
+        let result = action_end_combat(&mut state, false).unwrap();
         assert_eq!(result.total_xp, 30);
         assert_eq!(result.xp_per_survivor, 30); // only 1 survivor
         assert_eq!(result.xp_awards.len(), 1);
@@ -1913,7 +1914,7 @@ mod tests {
     #[test]
     fn end_combat_no_xp_when_no_kills() {
         let mut state = state_with_combat(); // 2 goblins alive, xp_value=5 each
-        let result = action_end_combat(&mut state).unwrap();
+        let result = action_end_combat(&mut state, false).unwrap();
         assert_eq!(result.total_xp, 0);
         assert_eq!(result.xp_per_survivor, 0);
         assert!(result.xp_awards.is_empty());
@@ -1933,7 +1934,7 @@ mod tests {
         m.hp = 0;
         state.combat = Some(CombatState::new(vec![m], 5));
 
-        let result = action_end_combat(&mut state).unwrap();
+        let result = action_end_combat(&mut state, false).unwrap();
         assert_eq!(result.xp_per_survivor, 100);
         assert_eq!(result.xp_awards.len(), 1);
         assert_eq!(result.xp_awards[0].modifier_pct, 10);

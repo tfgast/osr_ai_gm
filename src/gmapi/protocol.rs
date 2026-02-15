@@ -131,8 +131,11 @@ pub enum GMCommand {
     },
     /// Advance to the next combat phase (GM controls round pacing).
     NextPhase,
-    /// End the current combat.
-    EndCombat,
+    /// End the current combat. Monster XP is auto-awarded unless skip_xp is true.
+    EndCombat {
+        #[serde(default)]
+        skip_xp: bool,
+    },
 
     // -- GM-only: exploration --
     /// Enter dungeon exploration mode.

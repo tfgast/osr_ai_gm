@@ -503,7 +503,7 @@ fn phase2_end_combat_preserves_exploration_mode() {
     assert_eq!(state.mode, GameMode::Exploration);
 
     // EndCombat when no combat is active — should error and preserve mode
-    let resp = handle_request(&req("ec1", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("ec1", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert_err(&resp, "EndCombat with no active combat should error");
     assert_eq!(
         state.mode,
@@ -1203,7 +1203,7 @@ fn end_to_end_dungeon_combat_cycle() {
     assert_eq!(state.mode, GameMode::Combat);
 
     // End combat
-    let resp = handle_request(&req("e2e3", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("e2e3", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert_ok(&resp, "end combat");
     assert_eq!(
         state.mode,

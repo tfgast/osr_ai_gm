@@ -1090,7 +1090,7 @@ fn end_combat_happy_path() {
     let mut state = GameState::new();
     setup_combat(&mut state);
 
-    let resp = handle_request(&req("ec1", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("ec1", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert_response_format(&resp, "ec1");
     assert!(resp.success);
     assert_eq!(resp.mode, GameMode::Idle);
@@ -1109,7 +1109,7 @@ fn end_combat_happy_path() {
 #[test]
 fn end_combat_no_combat() {
     let mut state = GameState::new();
-    let resp = handle_request(&req("ec2", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("ec2", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(!resp.success);
     assert!(resp.error.unwrap().contains("no active combat"));
 }
@@ -1121,7 +1121,7 @@ fn end_combat_xp_counts_dead_only() {
     // Kill one monster (5 XP each)
     state.combat.as_mut().unwrap().monsters[0].hp = 0;
 
-    let resp = handle_request(&req("ec3", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("ec3", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
     assert_eq!(data["monsters_defeated"], 1);
@@ -3183,7 +3183,7 @@ fn rapid_combat_sequence() {
     assert_eq!(monsters.len(), 4);
 
     // End combat
-    let resp = handle_request(&req("end", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("end", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Idle);
     assert!(state.combat.is_none());
@@ -3271,7 +3271,7 @@ fn mode_transitions() {
     assert_eq!(resp.mode, GameMode::Combat);
 
     // Combat -> Exploration (restores pre-combat mode)
-    let resp = handle_request(&req("4", GMCommand::EndCombat), &mut state);
+    let resp = handle_request(&req("4", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert_eq!(resp.mode, GameMode::Exploration);
 
     // Exploration -> Wilderness should be rejected (must leave dungeon first)
