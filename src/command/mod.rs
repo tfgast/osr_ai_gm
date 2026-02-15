@@ -14,6 +14,7 @@ pub mod system;
 
 use std::collections::HashMap;
 use crate::persist::GameState;
+use crate::state::game::GameMode;
 
 /// Result of executing a command.
 #[derive(Debug)]
@@ -62,11 +63,19 @@ pub trait Command {
 }
 
 /// Resolve common aliases to canonical command names.
-fn resolve_alias(name: &str) -> &str {
+/// Mode-aware: `status` and `go` route to the correct command for the current game mode.
+fn resolve_alias<'a>(name: &'a str, mode: &GameMode) -> &'a str {
     match name {
         "l" => "look",
-        "go" => "move",
-        "status" => "exploration_status",
+        "go" => match mode {
+            GameMode::Wilderness => "travel",
+            _ => "move",
+        },
+        "status" => match mode {
+            GameMode::Wilderness => "wilderness_status",
+            GameMode::Combat => "combat_status",
+            _ => "exploration_status",
+        },
         "inventory" | "i" => "party",
         "examine" => "party",
         "take" | "grab" | "pick" => "loot",
@@ -100,7 +109,7 @@ impl CommandRegistry {
                 Err(e) => CommandResult::error(e.to_string()),
             };
         }
-        let name = resolve_alias(name);
+        let name = resolve_alias(name, &state.mode);
         let (result, category) = match self.commands.get(name) {
             Some(cmd) => (cmd.execute(args, state), "command_error"),
             None => (
@@ -194,36 +203,51 @@ mod tests {
 
     #[test]
     fn alias_look_resolves() {
-        assert_eq!(resolve_alias("l"), "look");
+        assert_eq!(resolve_alias("l", &GameMode::Exploration), "look");
     }
 
     #[test]
-    fn alias_go_resolves() {
-        assert_eq!(resolve_alias("go"), "move");
+    fn alias_go_resolves_exploration() {
+        assert_eq!(resolve_alias("go", &GameMode::Exploration), "move");
+    }
+
+    #[test]
+    fn alias_go_resolves_wilderness() {
+        assert_eq!(resolve_alias("go", &GameMode::Wilderness), "travel");
     }
 
     #[test]
     fn alias_inventory_resolves() {
-        assert_eq!(resolve_alias("inventory"), "party");
-        assert_eq!(resolve_alias("i"), "party");
-        assert_eq!(resolve_alias("examine"), "party");
+        assert_eq!(resolve_alias("inventory", &GameMode::Exploration), "party");
+        assert_eq!(resolve_alias("i", &GameMode::Exploration), "party");
+        assert_eq!(resolve_alias("examine", &GameMode::Exploration), "party");
     }
 
     #[test]
     fn alias_take_resolves() {
-        assert_eq!(resolve_alias("take"), "loot");
-        assert_eq!(resolve_alias("grab"), "loot");
-        assert_eq!(resolve_alias("pick"), "loot");
+        assert_eq!(resolve_alias("take", &GameMode::Exploration), "loot");
+        assert_eq!(resolve_alias("grab", &GameMode::Exploration), "loot");
+        assert_eq!(resolve_alias("pick", &GameMode::Exploration), "loot");
     }
 
     #[test]
-    fn alias_status_resolves() {
-        assert_eq!(resolve_alias("status"), "exploration_status");
+    fn alias_status_resolves_exploration() {
+        assert_eq!(resolve_alias("status", &GameMode::Exploration), "exploration_status");
+    }
+
+    #[test]
+    fn alias_status_resolves_wilderness() {
+        assert_eq!(resolve_alias("status", &GameMode::Wilderness), "wilderness_status");
+    }
+
+    #[test]
+    fn alias_status_resolves_combat() {
+        assert_eq!(resolve_alias("status", &GameMode::Combat), "combat_status");
     }
 
     #[test]
     fn non_alias_passes_through() {
-        assert_eq!(resolve_alias("attack"), "attack");
-        assert_eq!(resolve_alias("chargen"), "chargen");
+        assert_eq!(resolve_alias("attack", &GameMode::Exploration), "attack");
+        assert_eq!(resolve_alias("chargen", &GameMode::Exploration), "chargen");
     }
 }
