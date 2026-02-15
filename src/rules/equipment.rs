@@ -414,9 +414,24 @@ impl EquipmentRegistry {
     }
 
     fn find_weapon(&self, name: &str) -> Option<&WeaponDef> {
-        self.weapons_by_name
-            .get(&name.to_lowercase())
-            .map(|&idx| &self.weapons[idx])
+        let lower = name.to_lowercase();
+        // Exact match first
+        if let Some(&idx) = self.weapons_by_name.get(&lower) {
+            return Some(&self.weapons[idx]);
+        }
+        // Fuzzy match: find a weapon whose name appears in the input
+        // (handles "Fairy Longsword" → Longsword, "Dagger +1" → Dagger, etc.)
+        let mut best: Option<&WeaponDef> = None;
+        for weapon in &self.weapons {
+            let wname = weapon.name.to_lowercase();
+            if lower.contains(&wname) {
+                // Prefer longest match (e.g., "long sword" over "sword")
+                if best.map_or(true, |b| wname.len() > b.name.len()) {
+                    best = Some(weapon);
+                }
+            }
+        }
+        best
     }
 
     fn find_armour(&self, name: &str) -> Option<&ArmourDef> {
@@ -670,5 +685,21 @@ mod tests {
         let q = w.weapon_qualities();
         assert!(q.reload, "Crossbow should have reload quality");
         assert!(q.slow, "Crossbow should have slow quality");
+    }
+
+    /// hq-6c541: Fuzzy weapon matching for magical/named variants.
+    #[test]
+    fn find_weapon_fuzzy_magic_variant() {
+        // "Fairy Longsword" should match "Longsword"
+        let w = find_weapon("Fairy Longsword").unwrap();
+        assert!(w.name.to_lowercase().contains("sword"), "should match a sword variant");
+
+        // "Dagger +1" should match "Dagger"
+        let w = find_weapon("Dagger +1").unwrap();
+        assert_eq!(w.name.to_lowercase(), "dagger");
+
+        // Exact match still works
+        let w = find_weapon("Sword").unwrap();
+        assert_eq!(w.name, "Sword");
     }
 }
