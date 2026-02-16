@@ -1,0 +1,216 @@
+{
+  "rooms": {
+    "1": {
+      "exits": [
+        {
+          "to": "4",
+          "type": "open"
+        },
+        {
+          "to": "3C",
+          "type": "open"
+        }
+      ]
+    },
+    "2": {
+      "exits": [
+        {
+          "to": "3A",
+          "type": "open"
+        }
+      ]
+    },
+    "3A": {
+      "exits": [
+        {
+          "to": "2",
+          "type": "open"
+        },
+        {
+          "to": "3B",
+          "type": "open"
+        }
+      ]
+    },
+    "3B": {
+      "exits": [
+        {
+          "to": "3A",
+          "type": "open"
+        },
+        {
+          "to": "3C",
+          "type": "open"
+        }
+      ]
+    },
+    "3C": {
+      "exits": [
+        {
+          "to": "3B",
+          "type": "open"
+        },
+        {
+          "to": "1",
+          "type": "open"
+        }
+      ]
+    },
+    "4": {
+      "exits": [
+        {
+          "to": "1",
+          "type": "open"
+        },
+        {
+          "to": "5",
+          "type": "door"
+        },
+        {
+          "to": "7",
+          "type": "open"
+        }
+      ]
+    },
+    "5": {
+      "exits": [
+        {
+          "to": "4",
+          "type": "door"
+        },
+        {
+          "to": "6",
+          "type": "open"
+        }
+      ]
+    },
+    "6": {
+      "exits": [
+        {
+          "to": "5",
+          "type": "open"
+        },
+        {
+          "to": "8",
+          "type": "open"
+        },
+        {
+          "to": "7",
+          "type": "door"
+        }
+      ]
+    },
+    "7": {
+      "exits": [
+        {
+          "to": "4",
+          "type": "open"
+        },
+        {
+          "to": "6",
+          "type": "door"
+        },
+        {
+          "to": "9",
+          "type": "secret"
+        },
+        {
+          "to": "13",
+          "type": "open"
+        }
+      ]
+    },
+    "8": {
+      "exits": [
+        {
+          "to": "6",
+          "type": "open"
+        }
+      ]
+    },
+    "9": {
+      "exits": [
+        {
+          "to": "7",
+          "type": "secret"
+        },
+        {
+          "to": "10",
+          "type": "open"
+        }
+      ]
+    },
+    "10": {
+      "exits": [
+        {
+          "to": "9",
+          "type": "open"
+        },
+        {
+          "to": "12",
+          "type": "open"
+        },
+        {
+          "to": "11",
+          "type": "river_crossing"
+        }
+      ]
+    },
+    "11": {
+      "exits": [
+        {
+          "to": "10",
+          "type": "river_crossing"
+        },
+        {
+          "to": "14",
+          "type": "open"
+        }
+      ]
+    },
+    "12": {
+      "exits": [
+        {
+          "to": "10",
+          "type": "open"
+        },
+        {
+          "to": "13",
+          "type": "stairs"
+        }
+      ]
+    },
+    "13": {
+      "exits": [
+        {
+          "to": "12",
+          "type": "stairs"
+        },
+        {
+          "to": "7",
+          "type": "open"
+        }
+      ]
+    },
+    "14": {
+      "exits": [
+        {
+          "to": "11",
+          "type": "open"
+        },
+        {
+          "to": "15",
+          "type": "door"
+        }
+      ]
+    },
+    "15": {
+      "exits": [
+        {
+          "to": "14",
+          "type": "door"
+        }
+      ]
+    }
+  }
+}

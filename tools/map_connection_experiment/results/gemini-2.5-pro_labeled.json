@@ -1,0 +1,270 @@
+{
+  "rooms": {
+    "1": {
+      "name_guess": "Main entrance hall with a large star symbol on the floor",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "Wide open passage leading north."
+        },
+        {
+          "to": "3C",
+          "connection_type": "open",
+          "notes": "Open passage leading west into a natural cavern."
+        }
+      ]
+    },
+    "2": {
+      "name_guess": "Small natural cave",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Narrow natural passage leading east."
+        }
+      ]
+    },
+    "3A": {
+      "name_guess": "Cavern passage",
+      "exits": [
+        {
+          "to": "2",
+          "connection_type": "open",
+          "notes": "Passage west."
+        },
+        {
+          "to": "3B",
+          "connection_type": "open",
+          "notes": "Passage north."
+        }
+      ]
+    },
+    "3B": {
+      "name_guess": "Cavern T-junction",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Passage south."
+        },
+        {
+          "to": "3C",
+          "connection_type": "open",
+          "notes": "Passage east."
+        }
+      ]
+    },
+    "3C": {
+      "name_guess": "Cavern passage with columns",
+      "exits": [
+        {
+          "to": "3B",
+          "connection_type": "open",
+          "notes": "Passage west."
+        },
+        {
+          "to": "1",
+          "connection_type": "open",
+          "notes": "Wide opening east into the main entrance hall."
+        }
+      ]
+    },
+    "4": {
+      "name_guess": "Large square room",
+      "exits": [
+        {
+          "to": "1",
+          "connection_type": "open",
+          "notes": "Wide open passage leading south."
+        },
+        {
+          "to": "5",
+          "connection_type": "door",
+          "notes": "Door in the east wall."
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "Open passage leading north, through the junction labeled '4A'."
+        }
+      ]
+    },
+    "5": {
+      "name_guess": "Small rectangular room",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "door",
+          "notes": "Door in the west wall."
+        },
+        {
+          "to": "6",
+          "connection_type": "open",
+          "notes": "Open passage east."
+        }
+      ]
+    },
+    "6": {
+      "name_guess": "Room with an alcove",
+      "exits": [
+        {
+          "to": "5",
+          "connection_type": "open",
+          "notes": "Open passage west."
+        },
+        {
+          "to": "8",
+          "connection_type": "open",
+          "notes": "Open passage east, leading to a room by the river."
+        },
+        {
+          "to": "7",
+          "connection_type": "door",
+          "notes": "Door in the north wall."
+        }
+      ]
+    },
+    "7": {
+      "name_guess": "Central junction room with traps",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "Open passage south, through the junction labeled '4A'."
+        },
+        {
+          "to": "6",
+          "connection_type": "door",
+          "notes": "Door in the east wall."
+        },
+        {
+          "to": "9",
+          "connection_type": "secret",
+          "notes": "Secret door marked with 'S' on the west wall."
+        },
+        {
+          "to": "13",
+          "connection_type": "open",
+          "notes": "Open passage north, through the junction labeled '4A'."
+        }
+      ]
+    },
+    "8": {
+      "name_guess": "Riverside chamber",
+      "exits": [
+        {
+          "to": "6",
+          "connection_type": "open",
+          "notes": "Passage west."
+        }
+      ]
+    },
+    "9": {
+      "name_guess": "Room west of the central junction",
+      "exits": [
+        {
+          "to": "7",
+          "connection_type": "secret",
+          "notes": "Secret door in the east wall."
+        },
+        {
+          "to": "10",
+          "connection_type": "open",
+          "notes": "Open passage north."
+        }
+      ]
+    },
+    "10": {
+      "name_guess": "Trapped room with river access",
+      "exits": [
+        {
+          "to": "9",
+          "connection_type": "open",
+          "notes": "Open passage south."
+        },
+        {
+          "to": "12",
+          "connection_type": "open",
+          "notes": "Open passage east."
+        },
+        {
+          "to": "11",
+          "connection_type": "river_crossing",
+          "notes": "Connection across the river to the north."
+        }
+      ]
+    },
+    "11": {
+      "name_guess": "Room across the river",
+      "exits": [
+        {
+          "to": "10",
+          "connection_type": "river_crossing",
+          "notes": "Connection across the river to the south."
+        },
+        {
+          "to": "14",
+          "connection_type": "open",
+          "notes": "Open passage to the east."
+        }
+      ]
+    },
+    "12": {
+      "name_guess": "Trapped room with stairs",
+      "exits": [
+        {
+          "to": "10",
+          "connection_type": "open",
+          "notes": "Open passage to the west."
+        },
+        {
+          "to": "13",
+          "connection_type": "stairs",
+          "notes": "Stairs leading down to the south."
+        }
+      ]
+    },
+    "13": {
+      "name_guess": "Room at the bottom of stairs",
+      "exits": [
+        {
+          "to": "12",
+          "connection_type": "stairs",
+          "notes": "Stairs leading up to the north."
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "Open passage south, through the junction labeled '4A'."
+        }
+      ]
+    },
+    "14": {
+      "name_guess": "Pillared hall",
+      "exits": [
+        {
+          "to": "11",
+          "connection_type": "open",
+          "notes": "Open passage to the west."
+        },
+        {
+          "to": "15",
+          "connection_type": "door",
+          "notes": "Door in the east wall."
+        }
+      ]
+    },
+    "15": {
+      "name_guess": "Easternmost room",
+      "exits": [
+        {
+          "to": "14",
+          "connection_type": "door",
+          "notes": "Door in the west wall."
+        }
+      ]
+    }
+  },
+  "observations": "The map contains several labeled features that are not rooms, such as 'T' for trap, 'PP' for pit trap, and 'S' for secret door. Area '4A' is not a distinct room but a label for a hallway intersection connecting rooms 4, 7, and 13. The natural caves (2, 3A, 3B, 3C) have indistinct boundaries shown with 'A', 'B', 'C' markers. A river flows through the dungeon from east to west, creating a major obstacle and a specific 'river_crossing' connection type. The map scale is 1 square = 10 feet."
+}

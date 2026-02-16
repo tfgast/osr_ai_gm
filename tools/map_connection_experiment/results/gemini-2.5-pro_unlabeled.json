@@ -1,0 +1,280 @@
+{
+  "rooms": {
+    "1": {
+      "name_guess": "Entrance Hall",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "Wide, open passage to the north."
+        }
+      ]
+    },
+    "2": {
+      "name_guess": "Western Cavern",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Natural cavern passage leading east."
+        }
+      ]
+    },
+    "3A": {
+      "name_guess": "Cave Intersection",
+      "exits": [
+        {
+          "to": "2",
+          "connection_type": "open",
+          "notes": "Passage to western cavern."
+        },
+        {
+          "to": "3B",
+          "connection_type": "open",
+          "notes": "Short passage to a smaller cavern."
+        },
+        {
+          "to": "3C",
+          "connection_type": "open",
+          "notes": "Passage leading east towards the main complex."
+        }
+      ]
+    },
+    "3B": {
+      "name_guess": "Dead-end Cave",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Only exit leads back to the intersection."
+        }
+      ]
+    },
+    "3C": {
+      "name_guess": "Connecting Passage",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Passage back to the cave intersection."
+        },
+        {
+          "to": "4",
+          "connection_type": "door",
+          "notes": "A door leading into the central room."
+        }
+      ]
+    },
+    "4": {
+      "name_guess": "Central Junction Room",
+      "exits": [
+        {
+          "to": "1",
+          "connection_type": "open",
+          "notes": "Wide passage south to the entrance."
+        },
+        {
+          "to": "3C",
+          "connection_type": "door",
+          "notes": "Door in the west wall."
+        },
+        {
+          "to": "5",
+          "connection_type": "door",
+          "notes": "Door in the east wall."
+        },
+        {
+          "to": "6",
+          "connection_type": "open",
+          "notes": "Open passage to the northeast via junction 4A."
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "Open passage to the northwest via junction 4A."
+        },
+        {
+          "to": "13",
+          "connection_type": "stairs",
+          "notes": "Stairs lead up to the north via junction 4A."
+        }
+      ]
+    },
+    "5": {
+      "name_guess": "Eastern Guardroom",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "door",
+          "notes": "Door to the west."
+        },
+        {
+          "to": "6",
+          "connection_type": "door",
+          "notes": "Door to the north."
+        }
+      ]
+    },
+    "6": {
+      "name_guess": "East-side Passage",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "Open passage to the south, via junction 4A."
+        },
+        {
+          "to": "5",
+          "connection_type": "door",
+          "notes": "Door to the south."
+        },
+        {
+          "to": "8",
+          "connection_type": "river_crossing",
+          "notes": "Seems to be a narrow stone bridge or a gap to jump."
+        }
+      ]
+    },
+    "7": {
+      "name_guess": "Trapped Corridor",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "Open passage to the southeast, via junction 4A."
+        },
+        {
+          "to": "9",
+          "connection_type": "door",
+          "notes": "Door to the north."
+        }
+      ]
+    },
+    "8": {
+      "name_guess": "Far East Ruins",
+      "exits": [
+        {
+          "to": "6",
+          "connection_type": "river_crossing",
+          "notes": "Requires crossing the river, likely via a jump or narrow bridge."
+        }
+      ]
+    },
+    "9": {
+      "name_guess": "Western Antechamber",
+      "exits": [
+        {
+          "to": "7",
+          "connection_type": "door",
+          "notes": "Door to the south."
+        },
+        {
+          "to": "10",
+          "connection_type": "door",
+          "notes": "Door to the north."
+        },
+        {
+          "to": "13",
+          "connection_type": "secret",
+          "notes": "Secret door marked with 'S' in the east wall."
+        }
+      ]
+    },
+    "10": {
+      "name_guess": "Northwest Room",
+      "exits": [
+        {
+          "to": "9",
+          "connection_type": "door",
+          "notes": "Door to the south."
+        },
+        {
+          "to": "11",
+          "connection_type": "river_crossing",
+          "notes": "River separates the rooms; requires a jump or swim."
+        }
+      ]
+    },
+    "11": {
+      "name_guess": "North Bank Room",
+      "exits": [
+        {
+          "to": "10",
+          "connection_type": "river_crossing",
+          "notes": "Must cross the river to the south."
+        },
+        {
+          "to": "12",
+          "connection_type": "river_crossing",
+          "notes": "Must cross the river to the south-east. No bridge is visible."
+        }
+      ]
+    },
+    "12": {
+      "name_guess": "Northern Trapped Room",
+      "exits": [
+        {
+          "to": "11",
+          "connection_type": "river_crossing",
+          "notes": "Must cross the river to the north-west. No bridge is visible."
+        },
+        {
+          "to": "13",
+          "connection_type": "door",
+          "notes": "Door to the south."
+        },
+        {
+          "to": "14",
+          "connection_type": "door",
+          "notes": "Door leads east into a pillared hall. The river must be crossed inside the passage or hall."
+        }
+      ]
+    },
+    "13": {
+      "name_guess": "Upper Central Chamber",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "stairs",
+          "notes": "Stairs leading down to the south."
+        },
+        {
+          "to": "9",
+          "connection_type": "secret",
+          "notes": "Secret door in the west wall."
+        },
+        {
+          "to": "12",
+          "connection_type": "door",
+          "notes": "Door to the north."
+        }
+      ]
+    },
+    "14": {
+      "name_guess": "Pillared Hall",
+      "exits": [
+        {
+          "to": "12",
+          "connection_type": "door",
+          "notes": "Passage leading west, crosses the river."
+        },
+        {
+          "to": "15",
+          "connection_type": "door",
+          "notes": "Door to the north-east."
+        }
+      ]
+    },
+    "15": {
+      "name_guess": "Northeast Sanctum",
+      "exits": [
+        {
+          "to": "14",
+          "connection_type": "door",
+          "notes": "Door to the south-west."
+        }
+      ]
+    }
+  },
+  "observations": "The map features a river flowing from the northeast to the southwest, dividing the complex. Several connections require crossing this river. The map uses 'T' for traps, 'S' for secret doors, and 'PP' for a pit trap. Passages marked 'A' (from room 2) and 'B' (from room 10) appear to lead off the map. Area '4A' is not a room but a key intersection connecting rooms 4, 6, 7, and 13."
+}

@@ -1,0 +1,88 @@
+{
+  "_instructions": "Fill in the exits for each room based on the actual GotFN V1 Chapter 6 text. This is the ground truth for the room connection mapping experiment. Delete this _instructions key when done.",
+  "rooms": {
+    "1": {
+      "name": "Main Entry Landing",
+      "exits": [
+        {"to": "2", "connection_type": "FILL", "notes": ""},
+        {"to": "4", "connection_type": "FILL", "notes": ""}
+      ]
+    },
+    "2": {
+      "name": "Western Burial Tunnels",
+      "exits": [
+        {"to": "1", "connection_type": "FILL", "notes": ""},
+        {"to": "3A", "connection_type": "FILL", "notes": ""},
+        {"to": "3B", "connection_type": "FILL", "notes": ""}
+      ]
+    },
+    "3A": {
+      "name": "South Junction Archway",
+      "exits": []
+    },
+    "3B": {
+      "name": "Arched Stairwell Junction (south)",
+      "exits": []
+    },
+    "3C": {
+      "name": "Arched Stairwell Junction (north)",
+      "exits": []
+    },
+    "4": {
+      "name": "Great Northern Hall",
+      "exits": []
+    },
+    "4A": {
+      "name": "Great Bronze Doors",
+      "exits": []
+    },
+    "5": {
+      "name": "Collapsed Burial Chamber",
+      "exits": []
+    },
+    "6": {
+      "name": "Sealed Eastern Door",
+      "exits": []
+    },
+    "7": {
+      "name": "Western Corridor",
+      "exits": []
+    },
+    "8": {
+      "name": "River Ledge & Forgotten Crypt",
+      "exits": []
+    },
+    "9": {
+      "name": "Northern Corridor",
+      "exits": []
+    },
+    "10": {
+      "name": "Dead-End River Tunnel",
+      "exits": []
+    },
+    "11": {
+      "name": "Hanging North Alcove",
+      "exits": []
+    },
+    "12": {
+      "name": "Hanging South Alcove",
+      "exits": []
+    },
+    "13": {
+      "name": "The Riven Hall",
+      "exits": []
+    },
+    "14": {
+      "name": "The Far Side",
+      "exits": []
+    },
+    "15": {
+      "name": "Penultimate Crypt",
+      "exits": []
+    },
+    "16": {
+      "name": "Morkaal's Tomb (off-map, teleporter only)",
+      "exits": []
+    }
+  }
+}
