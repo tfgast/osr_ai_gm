@@ -5,19 +5,6 @@ use osr_ai_gm::state::game::GameMode;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-fn phase_name(phase: &CombatPhase) -> &'static str {
-    match phase {
-        CombatPhase::Declaration => "Declaration",
-        CombatPhase::Initiative => "Initiative",
-        CombatPhase::Morale => "Morale",
-        CombatPhase::Movement => "Movement",
-        CombatPhase::Missile => "Missile",
-        CombatPhase::Magic => "Magic",
-        CombatPhase::Melee => "Melee",
-        CombatPhase::EndOfRound => "End of Round",
-    }
-}
-
 fn door_state_style(state: &DoorState) -> (Color, &'static str) {
     match state {
         DoorState::Open => (Color::Green, "open"),
@@ -171,6 +158,53 @@ fn render_exploration(state: &GameState) -> Vec<Line<'static>> {
     lines
 }
 
+/// Short label for each phase used in the progression bar.
+fn phase_short(phase: &CombatPhase) -> &'static str {
+    match phase {
+        CombatPhase::Declaration => "Decl",
+        CombatPhase::Initiative => "Init",
+        CombatPhase::Morale => "Moral",
+        CombatPhase::Movement => "Move",
+        CombatPhase::Missile => "Miss",
+        CombatPhase::Magic => "Magic",
+        CombatPhase::Melee => "Melee",
+        CombatPhase::EndOfRound => "End",
+    }
+}
+
+const PHASE_ORDER: [CombatPhase; 8] = [
+    CombatPhase::Declaration,
+    CombatPhase::Initiative,
+    CombatPhase::Morale,
+    CombatPhase::Movement,
+    CombatPhase::Missile,
+    CombatPhase::Magic,
+    CombatPhase::Melee,
+    CombatPhase::EndOfRound,
+];
+
+fn render_phase_bar(current: &CombatPhase) -> Line<'static> {
+    let mut spans: Vec<Span> = Vec::new();
+    for (i, phase) in PHASE_ORDER.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(" › ", Style::default().fg(Color::DarkGray)));
+        }
+        let label = phase_short(phase);
+        if phase == current {
+            spans.push(Span::styled(
+                format!("[{}]", label),
+                Style::default().fg(Color::Yellow).bold(),
+            ));
+        } else {
+            spans.push(Span::styled(
+                label.to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+    }
+    Line::from(spans)
+}
+
 fn render_combat(state: &GameState) -> Vec<Line<'static>> {
     let mut lines: Vec<Line> = Vec::new();
 
@@ -185,7 +219,7 @@ fn render_combat(state: &GameState) -> Vec<Line<'static>> {
         }
     };
 
-    // Round and phase
+    // Round header
     lines.push(Line::from(vec![
         Span::styled("COMBAT", Style::default().fg(Color::Red).bold()),
         Span::raw("  "),
@@ -193,37 +227,79 @@ fn render_combat(state: &GameState) -> Vec<Line<'static>> {
             format!("Round {}", combat.round),
             Style::default().fg(Color::White),
         ),
-    ]));
-
-    lines.push(Line::from(vec![
-        Span::styled("Phase: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            phase_name(&combat.phase),
-            Style::default().fg(Color::Yellow),
-        ),
-    ]));
-
-    // Initiative and distance
-    lines.push(Line::from(vec![
-        Span::styled("Initiative  ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            format!("Party {}", combat.party_initiative),
-            Style::default().fg(Color::Cyan),
-        ),
-        Span::styled(" vs ", Style::default().fg(Color::DarkGray)),
-        Span::styled(
-            format!("Monsters {}", combat.monster_initiative),
-            Style::default().fg(Color::Red),
-        ),
-    ]));
-
-    lines.push(Line::from(vec![
-        Span::styled("Distance: ", Style::default().fg(Color::DarkGray)),
+        Span::raw("  "),
         Span::styled(
             format!("{}'", combat.distance),
-            Style::default().fg(Color::White),
+            Style::default().fg(Color::DarkGray),
         ),
     ]));
+
+    // Phase progression bar
+    lines.push(render_phase_bar(&combat.phase));
+
+    // Initiative winner callout (only after initiative has been rolled)
+    if combat.round > 0 {
+        let (winner_label, winner_color) =
+            if combat.party_initiative > combat.monster_initiative {
+                ("PARTY FIRST", Color::Cyan)
+            } else if combat.monster_initiative > combat.party_initiative {
+                ("MONSTERS FIRST", Color::Red)
+            } else {
+                ("SIMULTANEOUS", Color::Yellow)
+            };
+
+        lines.push(Line::from(vec![
+            Span::styled("Initiative  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("Party {}", combat.party_initiative),
+                Style::default().fg(Color::Cyan),
+            ),
+            Span::styled(" vs ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("Monsters {}", combat.monster_initiative),
+                Style::default().fg(Color::Red),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                format!("▸ {}", winner_label),
+                Style::default().fg(winner_color).bold(),
+            ),
+        ]));
+    }
+
+    // Party action tracker
+    let alive_members: Vec<_> = state
+        .party
+        .members
+        .iter()
+        .filter(|c| c.is_alive())
+        .collect();
+    if !alive_members.is_empty() {
+        lines.push(Line::raw(""));
+        lines.push(Line::from(Span::styled(
+            "── Party Actions ──",
+            Style::default().fg(Color::DarkGray),
+        )));
+        for c in &alive_members {
+            let acted = combat.characters_acted.contains(&c.name);
+            let (marker, marker_color) = if acted {
+                ("✓", Color::Green)
+            } else {
+                ("·", Color::White)
+            };
+            lines.push(Line::from(vec![
+                Span::styled(format!("  {} ", marker), Style::default().fg(marker_color)),
+                Span::styled(
+                    c.name.clone(),
+                    if acted {
+                        Style::default().fg(Color::DarkGray)
+                    } else {
+                        Style::default().fg(Color::White)
+                    },
+                ),
+            ]));
+        }
+    }
 
     // Spell declarations
     if !combat.spell_declarations.is_empty() {
@@ -247,7 +323,7 @@ fn render_combat(state: &GameState) -> Vec<Line<'static>> {
         }
     }
 
-    // Monsters
+    // Monsters with attack tracking
     let living: Vec<_> = combat.living_monsters();
     if !living.is_empty() {
         lines.push(Line::raw(""));
@@ -260,7 +336,7 @@ fn render_combat(state: &GameState) -> Vec<Line<'static>> {
             Style::default().fg(Color::DarkGray),
         )));
 
-        for (_idx, m) in &living {
+        for (idx, m) in &living {
             let mut spans = vec![Span::styled(
                 format!("  {}", m.name),
                 Style::default().fg(Color::White),
@@ -276,6 +352,24 @@ fn render_combat(state: &GameState) -> Vec<Line<'static>> {
                 spans.push(Span::styled(
                     " [helpless]",
                     Style::default().fg(Color::DarkGray),
+                ));
+            }
+
+            // Attack usage indicator
+            let total_attacks = m.attack_routines.len().max(1);
+            let used = combat
+                .monsters_attacked_this_round
+                .get(idx)
+                .copied()
+                .unwrap_or(0);
+            if used > 0 || total_attacks > 1 {
+                spans.push(Span::styled(
+                    format!("  [{}/{}]", used, total_attacks),
+                    Style::default().fg(if used >= total_attacks {
+                        Color::DarkGray
+                    } else {
+                        Color::White
+                    }),
                 ));
             }
 
