@@ -159,8 +159,13 @@ impl TimeTracker {
         messages
     }
 
-    /// Add a new light source.
+    /// Add a new light source.  If the carrier already holds one, the old
+    /// light is extinguished first (replace semantics).
     pub fn light(&mut self, kind: LightSourceKind, carrier: &str) {
+        if self.lights.iter().any(|l| l.carrier == carrier) {
+            self.lights.retain(|l| l.carrier != carrier);
+            self.log(format!("{}'s previous light source is extinguished.", carrier));
+        }
         let light = ActiveLight::new(kind, carrier);
         self.log(format!(
             "{} lights a {} ({} turns).",
@@ -426,5 +431,15 @@ mod tests {
         assert!(summary.starts_with("Light: "));
         assert!(summary.contains("Arden's torch (6 turns)"));
         assert!(summary.contains("Brin's lantern (24 turns)"));
+    }
+
+    /// oag-7gcuy: duplicate light on same carrier replaces instead of stacking.
+    #[test]
+    fn duplicate_light_replaces_not_stacks() {
+        let mut tracker = TimeTracker::new();
+        tracker.light(LightSourceKind::Torch, "Arden");
+        tracker.light(LightSourceKind::Torch, "Arden");
+        assert_eq!(tracker.lights.len(), 1, "should have exactly 1 light, not 2");
+        assert_eq!(tracker.lights[0].remaining_turns, 6, "replacement should be fresh");
     }
 }
