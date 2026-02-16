@@ -260,12 +260,17 @@ pub fn apply_daily_overhead<R: Rng>(rng: &mut R, party: &mut Party) -> DayOverhe
                 "Severe starvation! Each party member takes {} HP damage.",
                 hp_damage
             ));
-            for member in party.members.iter_mut().filter(|c| c.is_alive()) {
-                member.hp = (member.hp - hp_damage as i32).max(0);
+            let alive_before: Vec<usize> = party.members.iter()
+                .enumerate()
+                .filter(|(_, c)| c.is_alive())
+                .map(|(i, _)| i)
+                .collect();
+            for &i in &alive_before {
+                party.members[i].hp = (party.members[i].hp - hp_damage as i32).max(0);
             }
-            let dead: Vec<String> = party.members.iter()
-                .filter(|c| c.hp <= 0)
-                .map(|c| c.name.clone())
+            let dead: Vec<String> = alive_before.iter()
+                .filter(|&&i| party.members[i].hp <= 0)
+                .map(|&i| party.members[i].name.clone())
                 .collect();
             if !dead.is_empty() {
                 overhead.messages.push(format!("Died from starvation: {}.", dead.join(", ")));
@@ -1466,5 +1471,34 @@ mod tests {
         let result = forage_with(&mut rng, &mut ws, &mut party);
         assert!(result.overhead.starving, "should be starving with no rations");
         assert!(result.overhead.starvation_damage > 0, "day 3+ starvation should deal HP damage");
+    }
+
+    /// oag-67jg3: already-dead members must not appear in starvation death report.
+    #[test]
+    fn starvation_death_excludes_already_dead() {
+        let mut rng = test_rng();
+        let mut party = Party::new();
+
+        // Alice is alive, Bob is already dead
+        let mut alice = Character::new("Alice", Class::Fighter);
+        alice.hp = 2; // low enough that 1d4 starvation can kill her
+        party.add_member(alice);
+
+        let mut bob = Character::new("Bob", Class::Fighter);
+        bob.hp = 0; // already dead
+        party.add_member(bob);
+
+        party.rations = 0;
+        party.days_without_food = 2; // next call will be day 3 → HP damage
+
+        let overhead = apply_daily_overhead(&mut rng, &mut party);
+
+        // Bob was already dead — he must never appear in the death report
+        for msg in &overhead.messages {
+            assert!(!msg.contains("Bob"),
+                "already-dead Bob should not appear in starvation messages, got: {}", msg);
+        }
+        // Bob's HP should remain 0 (no damage applied to dead members)
+        assert_eq!(party.members[1].hp, 0);
     }
 }
