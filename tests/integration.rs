@@ -13,6 +13,7 @@ use osr_ai_gm::state::game::GameMode;
 use osr_ai_gm::state::time::LightSourceKind;
 use osr_ai_gm::state::wilderness::Terrain;
 
+use std::collections::{HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 fn unique_save_name(prefix: &str) -> String {
@@ -96,6 +97,20 @@ fn make_magic_user(name: &str) -> Character {
     c.gold_gp = 60;
     c.movement_rate = 120;
     c
+}
+
+/// Helper: path to Morkaal's Tomb module.json (copyrighted, not committed).
+/// Returns None if the file doesn't exist (CI environments).
+/// Uses the `data/modules/` prefix so action_load_module's fallback resolves
+/// it from `~/.osr_data/modules/`.
+fn morkaals_tomb_path() -> Option<String> {
+    let home = std::env::var("HOME").ok()?;
+    let real = format!("{}/.osr_data/modules/gotfn_morkaals_tomb/module.json", home);
+    if std::path::Path::new(&real).exists() {
+        Some("data/modules/gotfn_morkaals_tomb/module.json".to_string())
+    } else {
+        None
+    }
 }
 
 // ===========================================================================
@@ -3594,4 +3609,276 @@ fn playtest2c_wilderness_combat_roundtrip() {
         let resp = handle_request(&req("9", GMCommand::Travel { x: 0, y: 0 }), &mut state);
         assert!(resp.success, "should be able to travel after combat: {}", resp.message);
     }
+}
+
+// ===========================================================================
+// INTEGRATION TESTS: Morkaal's Tomb module (oag-aqt61)
+//
+// These tests exercise loading and playing the GotFN Morkaal's Tomb module.
+// They skip gracefully when ~/.osr_data is absent (CI environments).
+// ===========================================================================
+
+#[test]
+fn morkaals_tomb_load_and_dungeon_state() {
+    let path = match morkaals_tomb_path() {
+        Some(p) => p,
+        None => return,
+    };
+    let mut state = GameState::new();
+    let resp = handle_request(&req("mt1", GMCommand::LoadModule { path }), &mut state);
+    assert!(resp.success, "load Morkaal's Tomb failed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    // Verify response data
+    let data = resp.data.unwrap();
+    assert_eq!(data["module_name"], "Morkaal's Tomb");
+    assert_eq!(data["room_count"], 19);
+
+    // Verify dungeon state
+    let dungeon = state.dungeon.as_ref().unwrap();
+    assert_eq!(dungeon.rooms.len(), 19);
+    assert_eq!(dungeon.current_room, Some(0)); // entry room gets id 0
+
+    // Entry room should be "main_entry_landing"
+    let entry = dungeon.find_room(0).unwrap();
+    assert_eq!(entry.key.as_deref(), Some("main_entry_landing"));
+    assert!(dungeon.explored.contains(&0));
+
+    // Time tracker initialized
+    assert!(state.time.is_some());
+
+    // Wandering monster tables empty (Morkaal's Tomb has none)
+    assert!(state.wandering_monster_tables.is_empty());
+
+    // Module rules loaded
+    assert_eq!(state.module_rules.len(), 5);
+}
+
+#[test]
+fn morkaals_tomb_module_monsters_loaded() {
+    let path = match morkaals_tomb_path() {
+        Some(p) => p,
+        None => return,
+    };
+    let mut state = GameState::new();
+    let resp = handle_request(&req("mt1", GMCommand::LoadModule { path }), &mut state);
+    assert!(resp.success, "load failed: {}", resp.message);
+
+    // 3 module-specific monsters
+    assert_eq!(state.module_monsters.len(), 3,
+        "expected 3 module monsters, got: {:?}", state.module_monsters.keys().collect::<Vec<_>>());
+    assert!(state.module_monsters.contains_key("colossus of morkaal"));
+    assert!(state.module_monsters.contains_key("ectoplasmic echo skeleton"));
+    assert!(state.module_monsters.contains_key("wane wraith"));
+
+    // Spot-check that monster names match (stored lowercase key, original name preserved)
+    let wraith = &state.module_monsters["wane wraith"];
+    assert_eq!(wraith.name, "Wane Wraith");
+}
+
+#[test]
+fn morkaals_tomb_all_rooms_reachable() {
+    let path = match morkaals_tomb_path() {
+        Some(p) => p,
+        None => return,
+    };
+    let mut state = GameState::new();
+    let resp = handle_request(&req("mt1", GMCommand::LoadModule { path }), &mut state);
+    assert!(resp.success, "load failed: {}", resp.message);
+
+    let dungeon = state.dungeon.as_ref().unwrap();
+    let entry_id = dungeon.current_room.unwrap();
+
+    // BFS over all doors (regardless of state) to check reachability
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    visited.insert(entry_id);
+    queue.push_back(entry_id);
+
+    while let Some(room_id) = queue.pop_front() {
+        for door in &dungeon.doors {
+            let neighbor = if door.room_a == room_id {
+                Some(door.room_b)
+            } else if door.room_b == room_id {
+                Some(door.room_a)
+            } else {
+                None
+            };
+            if let Some(n) = neighbor {
+                if visited.insert(n) {
+                    queue.push_back(n);
+                }
+            }
+        }
+    }
+
+    assert_eq!(
+        visited.len(), 19,
+        "all 19 rooms should be reachable from entry; only reached {}. unreachable: {:?}",
+        visited.len(),
+        dungeon.rooms.iter()
+            .filter(|r| !visited.contains(&r.id))
+            .map(|r| (&r.name, r.id, r.key.as_deref()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn morkaals_tomb_rich_content() {
+    let path = match morkaals_tomb_path() {
+        Some(p) => p,
+        None => return,
+    };
+    let mut state = GameState::new();
+    let resp = handle_request(&req("mt1", GMCommand::LoadModule { path }), &mut state);
+    assert!(resp.success, "load failed: {}", resp.message);
+
+    // Look at the entry room
+    let resp = handle_request(&req("mt2", GMCommand::Look), &mut state);
+    assert!(resp.success, "look failed: {}", resp.message);
+    let data = resp.data.unwrap();
+    assert!(!data["description"].as_str().unwrap_or("").is_empty(),
+        "entry room should have a description");
+
+    // Check rich content directly on dungeon rooms
+    let dungeon = state.dungeon.as_ref().unwrap();
+
+    // Entry room should have features
+    let entry = dungeon.find_room(0).unwrap();
+    assert!(!entry.features.is_empty(),
+        "main_entry_landing should have features");
+
+    // Verify feature structure
+    let feature = &entry.features[0];
+    assert!(!feature.name.is_empty(), "feature should have a name");
+    assert!(!feature.description.is_empty(), "feature should have a description");
+    assert!(!feature.kind.is_empty(), "feature should have a kind");
+
+    // At least some rooms should have rich content
+    let rooms_with_features = dungeon.rooms.iter()
+        .filter(|r| !r.features.is_empty()).count();
+    assert!(rooms_with_features > 0, "at least one room should have features");
+
+    // All rooms should have module keys set
+    for room in &dungeon.rooms {
+        assert!(room.key.is_some(), "room '{}' (id {}) should have a module key", room.name, room.id);
+    }
+}
+
+#[test]
+fn morkaals_tomb_monster_spawning() {
+    let path = match morkaals_tomb_path() {
+        Some(p) => p,
+        None => return,
+    };
+    let mut state = GameState::new();
+    state.party.add_member(make_fighter("Aldric"));
+
+    let resp = handle_request(&req("mt1", GMCommand::LoadModule { path }), &mut state);
+    assert!(resp.success, "load failed: {}", resp.message);
+
+    // Light a torch
+    let resp = handle_request(&req("mt2", GMCommand::Light {
+        source: LightSourceKind::Torch,
+        carrier: "Aldric".to_string(),
+    }), &mut state);
+    assert!(resp.success, "light failed: {}", resp.message);
+
+    // Find a room with placed monsters
+    let target = {
+        let dungeon = state.dungeon.as_ref().unwrap();
+        dungeon.rooms.iter()
+            .find(|r| !r.placed_monsters.is_empty())
+            .map(|r| r.id)
+            .expect("module should have at least one room with placed monsters")
+    };
+
+    // Navigate directly to the target room (BFS test validates reachability)
+    {
+        let dungeon = state.dungeon.as_mut().unwrap();
+        dungeon.current_room = Some(target);
+        dungeon.explored.insert(target);
+    }
+
+    // SpawnPlaced should resolve from module_monsters
+    let resp = handle_request(&req("mt3", GMCommand::SpawnPlaced {
+        distance: 20,
+        name: None,
+    }), &mut state);
+    assert!(resp.success, "SpawnPlaced failed: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Combat);
+
+    let combat = state.combat.as_ref().unwrap();
+    assert!(!combat.monsters.is_empty(), "should have spawned monsters");
+    assert_eq!(combat.distance, 20);
+
+    // End combat to clean up
+    let resp = handle_request(&req("mt4", GMCommand::EndCombat { skip_xp: true }), &mut state);
+    assert!(resp.success);
+}
+
+#[test]
+fn morkaals_tomb_traps_and_treasure() {
+    let path = match morkaals_tomb_path() {
+        Some(p) => p,
+        None => return,
+    };
+    let mut state = GameState::new();
+    let resp = handle_request(&req("mt1", GMCommand::LoadModule { path }), &mut state);
+    assert!(resp.success, "load failed: {}", resp.message);
+
+    let dungeon = state.dungeon.as_ref().unwrap();
+
+    // Rooms with treasure
+    let rooms_with_treasure: Vec<_> = dungeon.rooms.iter()
+        .filter(|r| !r.placed_treasure.is_empty())
+        .collect();
+    assert!(!rooms_with_treasure.is_empty(),
+        "module should have rooms with placed treasure");
+
+    for room in &rooms_with_treasure {
+        for t in &room.placed_treasure {
+            assert!(!t.description.is_empty(), "treasure in '{}' should have description", room.name);
+            assert!(!t.taken, "treasure in '{}' should not be taken initially", room.name);
+        }
+    }
+
+    // Rooms with traps
+    let rooms_with_traps: Vec<_> = dungeon.rooms.iter()
+        .filter(|r| r.trap.is_some())
+        .collect();
+
+    for room in &rooms_with_traps {
+        let trap = room.trap.as_ref().unwrap();
+        assert!(!trap.is_empty(), "trap in '{}' should have description", room.name);
+        assert!(!room.trap_triggered, "trap in '{}' should not be triggered initially", room.name);
+    }
+}
+
+#[test]
+fn sample_crypt_backward_compatibility() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("bc1", GMCommand::LoadModule {
+        path: "data/modules/sample_crypt/module.json".to_string(),
+    }), &mut state);
+    assert!(resp.success, "sample_crypt should still load: {}", resp.message);
+    assert_eq!(state.mode, GameMode::Exploration);
+
+    let dungeon = state.dungeon.as_ref().unwrap();
+    assert_eq!(dungeon.rooms.len(), 3);
+    assert_eq!(dungeon.doors.len(), 2);
+
+    // Entry room check
+    let entry = dungeon.find_room(0).unwrap();
+    assert_eq!(entry.name, "Crypt Entrance");
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["module_name"], "Sample Crypt");
+    assert_eq!(data["room_count"], 3);
+
+    // Look works
+    let resp = handle_request(&req("bc2", GMCommand::Look), &mut state);
+    assert!(resp.success);
+    assert!(resp.message.contains("Crypt Entrance"),
+        "Look should mention entry room name, got: {}", resp.message);
 }
