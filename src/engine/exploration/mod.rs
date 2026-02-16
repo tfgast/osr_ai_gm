@@ -509,8 +509,12 @@ fn check_room_trap<R: Rng>(
                 if let Some(room) = dungeon.find_room_mut(dest) {
                     room.trap_triggered = true;
                 }
+                result.msg(trap.message);
+                result.msg(format!("Trap effect: {}", trap_desc));
+                result.msg("GM: Resolve saving throws and apply effects manually.".to_string());
+            } else {
+                result.msg(trap.message);
             }
-            result.msg(trap.message);
         }
         TrapTrigger::Action => {
             result.msg(format!(
@@ -1274,6 +1278,11 @@ mod tests {
                 triggered = true;
                 // Verify trap_triggered flag is set
                 assert!(dungeon.find_room(3).unwrap().trap_triggered);
+                // oag-kaltt: triggered trap must show effect description and GM prompt
+                assert!(output.contains("Trap effect: Pit trap"),
+                    "triggered trap should include description, got: {}", output);
+                assert!(output.contains("GM: Resolve saving throws"),
+                    "triggered trap should prompt GM for resolution, got: {}", output);
                 break;
             }
         }
@@ -1676,9 +1685,14 @@ mod tests {
 
             let result = move_through_door_with(&mut rng, &mut time, &mut dungeon, 1, 0);
             assert!(result.is_ok());
-            if result.unwrap().to_string().contains("TRAP TRIGGERED") {
+            let output = result.unwrap().to_string();
+            if output.contains("TRAP TRIGGERED") {
                 triggered = true;
                 assert!(dungeon.find_room(1).unwrap().trap_triggered);
+                assert!(output.contains("Trap effect: Pit trap (1d6 damage)"),
+                    "triggered entry trap should show effect, got: {}", output);
+                assert!(output.contains("GM: Resolve saving throws"),
+                    "triggered entry trap should prompt GM, got: {}", output);
                 break;
             }
         }
