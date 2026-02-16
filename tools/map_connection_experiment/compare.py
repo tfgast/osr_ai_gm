@@ -36,7 +36,7 @@ def connection_types(rooms: dict) -> dict[tuple[str, str], str]:
         src = normalize_room_id(room_id)
         for exit_def in room.get("exits", []):
             dst = normalize_room_id(exit_def["to"])
-            ctype = exit_def.get("connection_type", "unknown")
+            ctype = exit_def.get("connection_type") or exit_def.get("type", "unknown")
             types[(src, dst)] = ctype
     return types
 
