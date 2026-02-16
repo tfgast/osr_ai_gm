@@ -1400,4 +1400,35 @@ mod tests {
         assert!(module.rules.is_empty());
         assert!(module.tables.is_empty());
     }
+
+    #[test]
+    fn load_gotfn_morkaals_tomb() {
+        let path = std::path::PathBuf::from(
+            std::env::var("HOME").unwrap_or_default()
+        ).join(".osr_data/modules/gotfn_morkaals_tomb/module.json");
+        if !path.exists() {
+            // Skip if module data not present (CI environments)
+            return;
+        }
+        let module = load_module_from_path(&path).expect("Failed to load Morkaal's Tomb");
+        assert_eq!(module.name, "Morkaal's Tomb");
+        assert_eq!(module.level_range, (1, 1));
+        assert_eq!(module.entry_room, "main_entry_landing");
+        assert_eq!(module.rooms.len(), 19);
+        assert_eq!(module.rules.len(), 5);
+        assert!(module.wandering_monsters.is_empty());
+
+        // Spot-check a room with monsters
+        let room13 = &module.rooms["riven_hall"];
+        assert_eq!(room13.monsters.len(), 1);
+        assert_eq!(room13.monsters[0].name, "Wane Wraith");
+        assert_eq!(room13.monsters[0].count, 2);
+
+        // Spot-check exits
+        let room1 = &module.rooms["main_entry_landing"];
+        assert_eq!(room1.exits.len(), 2);
+
+        // Spot-check features
+        assert!(!room1.features.is_empty());
+    }
 }
