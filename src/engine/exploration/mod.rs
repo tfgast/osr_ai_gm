@@ -58,6 +58,19 @@ impl ExplorationResult {
     fn msg(&mut self, s: impl Into<String>) {
         self.messages.push(s.into());
     }
+
+    /// Record a wandering monster encounter with GM guidance.
+    fn set_encounter(&mut self, entry: encounter::EncounterEntry) {
+        self.msg(format!(
+            "Wandering monster! {} ({} appearing)",
+            entry.name, entry.number
+        ));
+        self.msg(format!(
+            "GM: Use SpawnMonster {{\"name\":\"{}\",\"count\":N}} to start combat.",
+            entry.name.to_lowercase()
+        ));
+        self.encounter = Some(entry);
+    }
 }
 
 impl std::fmt::Display for ExplorationResult {
@@ -67,6 +80,7 @@ impl std::fmt::Display for ExplorationResult {
         }
         if let Some(enc) = &self.encounter {
             writeln!(f, "*** WANDERING MONSTER: {} ({}) ***", enc.name, enc.number)?;
+            writeln!(f, "GM: Use SpawnMonster {{\"name\":\"{}\",\"count\":N}} to start combat.", enc.name.to_lowercase())?;
         }
         if let Some(monsters) = &self.placed_monsters {
             for m in monsters {
@@ -138,11 +152,7 @@ pub fn advance_dungeon_turn_with<R: Rng>(
 
     // Wandering monster check every 2 turns (1-in-6)
     if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
-        result.msg(format!(
-            "Wandering monster! {} ({} appearing)",
-            entry.name, entry.number
-        ));
-        result.encounter = Some(entry);
+        result.set_encounter(entry);
     }
 
     result
@@ -241,11 +251,7 @@ pub fn search_room_with<R: Rng>(
 
     // Wandering monster check (search consumes a turn)
     if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
-        result.msg(format!(
-            "Wandering monster! {} ({} appearing)",
-            entry.name, entry.number
-        ));
-        result.encounter = Some(entry);
+        result.set_encounter(entry);
     }
 
     result
@@ -299,11 +305,7 @@ pub fn listen_at_door_with<R: Rng>(
 
     // Wandering monster check (listening consumes a turn)
     if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
-        result.msg(format!(
-            "Wandering monster! {} ({} appearing)",
-            entry.name, entry.number
-        ));
-        result.encounter = Some(entry);
+        result.set_encounter(entry);
     }
 
     result
@@ -632,11 +634,7 @@ pub fn move_through_door_with<R: Rng>(
     // Use updated dungeon level after transition for wandering monster check
     let effective_level = if transition.is_some() { dungeon.level } else { dungeon_level };
     if let Some(entry) = check_wandering_monster(rng, time, effective_level) {
-        result.msg(format!(
-            "Wandering monster! {} ({} appearing)",
-            entry.name, entry.number
-        ));
-        result.encounter = Some(entry);
+        result.set_encounter(entry);
     }
 
     Ok(result)
