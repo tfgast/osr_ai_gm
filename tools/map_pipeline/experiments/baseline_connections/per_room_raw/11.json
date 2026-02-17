@@ -1,0 +1,65 @@
+{
+  "target": "11",
+  "connections": [
+    {
+      "to": "R1",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "Location 11 sits on the north bank of the river near the R1 river waypoint. The river passes adjacent to 11, allowing water-based access between them."
+    },
+    {
+      "to": "12",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Location 12 is directly south of 11. They appear to be two alcoves along the same passage or connected by a visible open corridor running north-south between them."
+    },
+    {
+      "to": "13",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "A passage appears to lead south from the 11/12 alcove area down into room 13 (The Riven Hall). There is a visible corridor connecting these areas."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "10",
+      "reason": "Location 10 is a dead-end river tunnel to the west. While somewhat nearby, there is no visible passage or doorway connecting 10 directly to 11. They are separated by solid walls and cave structure."
+    },
+    {
+      "to": "14",
+      "reason": "Location 14 is on the far east side across the river. No direct passage connects 11 to 14; they are separated by the river and solid walls with no visible opening."
+    },
+    {
+      "to": "4A",
+      "reason": "Location 4A (Great Bronze Doors) is far to the south in the central hall area. No direct passage connects it to 11; multiple rooms and corridors lie between them."
+    },
+    {
+      "to": "7",
+      "reason": "Location 7 (Western Corridor) is well to the south-southwest. No direct passage connects it to 11; they are separated by multiple intervening rooms and walls."
+    },
+    {
+      "to": "9",
+      "reason": "Location 9 (Northern Corridor) is to the south of 11. While in the same general area, the map shows walls separating them with no visible direct opening between 9 and 11."
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is far to the south-southwest. No direct connection visible; multiple rooms and corridors separate them."
+    },
+    {
+      "to": "R2",
+      "reason": "R2 is a river waypoint to the east. The river does not appear to directly connect to location 11 at this point; R1 is the closer river access point for 11."
+    },
+    {
+      "to": "R3",
+      "reason": "R3 is further east along the river. No direct river or passage connection to 11 is visible at this point."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 is far to the east-southeast along the river. No connection to 11."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 is the river exit far to the south. No connection to 11."
+    }
+  ]
+}

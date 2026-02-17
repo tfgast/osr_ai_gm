@@ -1,0 +1,65 @@
+{
+  "target": "R3",
+  "connections": [
+    {
+      "to": "R2",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R2 is upstream (west) of R3 along the same river channel. The river flows continuously from R2 to R3 with no barriers."
+    },
+    {
+      "to": "R4",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R4 is downstream (south-east) of R3 along the same river channel. The river flows continuously from R3 to R4."
+    },
+    {
+      "to": "14",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "Room 14 (The Far Side) is on the north bank of the river directly adjacent to R3. The room opens onto the river at this point, allowing water-based access."
+    },
+    {
+      "to": "15",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "Room 15 (Penultimate Crypt) is on the north side near R3. The river passes along its southern edge, and there appears to be access from the river bank into this room."
+    },
+    {
+      "to": "6",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "Room 6 (Sealed Eastern Door) is on the south bank of the river near R3. The river runs along its northern edge, providing water-based access at this point."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "12",
+      "reason": "Room 12 (Hanging South Alcove) is located further west along the river corridor, separated from R3 by walls and distance. No direct passage or river access connects them."
+    },
+    {
+      "to": "13",
+      "reason": "Room 13 (The Riven Hall) is southwest of R3, separated by walls. No direct passage, door, or river crossing visible between them."
+    },
+    {
+      "to": "4A",
+      "reason": "Room 4A (Great Bronze Doors) is well to the west of R3, separated by multiple rooms and walls. No direct connection visible."
+    },
+    {
+      "to": "8E",
+      "reason": "8E (Burial Platform) is south/southeast of R3, separated by walls and other rooms. No direct passage or river crossing connects them."
+    },
+    {
+      "to": "8W",
+      "reason": "8W (River Ledge) is south of R3 but separated by intervening rooms and walls. No direct river path or passage connects them at this point."
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is far upstream to the west, separated from R3 by R2 and significant river distance. Not directly adjacent along the river."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is far downstream at the bottom of the map. Not directly adjacent to R3 along the river channel."
+    }
+  ]
+}

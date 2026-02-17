@@ -1,0 +1,65 @@
+{
+  "target": "R4",
+  "connections": [
+    {
+      "to": "8E",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R4 is a river waypoint positioned at the water's edge adjacent to room 8E (Burial Platform). The river runs right alongside 8E, and R4 marks the crossing point at that bank."
+    },
+    {
+      "to": "8W",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "8W (River Ledge) is on the western side of the same room complex as 8E. R4 as a river waypoint connects to the river-adjacent areas, and 8W is named River Ledge indicating it borders the water at or near this crossing point."
+    },
+    {
+      "to": "R3",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R3 (North River Passage) is the next river waypoint upstream/north along the river from R4. The river channel visibly connects these two waypoints with continuous water flow."
+    },
+    {
+      "to": "R5",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R5 (River exit at cliff) is the next river waypoint downstream/south from R4. The river channel flows continuously from R4 southward to R5."
+    },
+    {
+      "to": "5",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "Room 5 (Collapsed Burial Chamber) appears to border the river on its eastern side near R4's position, providing river access at this crossing point."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "13",
+      "reason": "Room 13 (The Riven Hall) is located well to the northwest of R4, separated by multiple walls and rooms with no direct passage or river connection."
+    },
+    {
+      "to": "15",
+      "reason": "Room 15 (Penultimate Crypt) is in the far northeast of the map, separated from R4 by walls and other rooms with no direct connection visible."
+    },
+    {
+      "to": "4",
+      "reason": "Room 4 (Great Northern Hall) is a large central room well to the west and south of R4, separated by walls and intervening rooms with no direct passage."
+    },
+    {
+      "to": "4A",
+      "reason": "Room 4A (Great Bronze Doors) is adjacent to room 4 in the central area, far from R4 with no visible passage or river connection."
+    },
+    {
+      "to": "6",
+      "reason": "Room 6 (Sealed Eastern Door) is south of the central area, separated from R4 by walls and other spaces with no direct connection visible."
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is on the far northwest section of the river, not directly connected to R4 \u2014 other river waypoints (R2, R3) lie between them along the watercourse."
+    },
+    {
+      "to": "R2",
+      "reason": "R2 (North River Crossing) is upstream along the river but separated from R4 by R3; the river does not flow directly from R2 to R4 without passing through R3."
+    }
+  ]
+}

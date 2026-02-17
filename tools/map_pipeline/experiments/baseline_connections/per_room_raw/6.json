@@ -1,0 +1,61 @@
+{
+  "target": "6",
+  "connections": [
+    {
+      "to": "5",
+      "connection_type": "door",
+      "confidence": "high",
+      "notes": "Location 5 is immediately adjacent to 6 to the south/southwest. A doorway or passage is visible connecting these two locations."
+    },
+    {
+      "to": "7",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Location 7 is to the north/northwest of 6. A clear open corridor passage connects them."
+    },
+    {
+      "to": "4",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Location 4 is to the south of 6. There appears to be an open passage or corridor connecting 6 southward to 4."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "13",
+      "reason": "Location 13 is to the north separated by walls and other rooms. No direct passage visible between 6 and 13."
+    },
+    {
+      "to": "4A",
+      "reason": "Location 4A is far to the north near the top of the map. No direct connection to 6; separated by multiple rooms and walls."
+    },
+    {
+      "to": "8E",
+      "reason": "Location 8E is to the east across the river area. No direct passage connects 6 to 8E; they are separated by walls and the river channel."
+    },
+    {
+      "to": "8W",
+      "reason": "Location 8W is to the east near the river. No direct passage or doorway visible connecting 6 to 8W; separated by walls."
+    },
+    {
+      "to": "R1",
+      "reason": "R1 is in the northwest river area, far from 6 with no river access or passage connecting them."
+    },
+    {
+      "to": "R2",
+      "reason": "R2 is in the north river area, far from 6 with walls and rooms between them."
+    },
+    {
+      "to": "R3",
+      "reason": "R3 is in the northeast river area, far from 6 with no connection."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 is to the east near the river, separated from 6 by walls and the river channel with no visible crossing point."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 is far to the south at the river exit near the cliff, no connection to 6."
+    }
+  ]
+}

@@ -1,0 +1,570 @@
+{
+  "rooms": {
+    "1": {
+      "name": "Main Entry Landing",
+      "exits": [
+        {
+          "to": "R5",
+          "connection_type": "open",
+          "notes": "Entry from the cliff/river at the bottom of the map"
+        },
+        {
+          "to": "3A",
+          "connection_type": "stairs",
+          "notes": "Stairway leading up/north from the entry landing into the dungeon"
+        }
+      ]
+    },
+    "2": {
+      "name": "Western Burial Tunnels",
+      "exits": [
+        {
+          "to": "J1",
+          "connection_type": "open",
+          "notes": "Tunnel passage connecting northward to the burial tunnel branch junction"
+        },
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Tunnel passage heading east to the south junction archway"
+        }
+      ]
+    },
+    "3A": {
+      "name": "South Junction Archway",
+      "exits": [
+        {
+          "to": "1",
+          "connection_type": "stairs",
+          "notes": "Stairs descending south to the main entry landing"
+        },
+        {
+          "to": "2",
+          "connection_type": "open",
+          "notes": "Passage west toward the western burial tunnels"
+        },
+        {
+          "to": "3B",
+          "connection_type": "open",
+          "notes": "Passage continuing north through the arched corridor"
+        },
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "Passage east/north into the Great Northern Hall"
+        }
+      ]
+    },
+    "3B": {
+      "name": "Arched Stairwell Junction",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Passage south to the south junction archway"
+        },
+        {
+          "to": "3C",
+          "connection_type": "stairs",
+          "notes": "Stairs leading up to the upper arched stairwell junction"
+        },
+        {
+          "to": "6",
+          "connection_type": "open",
+          "notes": "Passage east to the sealed eastern door area"
+        }
+      ]
+    },
+    "3C": {
+      "name": "Arched Stairwell Junction",
+      "exits": [
+        {
+          "to": "3B",
+          "connection_type": "stairs",
+          "notes": "Stairs leading down to lower arched stairwell junction"
+        },
+        {
+          "to": "J2",
+          "connection_type": "open",
+          "notes": "Passage west toward the western corridor fork"
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "Passage continuing north/west into the western corridor"
+        }
+      ]
+    },
+    "4": {
+      "name": "Great Northern Hall",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Passage south/west back to the south junction archway"
+        },
+        {
+          "to": "4A",
+          "connection_type": "open",
+          "notes": "Passage north to the great bronze doors area"
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "The river runs along the eastern edge; river crossing possible to R4"
+        }
+      ]
+    },
+    "4A": {
+      "name": "Great Bronze Doors",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "Passage south into the Great Northern Hall"
+        },
+        {
+          "to": "9",
+          "connection_type": "door",
+          "notes": "The great bronze doors leading north to the northern corridor"
+        },
+        {
+          "to": "6",
+          "connection_type": "open",
+          "notes": "Passage east connecting to the sealed eastern door area"
+        }
+      ]
+    },
+    "5": {
+      "name": "Collapsed Burial Chamber",
+      "exits": [
+        {
+          "to": "J1",
+          "connection_type": "open",
+          "notes": "Passage south to the burial tunnel branch junction"
+        },
+        {
+          "to": "J2",
+          "connection_type": "open",
+          "notes": "Passage north/east toward the western corridor fork"
+        }
+      ]
+    },
+    "6": {
+      "name": "Sealed Eastern Door",
+      "exits": [
+        {
+          "to": "3B",
+          "connection_type": "open",
+          "notes": "Passage west back to the arched stairwell junction"
+        },
+        {
+          "to": "4A",
+          "connection_type": "open",
+          "notes": "Passage west connecting to the great bronze doors area"
+        },
+        {
+          "to": "8W",
+          "connection_type": "door",
+          "notes": "Sealed door leading east to the river ledge area of room 8"
+        }
+      ]
+    },
+    "7": {
+      "name": "Western Corridor",
+      "exits": [
+        {
+          "to": "3C",
+          "connection_type": "open",
+          "notes": "Passage south/east to the upper arched stairwell junction"
+        },
+        {
+          "to": "J2",
+          "connection_type": "open",
+          "notes": "Passage south to the western corridor fork"
+        },
+        {
+          "to": "9",
+          "connection_type": "open",
+          "notes": "Corridor continuing east to the northern corridor"
+        },
+        {
+          "to": "13",
+          "connection_type": "door",
+          "notes": "Door on the north side leading to the Riven Hall"
+        }
+      ]
+    },
+    "8E": {
+      "name": "Burial Platform",
+      "exits": [
+        {
+          "to": "8W",
+          "connection_type": "open",
+          "notes": "Connected to the river ledge portion of the same room"
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "The river passes alongside; crossing possible to R4 waypoint"
+        },
+        {
+          "to": "14",
+          "connection_type": "door",
+          "notes": "Door or passage leading east to The Far Side"
+        }
+      ]
+    },
+    "8W": {
+      "name": "River Ledge",
+      "exits": [
+        {
+          "to": "6",
+          "connection_type": "door",
+          "notes": "Door leading west back to the sealed eastern door"
+        },
+        {
+          "to": "8E",
+          "connection_type": "open",
+          "notes": "Connected to the burial platform portion of the same room"
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "Access to the river at the R4 crossing point"
+        }
+      ]
+    },
+    "9": {
+      "name": "Northern Corridor",
+      "exits": [
+        {
+          "to": "4A",
+          "connection_type": "door",
+          "notes": "Bronze doors leading south to the Great Bronze Doors area"
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "Corridor heading west to the western corridor"
+        },
+        {
+          "to": "13",
+          "connection_type": "open",
+          "notes": "Passage north into the Riven Hall"
+        },
+        {
+          "to": "10",
+          "connection_type": "secret",
+          "notes": "Secret door marked with S leading to the dead-end river tunnel"
+        }
+      ]
+    },
+    "10": {
+      "name": "Dead-End River Tunnel",
+      "exits": [
+        {
+          "to": "9",
+          "connection_type": "secret",
+          "notes": "Secret door leading back to the northern corridor"
+        },
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "The tunnel opens onto the river at the R1 crossing point"
+        }
+      ]
+    },
+    "11": {
+      "name": "Hanging North Alcove",
+      "exits": [
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "Accessible from the river at the R1 north-west crossing point"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "Accessible from the river at the R2 north river crossing"
+        },
+        {
+          "to": "13",
+          "connection_type": "pit",
+          "notes": "Vertical connection hanging over the Riven Hall below"
+        }
+      ]
+    },
+    "12": {
+      "name": "Hanging South Alcove",
+      "exits": [
+        {
+          "to": "13",
+          "connection_type": "pit",
+          "notes": "Vertical connection hanging over the Riven Hall below"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "Adjacent to the river near the R2 crossing point"
+        }
+      ]
+    },
+    "13": {
+      "name": "The Riven Hall",
+      "exits": [
+        {
+          "to": "7",
+          "connection_type": "door",
+          "notes": "Door on the south side connecting to the western corridor"
+        },
+        {
+          "to": "9",
+          "connection_type": "open",
+          "notes": "Passage south to the northern corridor"
+        },
+        {
+          "to": "11",
+          "connection_type": "pit",
+          "notes": "The hanging north alcove is above, connected vertically"
+        },
+        {
+          "to": "12",
+          "connection_type": "pit",
+          "notes": "The hanging south alcove is above, connected vertically"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "The river flows through or alongside the Riven Hall"
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "River continues east through the hall toward R3"
+        }
+      ]
+    },
+    "14": {
+      "name": "The Far Side",
+      "exits": [
+        {
+          "to": "8E",
+          "connection_type": "door",
+          "notes": "Door or passage leading west to the burial platform"
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "River access near the R3 passage point"
+        },
+        {
+          "to": "15",
+          "connection_type": "open",
+          "notes": "Passage north to the penultimate crypt"
+        }
+      ]
+    },
+    "15": {
+      "name": "Penultimate Crypt",
+      "exits": [
+        {
+          "to": "14",
+          "connection_type": "open",
+          "notes": "Passage south to The Far Side"
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "River runs near this room at the R3 crossing area"
+        }
+      ]
+    },
+    "J1": {
+      "name": "Burial Tunnel Branch",
+      "exits": [
+        {
+          "to": "2",
+          "connection_type": "open",
+          "notes": "Tunnel south to the western burial tunnels"
+        },
+        {
+          "to": "5",
+          "connection_type": "open",
+          "notes": "Tunnel north to the collapsed burial chamber"
+        },
+        {
+          "to": "J3",
+          "connection_type": "open",
+          "notes": "Tunnel east to the trapped fork"
+        }
+      ]
+    },
+    "J2": {
+      "name": "Western Corridor Fork",
+      "exits": [
+        {
+          "to": "5",
+          "connection_type": "open",
+          "notes": "Passage south/west to the collapsed burial chamber"
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "Passage north to the western corridor"
+        },
+        {
+          "to": "3C",
+          "connection_type": "open",
+          "notes": "Passage east to the upper arched stairwell junction"
+        }
+      ]
+    },
+    "J3": {
+      "name": "Trapped Fork",
+      "exits": [
+        {
+          "to": "J1",
+          "connection_type": "open",
+          "notes": "Passage west to the burial tunnel branch"
+        },
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "Passage south/east connecting toward the south junction archway area"
+        },
+        {
+          "to": "5",
+          "connection_type": "open",
+          "notes": "Passage north toward collapsed burial chamber area"
+        }
+      ]
+    },
+    "R1": {
+      "name": "North-West River Crossing",
+      "exits": [
+        {
+          "to": "10",
+          "connection_type": "river_crossing",
+          "notes": "River connects to the dead-end river tunnel"
+        },
+        {
+          "to": "11",
+          "connection_type": "river_crossing",
+          "notes": "River connects to the hanging north alcove"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "River flows east toward the R2 crossing point"
+        }
+      ]
+    },
+    "R2": {
+      "name": "North River Crossing",
+      "exits": [
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "River flows west toward R1"
+        },
+        {
+          "to": "11",
+          "connection_type": "river_crossing",
+          "notes": "River bank accessible to the hanging north alcove"
+        },
+        {
+          "to": "12",
+          "connection_type": "river_crossing",
+          "notes": "River bank accessible to the hanging south alcove"
+        },
+        {
+          "to": "13",
+          "connection_type": "river_crossing",
+          "notes": "River flows through or near the Riven Hall"
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "River continues east toward R3"
+        }
+      ]
+    },
+    "R3": {
+      "name": "North River Passage",
+      "exits": [
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "River flows west toward R2"
+        },
+        {
+          "to": "13",
+          "connection_type": "river_crossing",
+          "notes": "River accessible from the Riven Hall"
+        },
+        {
+          "to": "14",
+          "connection_type": "river_crossing",
+          "notes": "River accessible from The Far Side"
+        },
+        {
+          "to": "15",
+          "connection_type": "river_crossing",
+          "notes": "River accessible from the Penultimate Crypt"
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "River continues south toward R4"
+        }
+      ]
+    },
+    "R4": {
+      "name": "East River Crossing",
+      "exits": [
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "River flows north toward R3"
+        },
+        {
+          "to": "8E",
+          "connection_type": "river_crossing",
+          "notes": "River accessible from the burial platform"
+        },
+        {
+          "to": "8W",
+          "connection_type": "river_crossing",
+          "notes": "River accessible from the river ledge"
+        },
+        {
+          "to": "4",
+          "connection_type": "river_crossing",
+          "notes": "River crosses near the Great Northern Hall"
+        },
+        {
+          "to": "R5",
+          "connection_type": "river_crossing",
+          "notes": "River continues south toward the cliff exit"
+        }
+      ]
+    },
+    "R5": {
+      "name": "River exit at cliff",
+      "exits": [
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "River flows north toward R4"
+        },
+        {
+          "to": "1",
+          "connection_type": "open",
+          "notes": "Access to the main entry landing at the base of the cliff"
+        }
+      ]
+    }
+  },
+  "observations": "The map shows a multi-level dungeon with a river running from the northwest through the northern chambers and down the eastern side to exit at the southern cliff. Key uncertainties: (1) The exact connection between J3 (Trapped Fork) and surrounding rooms is somewhat ambiguous due to tunnel complexity in the western burial area. (2) The connection between rooms 11/12 and the Riven Hall (13) appears to be vertical (pit/overhang) based on the 'hanging' designation. (3) Room 6 connects to 8W through what appears to be a sealed door. (4) The secret door between 9 and 10 is marked with an S on the map. (5) The river waypoints are positioned to show where water crossings are possible between bank-adjacent rooms. (6) Room 14 and 15 are on the far (east) side of the river, accessible via river crossings at R3 or through room 8E."
+}

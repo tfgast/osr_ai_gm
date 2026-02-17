@@ -1,0 +1,67 @@
+{
+  "target": "4A",
+  "connections": [
+    {
+      "to": "4",
+      "connection_type": "door",
+      "confidence": "high",
+      "notes": "4A (Great Bronze Doors) sits directly at the northern entrance to room 4 (Great Northern Hall). There is a clear doorway passage connecting them \u2014 the bronze doors themselves are the connection point between the corridor and the hall."
+    },
+    {
+      "to": "9",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 9 (Northern Corridor) is directly west of 4A along the east-west passage. There is a clear open corridor connecting 9 to 4A with no walls blocking the passage."
+    },
+    {
+      "to": "6",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 6 (Sealed Eastern Door) is directly east of 4A along the same east-west corridor. A clear open passage connects 4A eastward to 6."
+    },
+    {
+      "to": "13",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 13 (The Riven Hall) is to the north of 4A. There appears to be an open passage or corridor leading northward from 4A into room 13."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "5",
+      "reason": "Room 5 (Collapsed Burial Chamber) is separated from 4A by walls. No visible doorway or passage connects 4A directly to room 5."
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 (Western Corridor) is further west beyond room 9. There is no direct passage from 4A to 7; room 9 lies between them."
+    },
+    {
+      "to": "8W",
+      "reason": "8W (River Ledge) is to the east beyond room 6 and separated by walls. No direct passage from 4A to 8W is visible."
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is located far to the west-southwest of 4A with multiple rooms and corridors between them. No direct connection exists."
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is far to the northwest. No river or passage directly connects 4A to R1."
+    },
+    {
+      "to": "R2",
+      "reason": "R2 (North River Crossing) is to the north in the river area. No direct river crossing or passage connects 4A to R2."
+    },
+    {
+      "to": "R3",
+      "reason": "R3 (North River Passage) is far to the northeast. No direct connection to 4A is visible."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 (East River Crossing) is to the east beyond walls and the river. No direct connection from 4A to R4."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is far to the south. No direct connection to 4A."
+    }
+  ]
+}

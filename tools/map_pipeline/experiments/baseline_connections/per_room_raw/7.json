@@ -1,0 +1,65 @@
+{
+  "target": "7",
+  "connections": [
+    {
+      "to": "9",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 9 (Northern Corridor) is directly adjacent to 7 along the east-west corridor. There is a clear open passage connecting them with no door visible between the two labels."
+    },
+    {
+      "to": "J2",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "J2 (Western Corridor Fork) sits at the western end of the corridor containing 7. The corridor runs openly from 7 westward to J2 with no intervening walls or doors."
+    },
+    {
+      "to": "13",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 13 (The Riven Hall) is north of 7. There appears to be a passage or opening connecting the corridor at 7 northward into room 13."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "12",
+      "reason": "Room 12 (Hanging South Alcove) is separated from 7 by walls and intervening spaces. No direct passage visible between them."
+    },
+    {
+      "to": "3C",
+      "reason": "Room 3C (Arched Stairwell Junction) is located further west/south from 7 with walls between them. No direct connection visible."
+    },
+    {
+      "to": "4",
+      "reason": "Room 4 (Great Northern Hall) is south/southeast of 7, separated by walls. No direct passage or door connects them."
+    },
+    {
+      "to": "4A",
+      "reason": "Room 4A (Great Bronze Doors) is east of 9, not directly adjacent to 7. Separated by room 9 and walls."
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is located further west beyond J2. No direct passage from 7 to J3 without passing through J2."
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is north of the corridor area but separated from 7 by walls and the river. No direct river crossing connection at location 7."
+    },
+    {
+      "to": "R2",
+      "reason": "R2 (North River Crossing) is in the river area to the north, separated from 7 by walls and intervening rooms."
+    },
+    {
+      "to": "R3",
+      "reason": "R3 (North River Passage) is far to the northeast, well separated from 7 with no direct connection."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 (East River Crossing) is far to the east, separated by multiple rooms and walls from 7."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is at the far south of the map, nowhere near 7."
+    }
+  ]
+}

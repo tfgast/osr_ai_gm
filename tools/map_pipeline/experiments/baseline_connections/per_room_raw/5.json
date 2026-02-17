@@ -1,0 +1,69 @@
+{
+  "target": "5",
+  "connections": [
+    {
+      "to": "4",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 4 (Great Northern Hall) is directly north/northwest of room 5, and there is a visible open passage connecting them through the corridor grid"
+    },
+    {
+      "to": "6",
+      "connection_type": "door",
+      "confidence": "high",
+      "notes": "Room 6 (Sealed Eastern Door) is adjacent to room 5 to the east/northeast with a visible doorway connecting them"
+    },
+    {
+      "to": "R4",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "The river runs along the eastern edge of room 5, and R4 (East River Crossing) is positioned at the water adjacent to room 5, providing a river crossing connection"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "1",
+      "reason": "Main Entry Landing is far to the south of room 5 with multiple rooms and corridors between them; no direct passage visible"
+    },
+    {
+      "to": "13",
+      "reason": "The Riven Hall (13) is in the upper-central area of the map, separated from room 5 by multiple rooms and corridors with no direct passage"
+    },
+    {
+      "to": "3C",
+      "reason": "Arched Stairwell Junction (3C) is on the west side of the map, far from room 5 with walls and other rooms intervening"
+    },
+    {
+      "to": "4A",
+      "reason": "Great Bronze Doors (4A) is in the central corridor area northwest of room 5; while room 4 connects to room 5, 4A is a separate location along the corridor without a direct passage to room 5"
+    },
+    {
+      "to": "7",
+      "reason": "Western Corridor (7) is to the west, separated from room 5 by room 4 and other intervening spaces with no direct passage"
+    },
+    {
+      "to": "8E",
+      "reason": "Burial Platform (8E) is to the northeast of room 5 but separated by walls and the river; no direct passage visible between them"
+    },
+    {
+      "to": "8W",
+      "reason": "River Ledge (8W) is to the northeast separated by walls and the river channel; no direct passage connects to room 5"
+    },
+    {
+      "to": "R1",
+      "reason": "North-West River Crossing is in the upper-left area of the map, far from room 5 with no river path directly connecting them"
+    },
+    {
+      "to": "R2",
+      "reason": "North River Crossing is in the upper-central area, far upstream from room 5 with no direct river crossing connection"
+    },
+    {
+      "to": "R3",
+      "reason": "North River Passage is in the upper-right area, upstream from room 5 with no direct connection"
+    },
+    {
+      "to": "R5",
+      "reason": "River exit at cliff is at the bottom of the map, downstream from room 5 with no direct connection at this point"
+    }
+  ]
+}

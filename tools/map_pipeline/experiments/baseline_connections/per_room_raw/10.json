@@ -1,0 +1,65 @@
+{
+  "target": "10",
+  "connections": [
+    {
+      "to": "R2",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R2 (North River Crossing) is positioned at the river directly adjacent to room 10. The river flows past room 10 and R2 marks the crossing point at that location."
+    },
+    {
+      "to": "9",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 9 (Northern Corridor) is directly west of room 10 and there is a visible open passage connecting the corridor to the dead-end tunnel."
+    },
+    {
+      "to": "13",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 13 (The Riven Hall) is to the south of room 10 and a passage appears to connect them through the area where the river runs."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "11",
+      "reason": "Room 11 is across the river to the northwest. There is no direct passage or door between 10 and 11; the river and walls separate them."
+    },
+    {
+      "to": "12",
+      "reason": "Room 12 is nearby but separated by walls. No visible doorway or passage directly connects 10 to 12."
+    },
+    {
+      "to": "3B",
+      "reason": "Room 3B is far to the southwest, separated by multiple rooms and corridors. No direct connection visible."
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 is to the southwest in the corridor grid, separated by intervening rooms and walls. No direct passage to 10."
+    },
+    {
+      "to": "J2",
+      "reason": "J2 is far to the west at a corridor fork. No direct passage connects it to room 10."
+    },
+    {
+      "to": "J3",
+      "reason": "J3 is to the west in the corridor area, separated by walls and other rooms. No direct connection to 10."
+    },
+    {
+      "to": "R1",
+      "reason": "R1 is at a river crossing further to the northwest. Not directly adjacent to room 10 along the river path."
+    },
+    {
+      "to": "R3",
+      "reason": "R3 is along the river to the east, not directly at room 10. Separated by distance along the river channel."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 is the east river crossing, far to the east of room 10. No direct connection."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 is the river exit at the cliff at the far south of the map. No direct connection to room 10."
+    }
+  ]
+}

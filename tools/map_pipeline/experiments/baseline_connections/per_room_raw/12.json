@@ -1,0 +1,65 @@
+{
+  "target": "12",
+  "connections": [
+    {
+      "to": "11",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Location 11 is directly north of 12. There is a visible open passage connecting the two alcoves along the western wall area above the river."
+    },
+    {
+      "to": "13",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Location 13 is south/southeast of 12. A visible corridor or passage connects 12 downward into the Riven Hall area."
+    },
+    {
+      "to": "R1",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "The river passes near location 12 on its western side. R1 sits at the river bend to the northwest, and the river bank appears accessible from 12's position, allowing a water crossing."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "10",
+      "reason": "Location 10 is far to the northwest in a dead-end tunnel area. No visible passage connects directly from 12 to 10; they are separated by walls and the river."
+    },
+    {
+      "to": "14",
+      "reason": "Location 14 is on the far east side of the map across the river. No direct passage or door connects 12 to 14; separated by river and walls."
+    },
+    {
+      "to": "4A",
+      "reason": "Location 4A is well south and east of 12 in the central corridor area. No direct passage connects them; multiple rooms and corridors lie between."
+    },
+    {
+      "to": "7",
+      "reason": "Location 7 is south of 12 in the western corridor area. No direct visible passage connects 12 to 7; they are separated by intervening rooms and walls."
+    },
+    {
+      "to": "9",
+      "reason": "Location 9 is south of 12 in the northern corridor. No direct passage connects them; walls and other rooms intervene."
+    },
+    {
+      "to": "J3",
+      "reason": "Location J3 is far to the southwest. No visible passage directly connects 12 to J3."
+    },
+    {
+      "to": "R2",
+      "reason": "R2 is an upstream river crossing point to the east. The river does not provide a direct crossing point between 12 and R2; they are separated by walls and distance along the river."
+    },
+    {
+      "to": "R3",
+      "reason": "R3 is far to the east across the map near the northeast river passage. No direct connection to 12."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 is on the east side of the map at a river crossing. Far from 12 with no direct connection."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 is at the river exit at the southern cliff, far from 12 with no direct connection."
+    }
+  ]
+}

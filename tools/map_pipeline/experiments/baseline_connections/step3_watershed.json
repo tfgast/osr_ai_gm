@@ -1,0 +1,480 @@
+{
+  "rooms": {
+    "1": {
+      "name": "Main Entry Landing",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R5",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "2": {
+      "name": "Western Burial Tunnels",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "4": {
+      "name": "Great Northern Hall",
+      "exits": [
+        {
+          "to": "1",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "3C",
+          "connection_type": "stairs",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "4A",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "5",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "5": {
+      "name": "Collapsed Burial Chamber",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "6": {
+      "name": "Sealed Eastern Door",
+      "exits": [
+        {
+          "to": "4A",
+          "connection_type": "door",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "8W",
+          "connection_type": "door",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "7": {
+      "name": "Western Corridor",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "4A",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "J3",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "9": {
+      "name": "Northern Corridor",
+      "exits": [
+        {
+          "to": "J3",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "10": {
+      "name": "Dead-End River Tunnel",
+      "exits": [
+        {
+          "to": "J2",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "11": {
+      "name": "Hanging North Alcove",
+      "exits": [
+        {
+          "to": "12",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "14",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "12": {
+      "name": "Hanging South Alcove",
+      "exits": [
+        {
+          "to": "11",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "13": {
+      "name": "The Riven Hall",
+      "exits": [
+        {
+          "to": "4A",
+          "connection_type": "door",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "14": {
+      "name": "The Far Side",
+      "exits": [
+        {
+          "to": "11",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "15",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "15": {
+      "name": "Penultimate Crypt",
+      "exits": [
+        {
+          "to": "14",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "3B": {
+      "name": "Arched Stairwell Junction",
+      "exits": [
+        {
+          "to": "J1",
+          "connection_type": "stairs",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "J2",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "3A": {
+      "name": "South Junction Archway",
+      "exits": [
+        {
+          "to": "2",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "J1",
+          "connection_type": "stairs",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "3C": {
+      "name": "Arched Stairwell Junction",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "stairs",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "J1",
+          "connection_type": "stairs",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "4A": {
+      "name": "Great Bronze Doors",
+      "exits": [
+        {
+          "to": "13",
+          "connection_type": "door",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "6",
+          "connection_type": "door",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "J2": {
+      "name": "Western Corridor Fork",
+      "exits": [
+        {
+          "to": "10",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "3B",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "J3",
+          "connection_type": "pit",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "R1": {
+      "name": "North-West River Crossing",
+      "exits": [
+        {
+          "to": "10",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "11",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "12",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "R2": {
+      "name": "North River Crossing",
+      "exits": [
+        {
+          "to": "12",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "13",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "14",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "R3": {
+      "name": "North River Passage",
+      "exits": [
+        {
+          "to": "15",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "8E",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "R4": {
+      "name": "East River Crossing",
+      "exits": [
+        {
+          "to": "8E",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "8W",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R5",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "8W": {
+      "name": "River Ledge",
+      "exits": [
+        {
+          "to": "6",
+          "connection_type": "door",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "8E": {
+      "name": "Burial Platform",
+      "exits": [
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "R5": {
+      "name": "River exit at cliff",
+      "exits": [
+        {
+          "to": "1",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "J1": {
+      "name": "Burial Tunnel Branch",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "stairs",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "3B",
+          "connection_type": "stairs",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "3C",
+          "connection_type": "stairs",
+          "notes": "watershed adjacency"
+        }
+      ]
+    },
+    "J3": {
+      "name": "Trapped Fork",
+      "exits": [
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "9",
+          "connection_type": "open",
+          "notes": "watershed adjacency"
+        },
+        {
+          "to": "J2",
+          "connection_type": "pit",
+          "notes": "watershed adjacency"
+        }
+      ]
+    }
+  },
+  "observations": "Watershed CV segmentation"
+}

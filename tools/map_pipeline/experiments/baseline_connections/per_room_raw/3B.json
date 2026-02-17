@@ -1,0 +1,69 @@
+{
+  "target": "3B",
+  "connections": [
+    {
+      "to": "3A",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "3A is immediately west of 3B along the same east-west arched corridor, connected by an open archway passage"
+    },
+    {
+      "to": "3C",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "3C is immediately east of 3B along the same arched corridor, connected by an open passage"
+    },
+    {
+      "to": "9",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "A corridor passage runs northward from the 3B junction area to room 9 (Northern Corridor)"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "10",
+      "reason": "Room 10 is far to the north across the river area, no direct passage from 3B"
+    },
+    {
+      "to": "2",
+      "reason": "Room 2 is far to the southwest, separated by multiple rooms and corridors, no direct connection to 3B"
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 (Western Corridor) is further west, separated from 3B by room 3A and other intervening spaces"
+    },
+    {
+      "to": "J1",
+      "reason": "Junction J1 is to the west near the burial tunnels, not directly adjacent to 3B with no visible passage between them"
+    },
+    {
+      "to": "J2",
+      "reason": "Junction J2 is positioned further west/north, not directly connected to 3B by a visible passage"
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is not adjacent to 3B, separated by walls and other rooms"
+    },
+    {
+      "to": "R1",
+      "reason": "River waypoint R1 is to the north near the river, no direct connection to 3B"
+    },
+    {
+      "to": "R2",
+      "reason": "River waypoint R2 is in the northern river area, no water passage reaches 3B"
+    },
+    {
+      "to": "R3",
+      "reason": "River waypoint R3 is in the northeast river area, far from 3B with no connection"
+    },
+    {
+      "to": "R4",
+      "reason": "River waypoint R4 is to the east near the river, no direct connection to 3B"
+    },
+    {
+      "to": "R5",
+      "reason": "River waypoint R5 is at the southern river exit, far from 3B with no connection"
+    }
+  ]
+}

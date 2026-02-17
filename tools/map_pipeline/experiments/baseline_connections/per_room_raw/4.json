@@ -1,0 +1,73 @@
+{
+  "target": "4",
+  "connections": [
+    {
+      "to": "5",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 5 is directly east of room 4, with a visible open passage connecting the two rooms"
+    },
+    {
+      "to": "6",
+      "connection_type": "door",
+      "confidence": "high",
+      "notes": "Room 6 is to the east/southeast of room 4, connected via a visible doorway passage"
+    },
+    {
+      "to": "4A",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 4A is directly north of room 4 within the same large hall complex, connected by an open passage along the hall's central axis"
+    },
+    {
+      "to": "3C",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 3C is to the northwest of room 4, connected via an open passage through the hall corridor system"
+    },
+    {
+      "to": "1",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 1 is to the south of room 4, connected via the main southern passage leading down to the entry landing"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "13",
+      "reason": "Room 13 is located well to the north separated by walls and other rooms; no direct passage visible between 4 and 13"
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 is to the northwest, separated by walls and intervening rooms (like 4A); no direct passage between 4 and 7"
+    },
+    {
+      "to": "8W",
+      "reason": "Room 8W is far to the east across the river; no direct passage or crossing visible between 4 and 8W"
+    },
+    {
+      "to": "J3",
+      "reason": "Junction J3 is to the west/southwest, separated by walls; no direct passage connects it to room 4"
+    },
+    {
+      "to": "R1",
+      "reason": "River waypoint R1 is far to the north-west; no river crossing or passage connects directly to room 4"
+    },
+    {
+      "to": "R2",
+      "reason": "River waypoint R2 is to the north near the river; no river crossing directly connects to room 4"
+    },
+    {
+      "to": "R3",
+      "reason": "River waypoint R3 is far to the northeast; no direct connection to room 4"
+    },
+    {
+      "to": "R4",
+      "reason": "River waypoint R4 is to the east across the river; no river crossing directly at room 4"
+    },
+    {
+      "to": "R5",
+      "reason": "River waypoint R5 is far to the south at the river exit; no connection to room 4"
+    }
+  ]
+}

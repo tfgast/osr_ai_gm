@@ -1,0 +1,73 @@
+{
+  "target": "J3",
+  "connections": [
+    {
+      "to": "J1",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "J3 and J1 are connected via a visible open corridor passage running between the two junction points in the western cave/corridor area"
+    },
+    {
+      "to": "3B",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "A passage branches from J3 southward/southwest toward room 3B in the arched stairwell junction area"
+    },
+    {
+      "to": "6",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "A corridor passage runs from J3 eastward connecting to room 6"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "10",
+      "reason": "Room 10 is far to the north near the river area with no direct passage from J3; separated by multiple rooms and corridors"
+    },
+    {
+      "to": "12",
+      "reason": "Room 12 is in the upper portion of the map, far from J3 with no direct passage visible"
+    },
+    {
+      "to": "3C",
+      "reason": "No direct visible passage from J3 to 3C; 3C is accessed through other routes, not directly from this fork"
+    },
+    {
+      "to": "4A",
+      "reason": "Room 4A (Great Bronze Doors) is centrally located but separated from J3 by walls and intervening rooms with no direct passage"
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 is along the western corridor but not directly connected to J3; passage goes through J1 or other junctions first"
+    },
+    {
+      "to": "9",
+      "reason": "Room 9 is the northern corridor, far from J3 with no direct connection visible"
+    },
+    {
+      "to": "J2",
+      "reason": "J2 is further north along the western corridor; no direct passage from J3 to J2 without passing through J1"
+    },
+    {
+      "to": "R1",
+      "reason": "R1 is a river waypoint in the northwest, far from J3 with no river or passage connection"
+    },
+    {
+      "to": "R2",
+      "reason": "R2 is a river waypoint in the north, no connection to J3"
+    },
+    {
+      "to": "R3",
+      "reason": "R3 is a river waypoint in the northeast area, no connection to J3"
+    },
+    {
+      "to": "R4",
+      "reason": "R4 is a river waypoint on the east side, no connection to J3"
+    },
+    {
+      "to": "R5",
+      "reason": "R5 is the river exit at the cliff in the south, no direct passage from J3 to R5"
+    }
+  ]
+}

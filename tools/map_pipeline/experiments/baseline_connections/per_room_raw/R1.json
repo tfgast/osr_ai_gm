@@ -1,0 +1,69 @@
+{
+  "target": "R1",
+  "connections": [
+    {
+      "to": "10",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "Room 10 (Dead-End River Tunnel) is on the river bank directly adjacent to R1. The river flows right past/through room 10, providing a water-based connection at this waypoint."
+    },
+    {
+      "to": "11",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "Room 11 (Hanging North Alcove) is on the north bank of the river at the R1 crossing point. The river passes directly below room 11, connecting it to this waypoint via water."
+    },
+    {
+      "to": "12",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "Room 12 (Hanging South Alcove) is on the south side of the river near R1. The river bank appears accessible from room 12 at this crossing point."
+    },
+    {
+      "to": "R2",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R2 is the next river waypoint downstream (east) along the same river channel. The river flows continuously from R1 to R2 with no obstruction."
+    },
+    {
+      "to": "R3",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R3 is another river waypoint further downstream along the same river. The river connects R1 through R2 to R3 as a continuous waterway."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "13",
+      "reason": "Room 13 (The Riven Hall) is separated from R1 by walls and intervening rooms. There is no direct passage, door, or river access between R1 and room 13."
+    },
+    {
+      "to": "14",
+      "reason": "Room 14 (The Far Side) is far to the east, separated by multiple rooms and walls from R1. No direct connection visible."
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 (Western Corridor) is south of R1, separated by walls. No visible passage or door connects them directly."
+    },
+    {
+      "to": "9",
+      "reason": "Room 9 (Northern Corridor) is to the east of R1, separated by walls and other rooms. No direct passage visible."
+    },
+    {
+      "to": "J2",
+      "reason": "Junction J2 (Western Corridor Fork) is well south of R1, separated by walls and corridors. No direct connection."
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is south of R1, separated by walls. No direct passage connects them."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 (East River Crossing) is on a different section of the river, far to the east. While the river may eventually connect them, R4 is not an adjacent waypoint \u2014 R2 and R3 are between them."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is at the far south/southeast of the map. It is not an adjacent river waypoint to R1; multiple other waypoints lie between them along the river."
+    }
+  ]
+}

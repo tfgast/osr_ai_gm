@@ -1,0 +1,55 @@
+{
+  "target": "3A",
+  "connections": [
+    {
+      "to": "4",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "3A sits at the southern end of the Great Northern Hall (4). There is a clear open passage/archway connecting northward from 3A into room 4's large gridded hall."
+    },
+    {
+      "to": "3B",
+      "connection_type": "stairs",
+      "confidence": "high",
+      "notes": "3B is adjacent to 3A and connected via stairs \u2014 parallel lines visible on the map indicate a stairway linking these two parts of the Arched Stairwell Junction."
+    },
+    {
+      "to": "9",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "The Northern Corridor (9) connects to 3A via an open passage running westward from 3A into the corridor."
+    },
+    {
+      "to": "J3",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "J3 (Trapped Fork) appears connected to 3A via a passage visible to the south/southwest of 3A, with an open corridor link between them."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "2",
+      "reason": "Room 2 (Western Burial Tunnels) is located far to the southwest of 3A with no direct passage between them; multiple walls and corridors separate them."
+    },
+    {
+      "to": "3C",
+      "reason": "3C is part of the Arched Stairwell Junction but does not share a direct opening with 3A; 3B intervenes between them with no visible direct passage from 3A to 3C."
+    },
+    {
+      "to": "4A",
+      "reason": "4A (Great Bronze Doors) is located to the north/northeast of 3A with solid walls between them; no visible passage directly connects 3A to 4A."
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 (Western Corridor) is to the west of 3A but separated by walls with no visible direct opening between 3A and room 7."
+    },
+    {
+      "to": "J1",
+      "reason": "J1 (Burial Tunnel Branch) is located well to the west/southwest of 3A with no direct passage; walls and intervening corridors block any direct connection."
+    },
+    {
+      "to": "J2",
+      "reason": "J2 (Western Corridor Fork) is to the west of 3A separated by walls and other rooms; no visible direct passage connects them."
+    }
+  ]
+}

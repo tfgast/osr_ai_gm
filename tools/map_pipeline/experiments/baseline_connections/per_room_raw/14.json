@@ -1,0 +1,63 @@
+{
+  "target": "14",
+  "connections": [
+    {
+      "to": "13",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "There appears to be a passage or opening connecting room 14 southward to room 13 (The Riven Hall), visible as a corridor segment between the two rooms"
+    },
+    {
+      "to": "15",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 14 connects eastward to room 15 (Penultimate Crypt) via a visible open passage between the two room areas in the upper portion of the map"
+    },
+    {
+      "to": "R2",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "The river runs along the south/east side of room 14, and R2 (North River Crossing) is positioned at the river adjacent to room 14, providing a water crossing point"
+    },
+    {
+      "to": "R3",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R3 (North River Passage) is a red waypoint on the river near the east side of room 14, providing a river crossing connection"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "11",
+      "reason": "Room 11 (Hanging North Alcove) is located to the west across the river with walls and the river channel separating it from room 14; no direct passage visible"
+    },
+    {
+      "to": "12",
+      "reason": "Room 12 (Hanging South Alcove) is separated from room 14 by walls and intervening space with no visible direct opening or passage"
+    },
+    {
+      "to": "4A",
+      "reason": "Room 4A (Great Bronze Doors) is far to the south of room 14 with multiple walls and rooms between them; no direct connection visible"
+    },
+    {
+      "to": "6",
+      "reason": "Room 6 (Sealed Eastern Door) is well south of room 14 with intervening rooms and walls; no direct passage"
+    },
+    {
+      "to": "8W",
+      "reason": "Room 8W (River Ledge) is far to the east/southeast of room 14 with walls and the river channel between them; no direct passage visible"
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is positioned on the river well to the west of room 14, not adjacent to room 14's boundaries"
+    },
+    {
+      "to": "R4",
+      "reason": "R4 (East River Crossing) is positioned further downstream/east along the river, not adjacent to room 14"
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is far south at the bottom of the map, well away from room 14 with no direct connection"
+    }
+  ]
+}

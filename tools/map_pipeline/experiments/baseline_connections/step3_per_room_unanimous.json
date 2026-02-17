@@ -1,0 +1,458 @@
+{
+  "rooms": {
+    "1": {
+      "name": "Main Entry Landing",
+      "exits": [
+        {
+          "to": "R5",
+          "connection_type": "river_crossing",
+          "notes": "R5 (River exit at cliff) is the red waypoint near location 1 at the bottom of the map. The river flows past the entry landing area, and R5 marks the river exit point at the cliff face adjacent to the main entry. Water access is visible connecting these two locations."
+        }
+      ]
+    },
+    "10": {
+      "name": "Dead-End River Tunnel",
+      "exits": []
+    },
+    "11": {
+      "name": "Hanging North Alcove",
+      "exits": [
+        {
+          "to": "12",
+          "connection_type": "open",
+          "notes": "Location 12 is directly south of 11. They appear to be two alcoves along the same passage or connected by a visible open corridor running north-south between them."
+        },
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "Location 11 sits on the north bank of the river near the R1 river waypoint. The river passes adjacent to 11, allowing water-based access between them."
+        }
+      ]
+    },
+    "12": {
+      "name": "Hanging South Alcove",
+      "exits": [
+        {
+          "to": "11",
+          "connection_type": "open",
+          "notes": "Location 12 is directly south of 11. They appear to be two alcoves along the same passage or connected by a visible open corridor running north-south between them."
+        },
+        {
+          "to": "13",
+          "connection_type": "open",
+          "notes": "Location 13 is south/southeast of 12. A visible corridor or passage connects 12 downward into the Riven Hall area."
+        },
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "The river passes near location 12 on its western side. R1 sits at the river bend to the northwest, and the river bank appears accessible from 12's position, allowing a water crossing."
+        }
+      ]
+    },
+    "13": {
+      "name": "The Riven Hall",
+      "exits": [
+        {
+          "to": "12",
+          "connection_type": "open",
+          "notes": "Location 13 is south/southeast of 12. A visible corridor or passage connects 12 downward into the Riven Hall area."
+        },
+        {
+          "to": "14",
+          "connection_type": "open",
+          "notes": "Room 14 is to the east/north-east of 13, connected by a visible open passage continuing the hall eastward"
+        },
+        {
+          "to": "4A",
+          "connection_type": "open",
+          "notes": "Room 4A (Great Bronze Doors) connects to 13 via the corridor running south from The Riven Hall through visible open passages"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "The river passes through or directly adjacent to room 13, and R2 (North River Crossing) is a river waypoint at this location allowing water crossing"
+        }
+      ]
+    },
+    "14": {
+      "name": "The Far Side",
+      "exits": [
+        {
+          "to": "13",
+          "connection_type": "open",
+          "notes": "Room 14 is to the east/north-east of 13, connected by a visible open passage continuing the hall eastward"
+        },
+        {
+          "to": "15",
+          "connection_type": "open",
+          "notes": "Room 14 connects eastward to room 15 (Penultimate Crypt) via a visible open passage between the two room areas in the upper portion of the map"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "The river runs along the south/east side of room 14, and R2 (North River Crossing) is positioned at the river adjacent to room 14, providing a water crossing point"
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "R3 (North River Passage) is a red waypoint on the river near the east side of room 14, providing a river crossing connection"
+        }
+      ]
+    },
+    "15": {
+      "name": "Penultimate Crypt",
+      "exits": [
+        {
+          "to": "14",
+          "connection_type": "open",
+          "notes": "Room 14 connects eastward to room 15 (Penultimate Crypt) via a visible open passage between the two room areas in the upper portion of the map"
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "R3 (North River Passage) is a red circle just south/southwest of room 15. The river flows directly adjacent to room 15, and R3 marks the river waypoint at that bank, providing a water crossing connection"
+        }
+      ]
+    },
+    "2": {
+      "name": "Western Burial Tunnels",
+      "exits": [
+        {
+          "to": "J1",
+          "connection_type": "open",
+          "notes": "J1 (Burial Tunnel Branch) sits along the tunnel passage that leads into room 2. A clear open tunnel passage connects them with no door or obstruction visible."
+        }
+      ]
+    },
+    "3A": {
+      "name": "South Junction Archway",
+      "exits": [
+        {
+          "to": "3B",
+          "connection_type": "stairs",
+          "notes": "3B is adjacent to 3A and connected via stairs \u2014 parallel lines visible on the map indicate a stairway linking these two parts of the Arched Stairwell Junction."
+        }
+      ]
+    },
+    "3B": {
+      "name": "Arched Stairwell Junction",
+      "exits": [
+        {
+          "to": "3A",
+          "connection_type": "stairs",
+          "notes": "3B is adjacent to 3A and connected via stairs \u2014 parallel lines visible on the map indicate a stairway linking these two parts of the Arched Stairwell Junction."
+        },
+        {
+          "to": "3C",
+          "connection_type": "stairs",
+          "notes": "3C is immediately east of 3B along the same arched corridor, connected by an open passage"
+        },
+        {
+          "to": "9",
+          "connection_type": "open",
+          "notes": "A corridor passage runs northward from the 3B junction area to room 9 (Northern Corridor)"
+        }
+      ]
+    },
+    "3C": {
+      "name": "Arched Stairwell Junction",
+      "exits": [
+        {
+          "to": "3B",
+          "connection_type": "stairs",
+          "notes": "3C is immediately east of 3B along the same arched corridor, connected by an open passage"
+        }
+      ]
+    },
+    "4": {
+      "name": "Great Northern Hall",
+      "exits": [
+        {
+          "to": "4A",
+          "connection_type": "door",
+          "notes": "Room 4A is directly north of room 4 within the same large hall complex, connected by an open passage along the hall's central axis"
+        },
+        {
+          "to": "5",
+          "connection_type": "open",
+          "notes": "Room 5 is directly east of room 4, with a visible open passage connecting the two rooms"
+        },
+        {
+          "to": "6",
+          "connection_type": "door",
+          "notes": "Room 6 is to the east/southeast of room 4, connected via a visible doorway passage"
+        }
+      ]
+    },
+    "4A": {
+      "name": "Great Bronze Doors",
+      "exits": [
+        {
+          "to": "13",
+          "connection_type": "open",
+          "notes": "Room 4A (Great Bronze Doors) connects to 13 via the corridor running south from The Riven Hall through visible open passages"
+        },
+        {
+          "to": "4",
+          "connection_type": "door",
+          "notes": "Room 4A is directly north of room 4 within the same large hall complex, connected by an open passage along the hall's central axis"
+        },
+        {
+          "to": "9",
+          "connection_type": "open",
+          "notes": "Room 9 (Northern Corridor) is directly west of 4A along the east-west passage. There is a clear open corridor connecting 9 to 4A with no walls blocking the passage."
+        }
+      ]
+    },
+    "5": {
+      "name": "Collapsed Burial Chamber",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "open",
+          "notes": "Room 5 is directly east of room 4, with a visible open passage connecting the two rooms"
+        },
+        {
+          "to": "6",
+          "connection_type": "door",
+          "notes": "Room 6 (Sealed Eastern Door) is adjacent to room 5 to the east/northeast with a visible doorway connecting them"
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "The river runs along the eastern edge of room 5, and R4 (East River Crossing) is positioned at the water adjacent to room 5, providing a river crossing connection"
+        }
+      ]
+    },
+    "6": {
+      "name": "Sealed Eastern Door",
+      "exits": [
+        {
+          "to": "4",
+          "connection_type": "door",
+          "notes": "Room 6 is to the east/southeast of room 4, connected via a visible doorway passage"
+        },
+        {
+          "to": "5",
+          "connection_type": "door",
+          "notes": "Room 6 (Sealed Eastern Door) is adjacent to room 5 to the east/northeast with a visible doorway connecting them"
+        }
+      ]
+    },
+    "7": {
+      "name": "Western Corridor",
+      "exits": [
+        {
+          "to": "9",
+          "connection_type": "open",
+          "notes": "Room 9 (Northern Corridor) is directly adjacent to 7 along the east-west corridor. There is a clear open passage connecting them with no door visible between the two labels."
+        },
+        {
+          "to": "J2",
+          "connection_type": "open",
+          "notes": "J2 (Western Corridor Fork) sits at the western end of the corridor containing 7. The corridor runs openly from 7 westward to J2 with no intervening walls or doors."
+        }
+      ]
+    },
+    "8E": {
+      "name": "Burial Platform",
+      "exits": [
+        {
+          "to": "8W",
+          "connection_type": "open",
+          "notes": "8W and 8E are split parts of the same room (room 8). They appear to share an open connection within the larger room area, with 8W on the western/river side and 8E on the eastern platform side."
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "The river runs along the eastern side of the dungeon adjacent to 8E. R4 (East River Crossing) sits in the river directly next to 8E, indicating a river crossing connection from the burial platform to the water."
+        }
+      ]
+    },
+    "8W": {
+      "name": "River Ledge",
+      "exits": [
+        {
+          "to": "8E",
+          "connection_type": "open",
+          "notes": "8W and 8E are split parts of the same room (room 8). They appear to share an open connection within the larger room area, with 8W on the western/river side and 8E on the eastern platform side."
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "R4 (East River Crossing) is positioned in the river directly adjacent to 8W. The River Ledge borders the water at this point, making R4 the river waypoint for crossing from 8W across the water."
+        }
+      ]
+    },
+    "9": {
+      "name": "Northern Corridor",
+      "exits": [
+        {
+          "to": "3B",
+          "connection_type": "open",
+          "notes": "A corridor passage runs northward from the 3B junction area to room 9 (Northern Corridor)"
+        },
+        {
+          "to": "4A",
+          "connection_type": "open",
+          "notes": "Room 9 (Northern Corridor) is directly west of 4A along the east-west passage. There is a clear open corridor connecting 9 to 4A with no walls blocking the passage."
+        },
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "Room 9 (Northern Corridor) is directly adjacent to 7 along the east-west corridor. There is a clear open passage connecting them with no door visible between the two labels."
+        }
+      ]
+    },
+    "J1": {
+      "name": "Burial Tunnel Branch",
+      "exits": [
+        {
+          "to": "2",
+          "connection_type": "open",
+          "notes": "J1 (Burial Tunnel Branch) sits along the tunnel passage that leads into room 2. A clear open tunnel passage connects them with no door or obstruction visible."
+        },
+        {
+          "to": "J2",
+          "connection_type": "open",
+          "notes": "A corridor/passage connects J1 northward to junction J2 (Western Corridor Fork), visible as an open tunnel between the two green junction markers"
+        }
+      ]
+    },
+    "J2": {
+      "name": "Western Corridor Fork",
+      "exits": [
+        {
+          "to": "7",
+          "connection_type": "open",
+          "notes": "J2 (Western Corridor Fork) sits at the western end of the corridor containing 7. The corridor runs openly from 7 westward to J2 with no intervening walls or doors."
+        },
+        {
+          "to": "J1",
+          "connection_type": "open",
+          "notes": "A corridor/passage connects J1 northward to junction J2 (Western Corridor Fork), visible as an open tunnel between the two green junction markers"
+        }
+      ]
+    },
+    "J3": {
+      "name": "Trapped Fork",
+      "exits": []
+    },
+    "R1": {
+      "name": "North-West River Crossing",
+      "exits": [
+        {
+          "to": "11",
+          "connection_type": "river_crossing",
+          "notes": "Location 11 sits on the north bank of the river near the R1 river waypoint. The river passes adjacent to 11, allowing water-based access between them."
+        },
+        {
+          "to": "12",
+          "connection_type": "river_crossing",
+          "notes": "The river passes near location 12 on its western side. R1 sits at the river bend to the northwest, and the river bank appears accessible from 12's position, allowing a water crossing."
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "R2 is the next river waypoint downstream (east) along the same river channel. The river flows continuously from R1 to R2 with no obstruction."
+        }
+      ]
+    },
+    "R2": {
+      "name": "North River Crossing",
+      "exits": [
+        {
+          "to": "13",
+          "connection_type": "river_crossing",
+          "notes": "The river passes through or directly adjacent to room 13, and R2 (North River Crossing) is a river waypoint at this location allowing water crossing"
+        },
+        {
+          "to": "14",
+          "connection_type": "river_crossing",
+          "notes": "The river runs along the south/east side of room 14, and R2 (North River Crossing) is positioned at the river adjacent to room 14, providing a water crossing point"
+        },
+        {
+          "to": "R1",
+          "connection_type": "river_crossing",
+          "notes": "R2 is the next river waypoint downstream (east) along the same river channel. The river flows continuously from R1 to R2 with no obstruction."
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "R3 is the next river waypoint downstream (to the east). The river visibly flows continuously between R2 and R3 with no obstruction."
+        }
+      ]
+    },
+    "R3": {
+      "name": "North River Passage",
+      "exits": [
+        {
+          "to": "14",
+          "connection_type": "river_crossing",
+          "notes": "R3 (North River Passage) is a red waypoint on the river near the east side of room 14, providing a river crossing connection"
+        },
+        {
+          "to": "15",
+          "connection_type": "river_crossing",
+          "notes": "R3 (North River Passage) is a red circle just south/southwest of room 15. The river flows directly adjacent to room 15, and R3 marks the river waypoint at that bank, providing a water crossing connection"
+        },
+        {
+          "to": "R2",
+          "connection_type": "river_crossing",
+          "notes": "R3 is the next river waypoint downstream (to the east). The river visibly flows continuously between R2 and R3 with no obstruction."
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "R4 is downstream (south-east) of R3 along the same river channel. The river flows continuously from R3 to R4."
+        }
+      ]
+    },
+    "R4": {
+      "name": "East River Crossing",
+      "exits": [
+        {
+          "to": "5",
+          "connection_type": "river_crossing",
+          "notes": "The river runs along the eastern edge of room 5, and R4 (East River Crossing) is positioned at the water adjacent to room 5, providing a river crossing connection"
+        },
+        {
+          "to": "8E",
+          "connection_type": "river_crossing",
+          "notes": "The river runs along the eastern side of the dungeon adjacent to 8E. R4 (East River Crossing) sits in the river directly next to 8E, indicating a river crossing connection from the burial platform to the water."
+        },
+        {
+          "to": "8W",
+          "connection_type": "river_crossing",
+          "notes": "R4 (East River Crossing) is positioned in the river directly adjacent to 8W. The River Ledge borders the water at this point, making R4 the river waypoint for crossing from 8W across the water."
+        },
+        {
+          "to": "R3",
+          "connection_type": "river_crossing",
+          "notes": "R4 is downstream (south-east) of R3 along the same river channel. The river flows continuously from R3 to R4."
+        },
+        {
+          "to": "R5",
+          "connection_type": "river_crossing",
+          "notes": "R5 (River exit at cliff) is the next river waypoint downstream/south from R4. The river channel flows continuously from R4 southward to R5."
+        }
+      ]
+    },
+    "R5": {
+      "name": "River exit at cliff",
+      "exits": [
+        {
+          "to": "1",
+          "connection_type": "river_crossing",
+          "notes": "R5 (River exit at cliff) is the red waypoint near location 1 at the bottom of the map. The river flows past the entry landing area, and R5 marks the river exit point at the cliff face adjacent to the main entry. Water access is visible connecting these two locations."
+        },
+        {
+          "to": "R4",
+          "connection_type": "river_crossing",
+          "notes": "R5 (River exit at cliff) is the next river waypoint downstream/south from R4. The river channel flows continuously from R4 southward to R5."
+        }
+      ]
+    }
+  },
+  "observations": "Per-room queries aggregated with unanimous voting."
+}

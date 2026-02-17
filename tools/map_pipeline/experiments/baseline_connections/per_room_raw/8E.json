@@ -1,0 +1,59 @@
+{
+  "target": "8E",
+  "connections": [
+    {
+      "to": "8W",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "8W and 8E are split parts of the same room (room 8). They appear to share an open connection within the larger room area, with 8W on the western/river side and 8E on the eastern platform side."
+    },
+    {
+      "to": "R4",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "The river runs along the eastern side of the dungeon adjacent to 8E. R4 (East River Crossing) sits in the river directly next to 8E, indicating a river crossing connection from the burial platform to the water."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "13",
+      "reason": "The Riven Hall (13) is located well to the west/northwest of 8E with intervening walls and corridors. No direct passage visible between them."
+    },
+    {
+      "to": "15",
+      "reason": "Penultimate Crypt (15) is in the far northeast of the map, separated from 8E by solid walls and the river. No visible passage connects them."
+    },
+    {
+      "to": "4",
+      "reason": "Great Northern Hall (4) is a large room south of 8E's general area but separated by walls. No visible doorway or passage connects 4 directly to 8E."
+    },
+    {
+      "to": "4A",
+      "reason": "Great Bronze Doors (4A) is located centrally, well west of 8E, with intervening walls and rooms. No direct connection visible."
+    },
+    {
+      "to": "5",
+      "reason": "Collapsed Burial Chamber (5) is south of 8E but separated by solid walls. No visible opening or passage connects them directly."
+    },
+    {
+      "to": "6",
+      "reason": "Sealed Eastern Door (6) is south/southeast of 8E but separated by walls. No visible direct passage between them."
+    },
+    {
+      "to": "R1",
+      "reason": "North-West River Crossing (R1) is far to the northwest along the river, well upstream from 8E with no direct river or passage connection."
+    },
+    {
+      "to": "R2",
+      "reason": "North River Crossing (R2) is in the northern part of the map along the river, not directly adjacent to 8E."
+    },
+    {
+      "to": "R3",
+      "reason": "North River Passage (R3) is in the northeast but upstream along the river from 8E, not directly adjacent."
+    },
+    {
+      "to": "R5",
+      "reason": "River exit at cliff (R5) is at the far south of the map where the river exits. While the river flows from R4 area southward, R5 is not directly adjacent to 8E."
+    }
+  ]
+}

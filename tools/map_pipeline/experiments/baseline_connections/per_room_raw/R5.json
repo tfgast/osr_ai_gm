@@ -1,0 +1,63 @@
+{
+  "target": "R5",
+  "connections": [
+    {
+      "to": "R4",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "The river visibly flows from R4 downstream to R5. R4 is the next river waypoint upstream, and the water channel is continuous between them."
+    },
+    {
+      "to": "1",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 1 (Main Entry Landing) is located right next to R5 at the bottom of the map near the star symbol. The landing appears to be on the riverbank at the cliff exit point, with the room opening onto the river area at R5."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "3C",
+      "reason": "Located far to the north in the dungeon interior, separated from R5 by multiple walls and rooms with no visible passage."
+    },
+    {
+      "to": "4",
+      "reason": "Located in the central-north area of the dungeon, separated from R5 by extensive walls and corridors with no direct connection."
+    },
+    {
+      "to": "4A",
+      "reason": "Located in the northern interior near the bronze doors, far from R5 with no visible passage connecting them."
+    },
+    {
+      "to": "5",
+      "reason": "Located in the central-east area of the dungeon, separated from R5 by walls and other rooms with no direct passage."
+    },
+    {
+      "to": "6",
+      "reason": "Located in the central-east area behind a sealed door, far from R5 with no visible connection."
+    },
+    {
+      "to": "8E",
+      "reason": "Located on the east side of the dungeon near the river but upstream and separated from R5 by walls and distance with no direct passage."
+    },
+    {
+      "to": "8W",
+      "reason": "Located on the east side of the dungeon, separated from R5 by walls and significant distance with no direct connection."
+    },
+    {
+      "to": "J1",
+      "reason": "Junction located in the interior tunnel system, separated from R5 by walls and corridors with no direct passage."
+    },
+    {
+      "to": "R1",
+      "reason": "River waypoint located far to the north-west, multiple river segments upstream from R5 with no direct connection."
+    },
+    {
+      "to": "R2",
+      "reason": "River waypoint located in the northern area, not directly adjacent to R5 along the river path."
+    },
+    {
+      "to": "R3",
+      "reason": "River waypoint located in the north-east area, not directly adjacent to R5 along the river path."
+    }
+  ]
+}

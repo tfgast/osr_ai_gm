@@ -1,0 +1,61 @@
+{
+  "target": "8W",
+  "connections": [
+    {
+      "to": "8E",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "8W and 8E are both splits of room 8. They share an open interior space \u2014 the River Ledge area connects to the Burial Platform area within the same larger room with no wall separating them."
+    },
+    {
+      "to": "R4",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R4 (East River Crossing) is positioned in the river directly adjacent to 8W. The River Ledge borders the water at this point, making R4 the river waypoint for crossing from 8W across the water."
+    },
+    {
+      "to": "R5",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "The river flows south past 8W's ledge area and continues down toward R5 at the cliff exit. The river channel connects these two points as a water route flowing downstream from the ledge."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "13",
+      "reason": "The Riven Hall (13) is located in the central-west area of the map, separated from 8W by multiple rooms and walls with no direct passage visible between them."
+    },
+    {
+      "to": "14",
+      "reason": "The Far Side (14) is in the upper portion of the map, far from 8W with no direct passage or doorway connecting them."
+    },
+    {
+      "to": "4",
+      "reason": "Great Northern Hall (4) is in the central area of the map, separated from 8W by walls and intervening rooms with no visible direct connection."
+    },
+    {
+      "to": "4A",
+      "reason": "Great Bronze Doors (4A) is in the upper-central area, well separated from 8W with solid walls and other rooms between them."
+    },
+    {
+      "to": "5",
+      "reason": "Collapsed Burial Chamber (5) is in the central area, separated from 8W by walls with no visible passage connecting them directly."
+    },
+    {
+      "to": "6",
+      "reason": "Sealed Eastern Door (6) is in the central-east area but separated from 8W by walls with no visible opening or passage between them."
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is in the upper-left portion of the map, far upstream on the river with no direct connection to 8W \u2014 intervening rooms and river bends separate them."
+    },
+    {
+      "to": "R2",
+      "reason": "R2 (North River Crossing) is in the upper-central river area, not directly connected to 8W \u2014 separated by significant distance along the river and intervening structures."
+    },
+    {
+      "to": "R3",
+      "reason": "R3 (North River Passage) is in the upper-right area of the map, upstream from 8W with intervening river bends and structures between them \u2014 no direct connection."
+    }
+  ]
+}

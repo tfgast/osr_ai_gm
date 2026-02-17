@@ -1,0 +1,65 @@
+{
+  "target": "R2",
+  "connections": [
+    {
+      "to": "12",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R2 sits on the river between rooms. Room 12 (Hanging South Alcove) is on the south bank of the river at this crossing point, with the river providing a water connection between them."
+    },
+    {
+      "to": "13",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "Room 13 (The Riven Hall) is near the south bank of the river close to R2. The river runs along or through the area near room 13, providing a water crossing connection."
+    },
+    {
+      "to": "14",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "Room 14 (The Far Side) is on the north bank of the river near R2. The river crossing at R2 connects to the far side of the river where room 14 sits."
+    },
+    {
+      "to": "R1",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R1 is the next river waypoint upstream (to the west/northwest). The river visibly flows continuously between R1 and R2 with no obstruction."
+    },
+    {
+      "to": "R3",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R3 is the next river waypoint downstream (to the east). The river visibly flows continuously between R2 and R3 with no obstruction."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "11",
+      "reason": "Room 11 (Hanging North Alcove) is on the north side of the river near R1 but not at the R2 crossing point. There is no direct passage or river crossing from R2 to room 11; it connects via R1 instead."
+    },
+    {
+      "to": "15",
+      "reason": "Room 15 (Penultimate Crypt) is further east along the north side of the map, separated from R2 by walls and distance. No visible passage or river crossing connects them directly."
+    },
+    {
+      "to": "4A",
+      "reason": "Room 4A (Great Bronze Doors) is well south of R2, deep in the dungeon interior. Solid walls and multiple rooms separate them with no direct connection visible."
+    },
+    {
+      "to": "6",
+      "reason": "Room 6 (Sealed Eastern Door) is south of the river area, separated from R2 by walls. No visible passage or doorway connects them directly."
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 (Western Corridor) is southwest of R2, separated by walls and other rooms. No direct passage connects them."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 (East River Crossing) is significantly further downstream/east on the river. R3 lies between R2 and R4, so there is no direct connection; the river path goes R2 -> R3 -> R4."
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is far south at the bottom of the map. Multiple river waypoints lie between R2 and R5 with no direct connection."
+    }
+  ]
+}

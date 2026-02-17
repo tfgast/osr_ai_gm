@@ -1,0 +1,61 @@
+{
+  "target": "15",
+  "connections": [
+    {
+      "to": "14",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 14 (The Far Side) is directly west of room 15, and there is a visible open passage connecting them through the corridor complex in the upper portion of the map"
+    },
+    {
+      "to": "R3",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R3 (North River Passage) is a red circle just south/southwest of room 15. The river flows directly adjacent to room 15, and R3 marks the river waypoint at that bank, providing a water crossing connection"
+    },
+    {
+      "to": "R4",
+      "connection_type": "river_crossing",
+      "confidence": "medium",
+      "notes": "R4 (East River Crossing) is a red circle to the east/southeast of room 15. The river curves around this area and R4 sits at a point where the river bank meets the room complex near 15"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "11",
+      "reason": "Room 11 (Hanging North Alcove) is in the upper-left area of the map, separated from room 15 by multiple rooms and corridors with no direct passage between them"
+    },
+    {
+      "to": "12",
+      "reason": "Room 12 (Hanging South Alcove) is in the central-upper area, separated from room 15 by walls and intervening rooms with no direct connection visible"
+    },
+    {
+      "to": "13",
+      "reason": "Room 13 (The Riven Hall) is in the central area below the river, separated from room 15 by the river and walls with no direct passage"
+    },
+    {
+      "to": "4A",
+      "reason": "Room 4A (Great Bronze Doors) is in the central corridor area, far from room 15 with multiple intervening rooms and no direct passage"
+    },
+    {
+      "to": "6",
+      "reason": "Room 6 (Sealed Eastern Door) is in the central-east area, separated from room 15 by corridors and rooms with no direct connection"
+    },
+    {
+      "to": "8W",
+      "reason": "Room 8W (River Ledge) is an orange circle in the east-central area, separated from room 15 by the river and intervening structures with no direct passage"
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is in the upper-left area near the river's entry point, too far from room 15 with no direct river or passage connection"
+    },
+    {
+      "to": "R2",
+      "reason": "R2 (North River Crossing) is in the upper-central area along the river, not directly adjacent to room 15's banks"
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is at the bottom of the map where the river exits, far from room 15 with no direct connection"
+    }
+  ]
+}

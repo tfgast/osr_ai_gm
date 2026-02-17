@@ -1,0 +1,53 @@
+{
+  "target": "3C",
+  "connections": [
+    {
+      "to": "3A",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "3A and 3C are adjacent parts of the same junction area, connected by a visible open archway passage"
+    },
+    {
+      "to": "3B",
+      "connection_type": "stairs",
+      "confidence": "high",
+      "notes": "3B and 3C are connected via the stairwell - parallel lines indicating stairs are visible between them"
+    },
+    {
+      "to": "J1",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "J1 (Burial Tunnel Branch) sits at a junction point with a visible open passage leading to 3C"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "2",
+      "reason": "Room 2 is further south/southwest in the burial tunnels area; no direct passage to 3C visible, would need to go through J1 or other intermediate points"
+    },
+    {
+      "to": "4",
+      "reason": "Room 4 (Great Northern Hall) is to the east separated by solid walls with no visible opening to 3C"
+    },
+    {
+      "to": "4A",
+      "reason": "Room 4A (Great Bronze Doors) is further east with no direct passage to 3C; walls intervene"
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 (Western Corridor) is to the north with no direct visible passage to 3C; separated by walls and intermediate spaces"
+    },
+    {
+      "to": "9",
+      "reason": "Room 9 (Northern Corridor) is well to the north with solid walls and other rooms between it and 3C"
+    },
+    {
+      "to": "J2",
+      "reason": "J2 (Western Corridor Fork) is to the north with no direct passage to 3C visible"
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is to the east/northeast with walls separating it from 3C, no visible direct connection"
+    }
+  ]
+}

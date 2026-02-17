@@ -1,0 +1,63 @@
+{
+  "target": "1",
+  "connections": [
+    {
+      "to": "3A",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Location 1 (Main Entry Landing) at the bottom of the map connects northward via an open passage/corridor leading up to 3A (South Junction Archway). A clear corridor runs from the entry landing upward to this archway junction."
+    },
+    {
+      "to": "R5",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "R5 (River exit at cliff) is the red waypoint near location 1 at the bottom of the map. The river flows past the entry landing area, and R5 marks the river exit point at the cliff face adjacent to the main entry. Water access is visible connecting these two locations."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "3C",
+      "reason": "3C (Arched Stairwell Junction) is located further north and west in the dungeon, separated from location 1 by multiple rooms and corridors. No direct passage exists between them."
+    },
+    {
+      "to": "4",
+      "reason": "4 (Great Northern Hall) is located in the central part of the dungeon, well north of location 1, separated by intermediate rooms and corridors. No direct connection visible."
+    },
+    {
+      "to": "4A",
+      "reason": "4A (Great Bronze Doors) is in the central-north area of the dungeon, separated from location 1 by multiple intervening spaces. No direct passage."
+    },
+    {
+      "to": "5",
+      "reason": "5 (Collapsed Burial Chamber) is in the eastern-central area of the map, separated from location 1 by walls and intervening rooms. No direct connection."
+    },
+    {
+      "to": "6",
+      "reason": "6 (Sealed Eastern Door) is in the west-central area of the dungeon, far from location 1 with no direct passage between them."
+    },
+    {
+      "to": "8W",
+      "reason": "8W (River Ledge) is on the east side of the map, separated from location 1 by significant distance and intervening structures. No direct connection."
+    },
+    {
+      "to": "J1",
+      "reason": "J1 (Burial Tunnel Branch) is in the western portion of the dungeon, far from the main entry with no direct passage to location 1."
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is in the upper-left area of the map, far upstream from location 1. No direct river or passage connection."
+    },
+    {
+      "to": "R2",
+      "reason": "R2 (North River Crossing) is in the upper-central area near the river's northern section, not directly connected to location 1."
+    },
+    {
+      "to": "R3",
+      "reason": "R3 (North River Passage) is in the upper-right area of the map, far from the main entry. No direct connection."
+    },
+    {
+      "to": "R4",
+      "reason": "R4 (East River Crossing) is on the east side of the map, separated from location 1 by intervening structures and distance. No direct connection."
+    }
+  ]
+}

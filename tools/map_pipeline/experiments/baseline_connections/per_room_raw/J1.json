@@ -1,0 +1,53 @@
+{
+  "target": "J1",
+  "connections": [
+    {
+      "to": "2",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "A tunnel passage leads south/southwest from J1 directly into room 2 (Western Burial Tunnels) through the winding cave system"
+    },
+    {
+      "to": "3A",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "A passage leads from J1 eastward/northeastward into room 3A (South Junction Archway), visible as an open tunnel connection"
+    },
+    {
+      "to": "J2",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "A corridor/passage connects J1 northward to junction J2 (Western Corridor Fork), visible as an open tunnel between the two green junction markers"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "3B",
+      "reason": "3B is in the arched stairwell area further north, separated from J1 by intervening rooms and walls with no direct passage visible"
+    },
+    {
+      "to": "3C",
+      "reason": "3C is in the arched stairwell area, not directly connected to J1; would need to pass through other rooms to reach it"
+    },
+    {
+      "to": "4",
+      "reason": "The Great Northern Hall is well north of J1 with multiple walls and rooms intervening, no direct passage visible"
+    },
+    {
+      "to": "4A",
+      "reason": "Great Bronze Doors area is far from J1 with no visible direct passage or connection"
+    },
+    {
+      "to": "7",
+      "reason": "Western Corridor is separated from J1 by walls and other rooms; no direct passage visible between them"
+    },
+    {
+      "to": "9",
+      "reason": "Northern Corridor is far north of J1 with multiple intervening structures and no direct connection"
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is not directly connected to J1; walls and intervening passages separate them with no visible direct opening"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "target": "2",
+  "connections": [
+    {
+      "to": "J1",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "J1 (Burial Tunnel Branch) sits along the tunnel passage that leads into room 2. A clear open tunnel passage connects them with no door or obstruction visible."
+    },
+    {
+      "to": "J3",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "J3 appears to connect to location 2 through the western tunnel system. An open passage/tunnel runs between them through the winding burial tunnels area."
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "1",
+      "reason": "Location 1 is at the bottom of the map. While both are in the southern portion, solid rock and walls separate them with no visible direct passage between 2 and 1."
+    },
+    {
+      "to": "3A",
+      "reason": "3A is to the northeast of 2 with solid walls and intervening rooms/corridors between them. No direct passage visible."
+    },
+    {
+      "to": "3B",
+      "reason": "3B is far to the northeast. Multiple walls and rooms separate it from 2 with no direct connection."
+    },
+    {
+      "to": "3C",
+      "reason": "3C is in the northeast area, separated from 2 by multiple intervening spaces and walls."
+    },
+    {
+      "to": "4",
+      "reason": "4 is the large hall to the east, separated from 2 by solid walls and intervening corridors."
+    },
+    {
+      "to": "7",
+      "reason": "7 is north of 2 but separated by walls. No visible direct opening connects them."
+    },
+    {
+      "to": "9",
+      "reason": "9 is to the north, separated by walls and other rooms. No direct passage visible between 2 and 9."
+    },
+    {
+      "to": "J2",
+      "reason": "J2 is located further north/northeast from 2 with walls between them. No direct passage connects them."
+    }
+  ]
+}

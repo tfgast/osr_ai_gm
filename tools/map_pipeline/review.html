@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Map Pipeline Review</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #1a1a1a; color: #ccc; display: flex; height: 100vh; }
+  #sidebar {
+    width: 340px; min-width: 340px; padding: 12px; overflow-y: auto;
+    background: #222; border-right: 1px solid #444;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #sidebar h2 { color: #fff; font-size: 14px; margin-bottom: 4px; }
+  #sidebar label { font-size: 12px; color: #aaa; }
+  #sidebar input[type=file] { font-size: 11px; margin-bottom: 4px; }
+  #canvas-wrap { flex: 1; overflow: auto; position: relative; cursor: crosshair; }
+  canvas { display: block; }
+  .item {
+    padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;
+    border: 1px solid transparent; display: flex; justify-content: space-between;
+    align-items: center; gap: 4px;
+  }
+  .item:hover { border-color: #666; }
+  .item.selected { border-color: #fff; background: #333; }
+  .item .id { font-weight: bold; min-width: 30px; }
+  .item .coords { color: #888; font-size: 10px; }
+  .item .name { color: #aaa; flex: 1; margin: 0 4px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .item .del-btn { color: #888; cursor: pointer; font-size: 14px; padding: 0 2px; }
+  .item .del-btn:hover { color: #f55; }
+  .loc-item { border-left: 3px solid; }
+  .sym-item { border-left: 3px solid; }
+  .conn-item { border-left: 3px solid; }
+  .section { margin-top: 8px; }
+  .section-header {
+    font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px;
+    padding-bottom: 4px; border-bottom: 1px solid #333; margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .section-header .count { font-size: 10px; }
+  #editPanel {
+    display: none; background: #2a2a2a; border: 1px solid #555; border-radius: 4px;
+    padding: 8px; font-size: 11px;
+  }
+  #editPanel.visible { display: flex; flex-direction: column; gap: 6px; }
+  #editPanel label { color: #aaa; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  #editPanel input, #editPanel select, #editPanel textarea {
+    font-family: monospace; font-size: 12px; background: #333; color: #eee;
+    border: 1px solid #555; border-radius: 3px; padding: 4px 6px; width: 100%;
+  }
+  #editPanel textarea { resize: vertical; min-height: 36px; }
+  #editPanel input:focus, #editPanel select:focus, #editPanel textarea:focus {
+    outline: none; border-color: #3b82f6;
+  }
+  .edit-row { display: flex; gap: 6px; align-items: end; }
+  .edit-row > div { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 2px; }
+  button {
+    padding: 6px 12px; font-family: monospace; font-size: 12px; cursor: pointer;
+    border: 1px solid #555; border-radius: 4px; background: #333; color: #ccc;
+  }
+  button:hover { background: #444; border-color: #888; }
+  button.primary { background: #2563eb; color: #fff; border-color: #3b82f6; }
+  button.primary:hover { background: #1d4ed8; }
+  button.danger { background: #7f1d1d; color: #fca5a5; border-color: #991b1b; }
+  button.danger:hover { background: #991b1b; }
+  #controls { display: flex; gap: 6px; flex-wrap: wrap; }
+  #status { font-size: 11px; color: #888; padding: 4px 0; min-height: 2.5em; }
+  .toggle-row { display: flex; gap: 8px; align-items: center; font-size: 11px; flex-wrap: wrap; }
+  .toggle-row input { margin: 0; }
+  select { font-family: monospace; font-size: 11px; background: #333; color: #ccc;
+    border: 1px solid #555; border-radius: 3px; padding: 2px 4px; }
+  #connTypeSelect { display: none; margin-top: 4px; }
+  #connTypeSelect.visible { display: flex; gap: 6px; align-items: center; }
+  .add-conn-hint { font-size: 10px; color: #666; font-style: italic; margin-top: 2px; }
+
+  /* Pipeline mode styles */
+  .pipeline-hidden { display: none !important; }
+  #pipelinePanel {
+    border: 1px solid #444; border-radius: 4px; padding: 8px;
+    background: #1e1e1e; font-size: 11px;
+  }
+  #pipelinePanel h3 { color: #3b82f6; font-size: 13px; margin-bottom: 8px; letter-spacing: 1px; }
+  .pipe-step {
+    display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+    border-radius: 3px; margin-bottom: 2px;
+  }
+  .pipe-step.active { background: #1e3a5f; }
+  .pipe-step .icon { font-size: 14px; min-width: 18px; text-align: center; }
+  .pipe-step .step-name { flex: 1; }
+  .pipe-step .step-status { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .pipe-step .step-status.approved { color: #4ade80; }
+  .pipe-step .step-status.review { color: #fbbf24; }
+  .pipe-step .step-status.running { color: #60a5fa; }
+  .pipe-step .step-status.pending { color: #666; }
+  .pipe-step .step-status.error { color: #f87171; }
+  .pipe-step .step-status.unavailable { color: #444; }
+  .pipe-actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #pipelineLog {
+    margin-top: 8px; max-height: 200px; overflow-y: auto;
+    background: #111; border: 1px solid #333; border-radius: 3px;
+    padding: 6px; font-size: 10px; white-space: pre-wrap; color: #aaa;
+    display: none;
+  }
+  #pipelineLog.visible { display: block; }
+  .pipe-config { margin-top: 8px; border-top: 1px solid #333; padding-top: 8px; }
+  .pipe-config summary { cursor: pointer; color: #888; font-size: 11px; }
+  .pipe-config select { margin-top: 4px; }
+  .pipe-config .model-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+  .pipe-config .model-row label { min-width: 80px; color: #888; font-size: 10px; }
+  #step4ReviewPanel {
+    display: none; max-height: 400px; overflow-y: auto;
+    border: 1px solid #444; border-radius: 4px; padding: 8px; background: #1e1e1e;
+  }
+  #step4ReviewPanel.visible { display: block; }
+  .desc-item { border-bottom: 1px solid #333; padding: 6px 0; }
+  .desc-item:last-child { border-bottom: none; }
+  .desc-item .desc-label { font-weight: bold; color: #3b82f6; }
+  .desc-item .desc-name { color: #ccc; margin-left: 8px; }
+  .desc-item .desc-text { color: #999; font-size: 10px; margin-top: 2px; }
+  .pipe-complete {
+    text-align: center; padding: 12px; background: #064e3b; border-radius: 4px;
+    color: #4ade80; font-size: 14px; margin-top: 8px;
+  }
+  #step3DebugPanel {
+    display: none; border: 1px solid #444; border-radius: 4px;
+    padding: 8px; background: #1e1e1e;
+  }
+  #step3DebugPanel.visible { display: block; }
+  #step3DebugPanel h3 {
+    color: #3b82f6; font-size: 13px; margin-bottom: 8px;
+    cursor: pointer; user-select: none;
+  }
+  .debug-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .debug-thumbs img {
+    max-width: 148px; border: 1px solid #555; border-radius: 3px;
+    cursor: pointer;
+  }
+  .debug-thumbs img:hover { border-color: #3b82f6; }
+  .step3-params { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 11px; }
+  .step3-params label { color: #aaa; }
+  .step3-params .param-row { display: flex; align-items: center; gap: 8px; }
+  .step3-params .param-row input[type=range] { flex: 1; }
+  .step3-params .param-row .val { min-width: 28px; text-align: right; color: #eee; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Map Pipeline Review</h2>
+
+  <div id="pipelinePanel" style="display:none;">
+    <h3>MAP EXTRACTION PIPELINE</h3>
+    <div id="pipelineSteps"></div>
+    <div class="pipe-actions" id="pipelineActions"></div>
+    <div id="pipelineLog"></div>
+    <details class="pipe-config">
+      <summary>Configuration</summary>
+      <div class="model-row">
+        <label>Default model:</label>
+        <select id="defaultModel" onchange="saveConfig()"></select>
+      </div>
+      <div id="perStepModels"></div>
+    </details>
+  </div>
+
+  <div id="step3DebugPanel">
+    <h3>Debug Images</h3>
+    <div class="debug-thumbs"></div>
+  </div>
+
+  <div id="step4ReviewPanel"></div>
+
+  <label id="imageInputLabel">Map Image</label>
+  <input type="file" id="imageInput" accept="image/*">
+
+  <label id="jsonInputLabel">Locations JSON (step 1/2 output)</label>
+  <input type="file" id="jsonInput" accept=".json">
+
+  <label id="connInputLabel">Connections JSON (step 3 output, optional)</label>
+  <input type="file" id="connInput" accept=".json">
+
+  <div id="controls">
+    <button class="primary" onclick="exportLocations()">Export Locations</button>
+    <button class="primary" onclick="exportConnections()">Export Connections</button>
+    <button onclick="resetScale()">Fit to View</button>
+    <button id="addLocBtn" onclick="enterAddMode('loc')">+ Location</button>
+    <button id="addSymBtn" onclick="enterAddMode('sym')">+ Symbol</button>
+  </div>
+
+  <div class="toggle-row">
+    <input type="checkbox" id="showLocs" checked onchange="draw()"><label for="showLocs">Locations</label>
+    <input type="checkbox" id="showSyms" checked onchange="draw()"><label for="showSyms">Symbols</label>
+    <input type="checkbox" id="showConns" checked onchange="draw()"><label for="showConns">Connections</label>
+  </div>
+
+  <div id="connTypeSelect">
+    <label>Type:</label>
+    <select id="connType" onchange="changeConnType()">
+      <option value="door">door</option>
+      <option value="open">open</option>
+      <option value="stairs">stairs</option>
+      <option value="secret">secret</option>
+      <option value="river_crossing">river_crossing</option>
+      <option value="pit">pit</option>
+    </select>
+    <button class="danger" onclick="deleteSelectedConn()">Delete</button>
+  </div>
+
+  <div id="status">Load a map image and JSON file to begin.</div>
+  <div class="add-conn-hint">Shift+click two locations to add a connection</div>
+
+  <div id="editPanel">
+    <div class="edit-row">
+      <div><label>Label</label><input id="editLabel" placeholder="e.g. 3A"></div>
+      <div><label>Type</label><select id="editType">
+        <option value="room">room</option>
+        <option value="junction">junction</option>
+        <option value="river_waypoint">river_waypoint</option>
+        <option value="room_split">room_split</option>
+        <option value="trap">trap</option>
+        <option value="pit_trap">pit_trap</option>
+        <option value="secret_door">secret_door</option>
+        <option value="stairs">stairs</option>
+        <option value="door">door</option>
+      </select></div>
+    </div>
+    <div><label>Name</label><input id="editName" placeholder="Room name or description"></div>
+    <div><label>Notes</label><textarea id="editNotes" rows="2" placeholder="Optional notes"></textarea></div>
+    <div class="edit-actions">
+      <button onclick="applyEdit()">Apply</button>
+      <button class="danger" onclick="deleteSelected()">Delete</button>
+    </div>
+  </div>
+
+  <div id="itemList"></div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+const LOC_COLORS = {
+  room: [30, 100, 255], junction: [0, 200, 50],
+  river_waypoint: [220, 30, 30], room_split: [255, 140, 0],
+};
+const SYM_COLORS = {
+  trap: [255, 50, 50], pit_trap: [200, 0, 0],
+  secret_door: [255, 200, 0], stairs: [0, 200, 200], door: [180, 180, 180],
+};
+const CONN_COLORS = {
+  door: [180, 180, 180], open: [255, 255, 255], stairs: [0, 200, 200],
+  secret: [255, 200, 0], river_crossing: [60, 140, 255], pit: [255, 80, 80],
+};
+const CONN_DASH = {
+  door: [], open: [], stairs: [8, 4], secret: [4, 4],
+  river_crossing: [12, 4], pit: [4, 8],
+};
+const DEFAULT_COLOR = [150, 50, 200];
+const R_LOC = 18, R_SYM = 10;
+
+let canvas, ctx, img = null, data = null, connData = null;
+let sx = 1, sy = 1;
+let zoom = 1, panX = 0, panY = 0;
+let dragging = null, dragOffX = 0, dragOffY = 0;
+let selected = null;
+let isPanning = false, panStartX = 0, panStartY = 0, panStartPanX = 0, panStartPanY = 0;
+let addConnFrom = null; // first location for shift-click add connection
+let addMode = null; // 'loc' or 'sym' when in add mode
+
+window.onload = () => {
+  canvas = document.getElementById('canvas');
+  ctx = canvas.getContext('2d');
+
+  document.getElementById('imageInput').onchange = loadImage;
+  document.getElementById('jsonInput').onchange = loadJSON;
+  document.getElementById('connInput').onchange = loadConnections;
+
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
+  window.addEventListener('keydown', onKey);
+  window.addEventListener('resize', () => { if (img) fitToView(); });
+
+  initPipeline();
+};
+
+function loadImage(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    img = new Image();
+    img.onload = () => { fitToView(); updateStatus(); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadJSON(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    data = JSON.parse(ev.target.result);
+    computeScale();
+    buildItemList();
+    updateStatus();
+    draw();
+  };
+  reader.readAsText(file);
+}
+
+function loadConnections(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    connData = JSON.parse(ev.target.result);
+    buildItemList();
+    updateStatus();
+    draw();
+  };
+  reader.readAsText(file);
+}
+
+function computeScale() {
+  if (!data || !img) { sx = 1; sy = 1; return; }
+  const dims = (data.map_features || {}).dimensions || {};
+  const rw = dims.width || img.width;
+  const rh = dims.height || img.height;
+  sx = img.width / rw;
+  sy = img.height / rh;
+}
+
+function fitToView() {
+  const wrap = document.getElementById('canvas-wrap');
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  if (!img) return;
+  zoom = Math.min(ww / img.width, wh / img.height, 1);
+  canvas.width = ww; canvas.height = wh;
+  panX = (ww - img.width * zoom) / 2;
+  panY = (wh - img.height * zoom) / 2;
+  draw();
+}
+
+function resetScale() { if (img) fitToView(); }
+
+function toCanvas(px, py) { return [px * zoom + panX, py * zoom + panY]; }
+function fromCanvas(cx, cy) { return [(cx - panX) / zoom, (cy - panY) / zoom]; }
+function toImg(px, py) { return [px * sx, py * sy]; }
+function fromImg(ix, iy) { return [ix / sx, iy / sy]; }
+
+// Get image-space position for a location ID
+function locPos(id) {
+  const loc = (data?.locations || {})[id];
+  if (!loc || loc.pixel_x == null) return null;
+  return toImg(loc.pixel_x, loc.pixel_y);
+}
+
+// --- Drawing ---
+
+function draw() {
+  if (!canvas.width) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(zoom, zoom);
+
+  if (img) ctx.drawImage(img, 0, 0);
+
+  if (data) {
+    const showLocs = document.getElementById('showLocs').checked;
+    const showSyms = document.getElementById('showSyms').checked;
+    const showConns = document.getElementById('showConns').checked;
+
+    // Draw connections first (behind markers)
+    if (showConns && connData) {
+      drawConnections();
+    }
+
+    if (showLocs) {
+      for (const [id, loc] of Object.entries(data.locations || {})) {
+        if (loc.pixel_x == null || loc.pixel_y == null) continue;
+        const [ix, iy] = toImg(loc.pixel_x, loc.pixel_y);
+        const c = LOC_COLORS[loc.type] || DEFAULT_COLOR;
+        const isSel = selected && selected.kind === 'loc' && selected.id === id;
+        const isAddFrom = addConnFrom === id;
+        drawCircle(ix, iy, R_LOC, c, id, isSel || isAddFrom);
+      }
+    }
+
+    if (showSyms) {
+      const syms = data.symbols || [];
+      for (let i = 0; i < syms.length; i++) {
+        const sym = syms[i];
+        if (sym.pixel_x == null || sym.pixel_y == null) continue;
+        const [ix, iy] = toImg(sym.pixel_x, sym.pixel_y);
+        const c = SYM_COLORS[sym.type] || DEFAULT_COLOR;
+        const label = (sym.label || sym.type[0]).slice(0, 2);
+        const isSel = selected && selected.kind === 'sym' && selected.idx === i;
+        drawDiamond(ix, iy, R_SYM, c, label, isSel);
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawConnections() {
+  const rooms = connData.rooms || {};
+  const drawn = new Set(); // avoid drawing same edge twice
+
+  for (const [fromId, room] of Object.entries(rooms)) {
+    for (const exit of (room.exits || [])) {
+      const toId = exit.to;
+      const edgeKey = [fromId, toId].sort().join('|');
+      if (drawn.has(edgeKey)) continue;
+      drawn.add(edgeKey);
+
+      const p1 = locPos(fromId);
+      const p2 = locPos(toId);
+      if (!p1 || !p2) continue;
+
+      const ctype = exit.connection_type || 'open';
+      const color = CONN_COLORS[ctype] || [200, 200, 200];
+      const dash = CONN_DASH[ctype] || [];
+      const isSel = selected && selected.kind === 'conn' &&
+        selected.from === fromId && selected.to === toId;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash(dash);
+      ctx.lineWidth = isSel ? 4 : 2.5;
+      ctx.strokeStyle = isSel ? '#ff0' : `rgba(${color}, 0.8)`;
+
+      // Offset line slightly so it doesn't go through circle centers
+      const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+      const dist = Math.hypot(dx, dy);
+      if (dist < 1) { ctx.restore(); continue; }
+      const ux = dx / dist, uy = dy / dist;
+      const startX = p1[0] + ux * R_LOC, startY = p1[1] + uy * R_LOC;
+      const endX = p2[0] - ux * R_LOC, endY = p2[1] - uy * R_LOC;
+
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw connection type label at midpoint
+      const mx = (startX + endX) / 2, my = (startY + endY) / 2;
+      const shortType = ctype.replace('river_crossing', 'river').replace('secret', 'sec');
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+      // Background pill
+      const tb = ctx.measureText(shortType);
+      const pw = tb.width + 6, ph = 12;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(mx - pw/2, my - ph/2, pw, ph);
+      ctx.fillStyle = isSel ? '#ff0' : `rgb(${color})`;
+      ctx.fillText(shortType, mx, my);
+
+      ctx.restore();
+    }
+  }
+}
+
+function drawCircle(x, y, r, color, label, isSel) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = `rgb(${color})`;
+  ctx.fill();
+  ctx.lineWidth = isSel ? 3 : 2;
+  ctx.strokeStyle = isSel ? '#ff0' : '#fff';
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.font = (label.length > 2 ? '12' : '14') + 'px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y);
+}
+
+function drawDiamond(x, y, r, color, label, isSel) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - r); ctx.lineTo(x + r, y);
+  ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
+  ctx.closePath();
+  ctx.fillStyle = `rgb(${color})`;
+  ctx.fill();
+  ctx.lineWidth = isSel ? 3 : 2;
+  ctx.strokeStyle = isSel ? '#ff0' : '#fff';
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y);
+}
+
+// --- Hit testing ---
+
+function hitTestLoc(cx, cy) {
+  const [ix, iy] = fromCanvas(cx, cy);
+  for (const [id, loc] of Object.entries(data?.locations || {})) {
+    if (loc.pixel_x == null) continue;
+    const [lx, ly] = toImg(loc.pixel_x, loc.pixel_y);
+    if (Math.hypot(ix - lx, iy - ly) < R_LOC) return { kind: 'loc', id, obj: loc };
+  }
+  return null;
+}
+
+function hitTestSym(cx, cy) {
+  const [ix, iy] = fromCanvas(cx, cy);
+  const syms = data?.symbols || [];
+  for (let i = 0; i < syms.length; i++) {
+    const sym = syms[i];
+    if (sym.pixel_x == null) continue;
+    const [sx2, sy2] = toImg(sym.pixel_x, sym.pixel_y);
+    if (Math.hypot(ix - sx2, iy - sy2) < R_SYM) return { kind: 'sym', idx: i, obj: sym };
+  }
+  return null;
+}
+
+function hitTestConn(cx, cy) {
+  if (!connData) return null;
+  const [ix, iy] = fromCanvas(cx, cy);
+  const rooms = connData.rooms || {};
+  const checked = new Set();
+  let best = null, bestDist = 12; // max click distance in image pixels
+
+  for (const [fromId, room] of Object.entries(rooms)) {
+    for (const exit of (room.exits || [])) {
+      const toId = exit.to;
+      const edgeKey = [fromId, toId].sort().join('|');
+      if (checked.has(edgeKey)) continue;
+      checked.add(edgeKey);
+
+      const p1 = locPos(fromId);
+      const p2 = locPos(toId);
+      if (!p1 || !p2) continue;
+
+      const d = pointToSegDist(ix, iy, p1[0], p1[1], p2[0], p2[1]);
+      if (d < bestDist) {
+        bestDist = d;
+        best = { kind: 'conn', from: fromId, to: toId, exit, edgeKey };
+      }
+    }
+  }
+  return best;
+}
+
+function pointToSegDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+// --- Input handling ---
+
+function onMouseDown(e) {
+  if (!data) return;
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    isPanning = true;
+    panStartX = e.clientX; panStartY = e.clientY;
+    panStartPanX = panX; panStartPanY = panY;
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+
+  // Add mode: place new location or symbol
+  if (addMode) {
+    handleAddClick(cx, cy);
+    return;
+  }
+
+  // Shift+click: add connection mode
+  if (e.shiftKey) {
+    const locHit = hitTestLoc(cx, cy);
+    if (locHit) {
+      if (!addConnFrom) {
+        addConnFrom = locHit.id;
+        updateStatus();
+        draw();
+      } else if (addConnFrom !== locHit.id) {
+        addConnection(addConnFrom, locHit.id);
+        addConnFrom = null;
+        draw();
+      }
+    }
+    return;
+  }
+
+  // Normal click: check locations, symbols, then connections
+  addConnFrom = null;
+  const locHit = hitTestLoc(cx, cy);
+  if (locHit) {
+    dragging = locHit;
+    const [ix, iy] = toImg(locHit.obj.pixel_x, locHit.obj.pixel_y);
+    const [scx, scy] = toCanvas(ix, iy);
+    dragOffX = cx - scx; dragOffY = cy - scy;
+    selected = locHit;
+    showConnTypeUI(false);
+    showEditPanel(locHit);
+    selectInList(locHit);
+    draw();
+    return;
+  }
+
+  const symHit = hitTestSym(cx, cy);
+  if (symHit) {
+    dragging = symHit;
+    const [ix, iy] = toImg(symHit.obj.pixel_x, symHit.obj.pixel_y);
+    const [scx, scy] = toCanvas(ix, iy);
+    dragOffX = cx - scx; dragOffY = cy - scy;
+    selected = symHit;
+    showConnTypeUI(false);
+    showEditPanel(symHit);
+    selectInList(symHit);
+    draw();
+    return;
+  }
+
+  const connHit = hitTestConn(cx, cy);
+  if (connHit) {
+    selected = connHit;
+    showConnTypeUI(true, connHit.exit.connection_type);
+    showEditPanel(null);
+    selectInList(connHit);
+    draw();
+    return;
+  }
+
+  // Nothing hit — pan
+  selected = null;
+  showConnTypeUI(false);
+  showEditPanel(null);
+  isPanning = true;
+  panStartX = e.clientX; panStartY = e.clientY;
+  panStartPanX = panX; panStartPanY = panY;
+  canvas.style.cursor = 'grabbing';
+}
+
+function onMouseMove(e) {
+  if (isPanning) {
+    panX = panStartPanX + (e.clientX - panStartX);
+    panY = panStartPanY + (e.clientY - panStartY);
+    draw();
+    return;
+  }
+  if (!dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left - dragOffX;
+  const cy = e.clientY - rect.top - dragOffY;
+  const [ix, iy] = fromCanvas(cx, cy);
+  const [px, py] = fromImg(ix, iy);
+  dragging.obj.pixel_x = Math.round(px);
+  dragging.obj.pixel_y = Math.round(py);
+  updateItemCoords(dragging);
+  draw();
+}
+
+function onMouseUp(e) {
+  if (isPanning) { isPanning = false; canvas.style.cursor = 'crosshair'; return; }
+  if (dragging) { dragging = null; updateStatus(); }
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+  const [ix, iy] = fromCanvas(cx, cy);
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  zoom *= factor;
+  zoom = Math.max(0.1, Math.min(10, zoom));
+  panX = cx - ix * zoom;
+  panY = cy - iy * zoom;
+  draw();
+}
+
+function onKey(e) {
+  if (e.key === '0') { fitToView(); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selected) {
+    // Don't delete if an input/textarea is focused
+    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+    deleteSelected();
+  }
+  if (e.key === 'Escape') {
+    addConnFrom = null;
+    selected = null;
+    addMode = null;
+    document.getElementById('addLocBtn').style.background = '';
+    document.getElementById('addSymBtn').style.background = '';
+    canvas.style.cursor = 'crosshair';
+    showConnTypeUI(false);
+    showEditPanel(null);
+    updateStatus();
+    draw();
+  }
+}
+
+// --- Connection editing ---
+
+function addConnection(fromId, toId) {
+  if (!connData) {
+    connData = { rooms: {} };
+  }
+  const rooms = connData.rooms;
+  const type = document.getElementById('connType').value || 'open';
+
+  if (!rooms[fromId]) rooms[fromId] = { name: fromId, exits: [] };
+  if (!rooms[toId]) rooms[toId] = { name: toId, exits: [] };
+
+  // Check for duplicate
+  const exists = rooms[fromId].exits.some(e => e.to === toId) ||
+                 rooms[toId].exits.some(e => e.to === fromId);
+  if (exists) {
+    updateStatus(`Connection ${fromId}↔${toId} already exists`);
+    return;
+  }
+
+  rooms[fromId].exits.push({ to: toId, connection_type: type, notes: '' });
+  rooms[toId].exits.push({ to: fromId, connection_type: type, notes: '' });
+  buildItemList();
+  updateStatus();
+}
+
+function deleteSelectedConn() {
+  if (!selected || selected.kind !== 'conn' || !connData) return;
+  const { from, to } = selected;
+  const rooms = connData.rooms;
+
+  if (rooms[from]) rooms[from].exits = rooms[from].exits.filter(e => e.to !== to);
+  if (rooms[to]) rooms[to].exits = rooms[to].exits.filter(e => e.to !== from);
+
+  selected = null;
+  showConnTypeUI(false);
+  buildItemList();
+  updateStatus();
+  draw();
+}
+
+function changeConnType() {
+  if (!selected || selected.kind !== 'conn' || !connData) return;
+  const newType = document.getElementById('connType').value;
+  const { from, to } = selected;
+  const rooms = connData.rooms;
+
+  // Update both directions
+  if (rooms[from]) {
+    const exit = rooms[from].exits.find(e => e.to === to);
+    if (exit) exit.connection_type = newType;
+  }
+  if (rooms[to]) {
+    const exit = rooms[to].exits.find(e => e.to === from);
+    if (exit) exit.connection_type = newType;
+  }
+
+  buildItemList();
+  draw();
+}
+
+function showConnTypeUI(show, type) {
+  const el = document.getElementById('connTypeSelect');
+  if (show) {
+    el.classList.add('visible');
+    if (type) document.getElementById('connType').value = type;
+  } else {
+    el.classList.remove('visible');
+  }
+}
+
+// --- Sidebar ---
+
+function buildItemList() {
+  const list = document.getElementById('itemList');
+  list.innerHTML = '';
+  if (!data && !connData) return;
+
+  // Locations
+  const locs = data?.locations || {};
+  if (Object.keys(locs).length) {
+    const sec = document.createElement('div');
+    sec.className = 'section';
+    sec.innerHTML = `<div class="section-header">Locations <span class="count">${Object.keys(locs).length}</span></div>`;
+    for (const [id, loc] of Object.entries(locs)) {
+      const c = LOC_COLORS[loc.type] || DEFAULT_COLOR;
+      const el = document.createElement('div');
+      el.className = 'item loc-item';
+      el.style.borderLeftColor = `rgb(${c})`;
+      el.dataset.kind = 'loc'; el.dataset.id = id;
+      el.innerHTML = `<span class="id">${id}</span>` +
+        `<span class="name">${loc.name_guess || loc.name || ''}</span>` +
+        `<span class="coords" id="loc-${id}-coords">${loc.pixel_x ?? '?'},${loc.pixel_y ?? '?'}</span>` +
+        `<span class="del-btn" title="Delete location">×</span>`;
+      el.onclick = (ev) => {
+        if (ev.target.classList.contains('del-btn')) {
+          selected = { kind: 'loc', id, obj: loc };
+          deleteSelected();
+          return;
+        }
+        selected = { kind: 'loc', id, obj: loc };
+        showConnTypeUI(false); showEditPanel(selected); highlightItem(el); draw();
+      };
+      sec.appendChild(el);
+    }
+    list.appendChild(sec);
+  }
+
+  // Symbols
+  const syms = data?.symbols || [];
+  if (syms.length) {
+    const sec = document.createElement('div');
+    sec.className = 'section';
+    sec.innerHTML = `<div class="section-header">Symbols <span class="count">${syms.length}</span></div>`;
+    for (let i = 0; i < syms.length; i++) {
+      const sym = syms[i];
+      const c = SYM_COLORS[sym.type] || DEFAULT_COLOR;
+      const el = document.createElement('div');
+      el.className = 'item sym-item';
+      el.style.borderLeftColor = `rgb(${c})`;
+      el.dataset.kind = 'sym'; el.dataset.idx = i;
+      const label = sym.label || sym.type;
+      el.innerHTML = `<span class="id">${label}</span>` +
+        `<span class="name">${sym.notes || sym.type}</span>` +
+        `<span class="coords" id="sym-${i}-coords">${sym.pixel_x ?? '?'},${sym.pixel_y ?? '?'}</span>` +
+        `<span class="del-btn" title="Delete symbol">×</span>`;
+      el.onclick = (ev) => {
+        if (ev.target.classList.contains('del-btn')) {
+          selected = { kind: 'sym', idx: i, obj: sym };
+          deleteSelected();
+          return;
+        }
+        selected = { kind: 'sym', idx: i, obj: sym };
+        showConnTypeUI(false); showEditPanel(selected); highlightItem(el); draw();
+      };
+      sec.appendChild(el);
+    }
+    list.appendChild(sec);
+  }
+
+  // Connections (deduplicated)
+  if (connData) {
+    const rooms = connData.rooms || {};
+    const edges = [];
+    const seen = new Set();
+    for (const [fromId, room] of Object.entries(rooms)) {
+      for (const exit of (room.exits || [])) {
+        const key = [fromId, exit.to].sort().join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        edges.push({ from: fromId, to: exit.to, type: exit.connection_type || 'open', exit });
+      }
+    }
+    edges.sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
+
+    const sec = document.createElement('div');
+    sec.className = 'section';
+    sec.innerHTML = `<div class="section-header">Connections <span class="count">${edges.length}</span></div>`;
+    for (const edge of edges) {
+      const c = CONN_COLORS[edge.type] || [200, 200, 200];
+      const el = document.createElement('div');
+      el.className = 'item conn-item';
+      el.style.borderLeftColor = `rgb(${c})`;
+      el.dataset.kind = 'conn'; el.dataset.from = edge.from; el.dataset.to = edge.to;
+      el.innerHTML = `<span class="id">${edge.from}↔${edge.to}</span>` +
+        `<span class="name">${edge.type}</span>` +
+        `<span class="del-btn" title="Delete connection">×</span>`;
+      el.onclick = (ev) => {
+        if (ev.target.classList.contains('del-btn')) {
+          selected = { kind: 'conn', from: edge.from, to: edge.to, exit: edge.exit };
+          deleteSelectedConn();
+          return;
+        }
+        selected = { kind: 'conn', from: edge.from, to: edge.to, exit: edge.exit };
+        showConnTypeUI(true, edge.type);
+        highlightItem(el);
+        draw();
+      };
+      sec.appendChild(el);
+    }
+    list.appendChild(sec);
+  }
+}
+
+function highlightItem(el) {
+  document.querySelectorAll('.item.selected').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function selectInList(hit) {
+  const items = document.querySelectorAll('.item');
+  items.forEach(el => {
+    el.classList.remove('selected');
+    if (hit.kind === 'loc' && el.dataset.kind === 'loc' && el.dataset.id === hit.id) el.classList.add('selected');
+    if (hit.kind === 'sym' && el.dataset.kind === 'sym' && el.dataset.idx == hit.idx) el.classList.add('selected');
+    if (hit.kind === 'conn' && el.dataset.kind === 'conn' &&
+        el.dataset.from === hit.from && el.dataset.to === hit.to) el.classList.add('selected');
+  });
+}
+
+function updateItemCoords(hit) {
+  if (hit.kind === 'loc') {
+    const el = document.getElementById(`loc-${hit.id}-coords`);
+    if (el) el.textContent = `${hit.obj.pixel_x},${hit.obj.pixel_y}`;
+  } else if (hit.kind === 'sym') {
+    const el = document.getElementById(`sym-${hit.idx}-coords`);
+    if (el) el.textContent = `${hit.obj.pixel_x},${hit.obj.pixel_y}`;
+  }
+}
+
+function updateStatus(msg) {
+  if (msg) { document.getElementById('status').textContent = msg; return; }
+  const locs = Object.keys(data?.locations || {}).length;
+  const syms = (data?.symbols || []).length;
+  const conns = connData ? Object.values(connData.rooms || {}).reduce((n, r) => n + (r.exits || []).length, 0) / 2 : 0;
+  const scaleInfo = (sx !== 1 || sy !== 1) ? ` | scale: ${sx.toFixed(3)}x` : '';
+  let text = `${locs} locs, ${syms} syms`;
+  if (connData) text += `, ${Math.round(conns)} conns`;
+  text += scaleInfo;
+  if (addConnFrom) text += ` | Adding conn from ${addConnFrom}...`;
+  else text += ' | Drag markers, shift+click to add conn, 0=fit';
+  document.getElementById('status').textContent = text;
+}
+
+// --- Edit panel ---
+
+function showEditPanel(hit) {
+  const panel = document.getElementById('editPanel');
+  const labelEl = document.getElementById('editLabel');
+  const typeEl = document.getElementById('editType');
+  const nameEl = document.getElementById('editName');
+  const notesEl = document.getElementById('editNotes');
+
+  if (!hit) { panel.classList.remove('visible'); return; }
+
+  const nameLabelEl = nameEl.previousElementSibling;
+
+  if (hit.kind === 'loc') {
+    const loc = hit.obj;
+    labelEl.value = hit.id;
+    labelEl.disabled = false;
+    typeEl.value = loc.type || 'room';
+    nameEl.value = loc.name_guess || loc.name || '';
+    nameLabelEl.textContent = 'Name';
+    nameEl.placeholder = 'Room name or description';
+    notesEl.value = loc.notes || '';
+    setTypeOptions(['room', 'junction', 'river_waypoint', 'room_split']);
+  } else if (hit.kind === 'sym') {
+    const sym = hit.obj;
+    labelEl.value = sym.label || '';
+    labelEl.disabled = false;
+    typeEl.value = sym.type || 'trap';
+    nameEl.value = sym.near_location || '';
+    nameLabelEl.textContent = 'Near Location';
+    nameEl.placeholder = 'Nearest room label';
+    notesEl.value = sym.notes || '';
+    setTypeOptions(['trap', 'pit_trap', 'secret_door', 'stairs', 'door']);
+  } else {
+    panel.classList.remove('visible');
+    return;
+  }
+
+  panel.classList.add('visible');
+}
+
+function setTypeOptions(types) {
+  const sel = document.getElementById('editType');
+  const current = sel.value;
+  sel.innerHTML = '';
+  for (const t of types) {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    sel.appendChild(opt);
+  }
+  if (types.includes(current)) sel.value = current;
+}
+
+function applyEdit() {
+  if (!selected) return;
+
+  const labelEl = document.getElementById('editLabel');
+  const typeEl = document.getElementById('editType');
+  const nameEl = document.getElementById('editName');
+  const notesEl = document.getElementById('editNotes');
+
+  if (selected.kind === 'loc') {
+    const oldId = selected.id;
+    const newId = labelEl.value.trim();
+    const loc = selected.obj;
+
+    loc.type = typeEl.value;
+    loc.name_guess = nameEl.value;
+    loc.name = nameEl.value;
+    loc.label = newId;
+    if (notesEl.value) loc.notes = notesEl.value;
+    else delete loc.notes;
+
+    // If label changed, re-key in locations dict
+    if (newId && newId !== oldId) {
+      delete data.locations[oldId];
+      data.locations[newId] = loc;
+      selected.id = newId;
+    }
+  } else if (selected.kind === 'sym') {
+    const sym = selected.obj;
+    sym.label = labelEl.value.trim();
+    sym.type = typeEl.value;
+    sym.near_location = nameEl.value;
+    sym.notes = notesEl.value;
+  }
+
+  buildItemList();
+  draw();
+  updateStatus('Applied changes');
+}
+
+function deleteSelected() {
+  if (!selected) return;
+
+  if (selected.kind === 'loc') {
+    delete data.locations[selected.id];
+  } else if (selected.kind === 'sym') {
+    data.symbols.splice(selected.idx, 1);
+  } else if (selected.kind === 'conn') {
+    deleteSelectedConn();
+    return;
+  }
+
+  selected = null;
+  showEditPanel(null);
+  showConnTypeUI(false);
+  buildItemList();
+  draw();
+  updateStatus();
+}
+
+// --- Add mode ---
+
+function enterAddMode(mode) {
+  if (addMode === mode) {
+    // Toggle off
+    addMode = null;
+    document.getElementById('addLocBtn').style.background = '';
+    document.getElementById('addSymBtn').style.background = '';
+    canvas.style.cursor = 'crosshair';
+    updateStatus();
+    return;
+  }
+  addMode = mode;
+  document.getElementById('addLocBtn').style.background = mode === 'loc' ? '#065f46' : '';
+  document.getElementById('addSymBtn').style.background = mode === 'sym' ? '#065f46' : '';
+  canvas.style.cursor = 'cell';
+  updateStatus(mode === 'loc' ? 'Click map to place new location' : 'Click map to place new symbol');
+}
+
+function handleAddClick(cx, cy) {
+  const [ix, iy] = fromCanvas(cx, cy);
+  const [px, py] = fromImg(ix, iy);
+  const x = Math.round(px), y = Math.round(py);
+
+  if (addMode === 'loc') {
+    // Generate a unique label
+    let label = prompt('Location label (e.g. J1, R1, 16):');
+    if (!label) return;
+    label = label.trim();
+    if (data.locations[label]) {
+      updateStatus(`Label "${label}" already exists`);
+      return;
+    }
+    const name = prompt('Name (optional):') || '';
+    data.locations[label] = {
+      label, name_guess: name, name, type: 'room', pixel_x: x, pixel_y: y
+    };
+    selected = { kind: 'loc', id: label, obj: data.locations[label] };
+    showEditPanel(selected);
+  } else if (addMode === 'sym') {
+    if (!data.symbols) data.symbols = [];
+    const type = document.getElementById('editType').value || 'trap';
+    const sym = {
+      type, label: type === 'pit_trap' ? 'PP' : type === 'secret_door' ? 'S' : 'T',
+      pixel_x: x, pixel_y: y, near_location: '', notes: ''
+    };
+    data.symbols.push(sym);
+    const idx = data.symbols.length - 1;
+    selected = { kind: 'sym', idx, obj: sym };
+    showEditPanel(selected);
+  }
+
+  // Exit add mode
+  addMode = null;
+  document.getElementById('addLocBtn').style.background = '';
+  document.getElementById('addSymBtn').style.background = '';
+  canvas.style.cursor = 'crosshair';
+  buildItemList();
+  draw();
+  updateStatus();
+}
+
+// --- Export ---
+
+function exportLocations() {
+  if (!data) return;
+  download(data, 'step_output_reviewed.json');
+}
+
+function exportConnections() {
+  if (!connData) return;
+  download(connData, 'step3_output_reviewed.json');
+}
+
+function download(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// === PIPELINE MODE ===
+
+const PIPELINE = new URLSearchParams(location.search).has('pipeline');
+const PIPE_MODELS = ["opus", "sonnet", "haiku", "gemini-2.5-pro", "gemini-2.5-flash", "o3", "o4-mini", "gpt-4.1", "gpt-5.3-codex"];
+
+const STEP_ICONS = {
+  approved: '\u2713', review: '\u25cf', running: '\u25b8',
+  pending: '\u25cb', error: '\u2717', unavailable: '\u2014',
+};
+
+// Map step_id to the data type it produces for review
+const STEP_REVIEW_TYPE = {
+  step1_features: 'locations',
+  step2: 'locations',
+  step3: 'connections',
+  step4: 'descriptions',
+};
+
+// Map step_id to file names for auto-loading
+const STEP_FILES = {
+  step1_features: { map: 'labeled_map', json: 'step1_output' },
+  step2: { map: 'labeled_map', json: 'step2_output' },
+  step3: { map: 'annotated_map', json: 'step3_output', locJson: 'step2_output_reviewed' },
+  step4: { json: 'step4_output' },
+};
+
+let pipeState = null;
+let pollTimer = null;
+
+function initPipeline() {
+  if (!PIPELINE) return;
+
+  // Hide standalone file inputs
+  for (const id of ['imageInputLabel', 'imageInput', 'jsonInputLabel', 'jsonInput',
+                     'connInputLabel', 'connInput']) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('pipeline-hidden');
+  }
+
+  // Show pipeline panel
+  document.getElementById('pipelinePanel').style.display = '';
+
+  // Populate model dropdowns
+  const sel = document.getElementById('defaultModel');
+  for (const m of PIPE_MODELS) {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    sel.appendChild(opt);
+  }
+
+  fetchState();
+}
+
+async function fetchState() {
+  try {
+    const resp = await fetch('/api/state');
+    pipeState = await resp.json();
+    renderPipeline();
+  } catch (e) {
+    console.error('fetchState error:', e);
+  }
+}
+
+function renderPipeline() {
+  if (!pipeState) return;
+  const steps = pipeState.steps;
+  const config = pipeState.config;
+
+  // Update model dropdown
+  document.getElementById('defaultModel').value = config.default_model || 'opus';
+
+  // Render step list
+  const container = document.getElementById('pipelineSteps');
+  container.innerHTML = '';
+
+  let reviewStep = null;
+  let hasRunning = false;
+
+  for (const [stepId, step] of Object.entries(steps)) {
+    const div = document.createElement('div');
+    div.className = 'pipe-step' + (step.status === 'review' ? ' active' : '');
+
+    const icon = STEP_ICONS[step.status] || '\u25cb';
+    div.innerHTML = `<span class="icon">${icon}</span>` +
+      `<span class="step-name">${step.name}</span>` +
+      `<span class="step-status ${step.status}">${step.status}</span>`;
+
+    // Re-run button for step3 when approved
+    if (stepId === 'step3' && step.status === 'approved') {
+      const reBtn = document.createElement('button');
+      reBtn.textContent = 're-run';
+      reBtn.style.cssText = 'padding:2px 6px;font-size:10px;margin-left:4px;';
+      reBtn.onclick = (e) => { e.stopPropagation(); runStep('step3'); };
+      div.appendChild(reBtn);
+    }
+
+    container.appendChild(div);
+
+    if (step.status === 'review') reviewStep = stepId;
+    if (step.status === 'running') hasRunning = true;
+  }
+
+  // Render action buttons
+  const actions = document.getElementById('pipelineActions');
+  actions.innerHTML = '';
+
+  if (hasRunning) {
+    startPolling();
+  } else if (reviewStep) {
+    stopPolling();
+    // Load the step output for review
+    autoLoadStepOutput(reviewStep);
+
+    if (reviewStep === 'step4') {
+      // Step4 has text review, show approve in pipeline panel
+      const btn = document.createElement('button');
+      btn.className = 'primary';
+      btn.textContent = 'Approve & Finish';
+      btn.onclick = () => approveStep(reviewStep);
+      actions.appendChild(btn);
+    } else {
+      // Spatial steps: replace export buttons with pipeline buttons
+      replaceExportButtons(reviewStep);
+    }
+  } else {
+    stopPolling();
+    // Find next runnable step
+    const nextPending = Object.entries(steps).find(([_, s]) => s.status === 'pending');
+    const allDone = Object.values(steps).every(s =>
+      s.status === 'approved' || s.status === 'unavailable');
+
+    if (allDone) {
+      showPipelineComplete();
+    } else if (nextPending) {
+      const btn = document.createElement('button');
+      btn.className = 'primary';
+      btn.textContent = `Run: ${nextPending[1].name}`;
+      btn.onclick = () => runStep(nextPending[0]);
+      actions.appendChild(btn);
+    }
+
+    // Show retry button for errored steps
+    for (const [stepId, step] of Object.entries(steps)) {
+      if (step.status === 'error') {
+        const btn = document.createElement('button');
+        btn.className = 'danger';
+        btn.textContent = `Retry: ${step.name}`;
+        btn.onclick = () => runStep(stepId);
+        actions.appendChild(btn);
+
+        if (step.error) {
+          const err = document.createElement('div');
+          err.style.cssText = 'color:#f87171;font-size:10px;margin-top:4px;';
+          err.textContent = step.error;
+          actions.appendChild(err);
+        }
+      }
+    }
+  }
+
+  // Show/hide log
+  const logEl = document.getElementById('pipelineLog');
+  if (hasRunning || pipeState.log) {
+    logEl.classList.add('visible');
+    logEl.textContent = pipeState.log || 'Starting...';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+}
+
+function replaceExportButtons(reviewStep) {
+  const controls = document.getElementById('controls');
+  // Hide original export buttons, add pipeline ones
+  controls.innerHTML = '';
+
+  // Step3 parameter controls
+  if (reviewStep === 'step3') {
+    const s3p = pipeState?.config?.step3_params || {};
+    const paramDiv = document.createElement('div');
+    paramDiv.className = 'step3-params';
+    paramDiv.innerHTML = `
+      <div class="param-row">
+        <label>Threshold:</label>
+        <input type="range" id="s3Threshold" min="100" max="220" value="${s3p.threshold || 160}"
+          oninput="document.getElementById('s3ThreshVal').textContent=this.value">
+        <span class="val" id="s3ThreshVal">${s3p.threshold || 160}</span>
+      </div>
+      <div class="param-row">
+        <label>Kernel:</label>
+        <select id="s3Kernel">
+          <option value="3"${(s3p.kernel||5)==3?' selected':''}>3</option>
+          <option value="5"${(s3p.kernel||5)==5?' selected':''}>5</option>
+          <option value="7"${(s3p.kernel||5)==7?' selected':''}>7</option>
+          <option value="9"${(s3p.kernel||5)==9?' selected':''}>9</option>
+        </select>
+      </div>`;
+    controls.appendChild(paramDiv);
+
+    const rerunBtn = document.createElement('button');
+    rerunBtn.className = 'danger';
+    rerunBtn.textContent = 'Re-run Step 3';
+    rerunBtn.onclick = rerunStep3;
+    controls.appendChild(rerunBtn);
+  }
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save Edits';
+  saveBtn.onclick = () => saveEdits(reviewStep);
+  controls.appendChild(saveBtn);
+
+  const approveBtn = document.createElement('button');
+  approveBtn.className = 'primary';
+  approveBtn.textContent = 'Approve & Continue';
+  approveBtn.onclick = () => approveStep(reviewStep);
+  controls.appendChild(approveBtn);
+
+  const fitBtn = document.createElement('button');
+  fitBtn.textContent = 'Fit to View';
+  fitBtn.onclick = resetScale;
+  controls.appendChild(fitBtn);
+
+  const addLocBtn = document.createElement('button');
+  addLocBtn.id = 'addLocBtn';
+  addLocBtn.textContent = '+ Location';
+  addLocBtn.onclick = () => enterAddMode('loc');
+  controls.appendChild(addLocBtn);
+
+  const addSymBtn = document.createElement('button');
+  addSymBtn.id = 'addSymBtn';
+  addSymBtn.textContent = '+ Symbol';
+  addSymBtn.onclick = () => enterAddMode('sym');
+  controls.appendChild(addSymBtn);
+}
+
+async function runStep(stepId) {
+  try {
+    const resp = await fetch(`/api/run/${stepId}`, { method: 'POST' });
+    const result = await resp.json();
+    if (result.error) {
+      updateStatus(result.error);
+      return;
+    }
+    fetchState();
+    startPolling();
+  } catch (e) {
+    updateStatus('Error starting step: ' + e.message);
+  }
+}
+
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    try {
+      // Poll log
+      const logResp = await fetch('/api/log');
+      const logData = await logResp.json();
+      const logEl = document.getElementById('pipelineLog');
+      logEl.classList.add('visible');
+      logEl.textContent = logData.log || 'Running...';
+      logEl.scrollTop = logEl.scrollHeight;
+
+      // Check state
+      const stateResp = await fetch('/api/state');
+      pipeState = await stateResp.json();
+
+      const running = Object.values(pipeState.steps).some(s => s.status === 'running');
+      if (!running) {
+        stopPolling();
+        renderPipeline();
+      }
+    } catch (e) {
+      console.error('poll error:', e);
+    }
+  }, 2000);
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+async function autoLoadStepOutput(stepId) {
+  const files = STEP_FILES[stepId];
+  if (!files) return;
+
+  try {
+    if (stepId === 'step4') {
+      // Text-only review
+      const jsonResp = await fetch(`/api/file/${files.json}`);
+      const jsonData = await jsonResp.json();
+      showStep4Review(jsonData);
+      return;
+    }
+
+    // Load map image
+    if (files.map) {
+      const mapResp = await fetch(`/api/file/${files.map}`);
+      const blob = await mapResp.blob();
+      const url = URL.createObjectURL(blob);
+      img = new Image();
+      img.onload = () => {
+        fitToView();
+        updateStatus();
+      };
+      img.src = url;
+    }
+
+    // Load JSON data (prefer reviewed version if user already saved edits)
+    if (files.json) {
+      const jsonResp = await fetch(`/api/file/${files.json}?prefer_reviewed`);
+      data = await jsonResp.json();
+      computeScale();
+    }
+
+    // For step3, also load connection data and debug images
+    if (stepId === 'step3' && files.locJson) {
+      // Load step2_reviewed as position data
+      const locResp = await fetch(`/api/file/${files.locJson}`);
+      data = await locResp.json();
+      computeScale();
+
+      // Load step3_output as connection data (prefer reviewed)
+      const connResp = await fetch(`/api/file/${files.json}?prefer_reviewed`);
+      connData = await connResp.json();
+
+      // Show debug images
+      showStep3Debug();
+    } else {
+      connData = null;
+    }
+
+    buildItemList();
+    if (img) {
+      fitToView();
+    } else {
+      draw();
+    }
+    updateStatus();
+  } catch (e) {
+    updateStatus('Error loading step output: ' + e.message);
+    console.error('autoLoad error:', e);
+  }
+}
+
+function showStep4Review(jsonData) {
+  const panel = document.getElementById('step4ReviewPanel');
+  panel.innerHTML = '';
+  panel.classList.add('visible');
+
+  const header = document.createElement('h3');
+  header.style.cssText = 'color:#3b82f6;font-size:13px;margin-bottom:8px;';
+  header.textContent = 'Location Descriptions';
+  panel.appendChild(header);
+
+  const locations = jsonData.locations || {};
+  for (const [id, loc] of Object.entries(locations)) {
+    const item = document.createElement('div');
+    item.className = 'desc-item';
+
+    const desc = loc.description || loc.text || '';
+    const source = loc.source || '';
+    const badge = source === 'generated' ? ' [generated]' : source === 'original' ? ' [original]' : '';
+
+    item.innerHTML = `<span class="desc-label">${id}</span>` +
+      `<span class="desc-name">${loc.name || ''}</span>` +
+      `<span style="color:#666;font-size:9px;">${badge}</span>` +
+      `<div class="desc-text">${desc.slice(0, 200)}${desc.length > 200 ? '...' : ''}</div>`;
+    panel.appendChild(item);
+  }
+}
+
+function showPipelineComplete() {
+  const actions = document.getElementById('pipelineActions');
+  actions.innerHTML = '<div class="pipe-complete">Pipeline Complete!</div>';
+
+  const dlBtn = document.createElement('button');
+  dlBtn.className = 'primary';
+  dlBtn.textContent = 'Download Final Output';
+  dlBtn.style.marginTop = '8px';
+  dlBtn.onclick = async () => {
+    try {
+      const resp = await fetch('/api/file/step4_output');
+      const jsonData = await resp.json();
+      download(jsonData, 'step4_output.json');
+    } catch (e) {
+      updateStatus('Error downloading: ' + e.message);
+    }
+  };
+  actions.appendChild(dlBtn);
+
+  // Also show the descriptions
+  fetch('/api/file/step4_output')
+    .then(r => r.json())
+    .then(d => showStep4Review(d))
+    .catch(() => {});
+}
+
+async function saveEdits(stepId) {
+  const body = { step_id: stepId };
+  if (stepId === 'step3') {
+    body.data = data;
+    body.connData = connData;
+  } else {
+    body.data = data;
+  }
+
+  try {
+    const resp = await fetch('/api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (result.error) {
+      updateStatus('Save error: ' + result.error);
+    } else {
+      updateStatus('Edits saved');
+    }
+  } catch (e) {
+    updateStatus('Save error: ' + e.message);
+  }
+}
+
+async function approveStep(stepId) {
+  const body = { step_id: stepId };
+  if (stepId === 'step3') {
+    body.data = data;
+    body.connData = connData;
+  } else if (stepId !== 'step4') {
+    body.data = data;
+  }
+
+  try {
+    const resp = await fetch(`/api/approve/${stepId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const result = await resp.json();
+    if (result.error) {
+      updateStatus('Approve error: ' + result.error);
+      return;
+    }
+    // Hide review panels
+    document.getElementById('step4ReviewPanel').classList.remove('visible');
+    hideStep3Debug();
+    // Clear canvas state
+    data = null; connData = null; img = null;
+    updateStatus('Approved ' + stepId);
+    fetchState();
+  } catch (e) {
+    updateStatus('Approve error: ' + e.message);
+  }
+}
+
+async function saveConfig() {
+  const defaultModel = document.getElementById('defaultModel').value;
+  try {
+    await fetch('/api/configure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ default_model: defaultModel }),
+    });
+  } catch (e) {
+    console.error('saveConfig error:', e);
+  }
+}
+
+// --- Step 3 debug images ---
+
+async function showStep3Debug() {
+  const panel = document.getElementById('step3DebugPanel');
+  const thumbs = panel.querySelector('.debug-thumbs');
+  thumbs.innerHTML = '';
+
+  const names = ['step3_debug_binary', 'step3_debug_watershed'];
+  const labels = ['Binary Mask', 'Watershed Regions'];
+  let loaded = 0;
+
+  for (let i = 0; i < names.length; i++) {
+    try {
+      const resp = await fetch(`/api/file/${names[i]}`);
+      if (!resp.ok) continue;
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const imgEl = document.createElement('img');
+      imgEl.src = url;
+      imgEl.title = labels[i];
+      imgEl.alt = labels[i];
+      imgEl.onclick = () => showDebugInCanvas(url);
+      thumbs.appendChild(imgEl);
+      loaded++;
+    } catch (e) { /* debug image not available yet */ }
+  }
+
+  if (loaded > 0) {
+    panel.classList.add('visible');
+  } else {
+    panel.classList.remove('visible');
+  }
+}
+
+let mapImg = null; // stashed map image while viewing debug
+
+function showDebugInCanvas(url) {
+  const debugImg = new Image();
+  debugImg.onload = () => {
+    if (!mapImg) mapImg = img;
+    img = debugImg;
+    fitToView();
+    showRestoreMapBtn(true);
+  };
+  debugImg.src = url;
+}
+
+function restoreMapImage() {
+  if (mapImg) {
+    img = mapImg;
+    mapImg = null;
+    fitToView();
+  }
+  showRestoreMapBtn(false);
+}
+
+function showRestoreMapBtn(show) {
+  let btn = document.getElementById('restoreMapBtn');
+  if (show && !btn) {
+    btn = document.createElement('button');
+    btn.id = 'restoreMapBtn';
+    btn.textContent = 'Show Map';
+    btn.style.cssText = 'position:absolute;top:8px;right:8px;z-index:10;';
+    btn.onclick = restoreMapImage;
+    document.getElementById('canvas-wrap').appendChild(btn);
+  } else if (!show && btn) {
+    btn.remove();
+  }
+}
+
+function hideStep3Debug() {
+  document.getElementById('step3DebugPanel').classList.remove('visible');
+  restoreMapImage();
+}
+
+async function rerunStep3() {
+  const threshold = parseInt(document.getElementById('s3Threshold')?.value || '160');
+  const kernel = parseInt(document.getElementById('s3Kernel')?.value || '5');
+
+  // Save params
+  try {
+    await fetch('/api/configure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step3_params: { threshold, kernel } }),
+    });
+  } catch (e) {
+    updateStatus('Error saving params: ' + e.message);
+    return;
+  }
+
+  // Re-run
+  hideStep3Debug();
+  runStep('step3');
+}
+</script>
+</body>
+</html>

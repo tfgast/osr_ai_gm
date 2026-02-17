@@ -1,0 +1,73 @@
+{
+  "target": "9",
+  "connections": [
+    {
+      "to": "7",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 7 (Western Corridor) is directly to the west of 9 along the same horizontal corridor, connected by an open passage"
+    },
+    {
+      "to": "4A",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 4A (Great Bronze Doors) is directly to the east of 9 along the corridor, connected via open passage"
+    },
+    {
+      "to": "13",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 13 (The Riven Hall) is to the north of 9, connected by a visible passage/opening leading north from the corridor"
+    },
+    {
+      "to": "J2",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Junction J2 (Western Corridor Fork) sits at the western end where corridor 9 meets corridor 7, serving as a navigation point between them"
+    },
+    {
+      "to": "3B",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 3B (Arched Stairwell Junction) is nearby to the west/northwest, connected via the corridor passage through or near J2"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "10",
+      "reason": "Room 10 (Dead-End River Tunnel) is located to the north across the river, separated by walls and water with no direct passage from 9"
+    },
+    {
+      "to": "11",
+      "reason": "Room 11 (Hanging North Alcove) is far to the north, separated by multiple walls and the river area, no direct connection to 9"
+    },
+    {
+      "to": "12",
+      "reason": "Room 12 (Hanging South Alcove) is to the north separated by walls and intervening rooms/passages, no direct opening to 9"
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is located to the east beyond 4A, not directly connected to 9 \u2014 would need to pass through 4A first"
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is to the northwest across the river, no direct river crossing point at room 9"
+    },
+    {
+      "to": "R2",
+      "reason": "R2 (North River Crossing) is to the north in the river, not directly adjacent to room 9 with no visible crossing point"
+    },
+    {
+      "to": "R3",
+      "reason": "R3 (North River Passage) is far to the northeast in the river system, no connection to 9"
+    },
+    {
+      "to": "R4",
+      "reason": "R4 (East River Crossing) is to the east in the river, separated by walls and other rooms from 9"
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is far to the south, no connection to 9"
+    }
+  ]
+}

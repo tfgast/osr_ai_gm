@@ -1,0 +1,73 @@
+{
+  "target": "13",
+  "connections": [
+    {
+      "to": "12",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 12 is directly north-west of 13, connected via an open passage along the corridor running between them"
+    },
+    {
+      "to": "14",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 14 is to the east/north-east of 13, connected by a visible open passage continuing the hall eastward"
+    },
+    {
+      "to": "R2",
+      "connection_type": "river_crossing",
+      "confidence": "high",
+      "notes": "The river passes through or directly adjacent to room 13, and R2 (North River Crossing) is a river waypoint at this location allowing water crossing"
+    },
+    {
+      "to": "6",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 6 is to the south-west of 13, connected via a passage leading from the hall southward"
+    },
+    {
+      "to": "4A",
+      "connection_type": "open",
+      "confidence": "medium",
+      "notes": "Room 4A (Great Bronze Doors) connects to 13 via the corridor running south from The Riven Hall through visible open passages"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "11",
+      "reason": "Room 11 is located further north across the river. No direct passage visible between 13 and 11; separated by walls and the river channel"
+    },
+    {
+      "to": "7",
+      "reason": "Room 7 (Western Corridor) is to the west but separated by walls and intervening rooms (9, 6). No direct visible passage from 13 to 7"
+    },
+    {
+      "to": "8W",
+      "reason": "Room 8W (River Ledge) is to the east, separated by walls and other rooms. No direct passage visible from 13"
+    },
+    {
+      "to": "9",
+      "reason": "Room 9 (Northern Corridor) is to the west of 13 but separated by walls. No direct visible opening between them"
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is located far to the south-west, well beyond direct connection range from 13. No visible passage"
+    },
+    {
+      "to": "R1",
+      "reason": "R1 (North-West River Crossing) is upstream/north-west, not at the same river section as room 13. No direct river crossing connection here"
+    },
+    {
+      "to": "R3",
+      "reason": "R3 (North River Passage) is to the east along the river, not directly adjacent to room 13"
+    },
+    {
+      "to": "R4",
+      "reason": "R4 (East River Crossing) is further downstream to the east, not directly at room 13's location"
+    },
+    {
+      "to": "R5",
+      "reason": "R5 (River exit at cliff) is far to the south at the river's exit point, nowhere near room 13"
+    }
+  ]
+}

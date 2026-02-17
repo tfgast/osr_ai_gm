@@ -1,0 +1,69 @@
+{
+  "target": "J2",
+  "connections": [
+    {
+      "to": "7",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "Room 7 (Western Corridor) is directly east of J2, connected by a visible open corridor passage continuing eastward from the fork"
+    },
+    {
+      "to": "J1",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "J1 is to the southwest of J2, connected by a visible open corridor/tunnel passage branching south-southwest from the fork"
+    },
+    {
+      "to": "3A",
+      "connection_type": "open",
+      "confidence": "high",
+      "notes": "3A is adjacent to J2 to the south/southeast, connected via an open passage at the fork junction area"
+    }
+  ],
+  "not_connected": [
+    {
+      "to": "10",
+      "reason": "Room 10 is located to the northwest, separated from J2 by walls and intervening passages through other rooms; no direct visible opening between them"
+    },
+    {
+      "to": "12",
+      "reason": "Room 12 is located further south, not directly adjacent to J2; separated by walls and other intervening spaces"
+    },
+    {
+      "to": "3B",
+      "reason": "3B is not directly adjacent to J2; separated by intervening rooms/corridors and walls with no visible direct passage"
+    },
+    {
+      "to": "3C",
+      "reason": "3C is not directly adjacent to J2; separated by intervening rooms/corridors and walls with no visible direct passage"
+    },
+    {
+      "to": "9",
+      "reason": "Room 9 is to the north but not directly connected to J2; the corridor path passes through room 7 or other intermediate locations first, with no direct passage visible"
+    },
+    {
+      "to": "R1",
+      "reason": "R1 is a river waypoint to the northwest, separated from J2 by walls and rock; no direct passage or river crossing visible between them"
+    },
+    {
+      "to": "R2",
+      "reason": "R2 is a river waypoint further north, no direct connection to J2 visible"
+    },
+    {
+      "to": "R3",
+      "reason": "R3 is a river waypoint to the northeast, far from J2 with no direct connection"
+    },
+    {
+      "to": "R4",
+      "reason": "R4 is a river waypoint to the east, far from J2 with no direct connection"
+    },
+    {
+      "to": "R5",
+      "reason": "R5 is a river waypoint at the southern cliff exit, far from J2 with no direct connection"
+    },
+    {
+      "to": "J3",
+      "reason": "J3 (Trapped Fork) is not directly adjacent to J2; separated by intervening corridors and rooms with no direct visible passage"
+    }
+  ]
+}
