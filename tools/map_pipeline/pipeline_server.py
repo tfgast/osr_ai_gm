@@ -120,6 +120,21 @@ class PipelineState:
                 step["output_file"] = output_file
             self._save()
 
+    def dirty_steps_after(self, step_id: str):
+        """Reset all steps after step_id back to pending."""
+        with self.lock:
+            step_ids = [s[0] for s in STEP_DEFS]
+            try:
+                idx = step_ids.index(step_id)
+            except ValueError:
+                return
+            for later_id in step_ids[idx + 1:]:
+                step = self.state["steps"][later_id]
+                if step["status"] in ("approved", "review", "error"):
+                    step["status"] = "pending"
+                    step["error"] = None
+            self._save()
+
     def set_log(self, text: str):
         with self.lock:
             self.state["log"] = text
@@ -491,9 +506,7 @@ class PipelineHandler(SimpleHTTPRequestHandler):
             return
 
         step = state["steps"][step_id]
-        allowed = ("pending", "error")
-        if step_id == "step3":
-            allowed = ("pending", "error", "review", "approved")
+        allowed = ("pending", "error", "review", "approved")
         if step["status"] not in allowed:
             self._json_response(
                 {"error": f"Step {step_id} is {step['status']}, cannot run"}, 400
@@ -503,6 +516,10 @@ class PipelineHandler(SimpleHTTPRequestHandler):
         if self.pipeline_state.is_running():
             self._json_response({"error": "A step is already running"}, 409)
             return
+
+        # Re-running a completed step dirties all later steps
+        if step["status"] in ("approved", "review"):
+            self.pipeline_state.dirty_steps_after(step_id)
 
         try:
             self.pipeline_runner.run_step(step_id)

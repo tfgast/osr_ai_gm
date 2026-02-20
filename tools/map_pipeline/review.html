@@ -1208,12 +1208,12 @@ function renderPipeline() {
       `<span class="step-name">${step.name}</span>` +
       `<span class="step-status ${step.status}">${step.status}</span>`;
 
-    // Re-run button for step3 when approved
-    if (stepId === 'step3' && step.status === 'approved') {
+    // Re-run button for any approved step
+    if (step.status === 'approved') {
       const reBtn = document.createElement('button');
       reBtn.textContent = 're-run';
       reBtn.style.cssText = 'padding:2px 6px;font-size:10px;margin-left:4px;';
-      reBtn.onclick = (e) => { e.stopPropagation(); runStep('step3'); };
+      reBtn.onclick = (e) => { e.stopPropagation(); runStep(stepId); };
       div.appendChild(reBtn);
     }
 
@@ -1236,6 +1236,12 @@ function renderPipeline() {
 
     if (reviewStep === 'step4') {
       // Step4 has text review, show approve in pipeline panel
+      const reBtn = document.createElement('button');
+      reBtn.className = 'danger';
+      reBtn.textContent = 'Re-run Descriptions';
+      reBtn.onclick = () => runStep('step4');
+      actions.appendChild(reBtn);
+
       const btn = document.createElement('button');
       btn.className = 'primary';
       btn.textContent = 'Approve & Finish';
@@ -1322,6 +1328,14 @@ function replaceExportButtons(reviewStep) {
     rerunBtn.className = 'danger';
     rerunBtn.textContent = 'Re-run Step 3';
     rerunBtn.onclick = rerunStep3;
+    controls.appendChild(rerunBtn);
+  } else {
+    // Re-run button for non-step3 review steps
+    const stepName = pipeState?.steps?.[reviewStep]?.name || reviewStep;
+    const rerunBtn = document.createElement('button');
+    rerunBtn.className = 'danger';
+    rerunBtn.textContent = `Re-run ${stepName}`;
+    rerunBtn.onclick = () => runStep(reviewStep);
     controls.appendChild(rerunBtn);
   }
 
