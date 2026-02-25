@@ -1,11 +1,63 @@
 //! XP thresholds and level advancement per OSE Rules Tome.
 //! Each class has its own XP progression table.
+//!
+//! When the `dsl-backend` feature is enabled and `OSR_BACKEND_XP=dsl`,
+//! XP lookups and level advancement checks delegate to the DSL runtime.
+//! Falls back to native on DSL failure.
 
 use super::class::Class;
 
 /// XP required to reach each level (index 0 = level 1 = 0 XP).
 /// Tables go up to level 14 for most human classes, less for demihumans.
 pub fn xp_for_level(class: Class, level: u32) -> u64 {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Xp) {
+        if let Some(val) = dsl_gate::dsl_xp_for_level(class, level) {
+            return val;
+        }
+    }
+    native_xp_for_level(class, level)
+}
+
+/// Check if a character has enough XP to advance to the next level.
+/// Returns the new level if advancement is possible, None otherwise.
+pub fn check_level_up(class: Class, current_level: u32, xp: u64) -> Option<u32> {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Xp) {
+        if let Some(can_advance) = dsl_gate::dsl_check_level_up(class, current_level, xp) {
+            return if can_advance { Some(current_level + 1) } else { None };
+        }
+    }
+    native_check_level_up(class, current_level, xp)
+}
+
+/// Calculate XP bonus/penalty from prime requisite score.
+/// Returns a percentage modifier: -20, -10, 0, +5, or +10.
+pub fn prime_req_xp_modifier(class: Class, abilities: &[i32; 6]) -> i32 {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Xp) {
+        if let Some(val) = dsl_gate::dsl_prime_req_xp_modifier(class, abilities) {
+            return val;
+        }
+    }
+    native_prime_req_xp_modifier(class, abilities)
+}
+
+/// Apply XP modifier and return adjusted XP amount.
+/// modifier is a percentage: -20, -10, 0, 5, 10
+pub fn adjust_xp(base_xp: u64, modifier_pct: i32) -> u64 {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Xp) {
+        if let Some(val) = dsl_gate::dsl_adjust_xp(base_xp, modifier_pct) {
+            return val;
+        }
+    }
+    native_adjust_xp(base_xp, modifier_pct)
+}
+
+// ── Native backend ──────────────────────────────────────────────
+
+fn native_xp_for_level(class: Class, level: u32) -> u64 {
     let table = xp_table(class);
     if level == 0 { return 0; }
     let idx = (level as usize).saturating_sub(1);
@@ -17,9 +69,7 @@ pub fn xp_for_level(class: Class, level: u32) -> u64 {
     }
 }
 
-/// Check if a character has enough XP to advance to the next level.
-/// Returns the new level if advancement is possible, None otherwise.
-pub fn check_level_up(class: Class, current_level: u32, xp: u64) -> Option<u32> {
+fn native_check_level_up(class: Class, current_level: u32, xp: u64) -> Option<u32> {
     let max = super::class::class_def(class).max_level;
     if current_level >= max {
         return None;
@@ -33,9 +83,7 @@ pub fn check_level_up(class: Class, current_level: u32, xp: u64) -> Option<u32> 
     }
 }
 
-/// Calculate XP bonus/penalty from prime requisite score.
-/// Returns a percentage modifier: -20, -10, 0, +5, or +10.
-pub fn prime_req_xp_modifier(class: Class, abilities: &[i32; 6]) -> i32 {
+fn native_prime_req_xp_modifier(class: Class, abilities: &[i32; 6]) -> i32 {
     use super::class::class_def;
     use super::ability::prime_req_xp_mod;
 
@@ -51,14 +99,110 @@ pub fn prime_req_xp_modifier(class: Class, abilities: &[i32; 6]) -> i32 {
     prime_req_xp_mod(min_score)
 }
 
-/// Apply XP modifier and return adjusted XP amount.
-/// modifier is a percentage: -20, -10, 0, 5, 10
-pub fn adjust_xp(base_xp: u64, modifier_pct: i32) -> u64 {
+fn native_adjust_xp(base_xp: u64, modifier_pct: i32) -> u64 {
     if modifier_pct == 0 {
         return base_xp;
     }
     let adjusted = base_xp as f64 * (1.0 + modifier_pct as f64 / 100.0);
     adjusted.round().max(0.0) as u64
+}
+
+// ── DSL gate helpers ──────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_gate {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider};
+    use ttrpg_interp::value::Value;
+
+    use crate::backend;
+
+    struct NullState;
+
+    impl StateProvider for NullState {
+        fn read_field(&self, _: &EntityRef, _: &str) -> Option<Value> { None }
+        fn read_conditions(&self, _: &EntityRef) -> Option<Vec<ActiveCondition>> { None }
+        fn read_turn_budget(&self, _: &EntityRef) -> Option<BTreeMap<Name, Value>> { None }
+        fn read_enabled_options(&self) -> Vec<Name> { Vec::new() }
+        fn position_eq(&self, _: &Value, _: &Value) -> bool { false }
+        fn distance(&self, _: &Value, _: &Value) -> Option<i64> { None }
+    }
+
+    struct NullHandler;
+
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response { Response::Acknowledged }
+    }
+
+    fn class_to_dsl(class: crate::rules::class::Class) -> Value {
+        Value::EnumVariant {
+            enum_name: "Class".into(),
+            variant: Name::from(format!("{:?}", class)),
+            fields: BTreeMap::new(),
+        }
+    }
+
+    /// Build a DSL `map<Ability, int>` from the 6-element ability array.
+    fn abilities_to_dsl(abilities: &[i32; 6]) -> Value {
+        let ability_names = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
+        let mut map = BTreeMap::new();
+        for (i, &name) in ability_names.iter().enumerate() {
+            let key = Value::EnumVariant {
+                enum_name: "Ability".into(),
+                variant: Name::from(name),
+                fields: BTreeMap::new(),
+            };
+            map.insert(key, Value::Int(abilities[i] as i64));
+        }
+        Value::Map(map)
+    }
+
+    pub fn dsl_xp_for_level(class: crate::rules::class::Class, level: u32) -> Option<u64> {
+        let rt = backend::dsl()?;
+        let args = vec![class_to_dsl(class), Value::Int(level as i64)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "xp_for_level", args).ok()?;
+        match result {
+            Value::Int(v) => Some(v as u64),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_check_level_up(class: crate::rules::class::Class, current_level: u32, xp: u64) -> Option<bool> {
+        let rt = backend::dsl()?;
+        let args = vec![
+            class_to_dsl(class),
+            Value::Int(current_level as i64),
+            Value::Int(xp as i64),
+        ];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "check_level_up", args).ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_prime_req_xp_modifier(class: crate::rules::class::Class, abilities: &[i32; 6]) -> Option<i32> {
+        let rt = backend::dsl()?;
+        let args = vec![class_to_dsl(class), abilities_to_dsl(abilities)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "prime_req_xp_modifier", args).ok()?;
+        match result {
+            Value::Int(v) => Some(v as i32),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_adjust_xp(base_xp: u64, modifier_pct: i32) -> Option<u64> {
+        let rt = backend::dsl()?;
+        let args = vec![Value::Int(base_xp as i64), Value::Int(modifier_pct as i64)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "adjust_xp", args).ok()?;
+        match result {
+            Value::Int(v) => Some(v as u64),
+            _ => None,
+        }
+    }
 }
 
 /// XP table for each class. Index 0 = level 1 (0 XP), index 1 = level 2, etc.

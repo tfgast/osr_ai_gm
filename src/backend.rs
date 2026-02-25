@@ -14,6 +14,7 @@ pub enum MechanicGroup {
     Saves,
     Ability,
     Thief,
+    Xp,
 }
 
 impl MechanicGroup {
@@ -25,6 +26,7 @@ impl MechanicGroup {
             MechanicGroup::Saves => "SAVES",
             MechanicGroup::Ability => "ABILITY",
             MechanicGroup::Thief => "THIEF",
+            MechanicGroup::Xp => "XP",
         }
     }
 }
@@ -37,6 +39,7 @@ pub struct BackendConfig {
     pub saves: Backend,
     pub ability: Backend,
     pub thief: Backend,
+    pub xp: Backend,
 }
 
 impl BackendConfig {
@@ -50,6 +53,7 @@ impl BackendConfig {
             saves: parse_backend_env("OSR_BACKEND_SAVES").or(global).unwrap_or(Backend::Native),
             ability: parse_backend_env("OSR_BACKEND_ABILITY").or(global).unwrap_or(Backend::Native),
             thief: parse_backend_env("OSR_BACKEND_THIEF").or(global).unwrap_or(Backend::Native),
+            xp: parse_backend_env("OSR_BACKEND_XP").or(global).unwrap_or(Backend::Native),
         }
     }
 
@@ -61,6 +65,7 @@ impl BackendConfig {
             MechanicGroup::Saves => self.saves,
             MechanicGroup::Ability => self.ability,
             MechanicGroup::Thief => self.thief,
+            MechanicGroup::Xp => self.xp,
         }
     }
 }
@@ -339,12 +344,14 @@ mod tests {
         assert_eq!(config.saves, Backend::Native);
         assert_eq!(config.ability, Backend::Native);
         assert_eq!(config.thief, Backend::Native);
+        assert_eq!(config.xp, Backend::Native);
     }
 
     #[test]
     fn mechanic_group_env_suffix() {
         assert_eq!(MechanicGroup::Combat.env_suffix(), "COMBAT");
         assert_eq!(MechanicGroup::TurnUndead.env_suffix(), "TURN_UNDEAD");
+        assert_eq!(MechanicGroup::Xp.env_suffix(), "XP");
     }
 
     #[test]
@@ -356,9 +363,11 @@ mod tests {
             saves: Backend::Dsl,
             ability: Backend::Native,
             thief: Backend::Native,
+            xp: Backend::Native,
         };
         assert_eq!(config.get(MechanicGroup::Combat), Backend::Dsl);
         assert_eq!(config.get(MechanicGroup::Morale), Backend::Native);
         assert_eq!(config.get(MechanicGroup::Saves), Backend::Dsl);
+        assert_eq!(config.get(MechanicGroup::Xp), Backend::Native);
     }
 }
