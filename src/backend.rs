@@ -53,15 +53,15 @@ impl BackendConfig {
         let global = parse_backend_env("OSR_BACKEND");
 
         BackendConfig {
-            combat: parse_backend_env("OSR_BACKEND_COMBAT").or(global).unwrap_or(Backend::Native),
-            morale: parse_backend_env("OSR_BACKEND_MORALE").or(global).unwrap_or(Backend::Native),
-            turn_undead: parse_backend_env("OSR_BACKEND_TURN_UNDEAD").or(global).unwrap_or(Backend::Native),
-            saves: parse_backend_env("OSR_BACKEND_SAVES").or(global).unwrap_or(Backend::Native),
-            ability: parse_backend_env("OSR_BACKEND_ABILITY").or(global).unwrap_or(Backend::Native),
-            thief: parse_backend_env("OSR_BACKEND_THIEF").or(global).unwrap_or(Backend::Native),
-            xp: parse_backend_env("OSR_BACKEND_XP").or(global).unwrap_or(Backend::Native),
-            spell: parse_backend_env("OSR_BACKEND_SPELL").or(global).unwrap_or(Backend::Native),
-            class: parse_backend_env("OSR_BACKEND_CLASS").or(global).unwrap_or(Backend::Native),
+            combat: parse_backend_env("OSR_BACKEND_COMBAT").or(global).unwrap_or(Backend::Dsl),
+            morale: parse_backend_env("OSR_BACKEND_MORALE").or(global).unwrap_or(Backend::Dsl),
+            turn_undead: parse_backend_env("OSR_BACKEND_TURN_UNDEAD").or(global).unwrap_or(Backend::Dsl),
+            saves: parse_backend_env("OSR_BACKEND_SAVES").or(global).unwrap_or(Backend::Dsl),
+            ability: parse_backend_env("OSR_BACKEND_ABILITY").or(global).unwrap_or(Backend::Dsl),
+            thief: parse_backend_env("OSR_BACKEND_THIEF").or(global).unwrap_or(Backend::Dsl),
+            xp: parse_backend_env("OSR_BACKEND_XP").or(global).unwrap_or(Backend::Dsl),
+            spell: parse_backend_env("OSR_BACKEND_SPELL").or(global).unwrap_or(Backend::Dsl),
+            class: parse_backend_env("OSR_BACKEND_CLASS").or(global).unwrap_or(Backend::Dsl),
         }
     }
 
@@ -345,18 +345,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_config_is_all_native() {
+    fn default_config_is_all_dsl() {
         // Don't use the OnceLock; test from_env directly with clean env
         let config = BackendConfig::from_env();
-        assert_eq!(config.combat, Backend::Native);
-        assert_eq!(config.morale, Backend::Native);
-        assert_eq!(config.turn_undead, Backend::Native);
-        assert_eq!(config.saves, Backend::Native);
-        assert_eq!(config.ability, Backend::Native);
-        assert_eq!(config.thief, Backend::Native);
-        assert_eq!(config.xp, Backend::Native);
-        assert_eq!(config.spell, Backend::Native);
-        assert_eq!(config.class, Backend::Native);
+        assert_eq!(config.combat, Backend::Dsl);
+        assert_eq!(config.morale, Backend::Dsl);
+        assert_eq!(config.turn_undead, Backend::Dsl);
+        assert_eq!(config.saves, Backend::Dsl);
+        assert_eq!(config.ability, Backend::Dsl);
+        assert_eq!(config.thief, Backend::Dsl);
+        assert_eq!(config.xp, Backend::Dsl);
+        assert_eq!(config.spell, Backend::Dsl);
+        assert_eq!(config.class, Backend::Dsl);
     }
 
     #[test]

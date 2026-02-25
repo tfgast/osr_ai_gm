@@ -147,7 +147,7 @@ mod dsl_gate {
 
     /// Build a DSL `map<Ability, int>` from the 6-element ability array.
     fn abilities_to_dsl(abilities: &[i32; 6]) -> Value {
-        let ability_names = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
+        let ability_names = ["STR", "INT", "WIS", "DEX", "CON", "CHA"];
         let mut map = BTreeMap::new();
         for (i, &name) in ability_names.iter().enumerate() {
             let key = Value::EnumVariant {
