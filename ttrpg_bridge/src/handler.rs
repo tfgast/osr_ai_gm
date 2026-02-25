@@ -45,7 +45,7 @@ impl EffectHandler for BridgeHandler {
                 let path_str: Vec<String> = path
                     .iter()
                     .map(|seg| match seg {
-                        ttrpg_interp::effect::FieldPathSegment::Field(f) => f.clone(),
+                        ttrpg_interp::effect::FieldPathSegment::Field(f) => f.to_string(),
                         ttrpg_interp::effect::FieldPathSegment::Index(v) => format!("[{:?}]", v),
                     })
                     .collect();

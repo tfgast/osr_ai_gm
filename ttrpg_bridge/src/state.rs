@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ttrpg_ast::Name;
 use ttrpg_interp::effect::FieldPathSegment;
 use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider, WritableState};
 use ttrpg_interp::value::Value;
@@ -73,7 +74,7 @@ impl StateProvider for BridgeState {
             .iter()
             .map(|e| ActiveCondition {
                 id: e.id as u64,
-                name: e.name.clone(),
+                name: e.name.clone().into(),
                 params: BTreeMap::new(),
                 bearer: *entity,
                 gained_at: e.id as u64,
@@ -83,7 +84,7 @@ impl StateProvider for BridgeState {
         Some(conditions)
     }
 
-    fn read_turn_budget(&self, entity: &EntityRef) -> Option<BTreeMap<String, Value>> {
+    fn read_turn_budget(&self, entity: &EntityRef) -> Option<BTreeMap<Name, Value>> {
         // Verify entity exists
         if is_character(entity) {
             self.characters.get(character_index(entity))?;
@@ -99,7 +100,7 @@ impl StateProvider for BridgeState {
         Some(budget)
     }
 
-    fn read_enabled_options(&self) -> Vec<String> {
+    fn read_enabled_options(&self) -> Vec<Name> {
         Vec::new()
     }
 
@@ -112,7 +113,7 @@ impl StateProvider for BridgeState {
         None
     }
 
-    fn entity_type_name(&self, entity: &EntityRef) -> Option<String> {
+    fn entity_type_name(&self, entity: &EntityRef) -> Option<Name> {
         if is_character(entity) {
             self.characters
                 .get(character_index(entity))
@@ -151,7 +152,7 @@ impl WritableState for BridgeState {
         use osr_ai_gm::state::effect::{ActiveEffect, EffectDuration};
         let effect = ActiveEffect {
             id: cond.id as u32,
-            name: cond.name,
+            name: cond.name.to_string(),
             source: String::new(),
             duration: EffectDuration::Permanent,
             modifiers: Vec::new(),
@@ -172,7 +173,7 @@ impl WritableState for BridgeState {
         &mut self,
         entity: &EntityRef,
         name: &str,
-        _params: Option<&BTreeMap<String, Value>>,
+        _params: Option<&BTreeMap<Name, Value>>,
     ) {
         if is_character(entity) {
             if let Some(c) = self.characters.get_mut(character_index(entity)) {
