@@ -302,9 +302,9 @@ fn init_registry() -> MonsterRegistry {
     // Find data directory relative to executable or working directory
     let data_paths = [
         // Development: relative to working directory
-        "data/core/monsters.json",
+        "data/games/ose/data/monsters.json",
         // Installed: relative to executable
-        "../data/core/monsters.json",
+        "../data/games/ose/data/monsters.json",
         // Alternative: in current directory
         "monsters.json",
     ];
@@ -328,7 +328,7 @@ fn init_registry() -> MonsterRegistry {
 
     if !loaded {
         eprintln!("Warning: No monster data files found. Using empty registry.");
-        eprintln!("Expected: data/core/monsters.json");
+        eprintln!("Expected: data/games/ose/data/monsters.json");
     }
 
     // TODO: Load module data from data/modules/*/monsters.json
@@ -364,11 +364,11 @@ pub fn reload_monsters() {
 mod tests {
     use super::*;
 
-    // Note: Tests require data/core/monsters.json to exist
+    // Note: Tests require data/games/ose/data/monsters.json to exist
     // If file is missing, tests that depend on specific monsters will be skipped
 
     fn has_data() -> bool {
-        Path::new("data/core/monsters.json").exists()
+        Path::new("data/games/ose/data/monsters.json").exists()
     }
 
     #[test]

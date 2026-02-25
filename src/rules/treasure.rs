@@ -184,9 +184,9 @@ fn init_registry() -> TreasureRegistry {
     // Find data directory relative to executable or working directory
     let data_paths = [
         // Development: relative to working directory
-        "data/core/treasure.json",
+        "data/games/ose/data/treasure.json",
         // Installed: relative to executable
-        "../data/core/treasure.json",
+        "../data/games/ose/data/treasure.json",
         // Alternative: in current directory
         "treasure.json",
     ];
@@ -210,7 +210,7 @@ fn init_registry() -> TreasureRegistry {
 
     if !loaded {
         eprintln!("Warning: No treasure data files found. Using empty registry.");
-        eprintln!("Expected: data/core/treasure.json");
+        eprintln!("Expected: data/games/ose/data/treasure.json");
     }
 
     registry
@@ -327,8 +327,8 @@ static GEMS_JEWELLERY: OnceLock<GemsJewelleryData> = OnceLock::new();
 /// Initialize gems/jewellery data by loading from JSON.
 fn init_gems_jewellery() -> GemsJewelleryData {
     let data_paths = [
-        "data/core/gems_jewellery.json",
-        "../data/core/gems_jewellery.json",
+        "data/games/ose/data/gems_jewellery.json",
+        "../data/games/ose/data/gems_jewellery.json",
         "gems_jewellery.json",
     ];
 
@@ -366,7 +366,7 @@ fn init_gems_jewellery() -> GemsJewelleryData {
     }
 
     eprintln!("Warning: No gems_jewellery data file found. Using defaults.");
-    eprintln!("Expected: data/core/gems_jewellery.json");
+    eprintln!("Expected: data/games/ose/data/gems_jewellery.json");
     default_gems_jewellery()
 }
 

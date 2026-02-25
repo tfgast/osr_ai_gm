@@ -179,7 +179,7 @@ static NPC_PARTY_DATA: OnceLock<NpcPartyData> = OnceLock::new();
 
 fn load_data() -> &'static NpcPartyData {
     NPC_PARTY_DATA.get_or_init(|| {
-        let json_str = include_str!("../../data/core/npc_parties.json");
+        let json_str = include_str!("../../data/games/ose/data/npc_parties.json");
         serde_json::from_str(json_str).expect("Failed to parse npc_parties.json")
     })
 }

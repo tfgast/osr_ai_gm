@@ -63,7 +63,7 @@ static ENCOUNTER_DATA: OnceLock<EncounterData> = OnceLock::new();
 
 fn load_encounter_data() -> &'static EncounterData {
     ENCOUNTER_DATA.get_or_init(|| {
-        let json_str = include_str!("../../data/core/encounters.json");
+        let json_str = include_str!("../../data/games/ose/data/encounters.json");
         serde_json::from_str(json_str).expect("Failed to parse encounters.json")
     })
 }

@@ -139,9 +139,9 @@ fn init_registry() -> MagicItemRegistry {
     // Find data directory relative to executable or working directory
     let data_paths = [
         // Development: relative to working directory
-        "data/core/magic_items.json",
+        "data/games/ose/data/magic_items.json",
         // Installed: relative to executable
-        "../data/core/magic_items.json",
+        "../data/games/ose/data/magic_items.json",
         // Alternative: in current directory
         "magic_items.json",
     ];
@@ -165,7 +165,7 @@ fn init_registry() -> MagicItemRegistry {
 
     if !loaded {
         eprintln!("Warning: No magic item data files found. Using empty registry.");
-        eprintln!("Expected: data/core/magic_items.json");
+        eprintln!("Expected: data/games/ose/data/magic_items.json");
     }
 
     registry

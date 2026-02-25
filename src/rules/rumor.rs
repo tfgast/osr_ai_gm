@@ -88,8 +88,8 @@ fn init_registry() -> RumorRegistry {
     let mut registry = RumorRegistry::new();
 
     let data_paths = [
-        "data/core/rumors.json",
-        "../data/core/rumors.json",
+        "data/games/ose/data/rumors.json",
+        "../data/games/ose/data/rumors.json",
         "rumors.json",
     ];
 
@@ -112,7 +112,7 @@ fn init_registry() -> RumorRegistry {
 
     if !loaded {
         eprintln!("Warning: No rumor data files found. Using empty registry.");
-        eprintln!("Expected: data/core/rumors.json");
+        eprintln!("Expected: data/games/ose/data/rumors.json");
     }
 
     registry

@@ -131,9 +131,9 @@ fn init_registry() -> SpellRegistry {
     // Find data directory relative to executable or working directory
     let data_paths = [
         // Development: relative to working directory
-        "data/core/spells.json",
+        "data/games/ose/data/spells.json",
         // Installed: relative to executable
-        "../data/core/spells.json",
+        "../data/games/ose/data/spells.json",
         // Alternative: in current directory
         "spells.json",
     ];
@@ -157,7 +157,7 @@ fn init_registry() -> SpellRegistry {
 
     if !loaded {
         eprintln!("Warning: No spell data files found. Using empty registry.");
-        eprintln!("Expected: data/core/spells.json");
+        eprintln!("Expected: data/games/ose/data/spells.json");
     }
 
     registry

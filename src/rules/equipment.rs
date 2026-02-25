@@ -474,8 +474,8 @@ fn init_registry() -> EquipmentRegistry {
     let mut registry = EquipmentRegistry::new();
 
     let data_paths = [
-        "data/core/equipment.json",
-        "../data/core/equipment.json",
+        "data/games/ose/data/equipment.json",
+        "../data/games/ose/data/equipment.json",
         "equipment.json",
     ];
 
@@ -498,7 +498,7 @@ fn init_registry() -> EquipmentRegistry {
 
     if !loaded {
         eprintln!("Warning: No equipment data files found. Using empty registry.");
-        eprintln!("Expected: data/core/equipment.json");
+        eprintln!("Expected: data/games/ose/data/equipment.json");
     }
 
     registry
