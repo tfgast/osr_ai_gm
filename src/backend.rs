@@ -85,6 +85,95 @@ pub fn is_dsl(group: MechanicGroup) -> bool {
     config().get(group) == Backend::Dsl
 }
 
+// ── DSL Helpers (stateless evaluation support) ───────────────
+
+#[cfg(feature = "dsl-backend")]
+pub use dsl_helpers::*;
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_helpers {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider};
+    use ttrpg_interp::value::{RollResult, Value};
+
+    use crate::bridge::dice::roll_interp_dice;
+
+    /// Minimal state provider for stateless DSL calls (derives with primitive args).
+    pub struct NullState;
+
+    impl StateProvider for NullState {
+        fn read_field(&self, _entity: &EntityRef, _field: &str) -> Option<Value> {
+            None
+        }
+        fn read_conditions(&self, _entity: &EntityRef) -> Option<Vec<ActiveCondition>> {
+            None
+        }
+        fn read_turn_budget(&self, _entity: &EntityRef) -> Option<BTreeMap<Name, Value>> {
+            None
+        }
+        fn read_enabled_options(&self) -> Vec<Name> {
+            Vec::new()
+        }
+        fn position_eq(&self, _a: &Value, _b: &Value) -> bool {
+            false
+        }
+        fn distance(&self, _a: &Value, _b: &Value) -> Option<i64> {
+            None
+        }
+        fn entity_type_name(&self, _entity: &EntityRef) -> Option<Name> {
+            None
+        }
+    }
+
+    /// Simple effect handler that handles dice rolls and acknowledges everything else.
+    /// Captures roll results so callers can extract die values (e.g. the d20 from attack_roll).
+    pub struct SimpleDiceHandler {
+        pub rolls: Vec<RollResult>,
+    }
+
+    impl Default for SimpleDiceHandler {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl SimpleDiceHandler {
+        pub fn new() -> Self {
+            SimpleDiceHandler { rolls: Vec::new() }
+        }
+    }
+
+    impl EffectHandler for SimpleDiceHandler {
+        fn handle(&mut self, effect: Effect) -> Response {
+            match effect {
+                Effect::RollDice { expr } => {
+                    let result = roll_interp_dice(&expr);
+                    self.rolls.push(result.clone());
+                    Response::Rolled(result)
+                }
+                Effect::RequiresCheck { passed, .. } => {
+                    if passed {
+                        Response::Acknowledged
+                    } else {
+                        Response::Vetoed
+                    }
+                }
+                Effect::ResolvePrompt { ref suggest, .. } => {
+                    if let Some(val) = suggest {
+                        Response::PromptResult(val.clone())
+                    } else {
+                        Response::PromptResult(Value::None)
+                    }
+                }
+                _ => Response::Acknowledged,
+            }
+        }
+    }
+}
+
 // ── DSL Runtime ──────────────────────────────────────────────
 
 #[cfg(feature = "dsl-backend")]

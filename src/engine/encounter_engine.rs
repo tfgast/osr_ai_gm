@@ -141,14 +141,64 @@ pub fn reaction_roll(cha_score: i32) -> (Reaction, i32, i32) {
 
 /// Testable version. Returns (reaction, raw_roll, modified_roll).
 pub fn reaction_roll_with<R: Rng>(rng: &mut R, cha_score: i32) -> (Reaction, i32, i32) {
+    let cha_mod = ability::cha_reaction_mod(cha_score);
+
+    // DSL gate: use reaction_roll mechanic if available
+    #[cfg(feature = "dsl-backend")]
+    if let Some(result) = dsl_reaction_roll(cha_mod) {
+        return result;
+    }
+
+    native_reaction_roll_with(rng, cha_mod)
+}
+
+fn native_reaction_roll_with<R: Rng>(rng: &mut R, cha_mod: i32) -> (Reaction, i32, i32) {
     let d1: i32 = rng.gen_range(1..=6);
     let d2: i32 = rng.gen_range(1..=6);
     let raw = d1 + d2;
-    let cha_mod = ability::cha_reaction_mod(cha_score);
     let modified = raw + cha_mod;
 
     let reaction = Reaction::from_roll(modified);
     (reaction, raw, modified)
+}
+
+/// Try evaluating reaction via DSL `reaction_roll` mechanic.
+/// Returns None on DSL error (caller falls through to native).
+#[cfg(feature = "dsl-backend")]
+fn dsl_reaction_roll(cha_mod: i32) -> Option<(Reaction, i32, i32)> {
+    use crate::backend::{self, MechanicGroup};
+    if !backend::is_dsl(MechanicGroup::Combat) {
+        return None;
+    }
+    let runtime = backend::dsl()?;
+    let mut handler = backend::SimpleDiceHandler::new();
+    use ttrpg_interp::value::Value;
+    match runtime.evaluate_mechanic(
+        &backend::NullState,
+        &mut handler,
+        "reaction_roll",
+        vec![Value::Int(cha_mod as i64)],
+    ) {
+        Ok(Value::EnumVariant { ref variant, .. }) => {
+            let reaction = match variant.as_str() {
+                "rx_hostile" => Reaction::Hostile,
+                "rx_unfriendly" => Reaction::Unfriendly,
+                "rx_neutral" => Reaction::Uncertain,
+                "rx_indifferent" => Reaction::Indifferent,
+                "rx_friendly" => Reaction::Friendly,
+                _ => return None,
+            };
+            // Extract raw 2d6 from handler (sum of the two dice)
+            let raw = handler
+                .rolls
+                .first()
+                .map(|r| r.unmodified as i32)
+                .unwrap_or(0);
+            let modified = raw + cha_mod;
+            Some((reaction, raw, modified))
+        }
+        _ => None,
+    }
 }
 
 /// Evasion attempt result.
