@@ -6,6 +6,7 @@
 use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::fs;
 use std::sync::OnceLock;
 
 use super::alignment::Alignment;
@@ -179,8 +180,12 @@ static NPC_PARTY_DATA: OnceLock<NpcPartyData> = OnceLock::new();
 
 fn load_data() -> &'static NpcPartyData {
     NPC_PARTY_DATA.get_or_init(|| {
-        let json_str = include_str!("../../data/games/ose/data/npc_parties.json");
-        serde_json::from_str(json_str).expect("Failed to parse npc_parties.json")
+        let path = crate::manifest::game_data_file("npc_parties")
+            .expect("No 'npc_parties' entry in game system manifest");
+        let content = fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+        serde_json::from_str(&content)
+            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path.display(), e))
     })
 }
 

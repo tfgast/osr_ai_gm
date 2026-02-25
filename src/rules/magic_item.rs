@@ -136,25 +136,12 @@ static REGISTRY: OnceLock<MagicItemRegistry> = OnceLock::new();
 fn init_registry() -> MagicItemRegistry {
     let mut registry = MagicItemRegistry::new();
 
-    // Find data directory relative to executable or working directory
-    let data_paths = [
-        // Development: relative to working directory
-        "data/games/ose/data/magic_items.json",
-        // Installed: relative to executable
-        "../data/games/ose/data/magic_items.json",
-        // Alternative: in current directory
-        "magic_items.json",
-    ];
-
-    let mut loaded = false;
-    for path_str in &data_paths {
-        let path = Path::new(path_str);
+    if let Some(path) = crate::manifest::game_data_file("magic_items") {
         if path.exists() {
-            match registry.load_file(path) {
+            match registry.load_file(&path) {
                 Ok(count) => {
                     eprintln!("Loaded {} magic items from {}", count, path.display());
-                    loaded = true;
-                    break;
+                    return registry;
                 }
                 Err(e) => {
                     eprintln!("Warning: {}", e);
@@ -163,10 +150,7 @@ fn init_registry() -> MagicItemRegistry {
         }
     }
 
-    if !loaded {
-        eprintln!("Warning: No magic item data files found. Using empty registry.");
-        eprintln!("Expected: data/games/ose/data/magic_items.json");
-    }
+    eprintln!("Warning: No magic item data file found in game system manifest.");
 
     registry
 }

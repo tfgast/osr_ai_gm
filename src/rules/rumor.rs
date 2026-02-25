@@ -87,21 +87,12 @@ static REGISTRY: OnceLock<RumorRegistry> = OnceLock::new();
 fn init_registry() -> RumorRegistry {
     let mut registry = RumorRegistry::new();
 
-    let data_paths = [
-        "data/games/ose/data/rumors.json",
-        "../data/games/ose/data/rumors.json",
-        "rumors.json",
-    ];
-
-    let mut loaded = false;
-    for path_str in &data_paths {
-        let path = Path::new(path_str);
+    if let Some(path) = crate::manifest::game_data_file("rumors") {
         if path.exists() {
-            match registry.load_file(path) {
+            match registry.load_file(&path) {
                 Ok(count) => {
                     eprintln!("Loaded {} rumor tables from {}", count, path.display());
-                    loaded = true;
-                    break;
+                    return registry;
                 }
                 Err(e) => {
                     eprintln!("Warning: {}", e);
@@ -110,10 +101,7 @@ fn init_registry() -> RumorRegistry {
         }
     }
 
-    if !loaded {
-        eprintln!("Warning: No rumor data files found. Using empty registry.");
-        eprintln!("Expected: data/games/ose/data/rumors.json");
-    }
+    eprintln!("Warning: No rumor data file found in game system manifest.");
 
     registry
 }

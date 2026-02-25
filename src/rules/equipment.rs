@@ -473,21 +473,12 @@ static REGISTRY: OnceLock<EquipmentRegistry> = OnceLock::new();
 fn init_registry() -> EquipmentRegistry {
     let mut registry = EquipmentRegistry::new();
 
-    let data_paths = [
-        "data/games/ose/data/equipment.json",
-        "../data/games/ose/data/equipment.json",
-        "equipment.json",
-    ];
-
-    let mut loaded = false;
-    for path_str in &data_paths {
-        let path = Path::new(path_str);
+    if let Some(path) = crate::manifest::game_data_file("equipment") {
         if path.exists() {
-            match registry.load_file(path) {
+            match registry.load_file(&path) {
                 Ok(count) => {
                     eprintln!("Loaded {} equipment items from {}", count, path.display());
-                    loaded = true;
-                    break;
+                    return registry;
                 }
                 Err(e) => {
                     eprintln!("Warning: {}", e);
@@ -496,10 +487,7 @@ fn init_registry() -> EquipmentRegistry {
         }
     }
 
-    if !loaded {
-        eprintln!("Warning: No equipment data files found. Using empty registry.");
-        eprintln!("Expected: data/games/ose/data/equipment.json");
-    }
+    eprintln!("Warning: No equipment data file found in game system manifest.");
 
     registry
 }

@@ -181,25 +181,12 @@ static REGISTRY: OnceLock<TreasureRegistry> = OnceLock::new();
 fn init_registry() -> TreasureRegistry {
     let mut registry = TreasureRegistry::new();
 
-    // Find data directory relative to executable or working directory
-    let data_paths = [
-        // Development: relative to working directory
-        "data/games/ose/data/treasure.json",
-        // Installed: relative to executable
-        "../data/games/ose/data/treasure.json",
-        // Alternative: in current directory
-        "treasure.json",
-    ];
-
-    let mut loaded = false;
-    for path_str in &data_paths {
-        let path = Path::new(path_str);
+    if let Some(path) = crate::manifest::game_data_file("treasure") {
         if path.exists() {
-            match registry.load_file(path) {
+            match registry.load_file(&path) {
                 Ok(count) => {
                     eprintln!("Loaded {} treasure types from {}", count, path.display());
-                    loaded = true;
-                    break;
+                    return registry;
                 }
                 Err(e) => {
                     eprintln!("Warning: {}", e);
@@ -208,10 +195,7 @@ fn init_registry() -> TreasureRegistry {
         }
     }
 
-    if !loaded {
-        eprintln!("Warning: No treasure data files found. Using empty registry.");
-        eprintln!("Expected: data/games/ose/data/treasure.json");
-    }
+    eprintln!("Warning: No treasure data file found in game system manifest.");
 
     registry
 }
@@ -326,16 +310,9 @@ static GEMS_JEWELLERY: OnceLock<GemsJewelleryData> = OnceLock::new();
 
 /// Initialize gems/jewellery data by loading from JSON.
 fn init_gems_jewellery() -> GemsJewelleryData {
-    let data_paths = [
-        "data/games/ose/data/gems_jewellery.json",
-        "../data/games/ose/data/gems_jewellery.json",
-        "gems_jewellery.json",
-    ];
-
-    for path_str in &data_paths {
-        let path = Path::new(path_str);
+    if let Some(path) = crate::manifest::game_data_file("gems_jewellery") {
         if path.exists() {
-            match fs::read_to_string(path) {
+            match fs::read_to_string(&path) {
                 Ok(content) => match serde_json::from_str::<GemsJewelleryFile>(&content) {
                     Ok(file) => {
                         let gem_entries = file
@@ -365,8 +342,7 @@ fn init_gems_jewellery() -> GemsJewelleryData {
         }
     }
 
-    eprintln!("Warning: No gems_jewellery data file found. Using defaults.");
-    eprintln!("Expected: data/games/ose/data/gems_jewellery.json");
+    eprintln!("Warning: No gems_jewellery data file found in game system manifest. Using defaults.");
     default_gems_jewellery()
 }
 

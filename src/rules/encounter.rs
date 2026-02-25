@@ -1,6 +1,7 @@
 use crate::state::wilderness::Terrain;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::fs;
 use std::sync::OnceLock;
 
 /// An entry from an encounter table.
@@ -63,8 +64,12 @@ static ENCOUNTER_DATA: OnceLock<EncounterData> = OnceLock::new();
 
 fn load_encounter_data() -> &'static EncounterData {
     ENCOUNTER_DATA.get_or_init(|| {
-        let json_str = include_str!("../../data/games/ose/data/encounters.json");
-        serde_json::from_str(json_str).expect("Failed to parse encounters.json")
+        let path = crate::manifest::game_data_file("encounters")
+            .expect("No 'encounters' entry in game system manifest");
+        let content = fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+        serde_json::from_str(&content)
+            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path.display(), e))
     })
 }
 

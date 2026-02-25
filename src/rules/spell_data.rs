@@ -128,25 +128,12 @@ static REGISTRY: OnceLock<SpellRegistry> = OnceLock::new();
 fn init_registry() -> SpellRegistry {
     let mut registry = SpellRegistry::new();
 
-    // Find data directory relative to executable or working directory
-    let data_paths = [
-        // Development: relative to working directory
-        "data/games/ose/data/spells.json",
-        // Installed: relative to executable
-        "../data/games/ose/data/spells.json",
-        // Alternative: in current directory
-        "spells.json",
-    ];
-
-    let mut loaded = false;
-    for path_str in &data_paths {
-        let path = Path::new(path_str);
+    if let Some(path) = crate::manifest::game_data_file("spells") {
         if path.exists() {
-            match registry.load_file(path) {
+            match registry.load_file(&path) {
                 Ok(count) => {
                     eprintln!("Loaded {} spells from {}", count, path.display());
-                    loaded = true;
-                    break;
+                    return registry;
                 }
                 Err(e) => {
                     eprintln!("Warning: {}", e);
@@ -155,10 +142,7 @@ fn init_registry() -> SpellRegistry {
         }
     }
 
-    if !loaded {
-        eprintln!("Warning: No spell data files found. Using empty registry.");
-        eprintln!("Expected: data/games/ose/data/spells.json");
-    }
+    eprintln!("Warning: No spell data file found in game system manifest.");
 
     registry
 }

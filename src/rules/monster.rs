@@ -299,25 +299,12 @@ static REGISTRY: OnceLock<MonsterRegistry> = OnceLock::new();
 fn init_registry() -> MonsterRegistry {
     let mut registry = MonsterRegistry::new();
 
-    // Find data directory relative to executable or working directory
-    let data_paths = [
-        // Development: relative to working directory
-        "data/games/ose/data/monsters.json",
-        // Installed: relative to executable
-        "../data/games/ose/data/monsters.json",
-        // Alternative: in current directory
-        "monsters.json",
-    ];
-
-    let mut loaded = false;
-    for path_str in &data_paths {
-        let path = Path::new(path_str);
+    if let Some(path) = crate::manifest::game_data_file("monsters") {
         if path.exists() {
-            match registry.load_file(path) {
+            match registry.load_file(&path) {
                 Ok(count) => {
                     eprintln!("Loaded {} monsters from {}", count, path.display());
-                    loaded = true;
-                    break;
+                    return registry;
                 }
                 Err(e) => {
                     eprintln!("Warning: {}", e);
@@ -326,10 +313,7 @@ fn init_registry() -> MonsterRegistry {
         }
     }
 
-    if !loaded {
-        eprintln!("Warning: No monster data files found. Using empty registry.");
-        eprintln!("Expected: data/games/ose/data/monsters.json");
-    }
+    eprintln!("Warning: No monster data file found in game system manifest.");
 
     // TODO: Load module data from data/modules/*/monsters.json
     // TODO: Load user data from ~/.osr_data/custom/monsters.json
