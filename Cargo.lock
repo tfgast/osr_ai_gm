@@ -1884,6 +1884,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "ttrpg_ast"
+version = "0.1.0"
+
+[[package]]
+name = "ttrpg_bridge"
+version = "0.1.0"
+dependencies = [
+ "osr_ai_gm",
+ "rand 0.8.5",
+ "ttrpg_ast",
+ "ttrpg_interp",
+]
+
+[[package]]
+name = "ttrpg_checker"
+version = "0.1.0"
+dependencies = [
+ "ttrpg_ast",
+]
+
+[[package]]
+name = "ttrpg_interp"
+version = "0.1.0"
+dependencies = [
+ "ttrpg_ast",
+ "ttrpg_checker",
+]
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
