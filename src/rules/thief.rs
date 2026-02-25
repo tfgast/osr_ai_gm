@@ -1,5 +1,10 @@
 //! Thief skill tables per OSE Rules Tome.
 //! Most skills are d% (percentile), Hear Noise is d6.
+//!
+//! When the `dsl-backend` feature is enabled and `OSR_BACKEND_THIEF=dsl`,
+//! derive functions delegate to DSL evaluations. Table lookups (skill_chance)
+//! and the check_skill function remain native; the DSL mechanic handles
+//! the full check flow at the engine action level.
 
 /// Thief skills available.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,6 +105,14 @@ pub fn check_skill(skill: ThiefSkill, level: u32, roll: u32) -> ThiefSkillResult
 /// Backstab damage multiplier by thief level per OSE Rules Tome.
 /// Level 1-4: x2, Level 5-8: x3, Level 9-12: x4, Level 13+: x5
 pub fn backstab_multiplier(level: u32) -> u32 {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Thief) {
+            if let Some(val) = dsl_gate::dsl_backstab_multiplier(level) {
+                return val;
+            }
+        }
+    }
     match level {
         1..=4 => 2,
         5..=8 => 3,
@@ -113,14 +126,101 @@ pub const BACKSTAB_ATTACK_BONUS: i32 = 4;
 
 /// Whether a class has thief skills.
 pub fn has_thief_skills(class: crate::rules::class::Class) -> bool {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Thief) {
+            if let Some(val) = dsl_gate::dsl_has_thief_skills(class) {
+                return val;
+            }
+        }
+    }
     use crate::rules::class::Class;
     matches!(class, Class::Thief | Class::Acrobat | Class::Assassin | Class::HalfOrc | Class::Bard)
 }
 
 /// Whether a class can backstab.
 pub fn can_backstab(class: crate::rules::class::Class) -> bool {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Thief) {
+            if let Some(val) = dsl_gate::dsl_can_backstab(class) {
+                return val;
+            }
+        }
+    }
     use crate::rules::class::Class;
     matches!(class, Class::Thief | Class::Assassin)
+}
+
+// ── DSL gate helpers ──────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_gate {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider};
+    use ttrpg_interp::value::Value;
+
+    use crate::backend;
+
+    /// Null state provider for pure derive evaluation (no entity access needed).
+    struct NullState;
+
+    impl StateProvider for NullState {
+        fn read_field(&self, _: &EntityRef, _: &str) -> Option<Value> { None }
+        fn read_conditions(&self, _: &EntityRef) -> Option<Vec<ActiveCondition>> { None }
+        fn read_turn_budget(&self, _: &EntityRef) -> Option<BTreeMap<Name, Value>> { None }
+        fn read_enabled_options(&self) -> Vec<Name> { Vec::new() }
+        fn position_eq(&self, _: &Value, _: &Value) -> bool { false }
+        fn distance(&self, _: &Value, _: &Value) -> Option<i64> { None }
+    }
+
+    /// Null effect handler for pure derive evaluation (no effects fired).
+    struct NullHandler;
+
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response { Response::Acknowledged }
+    }
+
+    fn class_to_dsl(class: crate::rules::class::Class) -> Value {
+        Value::EnumVariant {
+            enum_name: "Class".into(),
+            variant: Name::from(format!("{:?}", class)),
+            fields: BTreeMap::new(),
+        }
+    }
+
+    pub fn dsl_backstab_multiplier(level: u32) -> Option<u32> {
+        let rt = backend::dsl()?;
+        let args = vec![Value::Int(level as i64)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "backstab_multiplier", args).ok()?;
+        match result {
+            Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_has_thief_skills(class: crate::rules::class::Class) -> Option<bool> {
+        let rt = backend::dsl()?;
+        let args = vec![class_to_dsl(class)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "has_thief_skills", args).ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_can_backstab(class: crate::rules::class::Class) -> Option<bool> {
+        let rt = backend::dsl()?;
+        let args = vec![class_to_dsl(class)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "can_backstab", args).ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

@@ -991,6 +991,35 @@ pub fn action_thief_skill_check(
         }
     };
 
+    // DSL mechanic path: delegate the full skill check to the DSL interpreter.
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Thief) {
+        if let Some((success, dsl_roll)) = dsl_thief::dsl_skill_check(skill, character.level) {
+            let die_type = if skill.is_d6() { "d6" } else { "d%" };
+            let target = thief::skill_chance(skill, character.level);
+            let roll = dsl_roll.unwrap_or(0);
+            return Ok(ThiefSkillCheckResult {
+                message: format!(
+                    "{} attempts {} (level {}): rolled {} ({}) — {} [DSL].",
+                    character.name,
+                    skill.name(),
+                    character.level,
+                    roll,
+                    die_type,
+                    if success { "SUCCESS" } else { "FAILURE" }
+                ),
+                character: character.name.clone(),
+                skill: skill.name().to_string(),
+                level: character.level,
+                target,
+                roll,
+                die_type: die_type.to_string(),
+                success,
+            });
+        }
+    }
+
+    // Native path: hardcoded tables and local dice roll.
     let target = thief::skill_chance(skill, character.level);
     let roll: u32 = if skill.is_d6() {
         rand::Rng::gen_range(&mut rand::thread_rng(), 1..=6)
@@ -1019,4 +1048,94 @@ pub fn action_thief_skill_check(
         die_type: die_type.to_string(),
         success: result.success,
     })
+}
+
+// ── DSL thief mechanic helpers ──────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_thief {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider};
+    use ttrpg_interp::value::Value;
+
+    use crate::backend;
+    use crate::bridge::dice::roll_interp_dice;
+    use crate::rules::thief::ThiefSkill;
+
+    struct NullState;
+
+    impl StateProvider for NullState {
+        fn read_field(&self, _: &EntityRef, _: &str) -> Option<Value> { None }
+        fn read_conditions(&self, _: &EntityRef) -> Option<Vec<ActiveCondition>> { None }
+        fn read_turn_budget(&self, _: &EntityRef) -> Option<BTreeMap<Name, Value>> { None }
+        fn read_enabled_options(&self) -> Vec<Name> { Vec::new() }
+        fn position_eq(&self, _: &Value, _: &Value) -> bool { false }
+        fn distance(&self, _: &Value, _: &Value) -> Option<i64> { None }
+    }
+
+    /// Effect handler that rolls dice and captures the last roll total.
+    struct RollCapture {
+        last_roll: Option<i64>,
+    }
+
+    impl EffectHandler for RollCapture {
+        fn handle(&mut self, effect: Effect) -> Response {
+            match effect {
+                Effect::RollDice { expr } => {
+                    let result = roll_interp_dice(&expr);
+                    self.last_roll = Some(result.total);
+                    Response::Rolled(result)
+                }
+                _ => Response::Acknowledged,
+            }
+        }
+    }
+
+    fn thief_skill_to_dsl(skill: ThiefSkill) -> Value {
+        let variant = match skill {
+            ThiefSkill::ClimbWalls => "climb_walls",
+            ThiefSkill::FindTraps => "find_traps",
+            ThiefSkill::HearNoise => "hear_noise",
+            ThiefSkill::HideShadows => "hide_shadows",
+            ThiefSkill::MoveSilently => "move_silently",
+            ThiefSkill::OpenLocks => "open_locks",
+            ThiefSkill::PickPockets => "pick_pockets",
+            ThiefSkill::ReadLanguages => "read_languages",
+        };
+        Value::EnumVariant {
+            enum_name: "ThiefSkill".into(),
+            variant: variant.into(),
+            fields: BTreeMap::new(),
+        }
+    }
+
+    /// Call the DSL thief skill check mechanic.
+    /// Returns (success, optional_roll_value).
+    pub fn dsl_skill_check(skill: ThiefSkill, level: u32) -> Option<(bool, Option<u32>)> {
+        let rt = backend::dsl()?;
+        let (mechanic_name, args) = if skill.is_d6() {
+            ("hear_noise".to_string(), vec![Value::Int(level as i64)])
+        } else {
+            ("thief_skill_check".to_string(), vec![
+                thief_skill_to_dsl(skill),
+                Value::Int(level as i64),
+            ])
+        };
+        let mut handler = RollCapture { last_roll: None };
+        let result = rt.evaluate_mechanic(
+            &NullState,
+            &mut handler,
+            &mechanic_name,
+            args,
+        ).ok()?;
+        let success = match result {
+            Value::Bool(v) => v,
+            _ => return None,
+        };
+        let roll = handler.last_roll.map(|r| r as u32);
+        Some((success, roll))
+    }
 }
