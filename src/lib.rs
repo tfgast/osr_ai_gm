@@ -1,4 +1,7 @@
 pub mod auth;
+pub mod backend;
+#[cfg(feature = "dsl-backend")]
+pub mod bridge;
 pub mod command;
 pub mod dice;
 pub mod engine;
