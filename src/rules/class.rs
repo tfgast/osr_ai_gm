@@ -164,6 +164,16 @@ pub const CHA: usize = 5;
 
 /// Get the full class definition for a given class.
 pub fn class_def(class: Class) -> ClassDef {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Class) {
+        if let Some(def) = dsl_gate::dsl_class_def(class) {
+            return def;
+        }
+    }
+    native_class_def(class)
+}
+
+fn native_class_def(class: Class) -> ClassDef {
     match class {
         Class::Acrobat => ClassDef {
             class, hit_die: 4,
@@ -457,6 +467,12 @@ pub fn class_def(class: Class) -> ClassDef {
 /// Check if a set of ability scores meets the requirements for a class.
 /// Abilities array: [STR, INT, WIS, DEX, CON, CHA] (after racial modifiers).
 pub fn meets_requirements(class: Class, abilities: &[i32; 6]) -> bool {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Class) {
+        if let Some(val) = dsl_gate::dsl_meets_requirements(class, abilities) {
+            return val;
+        }
+    }
     let def = class_def(class);
     for &(idx, min) in def.requirements {
         if abilities[idx] < min {
@@ -491,6 +507,203 @@ pub fn eligible_classes(abilities: &[i32; 6]) -> Vec<Class> {
             }
         })
         .collect()
+}
+
+// ── DSL gate helpers ──────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_gate {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider};
+    use ttrpg_interp::value::Value;
+
+    use crate::backend;
+    use super::*;
+
+    struct NullState;
+
+    impl StateProvider for NullState {
+        fn read_field(&self, _: &EntityRef, _: &str) -> Option<Value> { None }
+        fn read_conditions(&self, _: &EntityRef) -> Option<Vec<ActiveCondition>> { None }
+        fn read_turn_budget(&self, _: &EntityRef) -> Option<BTreeMap<Name, Value>> { None }
+        fn read_enabled_options(&self) -> Vec<Name> { Vec::new() }
+        fn position_eq(&self, _: &Value, _: &Value) -> bool { false }
+        fn distance(&self, _: &Value, _: &Value) -> Option<i64> { None }
+    }
+
+    struct NullHandler;
+
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response { Response::Acknowledged }
+    }
+
+    fn class_to_dsl(class: Class) -> Value {
+        Value::EnumVariant {
+            enum_name: "Class".into(),
+            variant: Name::from(format!("{:?}", class)),
+            fields: BTreeMap::new(),
+        }
+    }
+
+    fn dsl_int(fields: &BTreeMap<Name, Value>, key: &str) -> Option<i64> {
+        match fields.get(&Name::from(key))? {
+            Value::Int(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    fn dsl_bool(fields: &BTreeMap<Name, Value>, key: &str) -> Option<bool> {
+        match fields.get(&Name::from(key))? {
+            Value::Bool(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    fn dsl_variant<'a>(fields: &'a BTreeMap<Name, Value>, key: &str) -> Option<&'a str> {
+        match fields.get(&Name::from(key))? {
+            Value::EnumVariant { variant, .. } => Some(variant.as_str()),
+            _ => None,
+        }
+    }
+
+    fn parse_combat_aptitude(s: &str) -> Option<CombatAptitude> {
+        match s {
+            "martial" => Some(CombatAptitude::Martial),
+            "semi_martial" => Some(CombatAptitude::SemiMartial),
+            "non_martial" => Some(CombatAptitude::NonMartial),
+            _ => None,
+        }
+    }
+
+    fn parse_armour_permission(s: &str) -> Option<ArmourPermission> {
+        match s {
+            "any_armour" => Some(ArmourPermission::Any),
+            "any_no_shield" => Some(ArmourPermission::AnyNoShield),
+            "leather_only" => Some(ArmourPermission::Leather),
+            "leather_shield" => Some(ArmourPermission::LeatherShield),
+            "no_armour" => Some(ArmourPermission::None),
+            _ => None,
+        }
+    }
+
+    fn parse_save_category(s: &str) -> Option<SaveCategory> {
+        match s {
+            "save_thief" => Some(SaveCategory::Thief),
+            "save_barbarian" => Some(SaveCategory::Barbarian),
+            "save_cleric" => Some(SaveCategory::Cleric),
+            "save_drow" => Some(SaveCategory::Drow),
+            "save_dwarf" => Some(SaveCategory::Dwarf),
+            "save_elf" => Some(SaveCategory::Elf),
+            "save_fighter" => Some(SaveCategory::Fighter),
+            "save_gnome" => Some(SaveCategory::Gnome),
+            "save_half_elf" => Some(SaveCategory::HalfElf),
+            "save_half_orc" => Some(SaveCategory::HalfOrc),
+            "save_magic_user" => Some(SaveCategory::MagicUser),
+            "save_paladin" => Some(SaveCategory::Paladin),
+            "save_svirfneblin" => Some(SaveCategory::Svirfneblin),
+            _ => None,
+        }
+    }
+
+    fn parse_spell_progression(s: &str) -> Option<SpellProgression> {
+        match s {
+            "prog_bard" => Some(SpellProgression::Bard),
+            "prog_cleric" => Some(SpellProgression::Cleric),
+            "prog_drow" => Some(SpellProgression::Drow),
+            "prog_druid" => Some(SpellProgression::Druid),
+            "prog_arcane_full" => Some(SpellProgression::ArcaneFullCaster),
+            "prog_half_elf" => Some(SpellProgression::HalfElf),
+            "prog_paladin" => Some(SpellProgression::Paladin),
+            "prog_ranger" => Some(SpellProgression::Ranger),
+            "non_caster" => Some(SpellProgression::NonCaster),
+            _ => None,
+        }
+    }
+
+    fn parse_spell_list(s: &str) -> Option<SpellListType> {
+        match s {
+            "no_list" => Some(SpellListType::None),
+            "list_cleric" => Some(SpellListType::Cleric),
+            "list_druid" => Some(SpellListType::Druid),
+            "list_illusionist" => Some(SpellListType::Illusionist),
+            "list_magic_user" => Some(SpellListType::MagicUser),
+            "list_drow_arcane_divine" => Some(SpellListType::DrowArcaneAndDivine),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_class_def(class: Class) -> Option<ClassDef> {
+        let rt = backend::dsl()?;
+        let args = vec![class_to_dsl(class)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "class_def", args).ok()?;
+
+        let fields = match &result {
+            Value::Struct { fields, .. } => fields,
+            _ => return None,
+        };
+
+        // Extract DSL fields
+        let hit_die = dsl_int(fields, "hit_die")? as u32;
+        let combat_aptitude = parse_combat_aptitude(dsl_variant(fields, "combat_aptitude")?)?;
+        let max_level = dsl_int(fields, "max_level")? as u32;
+        let armour = parse_armour_permission(dsl_variant(fields, "armour")?)?;
+        let weapons_any = dsl_bool(fields, "weapons_any")?;
+        let weapons_blunt_only = dsl_bool(fields, "weapons_blunt_only")?;
+        let save_category = parse_save_category(dsl_variant(fields, "save_category")?)?;
+        let spell_progression = parse_spell_progression(dsl_variant(fields, "spell_progression")?)?;
+        let spell_list = parse_spell_list(dsl_variant(fields, "spell_list")?)?;
+        let is_demihuman = dsl_bool(fields, "is_demihuman")?;
+
+        // Fields not in DSL — backfill from native
+        let native = native_class_def(class);
+
+        Some(ClassDef {
+            class,
+            hit_die,
+            combat_aptitude,
+            prime_requisites: native.prime_requisites,
+            requirements: native.requirements,
+            racial_modifiers: native.racial_modifiers,
+            max_level,
+            armour,
+            weapons_any,
+            weapons_blunt_only,
+            save_category,
+            spell_progression,
+            spell_list,
+            starting_gold: native.starting_gold,
+            is_demihuman,
+        })
+    }
+
+    pub fn dsl_meets_requirements(class: Class, abilities: &[i32; 6]) -> Option<bool> {
+        let rt = backend::dsl()?;
+
+        // Build DSL map<Ability, int> from ability array
+        let ability_names = ["STR", "INT", "WIS", "DEX", "CON", "CHA"];
+        let mut ability_map = BTreeMap::new();
+        for (i, &name) in ability_names.iter().enumerate() {
+            let key = Value::EnumVariant {
+                enum_name: "Ability".into(),
+                variant: Name::from(name),
+                fields: BTreeMap::new(),
+            };
+            ability_map.insert(key, Value::Int(abilities[i] as i64));
+        }
+
+        let args = vec![
+            class_to_dsl(class),
+            Value::Map(ability_map),
+        ];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "meets_requirements", args).ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
