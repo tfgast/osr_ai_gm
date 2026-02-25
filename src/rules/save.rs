@@ -1,4 +1,8 @@
 //! Saving throw tables per OSE Reference Booklet p13.
+//!
+//! Supports DSL backend gate: when `OSR_BACKEND_SAVES=dsl` is set and the
+//! `dsl-backend` feature is enabled, saving throw lookups are evaluated
+//! through the DSL runtime instead of the hardcoded tables below.
 
 /// Five saving throw categories (D, W, P, B, S).
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -35,7 +39,88 @@ pub enum SaveCategory {
 }
 
 /// Look up saving throws by category and character level.
+///
+/// When `dsl-backend` feature is enabled and `OSR_BACKEND_SAVES=dsl`,
+/// delegates to the DSL runtime. Falls back to native on DSL failure.
 pub fn saving_throws(cat: SaveCategory, level: u32) -> SavingThrows {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Saves) {
+        match dsl_saving_throws(cat, level) {
+            Some(saves) => return saves,
+            None => eprintln!("DSL saves evaluation failed for {:?} L{}, falling back to native", cat, level),
+        }
+    }
+    native_saving_throws(cat, level)
+}
+
+// ── DSL backend ─────────────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+fn dsl_saving_throws(cat: SaveCategory, level: u32) -> Option<SavingThrows> {
+    use std::collections::BTreeMap;
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::reference_state::GameState;
+    use ttrpg_interp::value::Value;
+
+    struct NullHandler;
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response {
+            Response::Acknowledged
+        }
+    }
+
+    let runtime = crate::backend::dsl()?;
+    let state = GameState::new();
+    let mut handler = NullHandler;
+
+    let cat_value = Value::EnumVariant {
+        enum_name: "SaveCategory".into(),
+        variant: dsl_variant_name(cat).into(),
+        fields: BTreeMap::new(),
+    };
+    let level_value = Value::Int(level as i64);
+    let args = || vec![cat_value.clone(), level_value.clone()];
+
+    let death = as_u32(runtime.evaluate_derive(&state, &mut handler, "get_save_death", args()).ok()?)?;
+    let wands = as_u32(runtime.evaluate_derive(&state, &mut handler, "get_save_wands", args()).ok()?)?;
+    let paralysis = as_u32(runtime.evaluate_derive(&state, &mut handler, "get_save_paralysis", args()).ok()?)?;
+    let breath = as_u32(runtime.evaluate_derive(&state, &mut handler, "get_save_breath", args()).ok()?)?;
+    let spells = as_u32(runtime.evaluate_derive(&state, &mut handler, "get_save_spells", args()).ok()?)?;
+
+    Some(SavingThrows::new(death, wands, paralysis, breath, spells))
+}
+
+#[cfg(feature = "dsl-backend")]
+fn dsl_variant_name(cat: SaveCategory) -> &'static str {
+    match cat {
+        SaveCategory::Thief => "save_thief",
+        SaveCategory::Barbarian => "save_barbarian",
+        SaveCategory::Cleric => "save_cleric",
+        SaveCategory::Drow => "save_drow",
+        SaveCategory::Dwarf => "save_dwarf",
+        SaveCategory::Elf => "save_elf",
+        SaveCategory::Fighter => "save_fighter",
+        SaveCategory::Gnome => "save_gnome",
+        SaveCategory::HalfElf => "save_half_elf",
+        SaveCategory::HalfOrc => "save_half_orc",
+        SaveCategory::MagicUser => "save_magic_user",
+        SaveCategory::Paladin => "save_paladin",
+        SaveCategory::Svirfneblin => "save_svirfneblin",
+    }
+}
+
+#[cfg(feature = "dsl-backend")]
+fn as_u32(v: ttrpg_interp::value::Value) -> Option<u32> {
+    if let ttrpg_interp::value::Value::Int(n) = v {
+        Some(n as u32)
+    } else {
+        None
+    }
+}
+
+// ── Native backend ──────────────────────────────────────────────
+
+fn native_saving_throws(cat: SaveCategory, level: u32) -> SavingThrows {
     use SaveCategory::*;
     match cat {
         Thief => match level {
