@@ -445,9 +445,12 @@ mod tests {
     #[test]
     fn award_xp_basic() {
         let mut state = GameState::new();
-        state
-            .party
-            .add_member(Character::new("Aldric", Class::Fighter));
+        let mut c = Character::new("Aldric", Class::Fighter);
+        c.abilities = crate::model::AbilityScores {
+            strength: 10, intelligence: 10, wisdom: 10,
+            dexterity: 10, constitution: 10, charisma: 10,
+        };
+        state.party.add_member(c);
         let cmd = AwardXpCommand;
         let result = cmd.execute(&["Aldric", "500"], &mut state);
         assert!(result.output.contains("500 XP"));
