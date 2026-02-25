@@ -36,7 +36,22 @@ pub enum TurnResult {
 ///
 /// - `cleric_level`: the cleric's character level (1+)
 /// - `undead_rank`: the undead type rank (1-9, clamped)
+///
+/// When `OSR_BACKEND_TURN_UNDEAD=dsl` and the `dsl-backend` feature is enabled,
+/// delegates to the DSL `turn_undead_result` derive. Falls back to native on error.
 pub fn turn_undead_result(cleric_level: u32, undead_rank: u32) -> TurnResult {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::TurnUndead) {
+        if let Some(result) = dsl_gate::dsl_turn_undead_result(cleric_level, undead_rank) {
+            return result;
+        }
+    }
+
+    turn_undead_result_native(cleric_level, undead_rank)
+}
+
+/// Native (Rust) implementation of the turn undead table lookup.
+fn turn_undead_result_native(cleric_level: u32, undead_rank: u32) -> TurnResult {
     let rank = undead_rank.clamp(1, 9);
     let diff = cleric_level as i32 - rank as i32;
 
@@ -57,8 +72,94 @@ pub fn turn_undead_result(cleric_level: u32, undead_rank: u32) -> TurnResult {
 
 /// Convert undead Hit Dice to a turn undead rank (1-9).
 /// HD 1-8 map directly to ranks 1-8; HD 9+ all map to rank 9.
+///
+/// When `OSR_BACKEND_TURN_UNDEAD=dsl` and the `dsl-backend` feature is enabled,
+/// delegates to the DSL `undead_rank_from_hd` derive. Falls back to native on error.
 pub fn undead_rank_from_hd(hd: u32) -> u32 {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::TurnUndead) {
+        if let Some(rank) = dsl_gate::dsl_undead_rank_from_hd(hd) {
+            return rank;
+        }
+    }
+
     hd.clamp(1, 9)
+}
+
+// ── DSL gate helpers ──────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_gate {
+    use super::TurnResult;
+    use crate::bridge::handler::BridgeHandler;
+    use crate::bridge::state::BridgeState;
+    use ttrpg_ast::Name;
+    use ttrpg_interp::value::Value;
+
+    /// Evaluate the DSL `turn_undead_result` derive.
+    pub fn dsl_turn_undead_result(cleric_level: u32, undead_rank: u32) -> Option<TurnResult> {
+        let runtime = crate::backend::dsl()?;
+        let state = BridgeState::new(vec![], vec![], vec![], 0, 0);
+        let mut handler = BridgeHandler::new();
+
+        let result = runtime
+            .evaluate_derive(
+                &state,
+                &mut handler,
+                "turn_undead_result",
+                vec![
+                    Value::Int(cleric_level as i64),
+                    Value::Int(undead_rank as i64),
+                ],
+            )
+            .ok()?;
+
+        value_to_turn_result(result)
+    }
+
+    /// Evaluate the DSL `undead_rank_from_hd` derive.
+    pub fn dsl_undead_rank_from_hd(hd: u32) -> Option<u32> {
+        let runtime = crate::backend::dsl()?;
+        let state = BridgeState::new(vec![], vec![], vec![], 0, 0);
+        let mut handler = BridgeHandler::new();
+
+        let result = runtime
+            .evaluate_derive(
+                &state,
+                &mut handler,
+                "undead_rank_from_hd",
+                vec![Value::Int(hd as i64)],
+            )
+            .ok()?;
+
+        match result {
+            Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
+    }
+
+    /// Convert a DSL `TurnResult` enum variant to the Rust `TurnResult`.
+    fn value_to_turn_result(value: Value) -> Option<TurnResult> {
+        match value {
+            Value::EnumVariant {
+                variant, fields, ..
+            } => match variant.as_str() {
+                "Impossible" => Some(TurnResult::Impossible),
+                "Roll" => {
+                    let target = fields.get(&Name::from("target"))?;
+                    if let Value::Int(v) = target {
+                        Some(TurnResult::Roll(*v as u32))
+                    } else {
+                        None
+                    }
+                }
+                "Turned" => Some(TurnResult::Turned),
+                "Destroyed" => Some(TurnResult::Destroyed),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -252,5 +353,79 @@ mod tests {
         assert_eq!(undead_rank_from_hd(9), 9);
         assert_eq!(undead_rank_from_hd(15), 9);
         assert_eq!(undead_rank_from_hd(100), 9);
+    }
+}
+
+// ── DSL backend tests ─────────────────────────────────────────
+//
+// These tests verify that the DSL derives produce identical results
+// to the native Rust implementation. Run with:
+//   OSR_BACKEND_TURN_UNDEAD=dsl cargo test --features dsl-backend
+
+#[cfg(all(test, feature = "dsl-backend"))]
+mod dsl_tests {
+    use super::dsl_gate;
+    use super::*;
+
+    // --- DSL turn_undead_result matches native for all rank/level combos ---
+
+    #[test]
+    fn dsl_turn_undead_result_matches_native() {
+        for level in 1..=14 {
+            for rank in 1..=9 {
+                let native = turn_undead_result_native(level, rank);
+                let dsl = dsl_gate::dsl_turn_undead_result(level, rank)
+                    .unwrap_or_else(|| panic!(
+                        "DSL returned None for level={}, rank={}", level, rank
+                    ));
+                assert_eq!(
+                    native, dsl,
+                    "Mismatch at level={}, rank={}: native={:?}, dsl={:?}",
+                    level, rank, native, dsl
+                );
+            }
+        }
+    }
+
+    // --- DSL undead_rank_from_hd matches native ---
+
+    #[test]
+    fn dsl_undead_rank_matches_native() {
+        for hd in 0..=15 {
+            let native = hd.clamp(1, 9);
+            let dsl = dsl_gate::dsl_undead_rank_from_hd(hd)
+                .unwrap_or_else(|| panic!("DSL returned None for hd={}", hd));
+            assert_eq!(
+                native, dsl,
+                "Mismatch at hd={}: native={}, dsl={}",
+                hd, native, dsl
+            );
+        }
+    }
+
+    // --- Spot-check specific DSL results ---
+
+    #[test]
+    fn dsl_skeleton_level_1() {
+        let result = dsl_gate::dsl_turn_undead_result(1, 1).unwrap();
+        assert_eq!(result, TurnResult::Roll(7));
+    }
+
+    #[test]
+    fn dsl_vampire_level_11_destroys() {
+        let result = dsl_gate::dsl_turn_undead_result(11, 8).unwrap();
+        assert_eq!(result, TurnResult::Destroyed);
+    }
+
+    #[test]
+    fn dsl_wight_level_1_impossible() {
+        let result = dsl_gate::dsl_turn_undead_result(1, 4).unwrap();
+        assert_eq!(result, TurnResult::Impossible);
+    }
+
+    #[test]
+    fn dsl_skeleton_level_2_auto_turn() {
+        let result = dsl_gate::dsl_turn_undead_result(2, 1).unwrap();
+        assert_eq!(result, TurnResult::Turned);
     }
 }
