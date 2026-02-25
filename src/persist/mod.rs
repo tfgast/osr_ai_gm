@@ -398,7 +398,7 @@ mod tests {
     fn load_rejects_future_save_version() {
         let dir = std::env::temp_dir();
         let path = dir.join("osr_ai_gm_test_future_version.json");
-        let mut state = GameState::new();
+        let state = GameState::new();
         save(&state, &path).unwrap();
         // Patch version to a future value
         let mut data: serde_json::Value =

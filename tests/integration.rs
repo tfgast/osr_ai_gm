@@ -243,7 +243,7 @@ fn full_dungeon_session() {
     assert!(resp.success, "end combat failed: {}", resp.message);
     assert_eq!(state.mode, GameMode::Exploration);
     let data = resp.data.unwrap();
-    let total_xp = data["total_xp"].as_u64().unwrap();
+    let _total_xp = data["total_xp"].as_u64().unwrap();
 
     // -- STEP 13: Award XP from treasure --
     // Monster XP was auto-distributed by end_combat, so only award treasure here
@@ -722,7 +722,7 @@ fn complete_ose_session() {
     assert!(resp.success);
     assert_eq!(state.mode, GameMode::Exploration);
     let data = resp.data.unwrap();
-    let monster_xp = data["total_xp"].as_u64().unwrap();
+    let _monster_xp = data["total_xp"].as_u64().unwrap();
 
     // === LOOT & XP ===
     // Monster XP was auto-distributed by end_combat, so only award treasure here
@@ -1673,7 +1673,7 @@ fn session_a_dungeon_crawl() {
     let share = treasure_gp / 4;
 
     // Track pre-XP state (may already have combat XP from auto-distribution)
-    let pre_fighter_xp = state.party.find_member("Aldric the Bold").unwrap().xp;
+    let _pre_fighter_xp = state.party.find_member("Aldric the Bold").unwrap().xp;
 
     for name in &["Aldric the Bold", "Vex", "Sister Mira", "Zanthus"] {
         let resp = handle_request(&req("a30", GMCommand::AwardTreasureXp {
@@ -2304,7 +2304,7 @@ fn character_progression_multi_level() {
 
     let resp = handle_request(&req("p5", GMCommand::EndCombat { skip_xp: false }), &mut state);
     assert!(resp.success);
-    let combat1_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
+    let _combat1_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
 
     // Award combat 1 treasure (monster XP was auto-distributed by end_combat)
     for name in &["Bjorn", "Nyx", "Amara", "Elara"] {
@@ -2330,7 +2330,7 @@ fn character_progression_multi_level() {
     }), &mut state);
 
     let resp = handle_request(&req("p13", GMCommand::EndCombat { skip_xp: false }), &mut state);
-    let combat2_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
+    let _combat2_xp = resp.data.unwrap()["total_xp"].as_u64().unwrap();
 
     // Award combat 2 treasure (monster XP was auto-distributed by end_combat)
     for name in &["Bjorn", "Nyx", "Amara", "Elara"] {
