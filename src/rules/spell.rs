@@ -1,4 +1,8 @@
 //! Spell slot progression tables per OSE Reference Booklet p16-17.
+//!
+//! When the `dsl-backend` feature is enabled and `OSR_BACKEND_SPELL=dsl`,
+//! `spell_slots` delegates to the DSL table lookup. Native fallback preserved
+//! when DSL is unavailable.
 
 /// Spell slots available at a given level. Index 0 = 1st level spells, etc.
 /// A value of 0 means no spells of that level available.
@@ -31,7 +35,18 @@ pub enum SpellProgression {
 
 /// Returns spell slots for a progression type at a given character level.
 /// Returns [0; 6] for non-casters or levels below casting threshold.
+///
+/// When `OSR_BACKEND_SPELL=dsl` and the `dsl-backend` feature is enabled,
+/// delegates to the DSL `spell_slots` table lookup.
 pub fn spell_slots(prog: SpellProgression, level: u32) -> SpellSlots {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Spell) {
+            if let Some(slots) = dsl_gate::dsl_spell_slots(prog, level) {
+                return slots;
+            }
+        }
+    }
     use SpellProgression::*;
     match prog {
         NonCaster => [0; 6],
@@ -173,6 +188,85 @@ pub fn total_slots(prog: SpellProgression, level: u32) -> u32 {
     spell_slots(prog, level).iter().sum()
 }
 
+// ── DSL gate helpers ──────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_gate {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider};
+    use ttrpg_interp::value::Value;
+
+    use super::{SpellProgression, SpellSlots};
+    use crate::backend;
+
+    /// Null state provider for pure table evaluation (no entity access needed).
+    struct NullState;
+
+    impl StateProvider for NullState {
+        fn read_field(&self, _: &EntityRef, _: &str) -> Option<Value> { None }
+        fn read_conditions(&self, _: &EntityRef) -> Option<Vec<ActiveCondition>> { None }
+        fn read_turn_budget(&self, _: &EntityRef) -> Option<BTreeMap<Name, Value>> { None }
+        fn read_enabled_options(&self) -> Vec<Name> { Vec::new() }
+        fn position_eq(&self, _: &Value, _: &Value) -> bool { false }
+        fn distance(&self, _: &Value, _: &Value) -> Option<i64> { None }
+        fn entity_type_name(&self, _: &EntityRef) -> Option<Name> { None }
+    }
+
+    /// Null effect handler for pure table evaluation (no effects fired).
+    struct NullHandler;
+
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response { Response::Acknowledged }
+    }
+
+    /// Map Rust SpellProgression to DSL enum variant name.
+    fn progression_to_dsl(prog: SpellProgression) -> Value {
+        let variant = match prog {
+            SpellProgression::NonCaster => "non_caster",
+            SpellProgression::Bard => "prog_bard",
+            SpellProgression::Cleric => "prog_cleric",
+            SpellProgression::Drow => "prog_drow",
+            SpellProgression::Druid => "prog_druid",
+            SpellProgression::ArcaneFullCaster => "prog_arcane_full",
+            SpellProgression::HalfElf => "prog_half_elf",
+            SpellProgression::Paladin => "prog_paladin",
+            SpellProgression::Ranger => "prog_ranger",
+        };
+        Value::EnumVariant {
+            enum_name: "SpellProgression".into(),
+            variant: Name::from(variant),
+            fields: BTreeMap::new(),
+        }
+    }
+
+    /// Convert a DSL list<int> result to a SpellSlots [u32; 6].
+    fn value_to_spell_slots(value: Value) -> Option<SpellSlots> {
+        match value {
+            Value::List(items) if items.len() == 6 => {
+                let mut slots = [0u32; 6];
+                for (i, item) in items.iter().enumerate() {
+                    match item {
+                        Value::Int(v) => slots[i] = *v as u32,
+                        _ => return None,
+                    }
+                }
+                Some(slots)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn dsl_spell_slots(prog: SpellProgression, level: u32) -> Option<SpellSlots> {
+        let rt = backend::dsl()?;
+        let args = vec![progression_to_dsl(prog), Value::Int(level as i64)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "spell_slots", args).ok()?;
+        value_to_spell_slots(result)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,5 +363,134 @@ mod tests {
     #[test]
     fn total_slots_magic_user_5() {
         assert_eq!(total_slots(SpellProgression::ArcaneFullCaster, 5), 5);
+    }
+}
+
+// ── DSL parity tests ────────────────────────────────────────────
+
+#[cfg(all(test, feature = "dsl-backend"))]
+mod dsl_tests {
+    use super::*;
+
+    /// Native-only spell_slots (bypass DSL gate).
+    fn native_spell_slots(prog: SpellProgression, level: u32) -> SpellSlots {
+        use SpellProgression::*;
+        match prog {
+            NonCaster => [0; 6],
+            Bard => match level {
+                1 => [0, 0, 0, 0, 0, 0], 2 => [1, 0, 0, 0, 0, 0],
+                3 => [2, 0, 0, 0, 0, 0], 4 => [3, 0, 0, 0, 0, 0],
+                5 => [3, 1, 0, 0, 0, 0], 6 => [3, 2, 0, 0, 0, 0],
+                7 => [3, 3, 0, 0, 0, 0], 8 => [3, 3, 1, 0, 0, 0],
+                9 => [3, 3, 2, 0, 0, 0], 10 => [3, 3, 3, 0, 0, 0],
+                11 => [3, 3, 3, 1, 0, 0], 12 => [3, 3, 3, 2, 0, 0],
+                13 => [3, 3, 3, 3, 0, 0], _ => [4, 4, 3, 3, 0, 0],
+            },
+            Cleric => match level {
+                1 => [0, 0, 0, 0, 0, 0], 2 => [1, 0, 0, 0, 0, 0],
+                3 => [2, 0, 0, 0, 0, 0], 4 => [2, 1, 0, 0, 0, 0],
+                5 => [2, 2, 0, 0, 0, 0], 6 => [2, 2, 1, 1, 0, 0],
+                7 => [2, 2, 2, 1, 1, 0], 8 => [3, 3, 2, 2, 1, 0],
+                9 => [3, 3, 3, 2, 2, 0], 10 => [4, 4, 3, 3, 2, 0],
+                11 => [4, 4, 4, 3, 3, 0], 12 => [5, 5, 4, 4, 3, 0],
+                13 => [5, 5, 5, 4, 4, 0], _ => [6, 5, 5, 5, 4, 0],
+            },
+            Drow => match level {
+                1 => [1, 0, 0, 0, 0, 0], 2 => [2, 0, 0, 0, 0, 0],
+                3 => [2, 1, 0, 0, 0, 0], 4 => [2, 2, 0, 0, 0, 0],
+                5 => [2, 2, 1, 0, 0, 0], 6 => [2, 2, 2, 1, 0, 0],
+                7 => [3, 3, 2, 2, 1, 0], 8 => [3, 3, 3, 2, 2, 0],
+                9 => [4, 4, 3, 3, 2, 0], _ => [4, 4, 4, 3, 3, 0],
+            },
+            Druid => match level {
+                1 => [1, 0, 0, 0, 0, 0], 2 => [2, 0, 0, 0, 0, 0],
+                3 => [2, 1, 0, 0, 0, 0], 4 => [2, 2, 0, 0, 0, 0],
+                5 => [2, 2, 1, 1, 0, 0], 6 => [2, 2, 2, 1, 1, 0],
+                7 => [3, 3, 2, 2, 1, 0], 8 => [3, 3, 3, 2, 2, 0],
+                9 => [4, 4, 3, 3, 2, 0], 10 => [4, 4, 4, 3, 3, 0],
+                11 => [5, 5, 4, 4, 3, 0], 12 => [5, 5, 5, 4, 4, 0],
+                13 => [6, 5, 5, 5, 4, 0], _ => [6, 6, 5, 5, 5, 0],
+            },
+            ArcaneFullCaster => match level {
+                1 => [1, 0, 0, 0, 0, 0], 2 => [2, 0, 0, 0, 0, 0],
+                3 => [2, 1, 0, 0, 0, 0], 4 => [2, 2, 0, 0, 0, 0],
+                5 => [2, 2, 1, 0, 0, 0], 6 => [2, 2, 2, 0, 0, 0],
+                7 => [3, 2, 2, 1, 0, 0], 8 => [3, 3, 2, 2, 0, 0],
+                9 => [3, 3, 3, 2, 1, 0], 10 => [3, 3, 3, 3, 2, 0],
+                11 => [4, 3, 3, 3, 2, 1], 12 => [4, 4, 3, 3, 3, 2],
+                13 => [4, 4, 4, 3, 3, 3], _ => [4, 4, 4, 4, 3, 3],
+            },
+            HalfElf => match level {
+                1 => [0, 0, 0, 0, 0, 0], 2 => [1, 0, 0, 0, 0, 0],
+                3 => [2, 0, 0, 0, 0, 0], 4 => [2, 0, 0, 0, 0, 0],
+                5 => [2, 1, 0, 0, 0, 0], 6 => [2, 2, 0, 0, 0, 0],
+                7 => [2, 2, 0, 0, 0, 0], 8 => [2, 2, 1, 0, 0, 0],
+                9 => [3, 2, 1, 0, 0, 0], 10 => [3, 2, 2, 0, 0, 0],
+                11 => [3, 2, 2, 1, 0, 0], _ => [3, 3, 2, 1, 0, 0],
+            },
+            Paladin => match level {
+                1..=8 => [0, 0, 0, 0, 0, 0],
+                9 => [1, 0, 0, 0, 0, 0], 10 => [2, 0, 0, 0, 0, 0],
+                11 => [2, 1, 0, 0, 0, 0], 12 => [2, 2, 0, 0, 0, 0],
+                13 => [2, 2, 1, 0, 0, 0], _ => [3, 2, 1, 0, 0, 0],
+            },
+            Ranger => match level {
+                1..=7 => [0, 0, 0, 0, 0, 0],
+                8 => [1, 0, 0, 0, 0, 0], 9 => [2, 0, 0, 0, 0, 0],
+                10 => [2, 1, 0, 0, 0, 0], 11 => [2, 2, 0, 0, 0, 0],
+                12 => [2, 2, 1, 0, 0, 0], 13 => [3, 2, 1, 0, 0, 0],
+                _ => [3, 2, 2, 0, 0, 0],
+            },
+        }
+    }
+
+    /// All 9 progressions to test.
+    const ALL_PROGS: [SpellProgression; 9] = [
+        SpellProgression::NonCaster,
+        SpellProgression::Bard,
+        SpellProgression::Cleric,
+        SpellProgression::Drow,
+        SpellProgression::Druid,
+        SpellProgression::ArcaneFullCaster,
+        SpellProgression::HalfElf,
+        SpellProgression::Paladin,
+        SpellProgression::Ranger,
+    ];
+
+    /// Max level defined in the DSL table for each progression.
+    /// Out-of-range levels fall back to native (correct behavior).
+    fn dsl_max_level(prog: SpellProgression) -> u32 {
+        match prog {
+            SpellProgression::Drow => 10,
+            SpellProgression::HalfElf => 12,
+            _ => 14,
+        }
+    }
+
+    /// Verify DSL spell_slots table matches native for all defined progression/level combos.
+    #[test]
+    fn dsl_matches_native_all_progressions() {
+        for &prog in &ALL_PROGS {
+            let max = dsl_max_level(prog);
+            for level in 1..=max {
+                let dsl = dsl_gate::dsl_spell_slots(prog, level)
+                    .unwrap_or_else(|| panic!("DSL spell_slots({:?}, {}) failed", prog, level));
+                let native = native_spell_slots(prog, level);
+                assert_eq!(
+                    dsl, native,
+                    "spell_slots({:?}, {}) mismatch: DSL={:?} native={:?}",
+                    prog, level, dsl, native
+                );
+            }
+        }
+    }
+
+    /// Verify that out-of-range levels gracefully fall back (DSL returns None).
+    #[test]
+    fn dsl_out_of_range_returns_none() {
+        // Drow level 11 is not in the DSL table
+        assert!(dsl_gate::dsl_spell_slots(SpellProgression::Drow, 11).is_none());
+        // HalfElf level 13 is not in the DSL table
+        assert!(dsl_gate::dsl_spell_slots(SpellProgression::HalfElf, 13).is_none());
     }
 }

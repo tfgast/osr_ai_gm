@@ -15,6 +15,7 @@ pub enum MechanicGroup {
     Ability,
     Thief,
     Xp,
+    Spell,
 }
 
 impl MechanicGroup {
@@ -27,6 +28,7 @@ impl MechanicGroup {
             MechanicGroup::Ability => "ABILITY",
             MechanicGroup::Thief => "THIEF",
             MechanicGroup::Xp => "XP",
+            MechanicGroup::Spell => "SPELL",
         }
     }
 }
@@ -40,6 +42,7 @@ pub struct BackendConfig {
     pub ability: Backend,
     pub thief: Backend,
     pub xp: Backend,
+    pub spell: Backend,
 }
 
 impl BackendConfig {
@@ -54,6 +57,7 @@ impl BackendConfig {
             ability: parse_backend_env("OSR_BACKEND_ABILITY").or(global).unwrap_or(Backend::Native),
             thief: parse_backend_env("OSR_BACKEND_THIEF").or(global).unwrap_or(Backend::Native),
             xp: parse_backend_env("OSR_BACKEND_XP").or(global).unwrap_or(Backend::Native),
+            spell: parse_backend_env("OSR_BACKEND_SPELL").or(global).unwrap_or(Backend::Native),
         }
     }
 
@@ -66,6 +70,7 @@ impl BackendConfig {
             MechanicGroup::Ability => self.ability,
             MechanicGroup::Thief => self.thief,
             MechanicGroup::Xp => self.xp,
+            MechanicGroup::Spell => self.spell,
         }
     }
 }
@@ -345,6 +350,7 @@ mod tests {
         assert_eq!(config.ability, Backend::Native);
         assert_eq!(config.thief, Backend::Native);
         assert_eq!(config.xp, Backend::Native);
+        assert_eq!(config.spell, Backend::Native);
     }
 
     #[test]
@@ -364,6 +370,7 @@ mod tests {
             ability: Backend::Native,
             thief: Backend::Native,
             xp: Backend::Native,
+            spell: Backend::Native,
         };
         assert_eq!(config.get(MechanicGroup::Combat), Backend::Dsl);
         assert_eq!(config.get(MechanicGroup::Morale), Backend::Native);
