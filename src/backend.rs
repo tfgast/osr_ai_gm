@@ -324,11 +324,13 @@ mod dsl_runtime {
 
     static DSL: OnceLock<Option<DslRuntime>> = OnceLock::new();
 
-    /// Get the global DSL runtime (lazily loaded from data/games/ose/rules/).
+    /// Get the global DSL runtime (lazily loaded from the active game system's rules directory).
     /// Returns None if loading fails (logged to stderr).
     pub fn dsl() -> Option<&'static DslRuntime> {
         DSL.get_or_init(|| {
-            match DslRuntime::load("data/games/ose/rules") {
+            let rules_dir = crate::manifest::game_rules_dir();
+            let dir_str = rules_dir.to_string_lossy();
+            match DslRuntime::load(&dir_str) {
                 Ok(runtime) => Some(runtime),
                 Err(e) => {
                     eprintln!("DSL backend failed to load: {}", e);

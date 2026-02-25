@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 /// Top-level game system manifest parsed from game.toml.
 #[derive(Debug, Clone, Deserialize)]
@@ -99,6 +100,82 @@ impl GameManifest {
     pub fn supports_mechanic(&self, mechanic: &str) -> bool {
         self.mechanics.supported.iter().any(|m| m == mechanic)
     }
+}
+
+// ── Global game system state ──────────────────────────────────
+
+/// The active game system: a loaded manifest plus its directory path.
+struct ActiveGameSystem {
+    game_dir: PathBuf,
+    manifest: GameManifest,
+}
+
+static GAME_SYSTEM: OnceLock<ActiveGameSystem> = OnceLock::new();
+
+/// Default game system path (relative to the working directory).
+const DEFAULT_GAME_DIR: &str = "data/games/ose";
+
+/// Resolve the game system directory from `--game` CLI arg, `GAME_SYSTEM` env var,
+/// or default to `data/games/ose`.
+pub fn resolve_game_dir(cli_arg: Option<&str>) -> PathBuf {
+    if let Some(path) = cli_arg {
+        return PathBuf::from(path);
+    }
+    if let Ok(path) = std::env::var("GAME_SYSTEM") {
+        return PathBuf::from(path);
+    }
+    PathBuf::from(DEFAULT_GAME_DIR)
+}
+
+/// Initialize the global game system from a directory path.
+///
+/// Loads `game.toml` from the directory and stores the manifest globally.
+/// Should be called once at startup before any game data is accessed.
+/// Returns an error if the manifest cannot be loaded.
+/// No-op if the game system was already initialized (e.g. by lazy default).
+pub fn init_game_system(game_dir: PathBuf) -> Result<(), String> {
+    let manifest = GameManifest::load(&game_dir)?;
+    // Use set(); if already initialized (lazy default beat us), that's fine.
+    let _ = GAME_SYSTEM.set(ActiveGameSystem { game_dir, manifest });
+    Ok(())
+}
+
+/// Get the active game system, lazily initializing from the default if needed.
+fn get_game_system() -> &'static ActiveGameSystem {
+    GAME_SYSTEM.get_or_init(|| {
+        let game_dir = resolve_game_dir(None);
+        let manifest = GameManifest::load(&game_dir)
+            .unwrap_or_else(|e| panic!("Failed to load default game system from '{}': {}", game_dir.display(), e));
+        ActiveGameSystem { game_dir, manifest }
+    })
+}
+
+/// Get the active game system directory path.
+pub fn game_dir() -> &'static Path {
+    &get_game_system().game_dir
+}
+
+/// Get the active game manifest.
+pub fn game_manifest() -> &'static GameManifest {
+    &get_game_system().manifest
+}
+
+/// Get the resolved rules directory for the active game system.
+pub fn game_rules_dir() -> PathBuf {
+    let gs = get_game_system();
+    gs.manifest.rules_dir(&gs.game_dir)
+}
+
+/// Get the resolved data directory for the active game system.
+pub fn game_data_dir() -> PathBuf {
+    let gs = get_game_system();
+    gs.manifest.data_dir(&gs.game_dir)
+}
+
+/// Resolve a data file path by key for the active game system.
+pub fn game_data_file(key: &str) -> Option<PathBuf> {
+    let gs = get_game_system();
+    gs.manifest.data_file(&gs.game_dir, key)
 }
 
 #[cfg(test)]

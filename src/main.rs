@@ -37,6 +37,7 @@ use osr_ai_gm::command::wilderness_cmds::{
     OrientCommand, TravelCommand, WildernessStatusCommand,
 };
 use osr_ai_gm::command::CommandRegistry;
+use osr_ai_gm::manifest;
 use osr_ai_gm::persist::{self, GameState};
 use std::io::{self, BufRead, Write};
 
@@ -197,8 +198,40 @@ fn build_registry() -> CommandRegistry {
     registry
 }
 
+/// Parse `--game <path>` from CLI arguments.
+fn parse_game_arg() -> Option<String> {
+    let args: Vec<String> = std::env::args().collect();
+    let mut i = 1;
+    while i < args.len() {
+        if args[i] == "--game" {
+            if i + 1 < args.len() {
+                return Some(args[i + 1].clone());
+            } else {
+                eprintln!("Error: --game requires a path argument");
+                std::process::exit(1);
+            }
+        }
+        // Support --game=<path> form
+        if let Some(path) = args[i].strip_prefix("--game=") {
+            return Some(path.to_string());
+        }
+        i += 1;
+    }
+    None
+}
+
 fn main() {
+    // Resolve and load the game system before anything else.
+    let game_arg = parse_game_arg();
+    let game_dir = manifest::resolve_game_dir(game_arg.as_deref());
+    if let Err(e) = manifest::init_game_system(game_dir.clone()) {
+        eprintln!("Failed to load game system from '{}': {}", game_dir.display(), e);
+        std::process::exit(1);
+    }
+
+    let gm = manifest::game_manifest();
     println!("OSR AI Game Master v{}", env!("CARGO_PKG_VERSION"));
+    println!("Game system: {} v{}", gm.game.name, gm.game.version);
     println!("Type 'help' for available commands, 'quit' to exit.\n");
 
     let registry = build_registry();
