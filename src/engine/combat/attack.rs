@@ -10,6 +10,55 @@ use crate::rules::{ability, attack, equipment};
 
 use super::initiative::disrupt_caster;
 
+// ── DSL attack_roll mechanic ─────────────────────────────────
+
+/// Result of a DSL attack_roll evaluation: (hit, d20_roll, target_number).
+#[cfg(feature = "dsl-backend")]
+struct DslAttackResult {
+    hit: bool,
+    roll: u32,
+    target_num: i32,
+}
+
+/// Try evaluating the attack via DSL `attack_roll` mechanic.
+/// Returns None on DSL error (caller falls through to native).
+#[cfg(feature = "dsl-backend")]
+fn dsl_attack_roll(thac0: u32, target_ac: i32, modifiers: i32) -> Option<DslAttackResult> {
+    use crate::backend::{self, MechanicGroup};
+    if !backend::is_dsl(MechanicGroup::Combat) {
+        return None;
+    }
+    let runtime = backend::dsl()?;
+    let mut handler = backend::SimpleDiceHandler::new();
+    use ttrpg_interp::value::Value;
+    match runtime.evaluate_mechanic(
+        &backend::NullState,
+        &mut handler,
+        "attack_roll",
+        vec![
+            Value::Int(thac0 as i64),
+            Value::Int(target_ac as i64),
+            Value::Int(modifiers as i64),
+        ],
+    ) {
+        Ok(Value::EnumVariant { ref variant, .. }) => {
+            let hit = variant.as_str() == "atk_hit";
+            let roll = handler
+                .rolls
+                .first()
+                .map(|r| r.unmodified as u32)
+                .unwrap_or(0);
+            let target_num = attack::target_number(thac0, target_ac);
+            Some(DslAttackResult {
+                hit,
+                roll,
+                target_num,
+            })
+        }
+        _ => None,
+    }
+}
+
 /// Result of a single attack (melee or missile).
 #[derive(Debug, Clone)]
 pub struct AttackResult {
@@ -240,11 +289,25 @@ pub fn character_melee_attack_with<R: Rng>(
     let target_ac = monster.ac;
     let target_name = monster.name.clone();
     let thac0 = character.thac0;
-
-    let roll = rng.gen_range(1..=20u32);
     let modifiers = str_mod;
-    let target_num = attack::target_number(thac0, target_ac);
-    let hit = attack::hits(thac0, target_ac, modifiers, roll);
+
+    // DSL gate: use attack_roll mechanic if available
+    #[cfg(feature = "dsl-backend")]
+    let (roll, target_num, hit) = {
+        if let Some(dsl) = dsl_attack_roll(thac0, target_ac, modifiers) {
+            (dsl.roll, dsl.target_num, dsl.hit)
+        } else {
+            let r = rng.gen_range(1..=20u32);
+            let tn = attack::target_number(thac0, target_ac);
+            (r, tn, attack::hits(thac0, target_ac, modifiers, r))
+        }
+    };
+    #[cfg(not(feature = "dsl-backend"))]
+    let (roll, target_num, hit) = {
+        let r = rng.gen_range(1..=20u32);
+        let tn = attack::target_number(thac0, target_ac);
+        (r, tn, attack::hits(thac0, target_ac, modifiers, r))
+    };
 
     let (damage, damage_rolls) = if hit {
         let dmg_expr = dice::parse(weapon_damage)
@@ -322,11 +385,25 @@ pub fn character_missile_attack_with<R: Rng>(
     let target_ac = monster.ac;
     let target_name = monster.name.clone();
     let thac0 = character.thac0;
-
-    let roll = rng.gen_range(1..=20u32);
     let modifiers = dex_mod + range_mod;
-    let target_num = attack::target_number(thac0, target_ac);
-    let hit = attack::hits(thac0, target_ac, modifiers, roll);
+
+    // DSL gate: use attack_roll mechanic if available
+    #[cfg(feature = "dsl-backend")]
+    let (roll, target_num, hit) = {
+        if let Some(dsl) = dsl_attack_roll(thac0, target_ac, modifiers) {
+            (dsl.roll, dsl.target_num, dsl.hit)
+        } else {
+            let r = rng.gen_range(1..=20u32);
+            let tn = attack::target_number(thac0, target_ac);
+            (r, tn, attack::hits(thac0, target_ac, modifiers, r))
+        }
+    };
+    #[cfg(not(feature = "dsl-backend"))]
+    let (roll, target_num, hit) = {
+        let r = rng.gen_range(1..=20u32);
+        let tn = attack::target_number(thac0, target_ac);
+        (r, tn, attack::hits(thac0, target_ac, modifiers, r))
+    };
 
     let (damage, damage_rolls) = if hit {
         let dmg_expr = dice::parse(weapon_damage)
@@ -411,11 +488,25 @@ pub(super) fn monster_attack_modified_with<R: Rng>(
         Some(d) => d,
         None => if monster.damage.is_empty() { "1d6" } else { &monster.damage },
     };
-
-    let roll = rng.gen_range(1..=20u32);
     let modifiers = modifier;
-    let target_num = attack::target_number(thac0, target_ac);
-    let hit = attack::hits(thac0, target_ac, modifiers, roll);
+
+    // DSL gate: use attack_roll mechanic if available
+    #[cfg(feature = "dsl-backend")]
+    let (roll, target_num, hit) = {
+        if let Some(dsl) = dsl_attack_roll(thac0, target_ac, modifiers) {
+            (dsl.roll, dsl.target_num, dsl.hit)
+        } else {
+            let r = rng.gen_range(1..=20u32);
+            let tn = attack::target_number(thac0, target_ac);
+            (r, tn, attack::hits(thac0, target_ac, modifiers, r))
+        }
+    };
+    #[cfg(not(feature = "dsl-backend"))]
+    let (roll, target_num, hit) = {
+        let r = rng.gen_range(1..=20u32);
+        let tn = attack::target_number(thac0, target_ac);
+        (r, tn, attack::hits(thac0, target_ac, modifiers, r))
+    };
 
     let (damage, damage_rolls) = if hit {
         let dmg_expr = dice::parse(damage_dice)

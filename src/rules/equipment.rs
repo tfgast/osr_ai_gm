@@ -571,11 +571,42 @@ pub fn find_gear(name: &str) -> Option<&'static GearDef> {
 /// Calculate AC from armour and shield, plus DEX modifier.
 /// AC is descending: lower = better.
 pub fn calculate_ac(armour_ac: i32, has_shield: bool, dex_mod: i32) -> i32 {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        if let Some(v) = dsl_calc_ac(armour_ac, has_shield, dex_mod) {
+            return v;
+        }
+    }
+    native_calculate_ac(armour_ac, has_shield, dex_mod)
+}
+
+fn native_calculate_ac(armour_ac: i32, has_shield: bool, dex_mod: i32) -> i32 {
     let mut ac = armour_ac;
     if has_shield {
-        ac -= 1; // shield improves AC by 1 (descending)
+        ac -= 1;
     }
-    ac - dex_mod // positive DEX mod improves (lowers) AC
+    ac - dex_mod
+}
+
+#[cfg(feature = "dsl-backend")]
+fn dsl_calc_ac(armour_ac: i32, has_shield: bool, dex_mod: i32) -> Option<i32> {
+    use ttrpg_interp::value::Value;
+    let runtime = crate::backend::dsl()?;
+    let mut handler = crate::backend::SimpleDiceHandler::new();
+    let shield_bonus = if has_shield { 1i64 } else { 0i64 };
+    match runtime.evaluate_derive(
+        &crate::backend::NullState,
+        &mut handler,
+        "calc_ac",
+        vec![
+            Value::Int(armour_ac as i64),
+            Value::Int(shield_bonus),
+            Value::Int(dex_mod as i64),
+        ],
+    ) {
+        Ok(Value::Int(v)) => Some(v as i32),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

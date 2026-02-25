@@ -192,7 +192,33 @@ impl<'de> Deserialize<'de> for HitDice {
 ///
 /// Example: THAC0 19 vs AC 5 (chain mail) = need 14 on d20.
 pub fn target_number(thac0: u32, target_ac: i32) -> i32 {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        if let Some(v) = dsl_target_number(thac0, target_ac) {
+            return v;
+        }
+    }
+    native_target_number(thac0, target_ac)
+}
+
+fn native_target_number(thac0: u32, target_ac: i32) -> i32 {
     thac0 as i32 - target_ac
+}
+
+#[cfg(feature = "dsl-backend")]
+fn dsl_target_number(thac0: u32, target_ac: i32) -> Option<i32> {
+    use ttrpg_interp::value::Value;
+    let runtime = crate::backend::dsl()?;
+    let mut handler = crate::backend::SimpleDiceHandler::new();
+    match runtime.evaluate_derive(
+        &crate::backend::NullState,
+        &mut handler,
+        "target_number",
+        vec![Value::Int(thac0 as i64), Value::Int(target_ac as i64)],
+    ) {
+        Ok(Value::Int(v)) => Some(v as i32),
+        _ => None,
+    }
 }
 
 /// Determine if an attack roll hits.
@@ -220,16 +246,50 @@ pub fn hits(thac0: u32, target_ac: i32, modifiers: i32, roll: u32) -> bool {
 ///
 /// Returns `None` if the target is out of range or weapon has no range (melee only).
 pub fn missile_range_modifier(distance: u32, short: u32, medium: u32, long: u32) -> Option<i32> {
+    // Out-of-range and invalid checks are always native (DSL doesn't handle None)
     if distance == 0 || short == 0 {
-        None // not a missile weapon or invalid range
-    } else if distance <= short {
-        Some(1) // +1 at short range
+        return None;
+    }
+    if distance > long {
+        return None;
+    }
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        if let Some(v) = dsl_missile_range_mod(distance, short, medium, long) {
+            return Some(v);
+        }
+    }
+    Some(native_missile_range_modifier(distance, short, medium, long))
+}
+
+fn native_missile_range_modifier(distance: u32, short: u32, medium: u32, _long: u32) -> i32 {
+    if distance <= short {
+        1
     } else if distance <= medium {
-        Some(0) // no modifier at medium range
-    } else if distance <= long {
-        Some(-1) // -1 at long range
+        0
     } else {
-        None // out of range
+        -1
+    }
+}
+
+#[cfg(feature = "dsl-backend")]
+fn dsl_missile_range_mod(distance: u32, short: u32, medium: u32, long: u32) -> Option<i32> {
+    use ttrpg_interp::value::Value;
+    let runtime = crate::backend::dsl()?;
+    let mut handler = crate::backend::SimpleDiceHandler::new();
+    match runtime.evaluate_derive(
+        &crate::backend::NullState,
+        &mut handler,
+        "missile_range_mod",
+        vec![
+            Value::Int(distance as i64),
+            Value::Int(short as i64),
+            Value::Int(medium as i64),
+            Value::Int(long as i64),
+        ],
+    ) {
+        Ok(Value::Int(v)) => Some(v as i32),
+        _ => None,
     }
 }
 
