@@ -1,0 +1,48 @@
+[game]
+name = "Old-School Essentials"
+version = "1.0.0"
+description = "Classic fantasy adventure game based on the 1981 Basic/Expert rules"
+author = "Necrotic Gnome"
+system_id = "ose"
+
+[paths]
+rules_dir = "rules"
+data_dir = "data"
+
+[rules]
+files = [
+    "ose_core.ttrpg",
+    "ose_ability.ttrpg",
+    "ose_class.ttrpg",
+    "ose_combat.ttrpg",
+    "ose_magic.ttrpg",
+    "ose_saves.ttrpg",
+    "ose_thief.ttrpg",
+]
+
+[data]
+spells = "spells.json"
+monsters = "monsters.json"
+equipment = "equipment.json"
+magic_items = "magic_items.json"
+treasure = "treasure.json"
+encounters = "encounters.json"
+npc_parties = "npc_parties.json"
+gems_jewellery = "gems_jewellery.json"
+rumors = "rumors.json"
+
+[mechanics]
+supported = [
+    "combat",
+    "morale",
+    "turn_undead",
+    "saves",
+    "ability",
+    "thief",
+    "xp",
+    "spell",
+    "class",
+]
+
+[features]
+requires_dsl = true
