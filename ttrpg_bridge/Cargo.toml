@@ -5,6 +5,6 @@ edition = "2021"
 
 [dependencies]
 osr_ai_gm = { path = ".." }
-ttrpg_interp = { path = "../../../../../ttrpg_dsl/mayor/rig/crates/ttrpg_interp" }
-ttrpg_ast = { path = "../../../../../ttrpg_dsl/mayor/rig/crates/ttrpg_ast" }
+ttrpg_interp = { path = "../../../../ttrpg_dsl/mayor/rig/crates/ttrpg_interp" }
+ttrpg_ast = { path = "../../../../ttrpg_dsl/mayor/rig/crates/ttrpg_ast" }
 rand = "0.8"
