@@ -854,18 +854,20 @@ pub fn action_declare_spell(
         )));
     }
 
-    // Check spell slot availability
+    // Check spell slot availability via DSL-gated casting rules
     if let Some(spell_def) = spell_data::find_spell(spell_name, None) {
-        let idx = (spell_def.level - 1) as usize;
-        if idx < 6 {
-            let max_slots = spell::spell_slots(cdef.spell_progression, character.level);
-            let used = character.spell_slots_used[idx];
-            if used >= max_slots[idx] {
-                return Err(EngineError::InvalidInput(format!(
-                    "{} has no level {} spell slots remaining ({} of {} used).",
-                    character.name, spell_def.level, used, max_slots[idx]
-                )));
-            }
+        let max_slots = spell::spell_slots(cdef.spell_progression, character.level);
+        if !spell::can_cast_spell(&character.spell_slots_used, &max_slots, spell_def.level) {
+            let idx = (spell_def.level - 1) as usize;
+            let (used, max) = if idx < 6 {
+                (character.spell_slots_used[idx], max_slots[idx])
+            } else {
+                (0, 0)
+            };
+            return Err(EngineError::InvalidInput(format!(
+                "{} has no level {} spell slots remaining ({} of {} used).",
+                character.name, spell_def.level, used, max
+            )));
         }
     }
 
@@ -971,12 +973,13 @@ pub fn action_cast_spell(
         }
     };
 
-    // Consume spell slot (whether disrupted or not — per B/X, attempted casting uses the slot)
+    // Consume spell slot via DSL-gated cost (whether disrupted or not — per B/X, attempted casting uses the slot)
     if let Some(spell_def) = spell_data::find_spell(&result.spell, None) {
+        let cost = spell::cast_cost(spell_def.level);
         let idx = (spell_def.level - 1) as usize;
         if idx < 6 {
             if let Some(character) = state.party.find_member_mut(char_name) {
-                character.spell_slots_used[idx] += 1;
+                character.spell_slots_used[idx] += cost;
             }
         }
     }

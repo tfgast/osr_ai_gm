@@ -188,6 +188,56 @@ pub fn total_slots(prog: SpellProgression, level: u32) -> u32 {
     spell_slots(prog, level).iter().sum()
 }
 
+/// Returns the casting resource type for the active game system.
+/// For OSE, this is always "vancian_slots".
+pub fn casting_resource_type(prog: SpellProgression) -> String {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Spell) {
+            if let Some(s) = dsl_gate::dsl_casting_resource_type(prog) {
+                return s;
+            }
+        }
+    }
+    let _ = prog;
+    "vancian_slots".to_string()
+}
+
+/// Check if a character can cast a spell at the given spell level,
+/// considering their current slot usage against maximum slots.
+pub fn can_cast_spell(slots_used: &SpellSlots, max_slots: &SpellSlots, spell_level: u32) -> bool {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Spell) {
+            if let Some(result) = dsl_gate::dsl_can_cast_spell(slots_used, max_slots, spell_level) {
+                return result;
+            }
+        }
+    }
+    // Native fallback: Vancian slot check
+    let idx = (spell_level - 1) as usize;
+    if idx < 6 {
+        slots_used[idx] < max_slots[idx]
+    } else {
+        false
+    }
+}
+
+/// Returns the cost (in resource units) to cast a spell of the given level.
+/// For Vancian casting, this is always 1 slot.
+pub fn cast_cost(spell_level: u32) -> u32 {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Spell) {
+            if let Some(cost) = dsl_gate::dsl_cast_cost(spell_level) {
+                return cost;
+            }
+        }
+    }
+    let _ = spell_level;
+    1 // Vancian: always 1 slot per cast
+}
+
 // ── DSL gate helpers ──────────────────────────────────────────
 
 #[cfg(feature = "dsl-backend")]
@@ -264,6 +314,65 @@ mod dsl_gate {
         let args = vec![progression_to_dsl(prog), Value::Int(level as i64)];
         let result = rt.evaluate_derive(&NullState, &mut NullHandler, "spell_slots", args).ok()?;
         value_to_spell_slots(result)
+    }
+
+    /// Build a CastingResource enum variant Value from its string name.
+    fn casting_resource_to_dsl(name: &str) -> Value {
+        Value::EnumVariant {
+            enum_name: "CastingResource".into(),
+            variant: Name::from(name),
+            fields: BTreeMap::new(),
+        }
+    }
+
+    /// Convert a SpellSlots [u32; 6] to a DSL list<int> Value.
+    fn spell_slots_to_dsl(slots: &super::SpellSlots) -> Value {
+        Value::List(slots.iter().map(|&s| Value::Int(s as i64)).collect())
+    }
+
+    pub fn dsl_casting_resource_type(prog: SpellProgression) -> Option<String> {
+        let rt = backend::dsl()?;
+        let args = vec![progression_to_dsl(prog)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "casting_resource_type", args).ok()?;
+        match result {
+            Value::EnumVariant { variant, .. } => Some(variant.to_string()),
+            Value::Str(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_can_cast_spell(
+        slots_used: &super::SpellSlots,
+        max_slots: &super::SpellSlots,
+        spell_level: u32,
+    ) -> Option<bool> {
+        let rt = backend::dsl()?;
+        let resource = dsl_casting_resource_type(SpellProgression::Cleric)?;
+        let args = vec![
+            casting_resource_to_dsl(&resource),
+            spell_slots_to_dsl(slots_used),
+            spell_slots_to_dsl(max_slots),
+            Value::Int(spell_level as i64),
+        ];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "can_cast_spell", args).ok()?;
+        match result {
+            Value::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_cast_cost(spell_level: u32) -> Option<u32> {
+        let rt = backend::dsl()?;
+        let resource = dsl_casting_resource_type(SpellProgression::Cleric)?;
+        let args = vec![
+            casting_resource_to_dsl(&resource),
+            Value::Int(spell_level as i64),
+        ];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "cast_cost", args).ok()?;
+        match result {
+            Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
     }
 }
 
@@ -363,6 +472,46 @@ mod tests {
     #[test]
     fn total_slots_magic_user_5() {
         assert_eq!(total_slots(SpellProgression::ArcaneFullCaster, 5), 5);
+    }
+
+    #[test]
+    fn casting_resource_type_is_vancian() {
+        assert_eq!(
+            casting_resource_type(SpellProgression::Cleric),
+            "vancian_slots"
+        );
+    }
+
+    #[test]
+    fn can_cast_spell_with_slots_available() {
+        let used = [0, 0, 0, 0, 0, 0];
+        let max = [2, 1, 0, 0, 0, 0];
+        assert!(can_cast_spell(&used, &max, 1));
+        assert!(can_cast_spell(&used, &max, 2));
+        assert!(!can_cast_spell(&used, &max, 3)); // max is 0
+    }
+
+    #[test]
+    fn can_cast_spell_all_slots_used() {
+        let used = [2, 1, 0, 0, 0, 0];
+        let max = [2, 1, 0, 0, 0, 0];
+        assert!(!can_cast_spell(&used, &max, 1));
+        assert!(!can_cast_spell(&used, &max, 2));
+    }
+
+    #[test]
+    fn can_cast_spell_partial_usage() {
+        let used = [1, 0, 0, 0, 0, 0];
+        let max = [2, 1, 0, 0, 0, 0];
+        assert!(can_cast_spell(&used, &max, 1)); // 1 of 2 used
+        assert!(can_cast_spell(&used, &max, 2)); // 0 of 1 used
+    }
+
+    #[test]
+    fn cast_cost_is_one() {
+        assert_eq!(cast_cost(1), 1);
+        assert_eq!(cast_cost(3), 1);
+        assert_eq!(cast_cost(6), 1);
     }
 }
 
@@ -492,5 +641,40 @@ mod dsl_tests {
         assert!(dsl_gate::dsl_spell_slots(SpellProgression::Drow, 11).is_none());
         // HalfElf level 13 is not in the DSL table
         assert!(dsl_gate::dsl_spell_slots(SpellProgression::HalfElf, 13).is_none());
+    }
+
+    #[test]
+    fn dsl_casting_resource_type_is_vancian() {
+        let result = dsl_gate::dsl_casting_resource_type(SpellProgression::Cleric);
+        assert_eq!(result, Some("vancian_slots".to_string()));
+    }
+
+    #[test]
+    fn dsl_can_cast_spell_with_slots() {
+        let used = [0, 0, 0, 0, 0, 0];
+        let max = [2, 1, 0, 0, 0, 0];
+        assert_eq!(dsl_gate::dsl_can_cast_spell(&used, &max, 1), Some(true));
+        assert_eq!(dsl_gate::dsl_can_cast_spell(&used, &max, 2), Some(true));
+        assert_eq!(dsl_gate::dsl_can_cast_spell(&used, &max, 3), Some(false));
+    }
+
+    #[test]
+    fn dsl_can_cast_spell_exhausted() {
+        let used = [2, 1, 0, 0, 0, 0];
+        let max = [2, 1, 0, 0, 0, 0];
+        assert_eq!(dsl_gate::dsl_can_cast_spell(&used, &max, 1), Some(false));
+        assert_eq!(dsl_gate::dsl_can_cast_spell(&used, &max, 2), Some(false));
+    }
+
+    #[test]
+    fn dsl_cast_cost_is_one() {
+        for level in 1..=6 {
+            assert_eq!(
+                dsl_gate::dsl_cast_cost(level),
+                Some(1),
+                "cast_cost for spell level {} should be 1",
+                level
+            );
+        }
     }
 }
