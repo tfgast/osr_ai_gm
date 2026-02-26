@@ -1,6 +1,8 @@
 //! Class definitions for OSE B/X 7 + Advanced Fantasy 15 = 22 classes.
 //! Data from OSE Reference Booklet p12, p19 and Players Tomes.
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use super::save::SaveCategory;
 use super::spell::{SpellProgression, SpellListType};
@@ -106,6 +108,63 @@ impl Class {
 impl std::fmt::Display for Class {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.name())
+    }
+}
+
+// ── ClassId: string-based class identifier ───────────────────
+
+/// String-based class identifier for data-driven class lookups.
+/// Wraps `Arc<str>` for O(1) clone. Canonical form is the display name
+/// (e.g., "Fighter", "Magic-User", "Half-Elf").
+/// Serializes transparently as a plain string for backward compatibility.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ClassId(Arc<str>);
+
+impl ClassId {
+    /// Create a ClassId, normalizing to canonical form.
+    /// Known classes (the core 22) are normalized via `Class::parse()`.
+    /// Unknown names (module/homebrew classes) are stored as-is.
+    pub fn new(s: &str) -> Self {
+        if let Some(class) = Class::parse(s) {
+            ClassId(Arc::from(class.name()))
+        } else {
+            ClassId(Arc::from(s))
+        }
+    }
+
+    /// Create a ClassId from a `Class` enum variant.
+    pub fn from_enum(class: Class) -> Self {
+        ClassId(Arc::from(class.name()))
+    }
+
+    /// Try to resolve this ClassId back to a `Class` enum variant.
+    /// Returns `None` for module/homebrew classes not in the core 22.
+    pub fn to_enum(&self) -> Option<Class> {
+        Class::parse(&self.0)
+    }
+
+    /// The canonical string form of this class identifier.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ClassId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl From<Class> for ClassId {
+    fn from(class: Class) -> Self {
+        ClassId::from_enum(class)
+    }
+}
+
+impl From<&str> for ClassId {
+    fn from(s: &str) -> Self {
+        ClassId::new(s)
     }
 }
 
@@ -812,6 +871,11 @@ impl ClassRegistry {
         self.by_name.get(name).map(|&idx| &self.classes[idx])
     }
 
+    /// Look up a class definition by ClassId.
+    pub fn get_by_id(&self, id: &ClassId) -> Option<&ClassDef> {
+        self.get_by_name(id.as_str())
+    }
+
     /// Iterate over all registered class definitions.
     pub fn all(&self) -> &[ClassDef] {
         &self.classes
@@ -1036,6 +1100,87 @@ mod tests {
         assert_eq!(class_def(Class::Gnome).bx_equivalent, Some(Class::Halfling));
     }
 
+    // ── ClassId tests ─────────────────────────────────────────
+
+    #[test]
+    fn class_id_from_enum_roundtrip() {
+        for &c in &Class::ALL {
+            let id = ClassId::from_enum(c);
+            assert_eq!(id.to_enum(), Some(c), "roundtrip failed for {:?}", c);
+            assert_eq!(id.as_str(), c.name());
+        }
+    }
+
+    #[test]
+    fn class_id_new_normalizes() {
+        // Case-insensitive, variant-tolerant normalization
+        assert_eq!(ClassId::new("fighter").as_str(), "Fighter");
+        assert_eq!(ClassId::new("FIGHTER").as_str(), "Fighter");
+        assert_eq!(ClassId::new("magic-user").as_str(), "Magic-User");
+        assert_eq!(ClassId::new("magicuser").as_str(), "Magic-User");
+        assert_eq!(ClassId::new("MU").as_str(), "Magic-User");
+        assert_eq!(ClassId::new("half-elf").as_str(), "Half-Elf");
+        assert_eq!(ClassId::new("halfelf").as_str(), "Half-Elf");
+    }
+
+    #[test]
+    fn class_id_unknown_class_preserved() {
+        let id = ClassId::new("Necromancer");
+        assert_eq!(id.as_str(), "Necromancer");
+        assert_eq!(id.to_enum(), None);
+    }
+
+    #[test]
+    fn class_id_from_trait() {
+        let id: ClassId = Class::Fighter.into();
+        assert_eq!(id.as_str(), "Fighter");
+
+        let id: ClassId = "thief".into();
+        assert_eq!(id.as_str(), "Thief");
+    }
+
+    #[test]
+    fn class_id_display() {
+        assert_eq!(format!("{}", ClassId::from_enum(Class::MagicUser)), "Magic-User");
+        assert_eq!(format!("{}", ClassId::new("Necromancer")), "Necromancer");
+    }
+
+    #[test]
+    fn class_id_equality() {
+        // Same canonical form
+        assert_eq!(ClassId::new("fighter"), ClassId::from_enum(Class::Fighter));
+        assert_eq!(ClassId::new("MU"), ClassId::new("Magic-User"));
+        // Different classes
+        assert_ne!(ClassId::from_enum(Class::Fighter), ClassId::from_enum(Class::Thief));
+    }
+
+    #[test]
+    fn class_id_serde_roundtrip() {
+        let id = ClassId::from_enum(Class::MagicUser);
+        let json = serde_json::to_string(&id).unwrap();
+        assert_eq!(json, "\"Magic-User\"");
+
+        let deserialized: ClassId = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, id);
+    }
+
+    #[test]
+    fn class_id_serde_unknown_class() {
+        let json = "\"Necromancer\"";
+        let id: ClassId = serde_json::from_str(json).unwrap();
+        assert_eq!(id.as_str(), "Necromancer");
+        assert_eq!(id.to_enum(), None);
+    }
+
+    #[test]
+    fn class_id_hash_consistent() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(ClassId::from_enum(Class::Fighter));
+        assert!(set.contains(&ClassId::new("fighter")));
+        assert!(!set.contains(&ClassId::new("Thief")));
+    }
+
     // ── ClassRegistry tests ───────────────────────────────────
 
     #[test]
@@ -1055,6 +1200,19 @@ mod tests {
         assert_eq!(reg.get_by_name("Magic-User").unwrap().class, Class::MagicUser);
         assert_eq!(reg.get_by_name("Half-Elf").unwrap().class, Class::HalfElf);
         assert!(reg.get_by_name("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn registry_lookup_by_class_id() {
+        let reg = class_registry();
+        let id = ClassId::from_enum(Class::Fighter);
+        assert_eq!(reg.get_by_id(&id).unwrap().class, Class::Fighter);
+
+        let id = ClassId::new("magic-user");
+        assert_eq!(reg.get_by_id(&id).unwrap().class, Class::MagicUser);
+
+        let id = ClassId::new("Necromancer");
+        assert!(reg.get_by_id(&id).is_none());
     }
 
     #[test]

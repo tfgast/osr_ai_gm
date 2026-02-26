@@ -12,7 +12,7 @@ default = []
 dsl-backend = ["dep:ttrpg_interp", "dep:ttrpg_ast", "dep:ttrpg_parser", "dep:ttrpg_checker", "dep:ttrpg_ose_data"]
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 rand = "0.8"
 toml = "0.8"
