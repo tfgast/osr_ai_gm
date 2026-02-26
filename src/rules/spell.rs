@@ -261,6 +261,22 @@ pub fn spell_point_cost(spell_level: u32) -> u32 {
     }
 }
 
+/// Returns true if a disrupted (failed) spell still consumes its Vancian slot.
+/// Per B/X OSE: an attempted casting always expends the slot, even if disrupted.
+/// Game systems that use a different model (e.g. prepared-without-expend) can
+/// override the DSL `disruption_consumes_slot` derive to return 0.
+pub fn disruption_consumes_slot() -> bool {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+            if let Some(v) = dsl_gate::dsl_disruption_consumes_slot() {
+                return v;
+            }
+        }
+    }
+    true // native fallback: B/X OSE always consumes the slot
+}
+
 /// Check whether all casting resources recharge on long rest.
 /// Returns true if the casting model fully recharges on rest (all known models do).
 pub fn rest_recovery(prog: SpellProgression) -> bool {
@@ -429,6 +445,21 @@ mod dsl_gate {
         let args = vec![casting_resource_to_dsl(&resource)];
         let result = rt.evaluate_derive(&NullState, &mut NullHandler, "rest_recovery", args).ok()?;
         match result {
+            Value::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
+
+    /// Check DSL `disruption_consumes_slot` derive (Combat group).
+    /// Returns Some(true) if the derive says slot is consumed, Some(false) if not, None on error.
+    pub fn dsl_disruption_consumes_slot() -> Option<bool> {
+        if !backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+            return None;
+        }
+        let rt = backend::dsl()?;
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "disruption_consumes_slot", vec![]).ok()?;
+        match result {
+            Value::Int(v) => Some(v != 0),
             Value::Bool(b) => Some(b),
             _ => None,
         }
@@ -769,6 +800,15 @@ mod dsl_tests {
     fn dsl_rest_recovery_true() {
         assert_eq!(
             dsl_gate::dsl_rest_recovery(SpellProgression::Cleric),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn dsl_disruption_consumes_slot_is_true() {
+        // B/X OSE: disrupted spells still consume the slot.
+        assert_eq!(
+            dsl_gate::dsl_disruption_consumes_slot(),
             Some(true)
         );
     }

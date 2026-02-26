@@ -305,4 +305,39 @@ system "OSE Combat" {
             _                                       => 10
         }
     }
+
+
+    // --- Combat movement ---
+    // Reference: OSE Reference Booklet — Movement in Combat.
+
+    // Encounter movement rate: base movement / 3, in feet per round.
+    // Example: 120' base movement → 40' encounter movement.
+    derive encounter_movement(base_movement: int) -> int {
+        floor(base_movement / 3)
+    }
+
+    // Fighting withdrawal distance: half encounter movement, in feet per round.
+    // Character retreats slowly while still facing the enemy; no free attacks.
+    derive fighting_withdrawal_distance(base_movement: int) -> int {
+        floor(encounter_movement(base_movement) / 2)
+    }
+
+    // Retreat free attack bonus: bonus to hit granted to enemies when a
+    // character retreats (turns back on enemies). Per OSE rules, +2 to attack.
+    derive retreat_free_attack_bonus() -> int {
+        2
+    }
+
+    // Melee engagement distance in feet.
+    // Enemies within this range can execute free attacks on a retreating character.
+    derive melee_engagement_distance() -> int {
+        10
+    }
+
+    // Spell disruption slot rule.
+    // Returns 1 if a disrupted spell still consumes its Vancian slot, 0 otherwise.
+    // Per B/X OSE: an attempted (but disrupted) casting still expends the slot.
+    derive disruption_consumes_slot() -> int {
+        1
+    }
 }
