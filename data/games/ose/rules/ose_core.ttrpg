@@ -167,6 +167,17 @@ system "OSE" {
         Destroyed
     }
 
+    // --- Turn undead attempt outcome ---
+    // Full result of a turn_undead_attempt mechanic call, combining
+    // table lookup, conditional 2d6 success check, and 2d6 HD roll.
+    enum TurnAttempt {
+        turn_impossible,
+        turn_failed(roll: int, target: int),           // rolled 2d6, missed target
+        turn_rolled(roll: int, target: int, hd: int),  // rolled 2d6, met target, 2d6 HD affected
+        turn_auto(hd: int),                            // automatic turn, 2d6 HD affected
+        turn_destroy(hd: int)                          // automatic destroy, 2d6 HD affected
+    }
+
     // --- Saving throw values (five categories: D/W/P/B/S) ---
 
     struct SavingThrows {

@@ -74,37 +74,22 @@ pub fn resolve_turn_undead_with<R: Rng>(
     let rank = turn::undead_rank_from_hd(hd);
     let undead_type = monster.name.clone();
 
-    let table_result = turn::turn_undead_result(cleric_level, rank);
-
-    let (roll, success, hd_affected, destroyed) = match table_result {
-        TurnResult::Impossible => (None, false, 0, false),
-        TurnResult::Roll(target) => {
-            let d1 = rng.gen_range(1..=6i32);
-            let d2 = rng.gen_range(1..=6i32);
-            let roll = d1 + d2;
-            let success = roll >= target as i32;
-            let hd_affected = if success {
-                let h1 = rng.gen_range(1..=6u32);
-                let h2 = rng.gen_range(1..=6u32);
-                h1 + h2
-            } else {
-                0
-            };
-            (Some(roll), success, hd_affected, false)
-        }
-        TurnResult::Turned => {
-            let h1 = rng.gen_range(1..=6u32);
-            let h2 = rng.gen_range(1..=6u32);
-            (None, true, h1 + h2, false)
-        }
-        TurnResult::Destroyed => {
-            let h1 = rng.gen_range(1..=6u32);
-            let h2 = rng.gen_range(1..=6u32);
-            (None, true, h1 + h2, true)
+    // DSL gate: delegate rolling procedure to turn_undead_attempt mechanic.
+    // On success returns (success, roll, table_result, hd_affected, destroyed).
+    // Falls back to native if DSL is unavailable or not configured.
+    #[cfg(feature = "dsl-backend")]
+    let (table_result, roll, success, hd_affected, destroyed) = {
+        if let Some((s, r, tr, hd_aff, d)) = turn::try_dsl_turn_undead_attempt(cleric_level, hd) {
+            (tr, r, s, hd_aff, d)
+        } else {
+            resolve_attempt_native(cleric_level, rank, rng)
         }
     };
+    #[cfg(not(feature = "dsl-backend"))]
+    let (table_result, roll, success, hd_affected, destroyed) =
+        resolve_attempt_native(cleric_level, rank, rng);
 
-    // Apply the turn/destroy effect to monsters
+    // Apply the turn/destroy effect to monsters (state mutation stays in Rust).
     if success && hd_affected > 0 {
         let mut remaining_hd = hd_affected;
         for m in combat.monsters.iter_mut() {
@@ -139,4 +124,41 @@ pub fn resolve_turn_undead_with<R: Rng>(
     };
     combat.log_event(result.to_string());
     result
+}
+
+/// Native Rust dice procedure for a turn undead attempt.
+/// Used when DSL backend is absent or not configured for TurnUndead.
+fn resolve_attempt_native<R: Rng>(
+    cleric_level: u32,
+    rank: u32,
+    rng: &mut R,
+) -> (TurnResult, Option<i32>, bool, u32, bool) {
+    let table_result = turn::turn_undead_result(cleric_level, rank);
+    match table_result {
+        TurnResult::Impossible => (table_result, None, false, 0, false),
+        TurnResult::Roll(target) => {
+            let d1 = rng.gen_range(1..=6i32);
+            let d2 = rng.gen_range(1..=6i32);
+            let roll = d1 + d2;
+            let success = roll >= target as i32;
+            let hd_affected = if success {
+                let h1 = rng.gen_range(1..=6u32);
+                let h2 = rng.gen_range(1..=6u32);
+                h1 + h2
+            } else {
+                0
+            };
+            (table_result, Some(roll), success, hd_affected, false)
+        }
+        TurnResult::Turned => {
+            let h1 = rng.gen_range(1..=6u32);
+            let h2 = rng.gen_range(1..=6u32);
+            (table_result, None, true, h1 + h2, false)
+        }
+        TurnResult::Destroyed => {
+            let h1 = rng.gen_range(1..=6u32);
+            let h2 = rng.gen_range(1..=6u32);
+            (table_result, None, true, h1 + h2, true)
+        }
+    }
 }

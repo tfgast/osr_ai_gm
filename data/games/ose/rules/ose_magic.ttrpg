@@ -299,4 +299,39 @@ system "OSE Magic" {
             _          => TurnResult.Destroyed
         }
     }
+
+    // Orchestrate a full turn undead attempt.
+    //
+    // Determines undead rank from HD, looks up the turn table result, rolls
+    // 2d6 for success if needed, rolls 2d6 for HD affected on success.
+    //
+    // cleric_level: the cleric's character level (1+)
+    // undead_hd:    hit dice of the target undead type (determines rank)
+    //
+    // Returns TurnAttempt encoding the full outcome so the caller can apply
+    // state changes (marking monsters turned/destroyed) and build log messages.
+    mechanic turn_undead_attempt(cleric_level: int, undead_hd: int) -> TurnAttempt {
+        let rank = undead_rank_from_hd(undead_hd)
+        let table = turn_undead_result(cleric_level, rank)
+        match table {
+            Impossible => TurnAttempt.turn_impossible,
+            Roll(target) => {
+                let r = roll(2d6)
+                if r.total >= target {
+                    let hd = roll(2d6)
+                    TurnAttempt.turn_rolled(r.total, target, hd.total)
+                } else {
+                    TurnAttempt.turn_failed(r.total, target)
+                }
+            },
+            Turned => {
+                let hd = roll(2d6)
+                TurnAttempt.turn_auto(hd.total)
+            },
+            Destroyed => {
+                let hd = roll(2d6)
+                TurnAttempt.turn_destroy(hd.total)
+            }
+        }
+    }
 }

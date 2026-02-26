@@ -86,6 +86,24 @@ pub fn undead_rank_from_hd(hd: u32) -> u32 {
     hd.clamp(1, 9)
 }
 
+/// Evaluate the DSL `turn_undead_attempt` mechanic (full rolling procedure).
+///
+/// Returns `(success, roll, table_result, hd_affected, destroyed)` on success,
+/// or `None` if the DSL backend is unavailable or not configured for TurnUndead.
+///
+/// `undead_hd` is the hit dice of the target monster (not rank — the mechanic
+/// converts HD→rank internally via `undead_rank_from_hd`).
+#[cfg(feature = "dsl-backend")]
+pub fn try_dsl_turn_undead_attempt(
+    cleric_level: u32,
+    undead_hd: u32,
+) -> Option<(bool, Option<i32>, TurnResult, u32, bool)> {
+    if !crate::backend::is_dsl(crate::backend::MechanicGroup::TurnUndead) {
+        return None;
+    }
+    dsl_gate::dsl_turn_undead_attempt(cleric_level, undead_hd)
+}
+
 // ── DSL gate helpers ──────────────────────────────────────────
 
 #[cfg(feature = "dsl-backend")]
@@ -134,6 +152,85 @@ mod dsl_gate {
 
         match result {
             Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
+    }
+
+    /// Evaluate the DSL `turn_undead_attempt` mechanic.
+    ///
+    /// Returns `(success, roll, table_result, hd_affected, destroyed)`:
+    /// - `success`: whether the turn succeeded
+    /// - `roll`: `Some(n)` if a 2d6 was rolled, `None` for auto-turn/destroy
+    /// - `table_result`: the table lookup result (for display)
+    /// - `hd_affected`: HD of undead affected (0 on failure/impossible)
+    /// - `destroyed`: true if undead are destroyed (vs. merely turned)
+    pub fn dsl_turn_undead_attempt(
+        cleric_level: u32,
+        undead_hd: u32,
+    ) -> Option<(bool, Option<i32>, TurnResult, u32, bool)> {
+        let runtime = crate::backend::dsl()?;
+        let state = BridgeState::new(vec![], vec![], vec![], 0, 0);
+        let mut handler = BridgeHandler::new();
+
+        let result = runtime
+            .evaluate_mechanic(
+                &state,
+                &mut handler,
+                "turn_undead_attempt",
+                vec![
+                    Value::Int(cleric_level as i64),
+                    Value::Int(undead_hd as i64),
+                ],
+            )
+            .ok()?;
+
+        value_to_turn_attempt(result)
+    }
+
+    /// Convert a DSL `TurnAttempt` enum variant to the Rust turn outcome tuple.
+    fn value_to_turn_attempt(
+        value: Value,
+    ) -> Option<(bool, Option<i32>, TurnResult, u32, bool)> {
+        match value {
+            Value::EnumVariant {
+                variant, fields, ..
+            } => match variant.as_str() {
+                "turn_impossible" => Some((false, None, TurnResult::Impossible, 0, false)),
+                "turn_failed" => {
+                    let roll = fields.get(&Name::from("roll")).and_then(|v| {
+                        if let Value::Int(n) = v { Some(*n as i32) } else { None }
+                    })?;
+                    let target = fields.get(&Name::from("target")).and_then(|v| {
+                        if let Value::Int(n) = v { Some(*n as u32) } else { None }
+                    })?;
+                    Some((false, Some(roll), TurnResult::Roll(target), 0, false))
+                }
+                "turn_rolled" => {
+                    let roll = fields.get(&Name::from("roll")).and_then(|v| {
+                        if let Value::Int(n) = v { Some(*n as i32) } else { None }
+                    })?;
+                    let target = fields.get(&Name::from("target")).and_then(|v| {
+                        if let Value::Int(n) = v { Some(*n as u32) } else { None }
+                    })?;
+                    let hd = fields.get(&Name::from("hd")).and_then(|v| {
+                        if let Value::Int(n) = v { Some(*n as u32) } else { None }
+                    })?;
+                    Some((true, Some(roll), TurnResult::Roll(target), hd, false))
+                }
+                "turn_auto" => {
+                    let hd = fields.get(&Name::from("hd")).and_then(|v| {
+                        if let Value::Int(n) = v { Some(*n as u32) } else { None }
+                    })?;
+                    Some((true, None, TurnResult::Turned, hd, false))
+                }
+                "turn_destroy" => {
+                    let hd = fields.get(&Name::from("hd")).and_then(|v| {
+                        if let Value::Int(n) = v { Some(*n as u32) } else { None }
+                    })?;
+                    Some((true, None, TurnResult::Destroyed, hd, true))
+                }
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -427,5 +524,82 @@ mod dsl_tests {
     fn dsl_skeleton_level_2_auto_turn() {
         let result = dsl_gate::dsl_turn_undead_result(2, 1).unwrap();
         assert_eq!(result, TurnResult::Turned);
+    }
+
+    // --- DSL turn_undead_attempt mechanic ---
+    //
+    // These tests verify the new orchestration mechanic that combines
+    // rank lookup, table lookup, and conditional dice rolling.
+
+    #[test]
+    fn dsl_attempt_impossible_returns_failure() {
+        // Wight (HD=4, rank=4) vs level 1 cleric: diff=-3 → Impossible
+        let result = dsl_gate::dsl_turn_undead_attempt(1, 4).unwrap();
+        let (success, roll, table, hd, destroyed) = result;
+        assert!(!success);
+        assert_eq!(roll, None);
+        assert_eq!(table, TurnResult::Impossible);
+        assert_eq!(hd, 0);
+        assert!(!destroyed);
+    }
+
+    #[test]
+    fn dsl_attempt_auto_turn_sets_hd_affected() {
+        // Skeleton (HD=1, rank=1) vs level 2 cleric: diff=1 → Turned (auto)
+        let result = dsl_gate::dsl_turn_undead_attempt(2, 1).unwrap();
+        let (success, roll, table, hd, destroyed) = result;
+        assert!(success);
+        assert_eq!(roll, None);
+        assert_eq!(table, TurnResult::Turned);
+        assert!(hd >= 2 && hd <= 12, "hd={} should be 2d6 range 2-12", hd);
+        assert!(!destroyed);
+    }
+
+    #[test]
+    fn dsl_attempt_auto_destroy_sets_destroyed_flag() {
+        // Skeleton (HD=1, rank=1) vs level 4 cleric: diff=3 → Destroyed (auto)
+        let result = dsl_gate::dsl_turn_undead_attempt(4, 1).unwrap();
+        let (success, roll, table, hd, destroyed) = result;
+        assert!(success);
+        assert_eq!(roll, None);
+        assert_eq!(table, TurnResult::Destroyed);
+        assert!(hd >= 2 && hd <= 12, "hd={} should be 2d6 range 2-12", hd);
+        assert!(destroyed);
+    }
+
+    #[test]
+    fn dsl_attempt_roll_case_returns_roll_value() {
+        // Ghoul (HD=3, rank=3) vs level 1 cleric: diff=-2 → Roll(11)
+        // We can't control the dice, but we can verify the structure.
+        let result = dsl_gate::dsl_turn_undead_attempt(1, 3).unwrap();
+        let (_, roll, table, _, _) = result;
+        assert_eq!(table, TurnResult::Roll(11));
+        let r = roll.expect("roll case must have a roll value");
+        assert!(r >= 2 && r <= 12, "roll={} should be 2d6 range 2-12", r);
+    }
+
+    #[test]
+    fn dsl_attempt_roll_success_has_hd() {
+        // Use level=9 vs skeleton (HD=1, rank=1): diff=8 → Destroyed.
+        // Use level=1 vs skeleton (HD=1, rank=1): diff=0 → Roll(7).
+        // With 100 iterations, we'll see at least some successes (E[roll]=7, ~58% succeed).
+        let mut saw_success_with_hd = false;
+        for _ in 0..100 {
+            let result = dsl_gate::dsl_turn_undead_attempt(1, 1).unwrap();
+            let (success, roll, table, hd, destroyed) = result;
+            assert_eq!(table, TurnResult::Roll(7));
+            assert!(!destroyed);
+            if success {
+                let r = roll.unwrap();
+                assert!(r >= 7, "success roll must be >= 7, got {}", r);
+                assert!(hd >= 2 && hd <= 12, "hd={} should be 2d6 on success", hd);
+                saw_success_with_hd = true;
+            } else {
+                let r = roll.unwrap();
+                assert!(r < 7, "failure roll must be < 7, got {}", r);
+                assert_eq!(hd, 0);
+            }
+        }
+        assert!(saw_success_with_hd, "expected at least one success in 100 trials");
     }
 }
