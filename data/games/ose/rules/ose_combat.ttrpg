@@ -202,6 +202,18 @@ system "OSE Combat" {
     }
 
 
+    // --- Attack resolution struct ---
+
+    // Full result of a character attack: hit flag, modifier used, and damage dealt.
+    // Returned by resolve_attack. Caller (Rust) applies HP, logs, and handles
+    // spell disruption side-effects.
+    struct AttackResolution {
+        hit: int
+        attack_mod: int
+        damage: int
+    }
+
+
     // --- Mechanics (can roll dice, no mutation) ---
 
     // Attack resolution: d20 + modifiers vs target number.
@@ -237,6 +249,92 @@ system "OSE Combat" {
         match {
             total < 1 => 1,
             _ => total
+        }
+    }
+
+    // Full attack procedure: weapon-type dispatch, modifier selection, hit roll,
+    // and damage roll. Replaces the Rust dispatch logic in resolve_character_attack.
+    //
+    // Parameters:
+    //   thac0, target_ac:  attacker THAC0 and defender AC
+    //   is_missile:        1 if weapon has missile quality, 0 otherwise
+    //   is_melee:          1 if weapon has melee quality, 0 otherwise
+    //     (versatile weapons have both set to 1; distance selects the mode)
+    //   distance:          current combat distance in feet
+    //   str_mod:           STR melee attack+damage modifier (includes rest penalty)
+    //   dex_mod:           DEX missile attack modifier (includes rest penalty)
+    //   short_range / medium_range / long_range: weapon range brackets (0 for melee-only)
+    //   damage_dice / damage_sides: weapon damage expression (e.g. 1, 8 for 1d8)
+    //   weapon_damage_mod: flat modifier from weapon notation (e.g. +1 for "1d8+1")
+    //   backstab_mult:     backstab damage multiplier (1 = normal, 2+ = backstab)
+    //
+    // Returns AttackResolution { hit, attack_mod, damage }.
+    // Caller (Rust) is responsible for HP mutation, logging, and spell disruption.
+    //
+    // Caller must pre-validate that range is legal (distance == 0 and is_missile,
+    // or distance > long_range) before calling — this mechanic does not error on
+    // out-of-range; that is handled by the native fallback path.
+    mechanic resolve_attack(
+        thac0: int,
+        target_ac: int,
+        is_missile: int,
+        is_melee: int,
+        distance: int,
+        str_mod: int,
+        dex_mod: int,
+        short_range: int,
+        medium_range: int,
+        long_range: int,
+        damage_dice: int,
+        damage_sides: int,
+        weapon_damage_mod: int = 0,
+        backstab_mult: int = 1
+    ) -> AttackResolution {
+        // Missile mode: pure missile (is_melee=0), or versatile weapon at > 10'.
+        let use_missile = match {
+            is_missile != 0 && is_melee == 0 => 1,
+            is_missile != 0 && distance > 10  => 1,
+            _                                  => 0
+        }
+
+        // Attack modifier: DEX + range bracket for missile, STR for melee.
+        let attack_mod = match {
+            use_missile != 0 =>
+                dex_mod + missile_range_mod(distance, short_range, medium_range, long_range),
+            _ => str_mod
+        }
+
+        // Damage flat modifier: STR + weapon bonus for melee, weapon bonus only for missile.
+        let damage_mod = match {
+            use_missile != 0 => weapon_damage_mod,
+            _ => str_mod + weapon_damage_mod
+        }
+
+        // Roll to hit (natural 1/20 rules are inside attack_roll).
+        let outcome = attack_roll(thac0, target_ac, attack_mod)
+
+        // Roll damage on hit.
+        // Backstab multiplies the raw dice roll before adding the flat modifier.
+        // Normal hit uses the standard damage_roll mechanic.
+        let damage = match outcome {
+            AttackOutcome.atk_hit => match {
+                backstab_mult > 1 => {
+                    let raw = roll(dice(damage_dice, damage_sides))
+                    let total = raw.total * backstab_mult + damage_mod
+                    match {
+                        total < 1 => 1,
+                        _         => total
+                    }
+                }
+                _ => damage_roll(damage_dice, damage_sides, damage_mod)
+            }
+            _ => 0
+        }
+
+        AttackResolution {
+            hit: match outcome { AttackOutcome.atk_hit => 1, _ => 0 },
+            attack_mod: attack_mod,
+            damage: damage
         }
     }
 

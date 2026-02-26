@@ -59,6 +59,116 @@ fn dsl_attack_roll(thac0: u32, target_ac: i32, modifiers: i32) -> Option<DslAtta
     }
 }
 
+// ── DSL resolve_attack mechanic ──────────────────────────────
+
+/// Full result of a DSL `resolve_attack` evaluation.
+#[cfg(feature = "dsl-backend")]
+struct DslResolveResult {
+    hit: bool,
+    roll: u32,
+    target_num: i32,
+    attack_mod: i32,
+    damage: i32,
+    damage_rolls: Vec<u32>,
+}
+
+/// Invoke the DSL `resolve_attack` mechanic — the full attack procedure
+/// (weapon-type dispatch, modifier selection, hit roll, damage roll).
+///
+/// Returns `None` if:
+/// - DSL backend is not configured for Combat
+/// - DSL runtime is not loaded
+/// - Missile range is invalid (caller should fall through to native error path)
+/// - DSL evaluation produces an unexpected value
+#[cfg(feature = "dsl-backend")]
+fn dsl_resolve_attack(
+    thac0: u32,
+    target_ac: i32,
+    is_missile: bool,
+    is_melee: bool,
+    distance: u32,
+    str_mod: i32,
+    dex_mod: i32,
+    range: (u32, u32, u32),
+    damage_str: &str,
+    backstab_mult: i32,
+) -> Option<DslResolveResult> {
+    use crate::backend::{self, MechanicGroup};
+    if !backend::is_dsl(MechanicGroup::Combat) {
+        return None;
+    }
+    // Pre-validate missile range so the native path can return the proper error.
+    if is_missile && attack::missile_range_modifier(distance, range.0, range.1, range.2).is_none() {
+        return None;
+    }
+    let runtime = backend::dsl()?;
+
+    // Parse weapon damage string (e.g. "1d8", "2d6+1") into components.
+    let (dmg_count, dmg_sides, dmg_base_mod) = {
+        let expr = dice::parse(damage_str)
+            .unwrap_or(dice::DiceExpr::Standard { count: 1, sides: 6, modifier: 0 });
+        match expr {
+            dice::DiceExpr::Standard { count, sides, modifier } =>
+                (count as i64, sides as i64, modifier as i64),
+            _ => (1, 6, 0),
+        }
+    };
+
+    let mut handler = backend::SimpleDiceHandler::new();
+    use ttrpg_interp::value::Value;
+    let result = runtime.evaluate_mechanic(
+        &backend::NullState,
+        &mut handler,
+        "resolve_attack",
+        vec![
+            Value::Int(thac0 as i64),
+            Value::Int(target_ac as i64),
+            Value::Int(if is_missile { 1 } else { 0 }),
+            Value::Int(if is_melee { 1 } else { 0 }),
+            Value::Int(distance as i64),
+            Value::Int(str_mod as i64),
+            Value::Int(dex_mod as i64),
+            Value::Int(range.0 as i64),
+            Value::Int(range.1 as i64),
+            Value::Int(range.2 as i64),
+            Value::Int(dmg_count),
+            Value::Int(dmg_sides),
+            Value::Int(dmg_base_mod),
+            Value::Int(backstab_mult as i64),
+        ],
+    );
+
+    match result {
+        Ok(Value::Struct { ref fields, .. }) => {
+            use ttrpg_ast::Name;
+            let hit_int = match fields.get(&Name::from("hit"))? {
+                Value::Int(v) => *v,
+                _ => return None,
+            };
+            let attack_mod = match fields.get(&Name::from("attack_mod"))? {
+                Value::Int(v) => *v as i32,
+                _ => return None,
+            };
+            let damage = match fields.get(&Name::from("damage"))? {
+                Value::Int(v) => *v as i32,
+                _ => return None,
+            };
+            let hit = hit_int != 0;
+            // handler.rolls[0] = d20 (from attack_roll inside resolve_attack)
+            let roll = handler.rolls.first().map(|r| r.unmodified as u32).unwrap_or(0);
+            // handler.rolls[1] = damage dice (only present on a hit)
+            let damage_rolls: Vec<u32> = handler
+                .rolls
+                .get(1)
+                .map(|r| r.dice.iter().map(|&d| d as u32).collect())
+                .unwrap_or_default();
+            let target_num = attack::target_number(thac0, target_ac);
+            Some(DslResolveResult { hit, roll, target_num, attack_mod, damage, damage_rolls })
+        }
+        _ => None,
+    }
+}
+
 /// Result of a single attack (melee or missile).
 #[derive(Debug, Clone)]
 pub struct AttackResult {
@@ -143,41 +253,80 @@ pub fn resolve_character_attack(
     }
 
     let qualities = weapon.weapon_qualities();
+
+    // Pure melee out-of-range: reject early with missile weapon hint.
+    if !qualities.missile && combat.distance > 10 {
+        let missile_weapons: Vec<&str> = character.inventory.iter()
+            .filter_map(|item| equipment::find_weapon(&item.name))
+            .filter(|w| w.weapon_qualities().missile)
+            .map(|w| w.name.as_str())
+            .collect();
+        let missile_hint = if missile_weapons.is_empty() {
+            String::new()
+        } else {
+            format!(" Available missile weapons: {}.", missile_weapons.join(", "))
+        };
+        return Err(format!(
+            "{} is a melee weapon but monsters are {}' away. \
+            Use \"close {}\" to move into melee range, or attack with a missile weapon.{}",
+            weapon.name, combat.distance, character.name, missile_hint));
+    }
+
+    let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
+    let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
+    let range = weapon.range_tuple();
+
+    // DSL path: unified dispatch via the `resolve_attack` mechanic.
+    // Falls through to native if DSL unavailable or range validation fails.
+    #[cfg(feature = "dsl-backend")]
+    {
+        let target_ac = combat.monsters[monster_idx].ac;
+        let target_name = combat.monsters[monster_idx].name.clone();
+        let thac0 = character.thac0;
+        if let Some(dsl) = dsl_resolve_attack(
+            thac0,
+            target_ac,
+            qualities.missile,
+            qualities.melee,
+            combat.distance,
+            str_mod,
+            dex_mod,
+            range,
+            weapon.damage_dice(),
+            1, // backstab_mult = 1 for normal character attacks
+        ) {
+            if dsl.hit {
+                combat.monsters[monster_idx].hp -= dsl.damage;
+            }
+            let target_killed = !combat.monsters[monster_idx].is_alive();
+            let target_hp_after = combat.monsters[monster_idx].hp;
+            let result = AttackResult {
+                attacker: character.name.clone(),
+                target: target_name,
+                roll: dsl.roll,
+                modifiers: dsl.attack_mod,
+                target_number: dsl.target_num,
+                hit: dsl.hit,
+                damage: dsl.damage,
+                damage_rolls: dsl.damage_rolls,
+                target_hp_after,
+                target_killed,
+            };
+            combat.log_event(result.to_string());
+            return Ok(result);
+        }
+    }
+
+    // Native fallback: original dispatch logic.
     if qualities.missile && !qualities.melee {
-        // Pure missile weapon
-        let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
-        character_missile_attack(combat, character, monster_idx, weapon.damage_dice(), dex_mod, weapon.range_tuple())
+        character_missile_attack(combat, character, monster_idx, weapon.damage_dice(), dex_mod, range)
     } else if qualities.missile && qualities.melee {
-        // Versatile weapon (e.g., dagger, spear) — melee if close, missile if far
         if combat.distance <= 10 {
-            let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
             Ok(character_melee_attack(combat, character, monster_idx, weapon.damage_dice(), str_mod))
         } else {
-            let dex_mod = ability::dex_missile_mod(character.abilities.dexterity) + rest_penalty;
-            character_missile_attack(combat, character, monster_idx, weapon.damage_dice(), dex_mod, weapon.range_tuple())
+            character_missile_attack(combat, character, monster_idx, weapon.damage_dice(), dex_mod, range)
         }
     } else {
-        // Pure melee weapon
-        if combat.distance > 10 {
-            // Find missile weapons in character's inventory
-            let missile_weapons: Vec<&str> = character.inventory.iter()
-                .filter_map(|item| equipment::find_weapon(&item.name))
-                .filter(|w| w.weapon_qualities().missile)
-                .map(|w| w.name.as_str())
-                .collect();
-
-            let missile_hint = if missile_weapons.is_empty() {
-                String::new()
-            } else {
-                format!(" Available missile weapons: {}.", missile_weapons.join(", "))
-            };
-
-            return Err(format!(
-                "{} is a melee weapon but monsters are {}' away. \
-                Use \"close {}\" to move into melee range, or attack with a missile weapon.{}",
-                weapon.name, combat.distance, character.name, missile_hint));
-        }
-        let str_mod = ability::str_melee_mod(character.abilities.strength) + rest_penalty;
         Ok(character_melee_attack(combat, character, monster_idx, weapon.damage_dice(), str_mod))
     }
 }
