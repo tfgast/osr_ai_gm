@@ -1179,6 +1179,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "ttrpg-ose-data",
  "ttrpg_ast",
  "ttrpg_checker",
  "ttrpg_interp",
@@ -1953,6 +1954,11 @@ checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
 ]
+
+[[package]]
+name = "ttrpg-ose-data"
+version = "0.1.0"
+source = "git+https://github.com/tfgast/ttrpg-ose-data.git?branch=main#8355c90c9befaac76cdbba13c9545d54d43fb810"
 
 [[package]]
 name = "ttrpg_ast"

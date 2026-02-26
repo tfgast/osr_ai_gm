@@ -213,34 +213,32 @@ mod dsl_runtime {
     }
 
     impl DslRuntime {
-        /// Load all .ttrpg files from the given directory, parse, lower, and type-check.
-        pub fn load(dir: &str) -> Result<Self, String> {
+        /// Load rule files with fallback: for each file in `expected_files`, try
+        /// the filesystem (`rules_dir/filename`) first, then bundled defaults from
+        /// `ttrpg_ose_data`. This allows users to override individual rule files
+        /// for homebrew customization.
+        pub fn load(rules_dir: &std::path::Path, expected_files: &[String]) -> Result<Self, String> {
             let mut sources = Vec::new();
 
-            let entries = std::fs::read_dir(dir)
-                .map_err(|e| format!("Failed to read DSL directory '{}': {}", dir, e))?;
-
-            let mut paths: Vec<_> = entries
-                .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .map_or(false, |ext| ext == "ttrpg")
-                })
-                .collect();
-
-            // Sort for deterministic load order
-            paths.sort_by_key(|e| e.path());
-
-            for entry in &paths {
-                let path = entry.path();
-                let content = std::fs::read_to_string(&path)
-                    .map_err(|e| format!("Failed to read '{}': {}", path.display(), e))?;
-                sources.push(content);
+            for filename in expected_files {
+                let path = rules_dir.join(filename);
+                if path.exists() {
+                    let content = std::fs::read_to_string(&path)
+                        .map_err(|e| format!("Failed to read '{}': {}", path.display(), e))?;
+                    sources.push(content);
+                } else if let Some(content) = ttrpg_ose_data::get_rule(filename) {
+                    sources.push(content.to_string());
+                } else {
+                    return Err(format!(
+                        "Rule file '{}' not found in '{}' or bundled data",
+                        filename,
+                        rules_dir.display()
+                    ));
+                }
             }
 
             if sources.is_empty() {
-                return Err(format!("No .ttrpg files found in '{}'", dir));
+                return Err("No rule files specified in game manifest".to_string());
             }
 
             let combined = sources.join("\n");
@@ -329,8 +327,8 @@ mod dsl_runtime {
     pub fn dsl() -> Option<&'static DslRuntime> {
         DSL.get_or_init(|| {
             let rules_dir = crate::manifest::game_rules_dir();
-            let dir_str = rules_dir.to_string_lossy();
-            match DslRuntime::load(&dir_str) {
+            let manifest = crate::manifest::game_manifest();
+            match DslRuntime::load(&rules_dir, &manifest.rules.files) {
                 Ok(runtime) => Some(runtime),
                 Err(e) => {
                     eprintln!("DSL backend failed to load: {}", e);

@@ -9,7 +9,7 @@ edition = "2021"
 
 [features]
 default = []
-dsl-backend = ["dep:ttrpg_interp", "dep:ttrpg_ast", "dep:ttrpg_parser", "dep:ttrpg_checker"]
+dsl-backend = ["dep:ttrpg_interp", "dep:ttrpg_ast", "dep:ttrpg_parser", "dep:ttrpg_checker", "dep:ttrpg_ose_data"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -20,3 +20,4 @@ ttrpg_interp = { git = "https://github.com/tfgast/ttrpg_dsl.git", branch = "main
 ttrpg_ast = { git = "https://github.com/tfgast/ttrpg_dsl.git", branch = "main", optional = true }
 ttrpg_parser = { git = "https://github.com/tfgast/ttrpg_dsl.git", branch = "main", optional = true }
 ttrpg_checker = { git = "https://github.com/tfgast/ttrpg_dsl.git", branch = "main", optional = true }
+ttrpg_ose_data = { git = "https://github.com/tfgast/ttrpg-ose-data.git", branch = "main", package = "ttrpg-ose-data", optional = true }
