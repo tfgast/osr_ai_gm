@@ -92,4 +92,60 @@ system "OSE Chargen" {
     derive get_character_thac0(aptitude: CombatAptitude, level: int) -> int {
         character_thac0(aptitude, level)
     }
+
+
+    // ========================================================
+    //  STARTING SPELL SELECTION
+    //
+    //  Determines what spells a caster starts with at level 1.
+    //  Arcane casters (spellbook) get Read Magic + one spell.
+    //  Divine casters know all spells on their list.
+    //
+    //  Reference: OSE Rules Tome, spell lists per class.
+    // ========================================================
+
+    // Whether this class uses a spellbook (arcane) vs knowing
+    // all spells on their list (divine).
+    // Arcane: Magic-User, Illusionist, Elf, Half-Elf, Gnome, Svirfneblin, Drow.
+    // Divine: Cleric, Druid, Paladin, Ranger, Bard.
+    derive is_spellbook_caster(class: Class) -> bool {
+        let def = class_def(class)
+        match def.spell_progression {
+            prog_arcane_full => true,
+            prog_half_elf    => true,
+            prog_drow        => true,
+            _                => false
+        }
+    }
+
+    // Starting spellbook for arcane casters.
+    // Always includes Read Magic plus one signature spell.
+    // Non-casters and divine casters return an empty list.
+    derive starting_spellbook(class: Class) -> list<string> {
+        match class {
+            MagicUser   => ["Read Magic", "Sleep"],
+            Illusionist => ["Read Magic", "Phantasmal Force"],
+            Elf         => ["Read Magic", "Sleep"],
+            Drow        => ["Read Magic", "Charm Person"],
+            HalfElf     => ["Read Magic", "Shield"],
+            Gnome       => ["Read Magic", "Colour Spray"],
+            Svirfneblin => ["Read Magic", "Chromatic Orb"],
+            _           => []
+        }
+    }
+
+    // All level-1 spells available per spell list type.
+    // For divine casters: the full selection to prepare from.
+    // For arcane casters: the pool they may add to their spellbook.
+    // Spell names match data/games/ose/data/spells.json exactly.
+    derive available_starting_spells(spell_list: SpellListType) -> list<string> {
+        match spell_list {
+            list_cleric => ["Cure Light Wounds", "Detect Evil", "Detect Magic", "Light", "Protection from Evil", "Purify Food and Water", "Remove Fear", "Resist Cold"],
+            list_druid => ["Animal Friendship", "Detect Danger", "Entangle", "Faerie Fire", "Invisibility to Animals", "Locate Plant or Animal", "Predict Weather", "Speak with Animals"],
+            list_illusionist => ["Auditory Illusion", "Chromatic Orb", "Colour Spray", "Dancing Lights", "Detect Illusion", "Glamour", "Hypnotism", "Light", "Phantasmal Force", "Read Magic", "Spook", "Wall of Fog"],
+            list_magic_user => ["Charm Person", "Detect Magic", "Floating Disc", "Hold Portal", "Light", "Magic Missile", "Protection from Evil", "Read Languages", "Read Magic", "Shield", "Sleep", "Ventriloquism"],
+            list_drow_arcane_divine => ["Charm Person", "Cure Light Wounds", "Detect Evil", "Detect Magic", "Floating Disc", "Hold Portal", "Light", "Magic Missile", "Protection from Evil", "Read Languages", "Read Magic", "Shield", "Sleep", "Ventriloquism"],
+            no_list => []
+        }
+    }
 }
