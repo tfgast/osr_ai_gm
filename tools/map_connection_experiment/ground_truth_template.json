@@ -4,85 +4,172 @@
     "1": {
       "name": "Main Entry Landing",
       "exits": [
-        {"to": "2", "connection_type": "FILL", "notes": ""},
-        {"to": "4", "connection_type": "FILL", "notes": ""}
+        {"to": "2", "connection_type": "pit", "notes": "Open to a cliff face on the sea"},
+        {"to": "4", "connection_type": "door"},
+        {"to": "5", "connection_type": "river_crossing"},
+        {"to": "8", "connection_type": "river_crossing"},
       ]
     },
     "2": {
       "name": "Western Burial Tunnels",
       "exits": [
-        {"to": "1", "connection_type": "FILL", "notes": ""},
-        {"to": "3A", "connection_type": "FILL", "notes": ""},
-        {"to": "3B", "connection_type": "FILL", "notes": ""}
+        {"to": "1", "connection_type": "pit", "notes": "Open to a cliff face on the sea"},
+        {"to": "3A", "connection_type": "open"},
       ]
     },
     "3A": {
       "name": "South Junction Archway",
-      "exits": []
+      "exits": [
+        {"to": "3B", "connection_type": "stairs"},
+        {"to": "3C", "connection_type": "stairs"},
+      ]
     },
     "3B": {
       "name": "Arched Stairwell Junction (south)",
-      "exits": []
+      "exits": [
+        {"to": "3A", "connection_type": "stairs"},
+        {"to": "7", "connection_type": "open", "notes": "pit trap on the way"},
+        {"to": "9", "connection_type": "open", "notes": "pit trap on the way"},
+        {"to": "10", "connection_type": "open"},
+      ]
     },
     "3C": {
       "name": "Arched Stairwell Junction (north)",
-      "exits": []
+      "exits": [
+        {"to": "3A", "connection_type": "stairs"},
+        {"to": "3B", "connection_type": "stairs"},
+        {"to": "4", "connection_type": "stairs"},
+      ]
     },
     "4": {
       "name": "Great Northern Hall",
-      "exits": []
+      "exits": [
+        {"to": "1", "connection_type": "doors"},
+        {"to": "3C", "connection_type": "stairs"},
+        {"to": "4A", "connection_type": "open", "notes": "description of doors in this room to 13"},
+        {"to": "5", "connection_type": "door"},
+        {"to": "6", "connection_type": "open"},
+        {"to": "7", "connection_type": "open"},
+        {"to": "13", "connection_type": "door", "notes": "see 4A for door description"},
+      ]
     },
     "4A": {
       "name": "Great Bronze Doors",
-      "exits": []
+      "exits": [
+        {"to": "4", "connection_type": "open", "notes": "part of same room"},
+        {"to": "13", "connection_type": "door"},
+      ]
     },
     "5": {
       "name": "Collapsed Burial Chamber",
-      "exits": []
+      "exits": [
+        {"to": "1", "connection_type": "river_crossing"},
+        {"to": "4", "connection_type": "door"},
+        {"to": "8", "connection_type": "river_crossing"},
+      ]
     },
     "6": {
       "name": "Sealed Eastern Door",
-      "exits": []
+      "exits": [
+        {"to": "4", "connection_type": "open"},
+        {"to": "7", "connection_type": "open"},
+        {"to": "8", "connection_type": "door"},
+      ]
     },
     "7": {
       "name": "Western Corridor",
-      "exits": []
+      "exits": [
+        {"to": "3B", "connection_type": "open", "notes": "pit trap on the way"},
+        {"to": "4", "connection_type": "open"},
+        {"to": "6", "connection_type": "open"},
+        {"to": "9", "connection_type": "open", "notes": "pit trap on the way"},
+        {"to": "10", "connection_type": "open", "notes": "pit trap on the way"},
+      ]
     },
     "8": {
       "name": "River Ledge & Forgotten Crypt",
-      "exits": []
+      "exits": [
+        {"to": "1", "connection_type": "river_crossing"},
+        {"to": "5", "connection_type": "river_crossing"},
+        {"to": "6", "connection_type": "door"},
+        {"to": "13", "connection_type": "river_crossing"},
+        {"to": "14", "connection_type": "river_crossing"},
+        {"to": "15", "connection_type": "river_crossing"},
+      ]
     },
     "9": {
       "name": "Northern Corridor",
-      "exits": []
+      "exits": [
+        {"to": "3B", "connection_type": "open", "notes": "pit trap on the way"},
+        {"to": "7", "connection_type": "open", "notes": "pit trap on the way"},
+        {"to": "10", "connection_type": "open", "notes": "pit trap on the way"},
+        {"to": "10", "connection_type": "river_crossing"},
+        {"to": "11", "connection_type": "river_crossing"},
+        {"to": "12", "connection_type": "river_crossing"},
+        {"to": "13", "connection_type": "secret"},
+      ]
     },
     "10": {
       "name": "Dead-End River Tunnel",
-      "exits": []
+      "exits": [
+        {"to": "3B", "connection_type": "open"},
+        {"to": "9", "connection_type": "open"},
+        {"to": "9", "connection_type": "river_crossing"},
+        {"to": "11", "connection_type": "river_crossing"},
+        {"to": "12", "connection_type": "river_crossing"},
+      ]
     },
     "11": {
       "name": "Hanging North Alcove",
-      "exits": []
+      "exits": [
+        {"to": "9", "connection_type": "river_crossing"},
+        {"to": "10", "connection_type": "river_crossing"},
+        {"to": "12", "connection_type": "river_crossing"},
+        {"to": "13", "connection_type": "river_crossing"},
+        {"to": "14", "connection_type": "river_crossing"},
+      ]
     },
     "12": {
       "name": "Hanging South Alcove",
-      "exits": []
+      "exits": [
+        {"to": "9", "connection_type": "river_crossing"},
+        {"to": "10", "connection_type": "river_crossing"},
+        {"to": "11", "connection_type": "river_crossing"},
+        {"to": "13", "connection_type": "river_crossing"},
+        {"to": "14", "connection_type": "river_crossing"},
+      ]
     },
     "13": {
       "name": "The Riven Hall",
-      "exits": []
+      "exits": [
+        {"to": "4A", "connection_type": "door"},
+        {"to": "11", "connection_type": "river_crossing"},
+        {"to": "12", "connection_type": "river_crossing"},
+        {"to": "14", "connection_type": "river_crossing"},
+        {"to": "15", "connection_type": "river_crossing"},
+      ]
     },
     "14": {
       "name": "The Far Side",
-      "exits": []
+      "exits": [
+        {"to": "11", "connection_type": "river_crossing"},
+        {"to": "12", "connection_type": "river_crossing"},
+        {"to": "13", "connection_type": "river_crossing"},
+        {"to": "15", "connection_type": "stairs"},
+        {"to": "16", "connection_type": "door", "notes": "door opens to magic portal after puzzle is solved"},
+      ]
     },
     "15": {
       "name": "Penultimate Crypt",
-      "exits": []
+      "exits": [
+        {"to": "8", "connection_type": "river_crossing"},
+        {"to": "13", "connection_type": "river_crossing"},
+        {"to": "14", "connection_type": "stairs"},
+      ]
     },
     "16": {
       "name": "Morkaal's Tomb (off-map, teleporter only)",
-      "exits": []
+      {"to": "14", "connection_type": "open", "notes": "stepping through magic archway teleports back to portal past door in room 14"},
     }
   }
 }
