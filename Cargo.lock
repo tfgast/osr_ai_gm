@@ -1958,7 +1958,7 @@ dependencies = [
 [[package]]
 name = "ttrpg-ose-data"
 version = "0.1.0"
-source = "git+https://github.com/tfgast/ttrpg-ose-data.git?branch=main#1d6c8d66ae383a2167c98785e51cedc432163674"
+source = "git+https://github.com/tfgast/ttrpg-ose-data.git?branch=main#993128f109c1b3f8d1fdd3d112b54aa59aa181c9"
 
 [[package]]
 name = "ttrpg_ast"
