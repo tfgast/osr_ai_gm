@@ -170,6 +170,15 @@ mod dsl_gate {
         fn handle(&mut self, _: Effect) -> Response { Response::Acknowledged }
     }
 
+    fn class_to_dsl(id: &crate::rules::class::ClassId) -> Value {
+        use crate::rules::class::canonical_to_dsl_variant;
+        Value::EnumVariant {
+            enum_name: "Class".into(),
+            variant: Name::from(canonical_to_dsl_variant(id.as_str())),
+            fields: BTreeMap::new(),
+        }
+    }
+
     pub fn dsl_backstab_multiplier(level: u32) -> Option<u32> {
         let rt = backend::dsl()?;
         let args = vec![Value::Int(level as i64)];
@@ -180,6 +189,25 @@ mod dsl_gate {
         }
     }
 
+    pub fn dsl_has_thief_skills(id: &crate::rules::class::ClassId) -> Option<bool> {
+        let rt = backend::dsl()?;
+        let args = vec![class_to_dsl(id)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "has_thief_skills", args).ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_can_backstab(id: &crate::rules::class::ClassId) -> Option<bool> {
+        let rt = backend::dsl()?;
+        let args = vec![class_to_dsl(id)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "can_backstab", args).ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

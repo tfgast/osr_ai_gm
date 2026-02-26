@@ -263,7 +263,7 @@ requires_dsl = true
         assert_eq!(manifest.game.name, "Old-School Essentials");
         assert_eq!(manifest.rules.files.len(), 11);
         assert_eq!(manifest.data.len(), 9);
-        assert_eq!(manifest.mechanics.supported.len(), 10);
+        assert_eq!(manifest.mechanics.supported.len(), 11);
     }
 
     #[test]

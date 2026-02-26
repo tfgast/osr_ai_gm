@@ -47,6 +47,7 @@ supported = [
     "spell",
     "class",
     "chargen",
+    "encounter",
 ]
 
 [features]

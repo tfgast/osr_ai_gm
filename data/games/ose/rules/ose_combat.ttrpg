@@ -253,4 +253,56 @@ system "OSE Combat" {
         }
         reaction_outcome(clamped)
     }
+
+
+    // --- Encounter mechanics ---
+    // Reference: OSE Reference Booklet — Encounters chapter.
+
+    // Surprise roll: each side rolls 1d6. A result of 1-2 means that side is surprised.
+    // Call once per side (party and monsters roll independently).
+    // Returns the raw d6 value; caller compares vs 2 to determine surprise.
+    mechanic surprise_roll() -> int {
+        let result = roll(1d6)
+        result.total
+    }
+
+    // Dungeon encounter distance in feet.
+    // surprised: 1 if either side is surprised, 0 for a normal encounter.
+    // Normal: 2d6 × 10 feet. Surprised: 1d4 × 10 feet.
+    mechanic dungeon_encounter_distance(surprised: int = 0) -> int {
+        let d = match {
+            surprised != 0 => roll(1d4),
+            _              => roll(2d6)
+        }
+        d.total * 10
+    }
+
+    // Wilderness encounter distance in yards.
+    // surprised: 1 if either side is surprised, 0 for a normal encounter.
+    // Normal: 4d6 × 10 yards. Surprised: 1d4 × 10 yards.
+    mechanic wilderness_encounter_distance(surprised: int = 0) -> int {
+        let d = match {
+            surprised != 0 => roll(1d4),
+            _              => roll(4d6)
+        }
+        d.total * 10
+    }
+
+    // Evasion chance percentage.
+    // party_size: number of characters in the fleeing party.
+    // fewer_monsters: 1 if monster count ≤ party size, 0 otherwise.
+    // Returns the percentage chance (1–100) of successful evasion.
+    // Based on OSE evasion table (party-size brackets × relative numbers).
+    derive evasion_chance(party_size: int, fewer_monsters: int) -> int {
+        match {
+            party_size <= 4  && fewer_monsters == 1 => 70,
+            party_size <= 4                         => 50,
+            party_size <= 12 && fewer_monsters == 1 => 50,
+            party_size <= 12                        => 35,
+            party_size <= 24 && fewer_monsters == 1 => 35,
+            party_size <= 24                        => 25,
+            fewer_monsters == 1                     => 25,
+            _                                       => 10
+        }
+    }
 }

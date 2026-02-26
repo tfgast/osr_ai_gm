@@ -18,6 +18,7 @@ pub enum MechanicGroup {
     Spell,
     Class,
     Chargen,
+    Encounter,
 }
 
 impl MechanicGroup {
@@ -34,6 +35,7 @@ impl MechanicGroup {
             MechanicGroup::Spell => "SPELL",
             MechanicGroup::Class => "CLASS",
             MechanicGroup::Chargen => "CHARGEN",
+            MechanicGroup::Encounter => "ENCOUNTER",
         }
     }
 }
@@ -50,6 +52,7 @@ pub struct BackendConfig {
     pub spell: Backend,
     pub class: Backend,
     pub chargen: Backend,
+    pub encounter: Backend,
 }
 
 impl BackendConfig {
@@ -67,6 +70,7 @@ impl BackendConfig {
             spell: parse_backend_env("OSR_BACKEND_SPELL").or(global).unwrap_or(Backend::Dsl),
             class: parse_backend_env("OSR_BACKEND_CLASS").or(global).unwrap_or(Backend::Dsl),
             chargen: parse_backend_env("OSR_BACKEND_CHARGEN").or(global).unwrap_or(Backend::Dsl),
+            encounter: parse_backend_env("OSR_BACKEND_ENCOUNTER").or(global).unwrap_or(Backend::Dsl),
         }
     }
 
@@ -82,6 +86,7 @@ impl BackendConfig {
             MechanicGroup::Spell => self.spell,
             MechanicGroup::Class => self.class,
             MechanicGroup::Chargen => self.chargen,
+            MechanicGroup::Encounter => self.encounter,
         }
     }
 }
@@ -378,6 +383,7 @@ mod tests {
         assert_eq!(config.spell, Backend::Dsl);
         assert_eq!(config.class, Backend::Dsl);
         assert_eq!(config.chargen, Backend::Dsl);
+        assert_eq!(config.encounter, Backend::Dsl);
     }
 
     #[test]
@@ -400,6 +406,7 @@ mod tests {
             spell: Backend::Native,
             class: Backend::Native,
             chargen: Backend::Dsl,
+            encounter: Backend::Native,
         };
         assert_eq!(config.get(MechanicGroup::Combat), Backend::Dsl);
         assert_eq!(config.get(MechanicGroup::Morale), Backend::Native);

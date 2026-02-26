@@ -40,6 +40,16 @@ pub fn check_surprise() -> (SurpriseResult, u32, u32) {
 
 /// Testable version. Returns (result, party_roll, monster_roll).
 pub fn check_surprise_with<R: Rng>(rng: &mut R) -> (SurpriseResult, u32, u32) {
+    // DSL gate: use surprise_roll mechanic if available
+    #[cfg(feature = "dsl-backend")]
+    if let Some(result) = dsl_check_surprise() {
+        return result;
+    }
+
+    native_check_surprise_with(rng)
+}
+
+fn native_check_surprise_with<R: Rng>(rng: &mut R) -> (SurpriseResult, u32, u32) {
     let party_roll: u32 = rng.gen_range(1..=6);
     let monster_roll: u32 = rng.gen_range(1..=6);
 
@@ -66,6 +76,16 @@ pub fn encounter_distance_dungeon(surprised: bool) -> u32 {
 
 /// Testable version.
 pub fn encounter_distance_dungeon_with<R: Rng>(rng: &mut R, surprised: bool) -> u32 {
+    // DSL gate: use dungeon_encounter_distance mechanic if available
+    #[cfg(feature = "dsl-backend")]
+    if let Some(d) = dsl_dungeon_distance(surprised) {
+        return d;
+    }
+
+    native_dungeon_distance_with(rng, surprised)
+}
+
+fn native_dungeon_distance_with<R: Rng>(rng: &mut R, surprised: bool) -> u32 {
     if surprised {
         let roll: u32 = rng.gen_range(1..=4);
         roll * 10
@@ -83,6 +103,16 @@ pub fn encounter_distance_wilderness(surprised: bool) -> u32 {
 
 /// Testable version. Returns distance in yards.
 pub fn encounter_distance_wilderness_with<R: Rng>(rng: &mut R, surprised: bool) -> u32 {
+    // DSL gate: use wilderness_encounter_distance mechanic if available
+    #[cfg(feature = "dsl-backend")]
+    if let Some(d) = dsl_wilderness_distance(surprised) {
+        return d;
+    }
+
+    native_wilderness_distance_with(rng, surprised)
+}
+
+fn native_wilderness_distance_with<R: Rng>(rng: &mut R, surprised: bool) -> u32 {
     if surprised {
         let d1: u32 = rng.gen_range(1..=4);
         d1 * 10
@@ -274,8 +304,16 @@ pub fn attempt_evasion_with<R: Rng>(
         return EvasionResult::auto_escape();
     }
 
-    // OSE evasion table: chance depends on party size and relative numbers
     let fewer_monsters = monster_count <= party_size;
+
+    // DSL gate: look up evasion chance from the DSL table
+    #[cfg(feature = "dsl-backend")]
+    if let Some(chance) = dsl_evasion_chance(party_size, fewer_monsters) {
+        let roll: i32 = rng.gen_range(1..=100);
+        return EvasionResult::from_roll(roll, chance);
+    }
+
+    // OSE evasion table: chance depends on party size and relative numbers
     let chance: i32 = match party_size {
         1..=4 => if fewer_monsters { 70 } else { 50 },
         5..=12 => if fewer_monsters { 50 } else { 35 },
@@ -366,6 +404,124 @@ pub fn begin_encounter_wilderness_with<R: Rng>(rng: &mut R) -> EncounterSequence
         monster_surprise_roll: m_roll,
         distance: distance_yards,
         messages,
+    }
+}
+
+// ── DSL gate helpers ─────────────────────────────────────────
+
+/// Try to resolve surprise check via DSL `surprise_roll` mechanic.
+/// Calls the mechanic twice (once per side) and assembles the SurpriseResult.
+/// Returns None on DSL error (caller falls through to native).
+#[cfg(feature = "dsl-backend")]
+fn dsl_check_surprise() -> Option<(SurpriseResult, u32, u32)> {
+    use crate::backend::{self, MechanicGroup};
+    if !backend::is_dsl(MechanicGroup::Encounter) {
+        return None;
+    }
+    let runtime = backend::dsl()?;
+    use ttrpg_interp::value::Value;
+
+    let mut handler = backend::SimpleDiceHandler::new();
+    let party_roll = match runtime.evaluate_mechanic(
+        &backend::NullState,
+        &mut handler,
+        "surprise_roll",
+        vec![],
+    ) {
+        Ok(Value::Int(n)) => n as u32,
+        _ => return None,
+    };
+
+    let mut handler2 = backend::SimpleDiceHandler::new();
+    let monster_roll = match runtime.evaluate_mechanic(
+        &backend::NullState,
+        &mut handler2,
+        "surprise_roll",
+        vec![],
+    ) {
+        Ok(Value::Int(n)) => n as u32,
+        _ => return None,
+    };
+
+    let party_surprised = party_roll <= 2;
+    let monster_surprised = monster_roll <= 2;
+
+    let result = match (party_surprised, monster_surprised) {
+        (true, true) => SurpriseResult::BothSurprised,
+        (true, false) => SurpriseResult::MonstersSurprise,
+        (false, true) => SurpriseResult::PartySurprises,
+        (false, false) => SurpriseResult::None,
+    };
+
+    Some((result, party_roll, monster_roll))
+}
+
+/// Try to resolve dungeon encounter distance via DSL `dungeon_encounter_distance` mechanic.
+/// Returns None on DSL error (caller falls through to native).
+#[cfg(feature = "dsl-backend")]
+fn dsl_dungeon_distance(surprised: bool) -> Option<u32> {
+    use crate::backend::{self, MechanicGroup};
+    if !backend::is_dsl(MechanicGroup::Encounter) {
+        return None;
+    }
+    let runtime = backend::dsl()?;
+    let mut handler = backend::SimpleDiceHandler::new();
+    use ttrpg_interp::value::Value;
+    match runtime.evaluate_mechanic(
+        &backend::NullState,
+        &mut handler,
+        "dungeon_encounter_distance",
+        vec![Value::Int(if surprised { 1 } else { 0 })],
+    ) {
+        Ok(Value::Int(n)) => Some(n as u32),
+        _ => None,
+    }
+}
+
+/// Try to resolve wilderness encounter distance via DSL `wilderness_encounter_distance` mechanic.
+/// Returns None on DSL error (caller falls through to native).
+#[cfg(feature = "dsl-backend")]
+fn dsl_wilderness_distance(surprised: bool) -> Option<u32> {
+    use crate::backend::{self, MechanicGroup};
+    if !backend::is_dsl(MechanicGroup::Encounter) {
+        return None;
+    }
+    let runtime = backend::dsl()?;
+    let mut handler = backend::SimpleDiceHandler::new();
+    use ttrpg_interp::value::Value;
+    match runtime.evaluate_mechanic(
+        &backend::NullState,
+        &mut handler,
+        "wilderness_encounter_distance",
+        vec![Value::Int(if surprised { 1 } else { 0 })],
+    ) {
+        Ok(Value::Int(n)) => Some(n as u32),
+        _ => None,
+    }
+}
+
+/// Try to look up the evasion chance percentage via DSL `evasion_chance` derive.
+/// Returns None on DSL error (caller falls through to native table).
+#[cfg(feature = "dsl-backend")]
+fn dsl_evasion_chance(party_size: u32, fewer_monsters: bool) -> Option<i32> {
+    use crate::backend::{self, MechanicGroup};
+    if !backend::is_dsl(MechanicGroup::Encounter) {
+        return None;
+    }
+    let runtime = backend::dsl()?;
+    let mut handler = backend::SimpleDiceHandler::new();
+    use ttrpg_interp::value::Value;
+    match runtime.evaluate_derive(
+        &backend::NullState,
+        &mut handler,
+        "evasion_chance",
+        vec![
+            Value::Int(party_size as i64),
+            Value::Int(if fewer_monsters { 1 } else { 0 }),
+        ],
+    ) {
+        Ok(Value::Int(n)) => Some(n as i32),
+        _ => None,
     }
 }
 
