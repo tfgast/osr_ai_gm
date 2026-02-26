@@ -171,9 +171,13 @@ pub fn class_def(id: &ClassId) -> ClassDef {
             return def;
         }
     }
-    native_class_def(name)
+    #[cfg(feature = "legacy-native")]
+    return native_class_def(name);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_class_def(name: &str) -> ClassDef {
     match name {
         "Acrobat" => ClassDef {
@@ -1188,6 +1192,7 @@ mod tests {
         assert!(reg.get_by_id(&id).is_none());
     }
 
+    #[cfg(feature = "legacy-native")]
     #[test]
     fn registry_parity_with_native() {
         let reg = class_registry();
@@ -1220,6 +1225,7 @@ mod tests {
 mod dsl_parity_tests {
     use super::*;
 
+    #[cfg(feature = "legacy-native")]
     #[test]
     fn dsl_class_def_parity_all_22() {
         for &name in &CANONICAL_CLASS_NAMES {

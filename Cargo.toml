@@ -8,8 +8,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = []
+default = ["legacy-native"]
 dsl-backend = ["dep:ttrpg_interp", "dep:ttrpg_ast", "dep:ttrpg_parser", "dep:ttrpg_checker", "dep:ttrpg_ose_data"]
+legacy-native = []
 
 [dependencies]
 serde = { version = "1", features = ["derive", "rc"] }

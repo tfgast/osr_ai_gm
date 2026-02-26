@@ -113,12 +113,15 @@ pub fn backstab_multiplier(level: u32) -> u32 {
             }
         }
     }
-    match level {
+    #[cfg(feature = "legacy-native")]
+    return match level {
         1..=4 => 2,
         5..=8 => 3,
         9..=12 => 4,
         _ => 5,
-    }
+    };
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Backstab attack bonus: +4 to hit.

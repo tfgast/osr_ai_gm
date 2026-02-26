@@ -47,6 +47,8 @@ pub fn spell_slots(prog: SpellProgression, level: u32) -> SpellSlots {
             }
         }
     }
+    #[cfg(feature = "legacy-native")]
+    return {
     use SpellProgression::*;
     match prog {
         NonCaster => [0; 6],
@@ -175,7 +177,9 @@ pub fn spell_slots(prog: SpellProgression, level: u32) -> SpellSlots {
             13 => [3, 2, 1, 0, 0, 0],
             _ => [3, 2, 2, 0, 0, 0],
         },
-    }
+    }};
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Check if a class has any spell slots at a given level.
@@ -199,8 +203,10 @@ pub fn casting_resource_type(prog: SpellProgression) -> String {
             }
         }
     }
-    let _ = prog;
-    "vancian_slots".to_string()
+    #[cfg(feature = "legacy-native")]
+    { let _ = prog; return "vancian_slots".to_string(); }
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Check if a character can cast a spell at the given spell level,
@@ -215,12 +221,13 @@ pub fn can_cast_spell(slots_used: &SpellSlots, max_slots: &SpellSlots, spell_lev
         }
     }
     // Native fallback: Vancian slot check
-    let idx = (spell_level - 1) as usize;
-    if idx < 6 {
-        slots_used[idx] < max_slots[idx]
-    } else {
-        false
-    }
+    #[cfg(feature = "legacy-native")]
+    return {
+        let idx = (spell_level - 1) as usize;
+        if idx < 6 { slots_used[idx] < max_slots[idx] } else { false }
+    };
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Returns the cost (in resource units) to cast a spell of the given level.
@@ -234,8 +241,10 @@ pub fn cast_cost(spell_level: u32) -> u32 {
             }
         }
     }
-    let _ = spell_level;
-    1 // Vancian: always 1 slot per cast
+    #[cfg(feature = "legacy-native")]
+    { let _ = spell_level; return 1; } // Vancian: always 1 slot per cast
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Returns the spell point cost for a given spell level.
@@ -250,7 +259,8 @@ pub fn spell_point_cost(spell_level: u32) -> u32 {
         }
     }
     // Native fallback: standard OSR spell point conversion
-    match spell_level {
+    #[cfg(feature = "legacy-native")]
+    return match spell_level {
         1 => 2,
         2 => 3,
         3 => 5,
@@ -258,7 +268,9 @@ pub fn spell_point_cost(spell_level: u32) -> u32 {
         5 => 7,
         6 => 9,
         _ => 0,
-    }
+    };
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Returns true if a disrupted (failed) spell still consumes its Vancian slot.
@@ -274,7 +286,10 @@ pub fn disruption_consumes_slot() -> bool {
             }
         }
     }
-    true // native fallback: B/X OSE always consumes the slot
+    #[cfg(feature = "legacy-native")]
+    return true; // B/X OSE always consumes the slot
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Check whether all casting resources recharge on long rest.
@@ -288,8 +303,10 @@ pub fn rest_recovery(prog: SpellProgression) -> bool {
             }
         }
     }
-    let _ = prog;
-    true // All resource types fully recharge on rest
+    #[cfg(feature = "legacy-native")]
+    { let _ = prog; return true; } // All resource types fully recharge on rest
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 // ── DSL gate helpers ──────────────────────────────────────────

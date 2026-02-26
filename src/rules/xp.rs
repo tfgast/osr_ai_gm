@@ -16,7 +16,10 @@ pub fn xp_for_level(id: &ClassId, level: u32) -> u64 {
             return val;
         }
     }
-    native_xp_for_level(id.as_str(), level)
+    #[cfg(feature = "legacy-native")]
+    return native_xp_for_level(id.as_str(), level);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Check if a character has enough XP to advance to the next level.
@@ -28,7 +31,10 @@ pub fn check_level_up(id: &ClassId, current_level: u32, xp: u64) -> Option<u32> 
             return if can_advance { Some(current_level + 1) } else { None };
         }
     }
-    native_check_level_up(id, current_level, xp)
+    #[cfg(feature = "legacy-native")]
+    return native_check_level_up(id, current_level, xp);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Calculate XP bonus/penalty from prime requisite score.
@@ -40,7 +46,10 @@ pub fn prime_req_xp_modifier(id: &ClassId, abilities: &[i32; 6]) -> i32 {
             return val;
         }
     }
-    native_prime_req_xp_modifier(id, abilities)
+    #[cfg(feature = "legacy-native")]
+    return native_prime_req_xp_modifier(id, abilities);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Apply XP modifier and return adjusted XP amount.
@@ -52,11 +61,15 @@ pub fn adjust_xp(base_xp: u64, modifier_pct: i32) -> u64 {
             return val;
         }
     }
-    native_adjust_xp(base_xp, modifier_pct)
+    #[cfg(feature = "legacy-native")]
+    return native_adjust_xp(base_xp, modifier_pct);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 // ── Native backend ──────────────────────────────────────────────
 
+#[cfg(feature = "legacy-native")]
 fn native_xp_for_level(name: &str, level: u32) -> u64 {
     let table = xp_table(name);
     if level == 0 { return 0; }
@@ -69,6 +82,7 @@ fn native_xp_for_level(name: &str, level: u32) -> u64 {
     }
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_check_level_up(id: &ClassId, current_level: u32, xp: u64) -> Option<u32> {
     let max = super::class::class_def(id).max_level;
     if current_level >= max {
@@ -83,6 +97,7 @@ fn native_check_level_up(id: &ClassId, current_level: u32, xp: u64) -> Option<u3
     }
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_prime_req_xp_modifier(id: &ClassId, abilities: &[i32; 6]) -> i32 {
     use super::class::class_def;
     use super::ability::prime_req_xp_mod;
@@ -99,6 +114,7 @@ fn native_prime_req_xp_modifier(id: &ClassId, abilities: &[i32; 6]) -> i32 {
     prime_req_xp_mod(min_score)
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_adjust_xp(base_xp: u64, modifier_pct: i32) -> u64 {
     if modifier_pct == 0 {
         return base_xp;
@@ -208,6 +224,7 @@ mod dsl_gate {
 
 /// XP table for each class. Index 0 = level 1 (0 XP), index 1 = level 2, etc.
 /// Uses B/X-equivalent class name for table lookup when available.
+#[cfg(feature = "legacy-native")]
 fn xp_table(name: &str) -> &'static [u64] {
     // Resolve to canonical name if needed, then look up B/X equivalent for XP table
     let canonical = normalize_class_name(name).unwrap_or(name);

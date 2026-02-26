@@ -198,9 +198,13 @@ pub fn target_number(thac0: u32, target_ac: i32) -> i32 {
             return v;
         }
     }
-    native_target_number(thac0, target_ac)
+    #[cfg(feature = "legacy-native")]
+    return native_target_number(thac0, target_ac);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_target_number(thac0: u32, target_ac: i32) -> i32 {
     thac0 as i32 - target_ac
 }
@@ -259,9 +263,13 @@ pub fn missile_range_modifier(distance: u32, short: u32, medium: u32, long: u32)
             return Some(v);
         }
     }
-    Some(native_missile_range_modifier(distance, short, medium, long))
+    #[cfg(feature = "legacy-native")]
+    return Some(native_missile_range_modifier(distance, short, medium, long));
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_missile_range_modifier(distance: u32, short: u32, medium: u32, _long: u32) -> i32 {
     if distance <= short {
         1
@@ -303,9 +311,13 @@ pub fn monster_thac0(hd: u32) -> u32 {
             return v;
         }
     }
-    native_monster_thac0(hd)
+    #[cfg(feature = "legacy-native")]
+    return native_monster_thac0(hd);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_monster_thac0(hd: u32) -> u32 {
     if hd == 0 {
         return 20;

@@ -46,9 +46,13 @@ pub fn check_surprise_with<R: Rng>(rng: &mut R) -> (SurpriseResult, u32, u32) {
         return result;
     }
 
-    native_check_surprise_with(rng)
+    #[cfg(feature = "legacy-native")]
+    return native_check_surprise_with(rng);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_check_surprise_with<R: Rng>(rng: &mut R) -> (SurpriseResult, u32, u32) {
     let party_roll: u32 = rng.gen_range(1..=6);
     let monster_roll: u32 = rng.gen_range(1..=6);
@@ -82,9 +86,13 @@ pub fn encounter_distance_dungeon_with<R: Rng>(rng: &mut R, surprised: bool) -> 
         return d;
     }
 
-    native_dungeon_distance_with(rng, surprised)
+    #[cfg(feature = "legacy-native")]
+    return native_dungeon_distance_with(rng, surprised);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_dungeon_distance_with<R: Rng>(rng: &mut R, surprised: bool) -> u32 {
     if surprised {
         let roll: u32 = rng.gen_range(1..=4);
@@ -109,9 +117,13 @@ pub fn encounter_distance_wilderness_with<R: Rng>(rng: &mut R, surprised: bool) 
         return d;
     }
 
-    native_wilderness_distance_with(rng, surprised)
+    #[cfg(feature = "legacy-native")]
+    return native_wilderness_distance_with(rng, surprised);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_wilderness_distance_with<R: Rng>(rng: &mut R, surprised: bool) -> u32 {
     if surprised {
         let d1: u32 = rng.gen_range(1..=4);
@@ -179,9 +191,13 @@ pub fn reaction_roll_with<R: Rng>(rng: &mut R, cha_score: i32) -> (Reaction, i32
         return result;
     }
 
-    native_reaction_roll_with(rng, cha_mod)
+    #[cfg(feature = "legacy-native")]
+    return native_reaction_roll_with(rng, cha_mod);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_reaction_roll_with<R: Rng>(rng: &mut R, cha_mod: i32) -> (Reaction, i32, i32) {
     let d1: i32 = rng.gen_range(1..=6);
     let d2: i32 = rng.gen_range(1..=6);

@@ -565,9 +565,13 @@ pub fn calculate_ac(armour_ac: i32, has_shield: bool, dex_mod: i32) -> i32 {
             return v;
         }
     }
-    native_calculate_ac(armour_ac, has_shield, dex_mod)
+    #[cfg(feature = "legacy-native")]
+    return native_calculate_ac(armour_ac, has_shield, dex_mod);
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
+#[cfg(feature = "legacy-native")]
 fn native_calculate_ac(armour_ac: i32, has_shield: bool, dex_mod: i32) -> i32 {
     let mut ac = armour_ac;
     if has_shield {

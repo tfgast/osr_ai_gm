@@ -19,7 +19,10 @@ fn encounter_move_rate(base_movement: u32) -> u32 {
             return v;
         }
     }
-    base_movement / 3
+    #[cfg(feature = "legacy-native")]
+    return base_movement / 3;
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Compute fighting withdrawal distance via DSL or native fallback.
@@ -31,7 +34,10 @@ fn fighting_withdrawal_move(base_movement: u32) -> u32 {
             return v;
         }
     }
-    (base_movement / 3) / 2
+    #[cfg(feature = "legacy-native")]
+    return (base_movement / 3) / 2;
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Return the melee engagement distance via DSL or native fallback (10 feet).
@@ -42,7 +48,10 @@ fn melee_engagement_dist() -> u32 {
             return v;
         }
     }
-    10
+    #[cfg(feature = "legacy-native")]
+    return 10;
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Return the retreat free attack bonus via DSL or native fallback (+2).
@@ -53,7 +62,10 @@ fn retreat_attack_bonus() -> i32 {
             return v;
         }
     }
-    2
+    #[cfg(feature = "legacy-native")]
+    return 2;
+    #[cfg(not(feature = "legacy-native"))]
+    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 #[cfg(feature = "dsl-backend")]
