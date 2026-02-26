@@ -1,0 +1,153 @@
+// ============================================================
+// OSE Retainer System — hiring, loyalty, wages, XP share
+//
+// DSL-side tables and derives for retainer mechanics:
+//   hiring reaction table (2d6 + CHA modifier brackets)
+//   loyalty check result (2d6 vs loyalty threshold)
+//   retainer XP share (50% of full share)
+//   standard wage table by level (L0-1=25gp, L2=50, L3=100, etc.)
+//
+// Currently hardcoded in src/engine/retainer.rs — no DSL gate.
+// DSL gates wired in oag-qqnbl.
+//
+// Reference: OSE Rules Tome — Retainers chapter.
+// ============================================================
+
+use "OSE"
+
+system "OSE Retainers" {
+
+    // --------------------------------------------------------
+    // ENUMS
+    // --------------------------------------------------------
+
+    // Hiring reaction outcome from 2d6 + CHA modifier.
+    // Prefixed hire_ to avoid variant name collisions.
+    enum HireReaction {
+        hire_refused,     // ≤ 3: refuses, bad reputation spreads
+        hire_reluctant,   // 4-5: refuses
+        hire_uncertain,   // 6-8: uncertain, try a better offer
+        hire_accepts,     // 9-11: accepts
+        hire_eager        // ≥ 12: accepts with +1 loyalty bonus
+    }
+
+    // Loyalty check outcome (2d6 vs loyalty score).
+    // Prefixed loyalty_ to avoid variant name collisions.
+    enum LoyaltyResult {
+        loyalty_loyal,      // roll ≤ loyalty: stays and fights
+        loyalty_wavering,   // roll ≤ loyalty + 2: uncertain
+        loyalty_disloyal    // roll > loyalty + 2: flees or refuses
+    }
+
+
+    // --------------------------------------------------------
+    // HIRING REACTION TABLE
+    //
+    // Modified 2d6 roll (CHA modifier applied before lookup).
+    // Values below 2 map to hire_refused (clamp in mechanic).
+    // Per OSE Rules Tome — Retainers: Hiring.
+    // --------------------------------------------------------
+
+    table hiring_reaction_table(roll: int) -> HireReaction {
+        2..=3  => hire_refused,
+        4..=5  => hire_reluctant,
+        6..=8  => hire_uncertain,
+        9..=11 => hire_accepts,
+        _      => hire_eager
+    }
+
+
+    // --------------------------------------------------------
+    // STANDARD WAGE TABLE
+    //
+    // Monthly wage in gold pieces by retainer level.
+    //   L0-1: 25 gp/month   (normal human or 1st-level)
+    //   L2:   50 gp/month
+    //   L3:  100 gp/month
+    //   L4:  200 gp/month
+    //   L5+: doubles each level (400, 800, 1600, 3200, ...)
+    //
+    // Per OSE Rules Tome — Retainers: Wages.
+    // --------------------------------------------------------
+
+    table standard_wage(level: int) -> int {
+        0..=1 => 25,
+        2     => 50,
+        3     => 100,
+        4     => 200,
+        5     => 400,
+        6     => 800,
+        7     => 1600,
+        8     => 3200,
+        _     => 6400
+    }
+
+
+    // --------------------------------------------------------
+    // DERIVES (pure computations, no dice)
+    // --------------------------------------------------------
+
+    // Loyalty check result from a 2d6 roll vs loyalty score.
+    //   roll ≤ loyalty       → loyal (stays and fights)
+    //   roll ≤ loyalty + 2   → wavering (uncertain)
+    //   roll > loyalty + 2   → disloyal (flees or refuses)
+    derive loyalty_check_result(roll: int, loyalty: int) -> LoyaltyResult {
+        match {
+            roll <= loyalty     => loyalty_loyal,
+            roll <= loyalty + 2 => loyalty_wavering,
+            _                   => loyalty_disloyal
+        }
+    }
+
+    // Retainer XP share: retainers receive half the awarded XP.
+    // A retainer's share = total_xp / 2 (integer division).
+    // Per OSE Rules Tome — Retainers: Experience.
+    derive retainer_xp_share(total_xp: int) -> int {
+        total_xp / 2
+    }
+
+    // Whether the hiring reaction grants a +1 loyalty bonus.
+    // Only an eager reaction (roll ≥ 12) gives +1 loyalty.
+    derive hiring_grants_loyalty_bonus(reaction: HireReaction) -> bool {
+        match reaction {
+            hire_eager => true,
+            _          => false
+        }
+    }
+
+    // Whether the hiring reaction results in a successful hire.
+    // Both hire_accepts and hire_eager mean the retainer joins.
+    derive hiring_succeeded(reaction: HireReaction) -> bool {
+        match reaction {
+            hire_accepts => true,
+            hire_eager   => true,
+            _            => false
+        }
+    }
+
+
+    // --------------------------------------------------------
+    // MECHANICS (can roll dice, no mutation)
+    // --------------------------------------------------------
+
+    // Hiring reaction roll: 2d6 + CHA reaction modifier.
+    // Result clamped to [2, 12] before table lookup so extreme
+    // CHA modifiers don't produce out-of-range lookups.
+    mechanic hiring_reaction_roll(cha_mod: int = 0) -> HireReaction {
+        let result = roll(2d6)
+        let total = result.total + cha_mod
+        let clamped = match {
+            total < 2  => 2,
+            total > 12 => 12,
+            _          => total
+        }
+        hiring_reaction_table(clamped)
+    }
+
+    // Loyalty check roll: 2d6 vs loyalty score.
+    // Delegates to loyalty_check_result derive for the outcome logic.
+    mechanic loyalty_check_roll(loyalty: int) -> LoyaltyResult {
+        let result = roll(2d6)
+        loyalty_check_result(result.total, loyalty)
+    }
+}

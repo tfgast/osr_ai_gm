@@ -24,6 +24,7 @@ files = [
     "ose_time_economy.ttrpg",
     "ose_exploration.ttrpg",
     "ose_wilderness.ttrpg",
+    "ose_retainers.ttrpg",
 ]
 
 [data]
@@ -52,6 +53,7 @@ supported = [
     "encounter",
     "exploration",
     "wilderness",
+    "retainers",
 ]
 
 [features]
