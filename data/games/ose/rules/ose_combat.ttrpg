@@ -85,6 +85,40 @@ system "OSE Combat" {
         }
     }
 
+    // --- Round procedure ---
+    // The combat round procedure expressed as a phase machine.
+    // Each phase has an ordered list of actors, determined by initiative winner.
+    //
+    // Actors:
+    //   "both"         — both sides act simultaneously (Declaration, Initiative)
+    //   "party"        — only the party acts (when party won initiative)
+    //   "monsters"     — only monsters act (Morale; or first in Movement–Melee
+    //                    when monsters won initiative)
+    //   "simultaneous" — both sides act in the same step (tied initiative)
+    //   "system"       — engine bookkeeping, no player/monster input (EndOfRound)
+    //
+    // initiative_winner: "party", "monsters", or "simultaneous"
+    //
+    // Returns the ordered slot list for a single phase. For phases that split
+    // by initiative (Movement, Missile, Magic, Melee), the winner's entry
+    // precedes the loser's entry so callers can iterate slots in order.
+    derive phase_actor_order(phase: string, initiative_winner: string) -> list<string> {
+        match {
+            // Simultaneous phases — initiative does not affect order
+            phase == "Declaration"                          => (["both"]),
+            phase == "Initiative"                           => (["both"]),
+            phase == "EndOfRound"                           => (["system"]),
+
+            // Morale — triggered by casualties, monsters only
+            phase == "Morale"                               => (["monsters"]),
+
+            // Initiative-ordered phases (Movement, Missile, Magic, Melee)
+            initiative_winner == "party"                    => (["party", "monsters"]),
+            initiative_winner == "monsters"                 => (["monsters", "party"]),
+            _                                               => (["simultaneous"])
+        }
+    }
+
     // --- Phase sequence ---
     // OSE combat round phases in execution order.
     // Reference: OSE Reference Booklet p116-124.

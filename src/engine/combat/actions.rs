@@ -1139,6 +1139,7 @@ pub fn action_next_phase(state: &mut GameState) -> Result<NextPhaseResult, Engin
     let previous = combat.phase.clone();
     combat.advance_phase();
     let current = combat.phase.clone();
+    let actor_order = combat.actor_order_for_phase();
     let msg = format!(
         "Phase: {} → {}",
         crate::model::phase_display_name(&previous),
@@ -1151,6 +1152,7 @@ pub fn action_next_phase(state: &mut GameState) -> Result<NextPhaseResult, Engin
         previous_phase: previous,
         current_phase: current,
         round: combat.round,
+        actor_order,
     })
 }
 

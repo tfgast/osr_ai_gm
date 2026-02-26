@@ -472,6 +472,89 @@ fn dsl_skip_phase(phase: &str, round: u32, has_spells_declared: bool, has_living
     }
 }
 
+/// Get the ordered actor slots for a combat phase.
+///
+/// Tries the DSL `phase_actor_order` derive first; falls back to the
+/// native OSE sequence if the DSL is unavailable.
+///
+/// `initiative_winner` is one of: `"party"`, `"monsters"`, `"simultaneous"`.
+pub fn get_phase_actor_order(phase: &str, initiative_winner: &str) -> Vec<String> {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        if let Some(order) = dsl_phase_actor_order(phase, initiative_winner) {
+            return order;
+        }
+    }
+    native_phase_actor_order(phase, initiative_winner)
+}
+
+/// Native (non-DSL) fallback for phase actor ordering.
+fn native_phase_actor_order(phase: &str, initiative_winner: &str) -> Vec<String> {
+    match phase {
+        "Declaration" | "Initiative" => vec!["both".to_string()],
+        "Morale" => vec!["monsters".to_string()],
+        "EndOfRound" => vec!["system".to_string()],
+        // Initiative-ordered phases
+        _ => match initiative_winner {
+            "party" => vec!["party".to_string(), "monsters".to_string()],
+            "monsters" => vec!["monsters".to_string(), "party".to_string()],
+            _ => vec!["simultaneous".to_string()],
+        },
+    }
+}
+
+/// Evaluate the DSL `phase_actor_order` derive.
+#[cfg(feature = "dsl-backend")]
+fn dsl_phase_actor_order(phase: &str, initiative_winner: &str) -> Option<Vec<String>> {
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::reference_state::GameState;
+    use ttrpg_interp::value::Value;
+
+    struct NullHandler;
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response {
+            Response::Acknowledged
+        }
+    }
+
+    if !crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        return None;
+    }
+
+    let runtime = crate::backend::dsl()?;
+    let state = GameState::new();
+    let mut handler = NullHandler;
+
+    let result = runtime
+        .evaluate_derive(
+            &state,
+            &mut handler,
+            "phase_actor_order",
+            vec![
+                Value::Str(phase.to_string()),
+                Value::Str(initiative_winner.to_string()),
+            ],
+        )
+        .ok()?;
+
+    match result {
+        Value::List(items) => {
+            let mut order = Vec::new();
+            for item in items {
+                match item {
+                    Value::Str(s) => order.push(s),
+                    _ => return None,
+                }
+            }
+            if order.is_empty() {
+                return None;
+            }
+            Some(order)
+        }
+        _ => None,
+    }
+}
+
 /// Display name for a phase ID. Returns the ID itself for most phases,
 /// but formats "EndOfRound" as "End of Round" for human display.
 pub fn phase_display_name(phase: &str) -> &str {
@@ -677,6 +760,21 @@ impl CombatState {
             .or_default()
             .entry(action_type.to_string())
             .or_insert(0) += 1;
+    }
+
+    /// Return the ordered actor slots for the current phase.
+    ///
+    /// The initiative winner is derived from the stored roll values.
+    /// Delegates to `get_phase_actor_order`, which tries the DSL first.
+    pub fn actor_order_for_phase(&self) -> Vec<String> {
+        let initiative_winner = if self.party_initiative > self.monster_initiative {
+            "party"
+        } else if self.monster_initiative > self.party_initiative {
+            "monsters"
+        } else {
+            "simultaneous"
+        };
+        get_phase_actor_order(&self.phase, initiative_winner)
     }
 
     pub fn living_monsters(&self) -> Vec<(usize, &Monster)> {

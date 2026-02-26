@@ -383,6 +383,9 @@ pub struct NextPhaseResult {
     pub previous_phase: String,
     pub current_phase: String,
     pub round: u32,
+    /// Ordered actor slots for the new phase (e.g. ["party", "monsters"]).
+    /// Derived from the DSL `phase_actor_order` derive (or native fallback).
+    pub actor_order: Vec<String>,
 }
 
 /// Typed success payload for `end_combat`.

@@ -1860,4 +1860,114 @@ mod tests {
         assert_eq!(result.initiative_order.len(), 1);
         assert_eq!(result.initiative_order[0].name, "Grond");
     }
+
+    // --- Phase actor order (round procedure) ---
+
+    #[test]
+    fn phase_actor_order_simultaneous_phases() {
+        use crate::model::get_phase_actor_order;
+        // Declaration and Initiative are simultaneous for both sides
+        assert_eq!(get_phase_actor_order("Declaration", "party"), vec!["both"]);
+        assert_eq!(get_phase_actor_order("Declaration", "monsters"), vec!["both"]);
+        assert_eq!(get_phase_actor_order("Initiative", "party"), vec!["both"]);
+        assert_eq!(get_phase_actor_order("Initiative", "monsters"), vec!["both"]);
+    }
+
+    #[test]
+    fn phase_actor_order_morale_monsters_only() {
+        use crate::model::get_phase_actor_order;
+        assert_eq!(get_phase_actor_order("Morale", "party"), vec!["monsters"]);
+        assert_eq!(get_phase_actor_order("Morale", "monsters"), vec!["monsters"]);
+        assert_eq!(get_phase_actor_order("Morale", "simultaneous"), vec!["monsters"]);
+    }
+
+    #[test]
+    fn phase_actor_order_end_of_round_system() {
+        use crate::model::get_phase_actor_order;
+        assert_eq!(get_phase_actor_order("EndOfRound", "party"), vec!["system"]);
+        assert_eq!(get_phase_actor_order("EndOfRound", "monsters"), vec!["system"]);
+    }
+
+    #[test]
+    fn phase_actor_order_initiative_ordered_party_first() {
+        use crate::model::get_phase_actor_order;
+        for phase in &["Movement", "Missile", "Magic", "Melee"] {
+            let order = get_phase_actor_order(phase, "party");
+            assert_eq!(order, vec!["party", "monsters"],
+                "phase {} with party initiative winner: party should act first", phase);
+        }
+    }
+
+    #[test]
+    fn phase_actor_order_initiative_ordered_monsters_first() {
+        use crate::model::get_phase_actor_order;
+        for phase in &["Movement", "Missile", "Magic", "Melee"] {
+            let order = get_phase_actor_order(phase, "monsters");
+            assert_eq!(order, vec!["monsters", "party"],
+                "phase {} with monsters initiative winner: monsters should act first", phase);
+        }
+    }
+
+    #[test]
+    fn phase_actor_order_simultaneous_initiative() {
+        use crate::model::get_phase_actor_order;
+        for phase in &["Movement", "Missile", "Magic", "Melee"] {
+            let order = get_phase_actor_order(phase, "simultaneous");
+            assert_eq!(order, vec!["simultaneous"],
+                "phase {} with tied initiative: simultaneous", phase);
+        }
+    }
+
+    #[test]
+    fn combat_state_actor_order_uses_stored_initiative() {
+        let mut combat = CombatState::new(vec![test_goblin()], 30);
+        combat.round = 1;
+
+        // Set party winning initiative
+        combat.party_initiative = 5;
+        combat.monster_initiative = 2;
+        combat.phase = "Melee".to_string();
+        assert_eq!(combat.actor_order_for_phase(), vec!["party", "monsters"]);
+
+        // Set monsters winning initiative
+        combat.party_initiative = 2;
+        combat.monster_initiative = 5;
+        assert_eq!(combat.actor_order_for_phase(), vec!["monsters", "party"]);
+
+        // Set tied initiative
+        combat.party_initiative = 3;
+        combat.monster_initiative = 3;
+        assert_eq!(combat.actor_order_for_phase(), vec!["simultaneous"]);
+    }
+
+    #[test]
+    fn combat_state_actor_order_for_simultaneous_phases() {
+        let mut combat = CombatState::new(vec![test_goblin()], 30);
+        combat.party_initiative = 6;
+        combat.monster_initiative = 1;
+
+        combat.phase = "Declaration".to_string();
+        assert_eq!(combat.actor_order_for_phase(), vec!["both"]);
+
+        combat.phase = "EndOfRound".to_string();
+        assert_eq!(combat.actor_order_for_phase(), vec!["system"]);
+    }
+
+    #[test]
+    fn action_next_phase_includes_actor_order() {
+        let mut state = crate::persist::GameState::default();
+        state.party.members = vec![test_fighter()];
+        let mut combat = CombatState::new(vec![test_goblin()], 30);
+        combat.round = 1;
+        combat.party_initiative = 5;
+        combat.monster_initiative = 2;
+        combat.phase = "Movement".to_string();
+        state.enter_combat(combat);
+
+        let result = action_next_phase(&mut state).unwrap();
+        // After Movement → Missile
+        assert_eq!(result.current_phase, "Missile");
+        // Party won initiative, so party should act first in Missile
+        assert_eq!(result.actor_order, vec!["party", "monsters"]);
+    }
 }
