@@ -119,7 +119,7 @@ mod dsl_gate {
     use ttrpg_interp::value::Value;
 
     use crate::backend;
-    use super::canonical_to_dsl_variant;
+    use crate::rules::class::canonical_to_dsl_variant;
 
     struct NullState;
 
