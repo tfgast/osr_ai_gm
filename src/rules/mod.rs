@@ -5,6 +5,7 @@ pub mod class;
 pub mod encounter;
 pub mod encumbrance;
 pub mod equipment;
+pub mod exploration;
 pub mod magic_item;
 pub mod module;
 pub mod monster;

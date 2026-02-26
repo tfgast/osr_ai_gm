@@ -1,0 +1,61 @@
+// ============================================================
+// OSE Exploration Mechanics — wandering monsters, search, listen
+//
+// DSL-side constants for values previously hardcoded in:
+//   src/engine/exploration/mod.rs
+//
+// Wandering monster check: every 2 turns, 1-in-6 chance.
+// Search room: 1-in-6 base (elves 2-in-6).
+// Listen at door: 1-in-6 base (demihumans 2-in-6).
+//
+// Reference: OSE Rules Tome — Dungeon Adventuring.
+// ============================================================
+
+use "OSE"
+
+system "OSE Exploration" {
+
+    // --------------------------------------------------------
+    // WANDERING MONSTER CHECK
+    // --------------------------------------------------------
+
+    // Number of dungeon turns between wandering monster checks.
+    // OSE: roll every 2 turns (1 turn = 10 minutes).
+    derive wandering_monster_interval() -> int {
+        2
+    }
+
+    // Die size for the wandering monster check (1-in-N triggers).
+    // OSE: 1-in-6 chance — roll 1d6, encounter on a 1.
+    derive wandering_monster_die() -> int {
+        6
+    }
+
+
+    // --------------------------------------------------------
+    // SEARCH ROOM
+    // --------------------------------------------------------
+
+    // Search success threshold (X-in-6).
+    // OSE: base 1-in-6; elves detect secret/concealed doors on 2-in-6.
+    derive search_room_chance(is_elf: bool) -> int {
+        match {
+            is_elf => 2,
+            _      => 1
+        }
+    }
+
+
+    // --------------------------------------------------------
+    // LISTEN AT DOOR
+    // --------------------------------------------------------
+
+    // Listen success threshold (X-in-6).
+    // OSE: base 1-in-6; demihumans (elves, halflings) succeed on 2-in-6.
+    derive listen_at_door_chance(is_demihuman: bool) -> int {
+        match {
+            is_demihuman => 2,
+            _            => 1
+        }
+    }
+}

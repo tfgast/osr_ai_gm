@@ -261,9 +261,9 @@ requires_dsl = true
         let manifest = GameManifest::load(Path::new("data/games/ose")).unwrap();
         assert_eq!(manifest.game.system_id, "ose");
         assert_eq!(manifest.game.name, "Old-School Essentials");
-        assert_eq!(manifest.rules.files.len(), 11);
+        assert_eq!(manifest.rules.files.len(), 12);
         assert_eq!(manifest.data.len(), 9);
-        assert_eq!(manifest.mechanics.supported.len(), 11);
+        assert_eq!(manifest.mechanics.supported.len(), 12);
     }
 
     #[test]

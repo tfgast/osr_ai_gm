@@ -12,19 +12,22 @@ pub use actions::{
 use crate::model::Character;
 use crate::rules::ability;
 use crate::rules::encounter;
+use crate::rules::exploration as exploration_rules;
 use crate::rules::thief;
 use crate::state::dungeon::{DoorState, DungeonState, PlacedMonsterInstance, PlacedTreasureInstance, TrapTrigger};
 use crate::state::time::TimeTracker;
 
-/// Check for wandering monsters (1-in-6 every 2 turns).
-/// Should be called after any action that consumes a dungeon turn.
+/// Check for wandering monsters (1-in-6 every 2 turns by default).
+/// Interval and die size come from `rules::exploration` (DSL-gated).
 fn check_wandering_monster<R: Rng>(
     rng: &mut R,
     time: &TimeTracker,
     dungeon_level: u32,
 ) -> Option<encounter::EncounterEntry> {
-    if time.total_turns.is_multiple_of(2) {
-        let roll: u32 = rng.gen_range(1..=6);
+    let interval = exploration_rules::wandering_monster_interval();
+    let die = exploration_rules::wandering_monster_die();
+    if time.total_turns % interval == 0 {
+        let roll: u32 = rng.gen_range(1..=die);
         if roll == 1 {
             let table_roll: u32 = rng.gen_range(1..=40);
             return encounter::dungeon_encounter_d40(dungeon_level, table_roll);
@@ -192,7 +195,7 @@ pub fn search_room_with<R: Rng>(
         None => return result,
     };
 
-    let threshold = if is_elf { 2 } else { 1 };
+    let threshold = exploration_rules::search_room_chance(is_elf);
     let roll: u32 = rng.gen_range(1..=6);
     let success = roll <= threshold;
 
@@ -290,7 +293,7 @@ pub fn listen_at_door_with<R: Rng>(
         result.msg(msg);
     }
 
-    let threshold = if is_elf_or_halfling { 2 } else { 1 };
+    let threshold = exploration_rules::listen_at_door_chance(is_elf_or_halfling);
     let roll: u32 = rng.gen_range(1..=6);
     if roll <= threshold {
         result.msg("You hear sounds beyond the door!");
