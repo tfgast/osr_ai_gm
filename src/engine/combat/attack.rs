@@ -302,7 +302,7 @@ pub fn character_melee_attack_with<R: Rng>(
             (r, tn, attack::hits(thac0, target_ac, modifiers, r))
         }
     };
-    #[cfg(all(not(feature = "dsl-backend"), feature = "legacy-native"))]
+    #[cfg(not(feature = "dsl-backend"))]
     let (roll, target_num, hit) = {
         let r = rng.gen_range(1..=20u32);
         let tn = attack::target_number(thac0, target_ac);
@@ -398,7 +398,7 @@ pub fn character_missile_attack_with<R: Rng>(
             (r, tn, attack::hits(thac0, target_ac, modifiers, r))
         }
     };
-    #[cfg(all(not(feature = "dsl-backend"), feature = "legacy-native"))]
+    #[cfg(not(feature = "dsl-backend"))]
     let (roll, target_num, hit) = {
         let r = rng.gen_range(1..=20u32);
         let tn = attack::target_number(thac0, target_ac);
@@ -501,7 +501,7 @@ pub(super) fn monster_attack_modified_with<R: Rng>(
             (r, tn, attack::hits(thac0, target_ac, modifiers, r))
         }
     };
-    #[cfg(all(not(feature = "dsl-backend"), feature = "legacy-native"))]
+    #[cfg(not(feature = "dsl-backend"))]
     let (roll, target_num, hit) = {
         let r = rng.gen_range(1..=20u32);
         let tn = attack::target_number(thac0, target_ac);

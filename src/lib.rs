@@ -1,11 +1,3 @@
-// Require at least one backend to be compiled in.
-#[cfg(not(any(feature = "dsl-backend", feature = "legacy-native")))]
-compile_error!(
-    "At least one backend feature must be enabled. \
-     Enable 'legacy-native' for built-in Rust rule tables, \
-     'dsl-backend' for the rule DSL, or both."
-);
-
 pub mod auth;
 pub mod backend;
 #[cfg(feature = "dsl-backend")]

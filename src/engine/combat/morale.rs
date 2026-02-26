@@ -45,13 +45,9 @@ pub fn check_morale(combat: &mut CombatState, morale_score: u32) -> MoraleResult
         // DSL evaluation failed — fall through to native
     }
 
-    #[cfg(feature = "legacy-native")]
-    return check_morale_with(combat, morale_score, &mut rand::thread_rng());
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    check_morale_with(combat, morale_score, &mut rand::thread_rng())
 }
 
-#[cfg(feature = "legacy-native")]
 pub fn check_morale_with<R: Rng>(combat: &mut CombatState, morale_score: u32, rng: &mut R) -> MoraleResult {
     let d1 = rng.gen_range(1..=6i32);
     let d2 = rng.gen_range(1..=6i32);

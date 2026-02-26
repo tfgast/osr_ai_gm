@@ -118,13 +118,9 @@ pub fn roll_abilities() -> [i32; 6] {
             return abilities;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return roll_abilities_with(&mut rand::thread_rng());
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    roll_abilities_with(&mut rand::thread_rng())
 }
 
-#[cfg(feature = "legacy-native")]
 pub fn roll_abilities_with<R: Rng>(rng: &mut R) -> [i32; 6] {
     let expr = dice::parse("3d6").expect("hardcoded dice expression '3d6'");
     let mut abilities = [0i32; 6];
@@ -142,13 +138,9 @@ pub fn roll_hp(hit_die: u32, con_mod: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return roll_hp_with(hit_die, con_mod, &mut rand::thread_rng());
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    roll_hp_with(hit_die, con_mod, &mut rand::thread_rng())
 }
 
-#[cfg(feature = "legacy-native")]
 pub fn roll_hp_with<R: Rng>(hit_die: u32, con_mod: i32, rng: &mut R) -> i32 {
     let expr = dice::DiceExpr::Standard { count: 1, sides: hit_die, modifier: 0 };
     let roll = dice::roll_with(&expr, rng).total;
@@ -157,13 +149,9 @@ pub fn roll_hp_with<R: Rng>(hit_die: u32, con_mod: i32, rng: &mut R) -> i32 {
 
 /// Roll starting gold. Notation is "3d6x10" (3d6 multiplied by 10).
 pub fn roll_gold(notation: &str) -> u32 {
-    #[cfg(feature = "legacy-native")]
-    return roll_gold_with(notation, &mut rand::thread_rng());
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    roll_gold_with(notation, &mut rand::thread_rng())
 }
 
-#[cfg(feature = "legacy-native")]
 pub fn roll_gold_with<R: Rng>(notation: &str, rng: &mut R) -> u32 {
     if let Some((dice_part, mult_str)) = notation.rsplit_once('x') {
         let multiplier: u32 = mult_str.parse().unwrap_or(1);
@@ -185,8 +173,7 @@ pub fn thac0(aptitude: CombatAptitude, level: u32) -> u32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match aptitude {
+    match aptitude {
         CombatAptitude::Martial => match level {
             1..=3 => 19,
             4..=6 => 17,
@@ -205,9 +192,7 @@ pub fn thac0(aptitude: CombatAptitude, level: u32) -> u32 {
             6..=10 => 17,
             _ => 14,
         },
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// Create a complete level-1 character.
@@ -228,7 +213,7 @@ pub fn create_character(
 
     let con_mod = ability::con_hp_mod(abilities[class::CON]);
     let hp = roll_hp(def.hit_die, con_mod);
-    let gold = roll_gold(&def.starting_gold);
+    let gold = roll_gold(def.starting_gold);
 
     let dex_mod = ability::dex_ac_mod(abilities[class::DEX]);
     let ac = equipment::calculate_ac(9, false, dex_mod);
@@ -260,7 +245,6 @@ pub fn create_character(
 }
 
 /// Create a complete level-1 character with a specific RNG (for testing).
-#[cfg(feature = "legacy-native")]
 pub fn create_character_with<R: Rng>(
     name: &str,
     class: impl Into<ClassId>,
@@ -274,7 +258,7 @@ pub fn create_character_with<R: Rng>(
 
     let con_mod = ability::con_hp_mod(abilities[class::CON]);
     let hp = roll_hp_with(def.hit_die, con_mod, rng);
-    let gold = roll_gold_with(&def.starting_gold, rng);
+    let gold = roll_gold_with(def.starting_gold, rng);
 
     let dex_mod = ability::dex_ac_mod(abilities[class::DEX]);
     let ac = equipment::calculate_ac(9, false, dex_mod); // unarmoured at creation

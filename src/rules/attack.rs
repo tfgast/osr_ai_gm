@@ -198,13 +198,9 @@ pub fn target_number(thac0: u32, target_ac: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return native_target_number(thac0, target_ac);
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    native_target_number(thac0, target_ac)
 }
 
-#[cfg(feature = "legacy-native")]
 fn native_target_number(thac0: u32, target_ac: i32) -> i32 {
     thac0 as i32 - target_ac
 }
@@ -263,13 +259,9 @@ pub fn missile_range_modifier(distance: u32, short: u32, medium: u32, long: u32)
             return Some(v);
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return Some(native_missile_range_modifier(distance, short, medium, long));
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    Some(native_missile_range_modifier(distance, short, medium, long))
 }
 
-#[cfg(feature = "legacy-native")]
 fn native_missile_range_modifier(distance: u32, short: u32, medium: u32, _long: u32) -> i32 {
     if distance <= short {
         1
@@ -305,20 +297,6 @@ fn dsl_missile_range_mod(distance: u32, short: u32, medium: u32, long: u32) -> O
 /// Monsters fight as martial (Fighter) combatants of equivalent HD level.
 /// 0 HD (normal humans) use THAC0 20.
 pub fn monster_thac0(hd: u32) -> u32 {
-    #[cfg(feature = "dsl-backend")]
-    if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
-        if let Some(v) = dsl_monster_thac0(hd) {
-            return v;
-        }
-    }
-    #[cfg(feature = "legacy-native")]
-    return native_monster_thac0(hd);
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
-}
-
-#[cfg(feature = "legacy-native")]
-fn native_monster_thac0(hd: u32) -> u32 {
     if hd == 0 {
         return 20;
     }
@@ -331,22 +309,6 @@ fn native_monster_thac0(hd: u32) -> u32 {
         13..=15 => 10,
         16..=18 => 8,
         _ => 6,
-    }
-}
-
-#[cfg(feature = "dsl-backend")]
-fn dsl_monster_thac0(hd: u32) -> Option<u32> {
-    use ttrpg_interp::value::Value;
-    let runtime = crate::backend::dsl()?;
-    let mut handler = crate::backend::SimpleDiceHandler::new();
-    match runtime.evaluate_derive(
-        &crate::backend::NullState,
-        &mut handler,
-        "monster_thac0",
-        vec![Value::Int(hd as i64)],
-    ) {
-        Ok(Value::Int(v)) => Some(v as u32),
-        _ => None,
     }
 }
 
@@ -641,36 +603,5 @@ mod tests {
         assert_eq!(json, "\"5+1*\"");
         let parsed: HitDice = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, hd);
-    }
-}
-
-#[cfg(all(test, feature = "dsl-backend"))]
-mod dsl_tests {
-    use super::*;
-
-    #[test]
-    fn dsl_monster_thac0_matches_native() {
-        // Verify DSL table returns the same results as the native implementation.
-        let cases = [
-            (0, 20),
-            (1, 19),
-            (3, 19),
-            (4, 17),
-            (6, 17),
-            (7, 14),
-            (9, 14),
-            (10, 12),
-            (12, 12),
-            (13, 10),
-            (15, 10),
-            (16, 8),
-            (18, 8),
-            (19, 6),
-        ];
-        for (hd, expected) in cases {
-            let result = monster_thac0(hd);
-            assert_eq!(result, expected,
-                "monster_thac0({}) should be {}, got {}", hd, expected, result);
-        }
     }
 }

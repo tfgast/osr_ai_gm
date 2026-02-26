@@ -67,20 +67,6 @@ mod dsl_eval {
     pub(super) fn u32(name: &str, score: i32) -> Option<u32> {
         eval_derive(name, score).map(|v| v as u32)
     }
-
-    /// Evaluate a DSL ability derive returning an enum variant name.
-    pub(super) fn variant(name: &str, score: i32) -> Option<String> {
-        let runtime = crate::backend::dsl()?;
-        let state = NullState;
-        let mut handler = BridgeHandler::new();
-        let result = runtime
-            .evaluate_derive(&state, &mut handler, name, vec![Value::Int(score as i64)])
-            .ok()?;
-        match result {
-            Value::EnumVariant { variant, .. } => Some(variant.to_string()),
-            _ => None,
-        }
-    }
 }
 
 #[cfg(feature = "dsl-backend")]
@@ -103,8 +89,7 @@ pub fn str_melee_mod(score: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=3 => -3,
         4..=5 => -2,
         6..=8 => -1,
@@ -112,9 +97,7 @@ pub fn str_melee_mod(score: i32) -> i32 {
         13..=15 => 1,
         16..=17 => 2,
         18.. => 3,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// STR open doors chance (X-in-6).
@@ -125,16 +108,13 @@ pub fn str_open_doors(score: i32) -> u32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=8 => 1,
         9..=12 => 2,
         13..=15 => 3,
         16..=17 => 4,
         18.. => 5,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// DEX modifier (AC and missile attacks).
@@ -153,8 +133,7 @@ pub fn dex_mod(score: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=3 => -3,
         4..=5 => -2,
         6..=8 => -1,
@@ -162,9 +141,7 @@ pub fn dex_mod(score: i32) -> i32 {
         13..=15 => 1,
         16..=17 => 2,
         18.. => 3,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// Deprecated alias for [`dex_mod`]. Use `dex_mod` instead.
@@ -183,8 +160,7 @@ pub fn dex_init_mod(score: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=3 => -2,
         4..=5 => -1,
         6..=8 => -1,
@@ -192,9 +168,7 @@ pub fn dex_init_mod(score: i32) -> i32 {
         13..=15 => 1,
         16..=17 => 1,
         18.. => 2,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// CON hit point modifier (per HD).
@@ -205,8 +179,7 @@ pub fn con_hp_mod(score: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=3 => -3,
         4..=5 => -2,
         6..=8 => -1,
@@ -214,9 +187,7 @@ pub fn con_hp_mod(score: i32) -> i32 {
         13..=15 => 1,
         16..=17 => 2,
         18.. => 3,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// INT additional languages count.
@@ -227,15 +198,12 @@ pub fn int_extra_languages(score: i32) -> u32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=12 => 0,
         13..=15 => 1,
         16..=17 => 2,
         18.. => 3,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// INT literacy level.
@@ -246,26 +214,13 @@ pub enum Literacy {
     Literate,
 }
 
-/// INT literacy level: score 3–5 → Illiterate, 6–8 → Basic, 9+ → Literate.
+/// INT literacy (no DSL equivalent — always native).
 pub fn int_literacy(score: i32) -> Literacy {
-    #[cfg(feature = "dsl-backend")]
-    if use_dsl() {
-        if let Some(v) = dsl_eval::variant("int_literacy", score) {
-            return match v.as_str() {
-                "illiterate" => Literacy::Illiterate,
-                "basic"      => Literacy::Basic,
-                _            => Literacy::Literate,
-            };
-        }
-    }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         3..=5 => Literacy::Illiterate,
         6..=8 => Literacy::Basic,
         _ => Literacy::Literate,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// WIS magic save modifier.
@@ -276,8 +231,7 @@ pub fn wis_magic_save_mod(score: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=3 => -3,
         4..=5 => -2,
         6..=8 => -1,
@@ -285,9 +239,7 @@ pub fn wis_magic_save_mod(score: i32) -> i32 {
         13..=15 => 1,
         16..=17 => 2,
         18.. => 3,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// CHA NPC reaction modifier.
@@ -298,8 +250,7 @@ pub fn cha_reaction_mod(score: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=3 => -2,
         4..=5 => -1,
         6..=8 => -1,
@@ -307,9 +258,7 @@ pub fn cha_reaction_mod(score: i32) -> i32 {
         13..=15 => 1,
         16..=17 => 1,
         18.. => 2,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// CHA max retainers.
@@ -320,8 +269,7 @@ pub fn cha_max_retainers(score: i32) -> u32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=3 => 1,
         4..=5 => 2,
         6..=8 => 3,
@@ -329,9 +277,7 @@ pub fn cha_max_retainers(score: i32) -> u32 {
         13..=15 => 5,
         16..=17 => 6,
         18.. => 7,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// CHA retainer loyalty (base).
@@ -342,8 +288,7 @@ pub fn cha_loyalty(score: i32) -> u32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=3 => 4,
         4..=5 => 5,
         6..=8 => 6,
@@ -351,9 +296,7 @@ pub fn cha_loyalty(score: i32) -> u32 {
         13..=15 => 8,
         16..=17 => 9,
         18.. => 10,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// Prime requisite XP modifier.
@@ -364,16 +307,13 @@ pub fn prime_req_xp_mod(score: i32) -> i32 {
             return v;
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return match score {
+    match score {
         ..=5 => -20,
         6..=8 => -10,
         9..=12 => 0,
         13..=15 => 5,
         16.. => 10,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 #[cfg(test)]

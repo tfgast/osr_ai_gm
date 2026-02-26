@@ -47,8 +47,6 @@ pub fn spell_slots(prog: SpellProgression, level: u32) -> SpellSlots {
             }
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return {
     use SpellProgression::*;
     match prog {
         NonCaster => [0; 6],
@@ -177,9 +175,7 @@ pub fn spell_slots(prog: SpellProgression, level: u32) -> SpellSlots {
             13 => [3, 2, 1, 0, 0, 0],
             _ => [3, 2, 2, 0, 0, 0],
         },
-    }};
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    }
 }
 
 /// Check if a class has any spell slots at a given level.
@@ -203,10 +199,8 @@ pub fn casting_resource_type(prog: SpellProgression) -> String {
             }
         }
     }
-    #[cfg(feature = "legacy-native")]
-    { let _ = prog; return "vancian_slots".to_string(); }
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    let _ = prog;
+    "vancian_slots".to_string()
 }
 
 /// Check if a character can cast a spell at the given spell level,
@@ -221,13 +215,12 @@ pub fn can_cast_spell(slots_used: &SpellSlots, max_slots: &SpellSlots, spell_lev
         }
     }
     // Native fallback: Vancian slot check
-    #[cfg(feature = "legacy-native")]
-    return {
-        let idx = (spell_level - 1) as usize;
-        if idx < 6 { slots_used[idx] < max_slots[idx] } else { false }
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    let idx = (spell_level - 1) as usize;
+    if idx < 6 {
+        slots_used[idx] < max_slots[idx]
+    } else {
+        false
+    }
 }
 
 /// Returns the cost (in resource units) to cast a spell of the given level.
@@ -241,10 +234,8 @@ pub fn cast_cost(spell_level: u32) -> u32 {
             }
         }
     }
-    #[cfg(feature = "legacy-native")]
-    { let _ = spell_level; return 1; } // Vancian: always 1 slot per cast
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    let _ = spell_level;
+    1 // Vancian: always 1 slot per cast
 }
 
 /// Returns the spell point cost for a given spell level.
@@ -259,8 +250,7 @@ pub fn spell_point_cost(spell_level: u32) -> u32 {
         }
     }
     // Native fallback: standard OSR spell point conversion
-    #[cfg(feature = "legacy-native")]
-    return match spell_level {
+    match spell_level {
         1 => 2,
         2 => 3,
         3 => 5,
@@ -268,28 +258,7 @@ pub fn spell_point_cost(spell_level: u32) -> u32 {
         5 => 7,
         6 => 9,
         _ => 0,
-    };
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
-}
-
-/// Returns true if a disrupted (failed) spell still consumes its Vancian slot.
-/// Per B/X OSE: an attempted casting always expends the slot, even if disrupted.
-/// Game systems that use a different model (e.g. prepared-without-expend) can
-/// override the DSL `disruption_consumes_slot` derive to return 0.
-pub fn disruption_consumes_slot() -> bool {
-    #[cfg(feature = "dsl-backend")]
-    {
-        if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
-            if let Some(v) = dsl_gate::dsl_disruption_consumes_slot() {
-                return v;
-            }
-        }
     }
-    #[cfg(feature = "legacy-native")]
-    return true; // B/X OSE always consumes the slot
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
 }
 
 /// Check whether all casting resources recharge on long rest.
@@ -303,10 +272,8 @@ pub fn rest_recovery(prog: SpellProgression) -> bool {
             }
         }
     }
-    #[cfg(feature = "legacy-native")]
-    { let _ = prog; return true; } // All resource types fully recharge on rest
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    let _ = prog;
+    true // All resource types fully recharge on rest
 }
 
 // ── DSL gate helpers ──────────────────────────────────────────
@@ -462,21 +429,6 @@ mod dsl_gate {
         let args = vec![casting_resource_to_dsl(&resource)];
         let result = rt.evaluate_derive(&NullState, &mut NullHandler, "rest_recovery", args).ok()?;
         match result {
-            Value::Bool(b) => Some(b),
-            _ => None,
-        }
-    }
-
-    /// Check DSL `disruption_consumes_slot` derive (Combat group).
-    /// Returns Some(true) if the derive says slot is consumed, Some(false) if not, None on error.
-    pub fn dsl_disruption_consumes_slot() -> Option<bool> {
-        if !backend::is_dsl(crate::backend::MechanicGroup::Combat) {
-            return None;
-        }
-        let rt = backend::dsl()?;
-        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "disruption_consumes_slot", vec![]).ok()?;
-        match result {
-            Value::Int(v) => Some(v != 0),
             Value::Bool(b) => Some(b),
             _ => None,
         }
@@ -817,15 +769,6 @@ mod dsl_tests {
     fn dsl_rest_recovery_true() {
         assert_eq!(
             dsl_gate::dsl_rest_recovery(SpellProgression::Cleric),
-            Some(true)
-        );
-    }
-
-    #[test]
-    fn dsl_disruption_consumes_slot_is_true() {
-        // B/X OSE: disrupted spells still consume the slot.
-        assert_eq!(
-            dsl_gate::dsl_disruption_consumes_slot(),
             Some(true)
         );
     }

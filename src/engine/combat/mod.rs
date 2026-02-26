@@ -29,9 +29,7 @@ pub use attack::{
     resolve_character_attack, set_monster_helpless, AttackResult, CoupDeGraceResult,
 };
 pub use initiative::{declare_spell, is_disrupted, roll_initiative, roll_initiative_with};
-pub use morale::{check_morale, MoraleResult};
-#[cfg(feature = "legacy-native")]
-pub use morale::check_morale_with;
+pub use morale::{check_morale, check_morale_with, MoraleResult};
 pub use movement::{close, fighting_withdrawal, retreat, retreat_with, RetreatResult};
 pub use turn_undead::{resolve_turn_undead, resolve_turn_undead_with, TurnUndeadResult};
 

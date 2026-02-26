@@ -197,10 +197,7 @@ pub fn saving_throws(cat: &SaveCategoryId, level: u32) -> SavingThrows {
             None => eprintln!("DSL saves evaluation failed for {:?} L{}, falling back to native", cat_enum, level),
         }
     }
-    #[cfg(feature = "legacy-native")]
-    return native_saving_throws(cat_enum, level);
-    #[cfg(not(feature = "legacy-native"))]
-    panic!("Native fallback unavailable: enable the 'legacy-native' feature");
+    native_saving_throws(cat_enum, level)
 }
 
 // ── DSL backend ─────────────────────────────────────────────────
@@ -270,7 +267,6 @@ fn as_u32(v: ttrpg_interp::value::Value) -> Option<u32> {
 
 // ── Native backend ──────────────────────────────────────────────
 
-#[cfg(feature = "legacy-native")]
 fn native_saving_throws(cat: SaveCategory, level: u32) -> SavingThrows {
     use SaveCategory::*;
     match cat {

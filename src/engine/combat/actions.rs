@@ -1006,21 +1006,13 @@ pub fn action_cast_spell(
         }
     };
 
-    // Consume spell slot: always for successful casts; for disrupted casts, only if
-    // the DSL `disruption_consumes_slot` derive returns 1 (per B/X OSE: it always does).
-    let consume_slot = if result.disrupted {
-        spell::disruption_consumes_slot()
-    } else {
-        true
-    };
-    if consume_slot {
-        if let Some(spell_def) = spell_data::find_spell(&result.spell, None) {
-            let cost = spell::cast_cost(spell_def.level);
-            let idx = (spell_def.level - 1) as usize;
-            if idx < 6 {
-                if let Some(character) = state.party.find_member_mut(char_name) {
-                    character.spell_slots_used[idx] += cost;
-                }
+    // Consume spell slot via DSL-gated cost (whether disrupted or not — per B/X, attempted casting uses the slot)
+    if let Some(spell_def) = spell_data::find_spell(&result.spell, None) {
+        let cost = spell::cast_cost(spell_def.level);
+        let idx = (spell_def.level - 1) as usize;
+        if idx < 6 {
+            if let Some(character) = state.party.find_member_mut(char_name) {
+                character.spell_slots_used[idx] += cost;
             }
         }
     }

@@ -10,10 +10,7 @@ use std::fs;
 use std::sync::OnceLock;
 
 use super::alignment::{Alignment, AlignmentId};
-use super::class::{ClassId, CombatAptitude, class_def};
-
-#[cfg(feature = "dsl-backend")]
-use crate::backend::{is_dsl, MechanicGroup};
+use super::class::{ClassId, class_def};
 
 // ============================================================================
 // JSON data structures
@@ -509,53 +506,12 @@ pub fn generate_high_level_magic_user_party<R: Rng>(rng: &mut R) -> NpcParty {
 
 /// Get stronghold ruler level for a given type.
 pub fn roll_ruler_level<R: Rng>(rng: &mut R, ruler_type: RulerType) -> u32 {
-    #[cfg(feature = "dsl-backend")]
-    {
-        if is_dsl(MechanicGroup::NpcParty) {
-            if let Some(dice) = dsl_gate::dsl_ruler_level_dice(ruler_type) {
-                return roll_dice_expr(rng, &dice);
-            }
-        }
-    }
     let dice = match ruler_type {
         RulerType::Arcane => "1d4+10",
         RulerType::Divine => "1d8+6",
         RulerType::Martial => "1d6+8",
     };
     roll_dice_expr(rng, dice)
-}
-
-/// AC (descending) for an NPC-as-monster by combat aptitude.
-fn aptitude_ac(aptitude: CombatAptitude) -> i32 {
-    #[cfg(feature = "dsl-backend")]
-    {
-        if is_dsl(MechanicGroup::NpcParty) {
-            if let Some(val) = dsl_gate::dsl_npc_aptitude_ac(aptitude) {
-                return val;
-            }
-        }
-    }
-    match aptitude {
-        CombatAptitude::Martial => 5,
-        CombatAptitude::SemiMartial => 7,
-        CombatAptitude::NonMartial => 9,
-    }
-}
-
-/// Default damage dice string for an NPC-as-monster by combat aptitude.
-fn aptitude_damage(aptitude: CombatAptitude) -> String {
-    #[cfg(feature = "dsl-backend")]
-    {
-        if is_dsl(MechanicGroup::NpcParty) {
-            if let Some(s) = dsl_gate::dsl_npc_aptitude_damage(aptitude) {
-                return s;
-            }
-        }
-    }
-    match aptitude {
-        CombatAptitude::Martial => "1d8".to_string(),
-        _ => "1d6".to_string(),
-    }
 }
 
 /// Generate a stronghold patrol.
@@ -633,6 +589,7 @@ pub fn reaction_description(reaction: RulerReaction) -> &'static str {
 pub fn npc_member_to_monster(member: &NpcMember) -> crate::model::Monster {
     use crate::model::Monster;
     use crate::rules::attack::HitDice;
+    use crate::rules::class::CombatAptitude;
     use crate::dice;
 
     let def = class_def(&member.class);
@@ -644,9 +601,18 @@ pub fn npc_member_to_monster(member: &NpcMember) -> crate::model::Monster {
         .map(|r| r.total.max(1))
         .unwrap_or((member.level as i32 * hit_die as i32 / 2).max(1));
 
-    // AC and damage by combat aptitude — DSL-gated.
-    let ac = aptitude_ac(aptitude);
-    let damage = aptitude_damage(aptitude);
+    // AC by combat aptitude (descending): Martial=5 (chain), SemiMartial=7 (leather+shield), NonMartial=9
+    let ac = match aptitude {
+        CombatAptitude::Martial => 5,
+        CombatAptitude::SemiMartial => 7,
+        CombatAptitude::NonMartial => 9,
+    };
+
+    // Damage by combat aptitude
+    let damage = match aptitude {
+        CombatAptitude::Martial => "1d8",
+        _ => "1d6",
+    };
 
     let name = format!("NPC {} Lv{}", member.class, member.level);
     let hd = HitDice { base: member.level, ..HitDice::default() };
@@ -654,100 +620,11 @@ pub fn npc_member_to_monster(member: &NpcMember) -> crate::model::Monster {
     m.hp = hp;
     m.max_hp = hp;
     m.ac = ac;
-    m.damage = damage;
+    m.damage = damage.to_string();
     m.morale = 9;
     m.xp_value = 0; // No XP for NPC adventurers
     m.attacks = vec!["attack".to_string()];
     m
-}
-
-// ── DSL gate helpers ──────────────────────────────────────────────────────────
-
-#[cfg(feature = "dsl-backend")]
-mod dsl_gate {
-    use std::collections::BTreeMap;
-
-    use ttrpg_ast::Name;
-    use ttrpg_interp::value::Value;
-
-    use crate::backend::{self, NullState, SimpleDiceHandler};
-    use crate::rules::class::CombatAptitude;
-
-    use super::RulerType;
-
-    fn ruler_type_to_value(ruler_type: RulerType) -> Value {
-        let variant = match ruler_type {
-            RulerType::Arcane  => "npc_ruler_arcane",
-            RulerType::Divine  => "npc_ruler_divine",
-            RulerType::Martial => "npc_ruler_martial",
-        };
-        Value::EnumVariant {
-            enum_name: "NpcRulerType".into(),
-            variant: Name::from(variant),
-            fields: BTreeMap::new(),
-        }
-    }
-
-    fn aptitude_to_value(aptitude: CombatAptitude) -> Value {
-        let variant = match aptitude {
-            CombatAptitude::Martial     => "npc_apt_martial",
-            CombatAptitude::SemiMartial => "npc_apt_semi_martial",
-            CombatAptitude::NonMartial  => "npc_apt_non_martial",
-        };
-        Value::EnumVariant {
-            enum_name: "NpcCombatAptitude".into(),
-            variant: Name::from(variant),
-            fields: BTreeMap::new(),
-        }
-    }
-
-    pub fn dsl_ruler_level_dice(ruler_type: RulerType) -> Option<String> {
-        let rt = backend::dsl()?;
-        let result = rt
-            .evaluate_derive(
-                &NullState,
-                &mut SimpleDiceHandler::new(),
-                "ruler_level_dice",
-                vec![ruler_type_to_value(ruler_type)],
-            )
-            .ok()?;
-        match result {
-            Value::Str(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    pub fn dsl_npc_aptitude_ac(aptitude: CombatAptitude) -> Option<i32> {
-        let rt = backend::dsl()?;
-        let result = rt
-            .evaluate_derive(
-                &NullState,
-                &mut SimpleDiceHandler::new(),
-                "npc_aptitude_ac",
-                vec![aptitude_to_value(aptitude)],
-            )
-            .ok()?;
-        match result {
-            Value::Int(v) => Some(v as i32),
-            _ => None,
-        }
-    }
-
-    pub fn dsl_npc_aptitude_damage(aptitude: CombatAptitude) -> Option<String> {
-        let rt = backend::dsl()?;
-        let result = rt
-            .evaluate_derive(
-                &NullState,
-                &mut SimpleDiceHandler::new(),
-                "npc_aptitude_damage",
-                vec![aptitude_to_value(aptitude)],
-            )
-            .ok()?;
-        match result {
-            Value::Str(s) => Some(s),
-            _ => None,
-        }
-    }
 }
 
 #[cfg(test)]
