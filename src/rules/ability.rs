@@ -67,6 +67,20 @@ mod dsl_eval {
     pub(super) fn u32(name: &str, score: i32) -> Option<u32> {
         eval_derive(name, score).map(|v| v as u32)
     }
+
+    /// Evaluate a DSL ability derive returning an enum variant name.
+    pub(super) fn variant(name: &str, score: i32) -> Option<String> {
+        let runtime = crate::backend::dsl()?;
+        let state = NullState;
+        let mut handler = BridgeHandler::new();
+        let result = runtime
+            .evaluate_derive(&state, &mut handler, name, vec![Value::Int(score as i64)])
+            .ok()?;
+        match result {
+            Value::EnumVariant { variant, .. } => Some(variant.to_string()),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(feature = "dsl-backend")]
@@ -214,8 +228,18 @@ pub enum Literacy {
     Literate,
 }
 
-/// INT literacy (no DSL equivalent — always native).
+/// INT literacy level: score 3–5 → Illiterate, 6–8 → Basic, 9+ → Literate.
 pub fn int_literacy(score: i32) -> Literacy {
+    #[cfg(feature = "dsl-backend")]
+    if use_dsl() {
+        if let Some(v) = dsl_eval::variant("int_literacy", score) {
+            return match v.as_str() {
+                "illiterate" => Literacy::Illiterate,
+                "basic"      => Literacy::Basic,
+                _            => Literacy::Literate,
+            };
+        }
+    }
     match score {
         3..=5 => Literacy::Illiterate,
         6..=8 => Literacy::Basic,

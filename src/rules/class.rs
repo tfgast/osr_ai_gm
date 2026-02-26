@@ -135,9 +135,9 @@ pub struct ClassDef {
     pub class_id: ClassId,
     pub hit_die: u32,
     pub combat_aptitude: CombatAptitude,
-    pub prime_requisites: &'static [usize], // ability indices
-    pub requirements: &'static [AbilityRequirement],
-    pub racial_modifiers: &'static [AbilityModifier],
+    pub prime_requisites: Vec<usize>, // ability indices
+    pub requirements: Vec<AbilityRequirement>,
+    pub racial_modifiers: Vec<AbilityModifier>,
     pub max_level: u32,
     pub armour: ArmourPermission,
     pub weapons_any: bool,       // true = any weapon, false = restricted
@@ -145,7 +145,7 @@ pub struct ClassDef {
     pub save_category: SaveCategoryId,
     pub spell_progression: SpellProgression,
     pub spell_list: SpellListType,
-    pub starting_gold: &'static str, // dice notation for gold in gp
+    pub starting_gold: String, // dice notation for gold in gp
     pub is_demihuman: bool,
     // Capability tags (populated from DSL or native fallback)
     pub has_thief_skills: bool,
@@ -179,330 +179,330 @@ fn native_class_def(name: &str) -> ClassDef {
         "Acrobat" => ClassDef {
             class_id: ClassId::new("Acrobat"), hit_die: 4,
             combat_aptitude: CombatAptitude::SemiMartial,
-            prime_requisites: &[DEX],
-            requirements: &[(DEX, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![DEX],
+            requirements: vec![(DEX, 9)],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::None,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Thief),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: true, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Thief")),
         },
         "Assassin" => ClassDef {
             class_id: ClassId::new("Assassin"), hit_die: 4,
             combat_aptitude: CombatAptitude::SemiMartial,
-            prime_requisites: &[DEX],
-            requirements: &[(DEX, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![DEX],
+            requirements: vec![(DEX, 9)],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Thief),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: true, can_backstab: true, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Thief")),
         },
         "Barbarian" => ClassDef {
             class_id: ClassId::new("Barbarian"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR],
-            requirements: &[(STR, 9), (DEX, 9), (CON, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![STR],
+            requirements: vec![(STR, 9), (DEX, 9), (CON, 9)],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Barbarian),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Fighter")),
         },
         "Bard" => ClassDef {
             class_id: ClassId::new("Bard"), hit_die: 6,
             combat_aptitude: CombatAptitude::SemiMartial,
-            prime_requisites: &[CHA],
-            requirements: &[(DEX, 9), (CHA, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![CHA],
+            requirements: vec![(DEX, 9), (CHA, 9)],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::LeatherShield,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Thief),
             spell_progression: SpellProgression::Bard,
             spell_list: SpellListType::Druid,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: true, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Thief")),
         },
         "Cleric" => ClassDef {
             class_id: ClassId::new("Cleric"), hit_die: 6,
             combat_aptitude: CombatAptitude::SemiMartial,
-            prime_requisites: &[WIS],
-            requirements: &[],
-            racial_modifiers: &[],
+            prime_requisites: vec![WIS],
+            requirements: vec![],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: false, weapons_blunt_only: true,
             save_category: SaveCategoryId::from_enum(SaveCategory::Cleric),
             spell_progression: SpellProgression::Cleric,
             spell_list: SpellListType::Cleric,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: true,
             bx_equivalent: None,
         },
         "Drow" => ClassDef {
             class_id: ClassId::new("Drow"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR, INT],
-            requirements: &[(INT, 9)],
-            racial_modifiers: &[(DEX, 1), (CON, -1)],
+            prime_requisites: vec![STR, INT],
+            requirements: vec![(INT, 9)],
+            racial_modifiers: vec![(DEX, 1), (CON, -1)],
             max_level: 10, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Drow),
             spell_progression: SpellProgression::Drow,
             spell_list: SpellListType::DrowArcaneAndDivine,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Elf")),
         },
         "Druid" => ClassDef {
             class_id: ClassId::new("Druid"), hit_die: 6,
             combat_aptitude: CombatAptitude::SemiMartial,
-            prime_requisites: &[WIS],
-            requirements: &[],
-            racial_modifiers: &[],
+            prime_requisites: vec![WIS],
+            requirements: vec![],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Leather,
             weapons_any: false, weapons_blunt_only: true,
             save_category: SaveCategoryId::from_enum(SaveCategory::Cleric),
             spell_progression: SpellProgression::Druid,
             spell_list: SpellListType::Druid,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Cleric")),
         },
         "Duergar" => ClassDef {
             class_id: ClassId::new("Duergar"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR],
-            requirements: &[(INT, 9), (CON, 9)],
-            racial_modifiers: &[(CON, 1), (CHA, -1)],
+            prime_requisites: vec![STR],
+            requirements: vec![(INT, 9), (CON, 9)],
+            racial_modifiers: vec![(CON, 1), (CHA, -1)],
             max_level: 10, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Dwarf),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Dwarf")),
         },
         "Dwarf" => ClassDef {
             class_id: ClassId::new("Dwarf"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR],
-            requirements: &[(CON, 9)],
-            racial_modifiers: &[(CON, 1), (CHA, -1)],
+            prime_requisites: vec![STR],
+            requirements: vec![(CON, 9)],
+            racial_modifiers: vec![(CON, 1), (CHA, -1)],
             max_level: 12, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Dwarf),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
         "Elf" => ClassDef {
             class_id: ClassId::new("Elf"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR, INT],
-            requirements: &[(INT, 9)],
-            racial_modifiers: &[(DEX, 1), (CON, -1)],
+            prime_requisites: vec![STR, INT],
+            requirements: vec![(INT, 9)],
+            racial_modifiers: vec![(DEX, 1), (CON, -1)],
             max_level: 10, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Elf),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::MagicUser,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
         "Fighter" => ClassDef {
             class_id: ClassId::new("Fighter"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR],
-            requirements: &[],
-            racial_modifiers: &[],
+            prime_requisites: vec![STR],
+            requirements: vec![],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Fighter),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
         "Gnome" => ClassDef {
             class_id: ClassId::new("Gnome"), hit_die: 6,
             combat_aptitude: CombatAptitude::NonMartial,
-            prime_requisites: &[DEX, INT],
-            requirements: &[(INT, 9), (CON, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![DEX, INT],
+            requirements: vec![(INT, 9), (CON, 9)],
+            racial_modifiers: vec![],
             max_level: 8, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Gnome),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Halfling")),
         },
         "Half-Elf" => ClassDef {
             class_id: ClassId::new("Half-Elf"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR, INT],
-            requirements: &[(CON, 9), (CHA, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![STR, INT],
+            requirements: vec![(CON, 9), (CHA, 9)],
+            racial_modifiers: vec![],
             max_level: 12, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::HalfElf),
             spell_progression: SpellProgression::HalfElf,
             spell_list: SpellListType::MagicUser,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Elf")),
         },
         "Halfling" => ClassDef {
             class_id: ClassId::new("Halfling"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR, DEX],
-            requirements: &[(CON, 9), (DEX, 9)],
-            racial_modifiers: &[(STR, -1), (DEX, 1)],
+            prime_requisites: vec![STR, DEX],
+            requirements: vec![(CON, 9), (DEX, 9)],
+            racial_modifiers: vec![(STR, -1), (DEX, 1)],
             max_level: 8, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Dwarf),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
         "Half-Orc" => ClassDef {
             class_id: ClassId::new("Half-Orc"), hit_die: 6,
             combat_aptitude: CombatAptitude::SemiMartial,
-            prime_requisites: &[STR, DEX],
-            requirements: &[],
-            racial_modifiers: &[(STR, 1), (CON, 1), (CHA, -2)],
+            prime_requisites: vec![STR, DEX],
+            requirements: vec![],
+            racial_modifiers: vec![(STR, 1), (CON, 1), (CHA, -2)],
             max_level: 8, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::HalfOrc),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: true, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Dwarf")),
         },
         "Illusionist" => ClassDef {
             class_id: ClassId::new("Illusionist"), hit_die: 4,
             combat_aptitude: CombatAptitude::NonMartial,
-            prime_requisites: &[INT],
-            requirements: &[(DEX, 9), (INT, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![INT],
+            requirements: vec![(DEX, 9), (INT, 9)],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::None,
             weapons_any: false, weapons_blunt_only: false, // dagger only
             save_category: SaveCategoryId::from_enum(SaveCategory::MagicUser),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Magic-User")),
         },
         "Knight" => ClassDef {
             class_id: ClassId::new("Knight"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR],
-            requirements: &[(STR, 9), (CHA, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![STR],
+            requirements: vec![(STR, 9), (CHA, 9)],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Fighter),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Fighter")),
         },
         "Magic-User" => ClassDef {
             class_id: ClassId::new("Magic-User"), hit_die: 4,
             combat_aptitude: CombatAptitude::NonMartial,
-            prime_requisites: &[INT],
-            requirements: &[],
-            racial_modifiers: &[],
+            prime_requisites: vec![INT],
+            requirements: vec![],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::None,
             weapons_any: false, weapons_blunt_only: false, // dagger only
             save_category: SaveCategoryId::from_enum(SaveCategory::MagicUser),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::MagicUser,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
         "Paladin" => ClassDef {
             class_id: ClassId::new("Paladin"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR],
-            requirements: &[(CHA, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![STR],
+            requirements: vec![(CHA, 9)],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Paladin),
             spell_progression: SpellProgression::Paladin,
             spell_list: SpellListType::Cleric,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: true,
             bx_equivalent: Some(ClassId::new("Fighter")),
         },
         "Ranger" => ClassDef {
             class_id: ClassId::new("Ranger"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[STR],
-            requirements: &[(STR, 9), (WIS, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![STR],
+            requirements: vec![(STR, 9), (WIS, 9)],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Fighter),
             spell_progression: SpellProgression::Ranger,
             spell_list: SpellListType::Druid,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Fighter")),
         },
         "Svirfneblin" => ClassDef {
             class_id: ClassId::new("Svirfneblin"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
-            prime_requisites: &[DEX, INT],
-            requirements: &[(CON, 9)],
-            racial_modifiers: &[],
+            prime_requisites: vec![DEX, INT],
+            requirements: vec![(CON, 9)],
+            racial_modifiers: vec![],
             max_level: 8, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Svirfneblin),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
-            starting_gold: "3d6x10", is_demihuman: true,
+            starting_gold: "3d6x10".to_string(), is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: Some(ClassId::new("Halfling")),
         },
         "Thief" => ClassDef {
             class_id: ClassId::new("Thief"), hit_die: 4,
             combat_aptitude: CombatAptitude::SemiMartial,
-            prime_requisites: &[DEX],
-            requirements: &[],
-            racial_modifiers: &[],
+            prime_requisites: vec![DEX],
+            requirements: vec![],
+            racial_modifiers: vec![],
             max_level: 14, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
             save_category: SaveCategoryId::from_enum(SaveCategory::Thief),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
-            starting_gold: "3d6x10", is_demihuman: false,
+            starting_gold: "3d6x10".to_string(), is_demihuman: false,
             has_thief_skills: true, can_backstab: true, can_turn_undead: false,
             bx_equivalent: None,
         },
@@ -520,7 +520,7 @@ pub fn meets_requirements(id: &ClassId, abilities: &[i32; 6]) -> bool {
         }
     }
     let def = class_def(id);
-    for &(idx, min) in def.requirements {
+    for &(idx, min) in &def.requirements {
         if abilities[idx] < min {
             return false;
         }
@@ -532,7 +532,7 @@ pub fn meets_requirements(id: &ClassId, abilities: &[i32; 6]) -> bool {
 /// Modifies abilities in place and clamps to 3..=18.
 pub fn apply_racial_modifiers(id: &ClassId, abilities: &mut [i32; 6]) {
     let def = class_def(id);
-    for &(idx, modifier) in def.racial_modifiers {
+    for &(idx, modifier) in &def.racial_modifiers {
         abilities[idx] = (abilities[idx] + modifier).clamp(3, 18);
     }
 }
@@ -614,6 +614,36 @@ mod dsl_gate {
             Value::EnumVariant { variant, .. } => Some(variant.as_str()),
             _ => None,
         }
+    }
+
+    /// Convert a 6-element list<int> (ability order) to Vec<usize> of non-zero indices.
+    /// Used to extract prime_requisites: 1 = prime req, 0 = not.
+    fn list6_to_indices(list: &[Value]) -> Option<Vec<usize>> {
+        if list.len() != 6 { return None; }
+        let mut result = Vec::new();
+        for (i, v) in list.iter().enumerate() {
+            match v {
+                Value::Int(n) if *n != 0 => result.push(i),
+                Value::Int(_) => {},
+                _ => return None,
+            }
+        }
+        Some(result)
+    }
+
+    /// Convert a 6-element list<int> (ability order) to Vec<(usize, i32)> for non-zero entries.
+    /// Used to extract requirements (min scores) and racial_modifiers.
+    fn list6_to_pairs(list: &[Value]) -> Option<Vec<(usize, i32)>> {
+        if list.len() != 6 { return None; }
+        let mut result = Vec::new();
+        for (i, v) in list.iter().enumerate() {
+            match v {
+                Value::Int(n) if *n != 0 => result.push((i, *n as i32)),
+                Value::Int(_) => {},
+                _ => return None,
+            }
+        }
+        Some(result)
     }
 
     fn parse_combat_aptitude(s: &str) -> Option<CombatAptitude> {
@@ -706,16 +736,61 @@ mod dsl_gate {
             _ => None,
         };
 
-        // Fields not in DSL — backfill from native
-        let native = native_class_def(name);
+        // Extract prime_requisites from DSL derive class_prime_requisites
+        let prime_requisites = {
+            let pr_result = rt.evaluate_derive(
+                &NullState, &mut NullHandler, "class_prime_requisites",
+                vec![class_to_dsl(name)],
+            ).ok()?;
+            match pr_result {
+                Value::List(items) => list6_to_indices(&items)?,
+                _ => return None,
+            }
+        };
+
+        // Extract requirements from DSL derive class_requirements
+        let requirements = {
+            let req_result = rt.evaluate_derive(
+                &NullState, &mut NullHandler, "class_requirements",
+                vec![class_to_dsl(name)],
+            ).ok()?;
+            match req_result {
+                Value::List(items) => list6_to_pairs(&items)?,
+                _ => return None,
+            }
+        };
+
+        // Extract racial_modifiers from DSL derive racial_modifiers
+        let racial_modifiers = {
+            let rm_result = rt.evaluate_derive(
+                &NullState, &mut NullHandler, "racial_modifiers",
+                vec![class_to_dsl(name)],
+            ).ok()?;
+            match rm_result {
+                Value::List(items) => list6_to_pairs(&items)?,
+                _ => return None,
+            }
+        };
+
+        // Extract starting_gold from DSL derive class_starting_gold
+        let starting_gold = {
+            let sg_result = rt.evaluate_derive(
+                &NullState, &mut NullHandler, "class_starting_gold",
+                vec![class_to_dsl(name)],
+            ).ok()?;
+            match sg_result {
+                Value::Str(s) => s,
+                _ => return None,
+            }
+        };
 
         Some(ClassDef {
             class_id: ClassId::new(name),
             hit_die,
             combat_aptitude,
-            prime_requisites: native.prime_requisites,
-            requirements: native.requirements,
-            racial_modifiers: native.racial_modifiers,
+            prime_requisites,
+            requirements,
+            racial_modifiers,
             max_level,
             armour,
             weapons_any,
@@ -723,7 +798,7 @@ mod dsl_gate {
             save_category,
             spell_progression,
             spell_list,
-            starting_gold: native.starting_gold,
+            starting_gold,
             is_demihuman,
             has_thief_skills,
             can_backstab,
@@ -856,8 +931,8 @@ mod tests {
         assert_eq!(def.hit_die, 8);
         assert!(def.is_demihuman);
         assert_eq!(def.max_level, 12);
-        assert_eq!(def.requirements, &[(CON, 9)]);
-        assert_eq!(def.racial_modifiers, &[(CON, 1), (CHA, -1)]);
+        assert_eq!(def.requirements, [(CON, 9)]);
+        assert_eq!(def.racial_modifiers, [(CON, 1), (CHA, -1)]);
     }
 
     #[test]
@@ -1121,6 +1196,9 @@ mod tests {
             let native = native_class_def(name);
             assert_eq!(reg_def.hit_die, native.hit_die, "{} hit_die", name);
             assert_eq!(reg_def.combat_aptitude, native.combat_aptitude, "{} combat_aptitude", name);
+            assert_eq!(reg_def.prime_requisites, native.prime_requisites, "{} prime_requisites", name);
+            assert_eq!(reg_def.requirements, native.requirements, "{} requirements", name);
+            assert_eq!(reg_def.racial_modifiers, native.racial_modifiers, "{} racial_modifiers", name);
             assert_eq!(reg_def.max_level, native.max_level, "{} max_level", name);
             assert_eq!(reg_def.armour, native.armour, "{} armour", name);
             assert_eq!(reg_def.weapons_any, native.weapons_any, "{} weapons_any", name);
@@ -1128,6 +1206,7 @@ mod tests {
             assert_eq!(reg_def.save_category, native.save_category, "{} save_category", name);
             assert_eq!(reg_def.spell_progression, native.spell_progression, "{} spell_progression", name);
             assert_eq!(reg_def.spell_list, native.spell_list, "{} spell_list", name);
+            assert_eq!(reg_def.starting_gold, native.starting_gold, "{} starting_gold", name);
             assert_eq!(reg_def.is_demihuman, native.is_demihuman, "{} is_demihuman", name);
             assert_eq!(reg_def.has_thief_skills, native.has_thief_skills, "{} has_thief_skills", name);
             assert_eq!(reg_def.can_backstab, native.can_backstab, "{} can_backstab", name);
@@ -1153,6 +1232,9 @@ mod dsl_parity_tests {
 
             assert_eq!(dsl.hit_die, native.hit_die, "{} hit_die", name);
             assert_eq!(dsl.combat_aptitude, native.combat_aptitude, "{} combat_aptitude", name);
+            assert_eq!(dsl.prime_requisites, native.prime_requisites, "{} prime_requisites", name);
+            assert_eq!(dsl.requirements, native.requirements, "{} requirements", name);
+            assert_eq!(dsl.racial_modifiers, native.racial_modifiers, "{} racial_modifiers", name);
             assert_eq!(dsl.max_level, native.max_level, "{} max_level", name);
             assert_eq!(dsl.armour, native.armour, "{} armour", name);
             assert_eq!(dsl.weapons_any, native.weapons_any, "{} weapons_any", name);
@@ -1160,6 +1242,7 @@ mod dsl_parity_tests {
             assert_eq!(dsl.save_category, native.save_category, "{} save_category", name);
             assert_eq!(dsl.spell_progression, native.spell_progression, "{} spell_progression", name);
             assert_eq!(dsl.spell_list, native.spell_list, "{} spell_list", name);
+            assert_eq!(dsl.starting_gold, native.starting_gold, "{} starting_gold", name);
             assert_eq!(dsl.is_demihuman, native.is_demihuman, "{} is_demihuman", name);
             assert_eq!(dsl.has_thief_skills, native.has_thief_skills, "{} has_thief_skills", name);
             assert_eq!(dsl.can_backstab, native.can_backstab, "{} can_backstab", name);

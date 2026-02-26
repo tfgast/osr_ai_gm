@@ -213,7 +213,7 @@ pub fn create_character(
 
     let con_mod = ability::con_hp_mod(abilities[class::CON]);
     let hp = roll_hp(def.hit_die, con_mod);
-    let gold = roll_gold(def.starting_gold);
+    let gold = roll_gold(&def.starting_gold);
 
     let dex_mod = ability::dex_ac_mod(abilities[class::DEX]);
     let ac = equipment::calculate_ac(9, false, dex_mod);
@@ -258,7 +258,7 @@ pub fn create_character_with<R: Rng>(
 
     let con_mod = ability::con_hp_mod(abilities[class::CON]);
     let hp = roll_hp_with(def.hit_die, con_mod, rng);
-    let gold = roll_gold_with(def.starting_gold, rng);
+    let gold = roll_gold_with(&def.starting_gold, rng);
 
     let dex_mod = ability::dex_ac_mod(abilities[class::DEX]);
     let ac = equipment::calculate_ac(9, false, dex_mod); // unarmoured at creation
