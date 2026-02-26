@@ -282,14 +282,14 @@ impl Command for LookCommand {
 mod tests {
     use super::*;
     use crate::model::Character;
-    use crate::rules::class::Class;
+    
     use crate::state::game::GameMode;
     use crate::state::dungeon::{Door, Room, DungeonState};
     use crate::state::time::TimeTracker;
 
     fn dungeon_state_with_doors() -> GameState {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.abilities.strength = 14;
         state.party.add_member(c);
 
@@ -370,7 +370,7 @@ mod tests {
     fn pick_lock_thief_attempts() {
         let cmd = PickLockCommand;
         let mut state = dungeon_state_with_doors();
-        let mut thief = Character::new("Shade", Class::Thief);
+        let mut thief = Character::new("Shade", "Thief");
         thief.abilities.dexterity = 16;
         state.party.add_member(thief);
         let result = cmd.execute(&["1", "Shade"], &mut state);

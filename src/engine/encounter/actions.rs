@@ -234,7 +234,7 @@ pub fn action_spawn_npc_party(
         .members
         .iter()
         .map(|member| SpawnNpcPartyMemberInfo {
-            class: member.class,
+            class: member.class.clone(),
             level: member.level,
             alignment: member.alignment.clone(),
             role: member.role.clone(),

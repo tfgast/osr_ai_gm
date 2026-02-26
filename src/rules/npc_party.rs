@@ -10,7 +10,7 @@ use std::fs;
 use std::sync::OnceLock;
 
 use super::alignment::{Alignment, AlignmentId};
-use super::class::Class;
+use super::class::{ClassId, class_def};
 
 // ============================================================================
 // JSON data structures
@@ -120,7 +120,7 @@ struct ReactionEntry {
 /// An NPC party member.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NpcMember {
-    pub class: Class,
+    pub class: ClassId,
     pub level: u32,
     pub alignment: AlignmentId,
     pub role: Option<String>,
@@ -230,18 +230,18 @@ fn roll_dice_expr<R: Rng>(rng: &mut R, expr: &str) -> u32 {
 // ============================================================================
 
 /// Roll a random NPC class from the d20 table, mapped to B/X equivalents.
-pub fn roll_class<R: Rng>(rng: &mut R) -> Class {
+pub fn roll_class<R: Rng>(rng: &mut R) -> ClassId {
     let data = load_data();
     let roll: u32 = rng.gen_range(1..=20);
 
     for entry in &data.class_level_table {
         if entry.roll == roll {
-            let raw = Class::parse(&entry.class).unwrap_or(Class::Fighter);
-            return to_bx_class(raw);
+            let raw = ClassId::new(&entry.class);
+            return to_bx_class(&raw);
         }
     }
 
-    Class::Fighter // Fallback
+    ClassId::new("Fighter") // Fallback
 }
 
 /// Get the level dice expression for a class at a given tier.
@@ -264,28 +264,16 @@ pub fn level_dice_for_class(class: &str, tier: &str) -> Option<&'static str> {
 ///
 /// NPC parties should use B/X classes only (Fighter, Cleric, Magic-User,
 /// Thief, Elf, Dwarf, Halfling) since the game's chargen uses B/X rules.
-fn to_bx_class(class: Class) -> Class {
-    match class {
-        // Already B/X
-        Class::Fighter | Class::Cleric | Class::MagicUser | Class::Thief
-        | Class::Elf | Class::Dwarf | Class::Halfling => class,
-        // Martial-flavored → Fighter
-        Class::Barbarian | Class::Knight | Class::Paladin | Class::Ranger => Class::Fighter,
-        // Rogue-flavored → Thief
-        Class::Acrobat | Class::Assassin | Class::Bard => Class::Thief,
-        // Divine → Cleric
-        Class::Druid => Class::Cleric,
-        // Arcane → Magic-User
-        Class::Illusionist => Class::MagicUser,
-        // Demihuman variants → B/X demihuman
-        Class::HalfElf | Class::Drow => Class::Elf,
-        Class::HalfOrc | Class::Duergar => Class::Dwarf,
-        Class::Gnome | Class::Svirfneblin => Class::Halfling,
+fn to_bx_class(id: &ClassId) -> ClassId {
+    let def = class_def(id);
+    match &def.bx_equivalent {
+        Some(bx) => bx.clone(),
+        None => id.clone(),
     }
 }
 
 /// Roll a random NPC class and level.
-pub fn roll_class_and_level<R: Rng>(rng: &mut R, tier: &str) -> (Class, u32) {
+pub fn roll_class_and_level<R: Rng>(rng: &mut R, tier: &str) -> (ClassId, u32) {
     let data = load_data();
     let roll: u32 = rng.gen_range(1..=20);
 
@@ -296,12 +284,12 @@ pub fn roll_class_and_level<R: Rng>(rng: &mut R, tier: &str) -> (Class, u32) {
                 _ => &entry.expert_level_dice,
             };
             let level = roll_dice_expr(rng, dice);
-            let raw_class = Class::parse(&entry.class).unwrap_or(Class::Fighter);
-            return (to_bx_class(raw_class), level);
+            let raw = ClassId::new(&entry.class);
+            return (to_bx_class(&raw), level);
         }
     }
 
-    (Class::Fighter, 1)
+    (ClassId::new("Fighter"), 1)
 }
 
 /// Roll a random alignment.
@@ -382,7 +370,7 @@ pub fn generate_high_level_cleric_party<R: Rng>(rng: &mut R) -> NpcParty {
     // Leader
     let leader_level = roll_dice_expr(rng, "1d6+6");
     members.push(NpcMember {
-        class: Class::Cleric,
+        class: ClassId::new("Cleric"),
         level: leader_level,
         alignment: roll_alignment(rng),
         role: Some("Leader".to_string()),
@@ -393,7 +381,7 @@ pub fn generate_high_level_cleric_party<R: Rng>(rng: &mut R) -> NpcParty {
     for _ in 0..cleric_count {
         let level = roll_dice_expr(rng, "1d4+1");
         members.push(NpcMember {
-            class: Class::Cleric,
+            class: ClassId::new("Cleric"),
             level,
             alignment: roll_alignment(rng),
             role: None,
@@ -405,7 +393,7 @@ pub fn generate_high_level_cleric_party<R: Rng>(rng: &mut R) -> NpcParty {
     for _ in 0..fighter_count {
         let level = roll_dice_expr(rng, "1d6");
         members.push(NpcMember {
-            class: Class::Fighter,
+            class: ClassId::new("Fighter"),
             level,
             alignment: roll_alignment(rng),
             role: None,
@@ -432,7 +420,7 @@ pub fn generate_high_level_fighter_party<R: Rng>(rng: &mut R) -> NpcParty {
     // Leader
     let leader_level = roll_dice_expr(rng, "1d4+6");
     members.push(NpcMember {
-        class: Class::Fighter,
+        class: ClassId::new("Fighter"),
         level: leader_level,
         alignment: roll_alignment(rng),
         role: Some("Leader".to_string()),
@@ -473,7 +461,7 @@ pub fn generate_high_level_magic_user_party<R: Rng>(rng: &mut R) -> NpcParty {
     // Leader
     let leader_level = roll_dice_expr(rng, "1d4+6");
     members.push(NpcMember {
-        class: Class::MagicUser,
+        class: ClassId::new("Magic-User"),
         level: leader_level,
         alignment: leader_alignment.clone(),
         role: Some("Leader".to_string()),
@@ -484,7 +472,7 @@ pub fn generate_high_level_magic_user_party<R: Rng>(rng: &mut R) -> NpcParty {
     for _ in 0..apprentice_count {
         let level = roll_dice_expr(rng, "1d3");
         members.push(NpcMember {
-            class: Class::MagicUser,
+            class: ClassId::new("Magic-User"),
             level,
             alignment: leader_alignment.clone(),
             role: Some("Apprentice".to_string()),
@@ -497,7 +485,7 @@ pub fn generate_high_level_magic_user_party<R: Rng>(rng: &mut R) -> NpcParty {
         let level = roll_dice_expr(rng, "1d4+1");
         let merc_alignment = roll_alignment(rng);
         members.push(NpcMember {
-            class: Class::Fighter,
+            class: ClassId::new("Fighter"),
             level,
             alignment: merc_alignment,
             role: Some("Mercenary".to_string()),
@@ -601,11 +589,10 @@ pub fn reaction_description(reaction: RulerReaction) -> &'static str {
 pub fn npc_member_to_monster(member: &NpcMember) -> crate::model::Monster {
     use crate::model::Monster;
     use crate::rules::attack::HitDice;
-    use crate::rules::class::{class_def, CombatAptitude};
+    use crate::rules::class::CombatAptitude;
     use crate::dice;
 
-    let class_id = crate::rules::class::ClassId::from_enum(member.class);
-    let def = class_def(&class_id);
+    let def = class_def(&member.class);
     let (hit_die, aptitude) = (def.hit_die, def.combat_aptitude);
 
     // Roll HP: level * hit_die (e.g. level 3 Fighter = 3d8)
@@ -690,7 +677,7 @@ mod tests {
         let leader = party.members.iter().find(|m| m.role == Some("Leader".to_string()));
         assert!(leader.is_some());
         let leader = leader.unwrap();
-        assert_eq!(leader.class, Class::Cleric);
+        assert_eq!(leader.class, ClassId::new("Cleric"));
         assert!(leader.level >= 7); // 1d6+6 minimum
     }
 
@@ -702,7 +689,7 @@ mod tests {
         let leader = party.members.iter().find(|m| m.role == Some("Leader".to_string()));
         assert!(leader.is_some());
         let leader = leader.unwrap();
-        assert_eq!(leader.class, Class::Fighter);
+        assert_eq!(leader.class, ClassId::new("Fighter"));
         assert!(leader.level >= 7); // 1d4+6 minimum
     }
 
@@ -718,7 +705,7 @@ mod tests {
             .collect();
         assert!(apprentices.len() >= 1);
         for a in apprentices {
-            assert_eq!(a.class, Class::MagicUser);
+            assert_eq!(a.class, ClassId::new("Magic-User"));
         }
     }
 
@@ -795,10 +782,10 @@ mod tests {
         }
 
         // Should find at least these classes
-        assert!(found_classes.contains(&Class::Fighter));
-        assert!(found_classes.contains(&Class::Cleric));
-        assert!(found_classes.contains(&Class::MagicUser));
-        assert!(found_classes.contains(&Class::Thief));
+        assert!(found_classes.contains(&ClassId::new("Fighter")));
+        assert!(found_classes.contains(&ClassId::new("Cleric")));
+        assert!(found_classes.contains(&ClassId::new("Magic-User")));
+        assert!(found_classes.contains(&ClassId::new("Thief")));
     }
 
     #[test]
@@ -847,7 +834,7 @@ mod tests {
     #[test]
     fn npc_member_to_monster_fighter() {
         let member = NpcMember {
-            class: Class::Fighter,
+            class: ClassId::new("Fighter"),
             level: 5,
             alignment: AlignmentId::from_enum(Alignment::Neutral),
             role: None,
@@ -864,7 +851,7 @@ mod tests {
     #[test]
     fn npc_member_to_monster_magic_user() {
         let member = NpcMember {
-            class: Class::MagicUser,
+            class: ClassId::new("Magic-User"),
             level: 3,
             alignment: AlignmentId::from_enum(Alignment::Chaotic),
             role: None,

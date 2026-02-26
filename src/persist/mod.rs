@@ -357,7 +357,7 @@ pub fn load(path: &Path) -> io::Result<GameState> {
 mod tests {
     use super::*;
     use crate::model::Character;
-    use crate::rules::class::Class;
+    
     use crate::test_util::lock_env;
     use std::path::PathBuf;
 
@@ -367,7 +367,7 @@ mod tests {
         let path = dir.join("osr_ai_gm_test_save.json");
 
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Aldric", Class::Fighter));
+        state.party.add_member(Character::new("Aldric", "Fighter"));
         state.time = Some(TimeTracker::new());
         for _ in 0..42 {
             state.time.as_mut().unwrap().advance_turn();
@@ -539,7 +539,7 @@ mod tests {
         unsafe { std::env::set_var("OSR_DATA_DIR", &dir) };
 
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Tharos", Class::MagicUser));
+        state.party.add_member(Character::new("Tharos", "Magic-User"));
         state.dungeon_level = 5;
         state.notes.push("Found the amulet.".to_string());
 

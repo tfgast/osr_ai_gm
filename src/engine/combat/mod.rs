@@ -149,7 +149,7 @@ mod tests {
     use super::*;
     use crate::model::{AbilityScores, Monster};
     use crate::rules::alignment::{Alignment, AlignmentId};
-    use crate::rules::class::Class;
+    use crate::rules::class::ClassId;
     use crate::rules::equipment;
     use crate::rules::turn::TurnResult;
     use rand::rngs::StdRng;
@@ -162,7 +162,7 @@ mod tests {
     fn test_fighter() -> Character {
         Character {
             name: "Grond".to_string(),
-            class: Class::Fighter.into(),
+            class: ClassId::new("Fighter"),
             level: 1,
             abilities: AbilityScores {
                 strength: 16,
@@ -193,7 +193,7 @@ mod tests {
     fn test_cleric() -> Character {
         Character {
             name: "Brother Aldric".to_string(),
-            class: Class::Cleric.into(),
+            class: ClassId::new("Cleric"),
             level: 3,
             abilities: AbilityScores {
                 strength: 12,
@@ -224,7 +224,7 @@ mod tests {
     fn test_magic_user() -> Character {
         Character {
             name: "Elara".to_string(),
-            class: Class::MagicUser.into(),
+            class: ClassId::new("Magic-User"),
             level: 1,
             abilities: AbilityScores {
                 strength: 8,

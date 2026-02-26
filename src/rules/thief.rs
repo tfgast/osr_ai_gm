@@ -291,21 +291,21 @@ mod tests {
 
     #[test]
     fn thief_has_skills() {
-        use crate::rules::class::{Class, ClassId};
-        assert!(has_thief_skills(&ClassId::from_enum(Class::Thief)));
-        assert!(has_thief_skills(&ClassId::from_enum(Class::Assassin)));
-        assert!(has_thief_skills(&ClassId::from_enum(Class::Acrobat)));
-        assert!(!has_thief_skills(&ClassId::from_enum(Class::Fighter)));
-        assert!(!has_thief_skills(&ClassId::from_enum(Class::Cleric)));
+        use crate::rules::class::ClassId;
+        assert!(has_thief_skills(&ClassId::new("Thief")));
+        assert!(has_thief_skills(&ClassId::new("Assassin")));
+        assert!(has_thief_skills(&ClassId::new("Acrobat")));
+        assert!(!has_thief_skills(&ClassId::new("Fighter")));
+        assert!(!has_thief_skills(&ClassId::new("Cleric")));
     }
 
     #[test]
     fn thief_can_backstab() {
-        use crate::rules::class::{Class, ClassId};
-        assert!(can_backstab(&ClassId::from_enum(Class::Thief)));
-        assert!(can_backstab(&ClassId::from_enum(Class::Assassin)));
-        assert!(!can_backstab(&ClassId::from_enum(Class::Acrobat)));
-        assert!(!can_backstab(&ClassId::from_enum(Class::Fighter)));
+        use crate::rules::class::ClassId;
+        assert!(can_backstab(&ClassId::new("Thief")));
+        assert!(can_backstab(&ClassId::new("Assassin")));
+        assert!(!can_backstab(&ClassId::new("Acrobat")));
+        assert!(!can_backstab(&ClassId::new("Fighter")));
     }
 
     #[test]

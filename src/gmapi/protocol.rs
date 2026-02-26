@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::rules::alignment::AlignmentId;
 use crate::rules::attack::HitDice;
-use crate::rules::class::{Class, ClassId};
+use crate::rules::class::{ClassId, normalize_class_name};
 use crate::state::dungeon::DoorState;
 use crate::state::game::GameMode;
 use crate::state::time::LightSourceKind;
@@ -418,12 +418,12 @@ fn default_room_name() -> String { "Entrance".to_string() }
 fn default_save_path() -> String { "save.json".to_string() }
 fn default_distance() -> u32 { 60 }
 
-/// Deserialize a `Class` from a string, using `Class::parse` for flexible matching.
+/// Deserialize a `ClassId` from a string, using `normalize_class_name` for flexible matching.
 fn deserialize_class<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<ClassId, D::Error> {
     let s = String::deserialize(deserializer)?;
     // Validate the class name is known, then return as ClassId
-    Class::parse(&s)
-        .map(ClassId::from_enum)
+    normalize_class_name(&s)
+        .map(ClassId::new)
         .ok_or_else(|| serde::de::Error::custom(format!("unknown class '{}'", s)))
 }
 
@@ -719,7 +719,7 @@ mod tests {
         match &req.command {
             GMCommand::CreateCharacter { name, class, alignment, abilities } => {
                 assert_eq!(name, "Aldric");
-                assert_eq!(*class, ClassId::from_enum(Class::Fighter));
+                assert_eq!(*class, ClassId::new("Fighter"));
                 assert_eq!(*alignment, AlignmentId::default()); // default
                 assert!(abilities.is_none()); // default
             }
@@ -734,7 +734,7 @@ mod tests {
         match &req.command {
             GMCommand::CreateCharacter { name, class, alignment, abilities } => {
                 assert_eq!(name, "Hoyret");
-                assert_eq!(*class, ClassId::from_enum(Class::Ranger));
+                assert_eq!(*class, ClassId::new("Ranger"));
                 assert_eq!(*alignment, AlignmentId::new("Neutral"));
                 assert_eq!(*abilities, Some([12, 13, 11, 12, 5, 6]));
             }

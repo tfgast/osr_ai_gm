@@ -363,11 +363,11 @@ fn treasure_module_command_parity_golden_scaffold_captures_snapshots() {
 use crate::command::gm_cmds::AwardTreasureXpCommand;
 use crate::command::system::{NoteCommand, NoteDeleteCommand, NotesCommand};
 use crate::model::{AbilityScores, Character};
-use crate::rules::class::Class;
+
 
 fn state_with_fighter() -> GameState {
     let mut state = GameState::new();
-    let mut c = Character::new("Aldric", Class::Fighter);
+    let mut c = Character::new("Aldric", "Fighter");
     c.abilities = AbilityScores {
         strength: 16,
         intelligence: 10,

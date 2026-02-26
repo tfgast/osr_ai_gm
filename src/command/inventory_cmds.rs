@@ -196,11 +196,11 @@ impl Command for UnequipCommand {
 mod tests {
     use super::*;
     use crate::model::{Character, Item};
-    use crate::rules::class::Class;
+    
 
     fn state_with_fighter() -> GameState {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.gold_gp = 100;
         c.abilities.dexterity = 10; // no DEX mod
         state.party.add_member(c);

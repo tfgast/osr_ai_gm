@@ -439,13 +439,13 @@ pub const GM_ONLY_COMMANDS: &[&str] = &[
 mod tests {
     use super::*;
     use crate::model::{Character, CombatState};
-    use crate::rules::class::Class;
+    
     use crate::state::game::GameMode;
 
     #[test]
     fn award_xp_basic() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.abilities = crate::model::AbilityScores {
             strength: 10, intelligence: 10, wisdom: 10,
             dexterity: 10, constitution: 10, charisma: 10,
@@ -496,7 +496,7 @@ mod tests {
     #[test]
     fn heal_basic() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.hp = 3;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -509,7 +509,7 @@ mod tests {
     #[test]
     fn heal_capped_at_max() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.hp = 8;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn heal_above_max_hp_does_not_reduce() {
         let mut state = GameState::new();
-        let mut c = Character::new("Zara", Class::Fighter);
+        let mut c = Character::new("Zara", "Fighter");
         c.hp = 8;
         c.max_hp = 5;
         state.party.add_member(c);
@@ -551,7 +551,7 @@ mod tests {
     #[test]
     fn damage_basic() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.hp = 10;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -565,7 +565,7 @@ mod tests {
     #[test]
     fn damage_kills() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.hp = 3;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -594,7 +594,7 @@ mod tests {
     #[test]
     fn set_hp_basic() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.hp = 5;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn set_hp_to_zero() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.hp = 5;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -638,7 +638,7 @@ mod tests {
     #[test]
     fn set_hp_above_max_clamps_and_warns() {
         let mut state = GameState::new();
-        let mut c = Character::new("Grond", Class::Fighter);
+        let mut c = Character::new("Grond", "Fighter");
         c.hp = 5;
         c.max_hp = 7;
         state.party.add_member(c);
@@ -709,7 +709,7 @@ mod tests {
     #[test]
     fn add_gold_basic() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.gold_gp = 100;
         state.party.add_member(c);
         let cmd = AddGoldCommand;
@@ -737,7 +737,7 @@ mod tests {
     #[test]
     fn add_gold_invalid_amount() {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.gold_gp = 100;
         state.party.add_member(c);
         let cmd = AddGoldCommand;
@@ -758,7 +758,7 @@ mod tests {
     }
 
     fn make_leveled_fighter(name: &str, xp: u64, gold: u32) -> Character {
-        let mut c = Character::new(name, Class::Fighter);
+        let mut c = Character::new(name, "Fighter");
         c.abilities = crate::model::AbilityScores {
             strength: 16,
             intelligence: 10,
@@ -827,7 +827,7 @@ mod tests {
     fn train_max_level() {
         let mut state = GameState::new();
         // Halfling max level is 8
-        let mut c = Character::new("Bilbo", Class::Halfling);
+        let mut c = Character::new("Bilbo", "Halfling");
         c.level = 8;
         c.xp = 999_999;
         c.gold_gp = 9999;
@@ -911,7 +911,7 @@ mod tests {
 
     fn make_combat_state_with_thief() -> GameState {
         let mut state = GameState::new();
-        let mut c = Character::new("Shadow", Class::Thief);
+        let mut c = Character::new("Shadow", "Thief");
         c.hp = 6;
         c.max_hp = 6;
         c.thac0 = 19;
@@ -956,7 +956,7 @@ mod tests {
     fn backstab_non_thief_rejected() {
         let mut state = make_combat_state_with_thief();
         // Add a fighter and try to backstab with them
-        let mut f = Character::new("Aldric", Class::Fighter);
+        let mut f = Character::new("Aldric", "Fighter");
         f.hp = 10;
         f.max_hp = 10;
         state.party.add_member(f);
@@ -969,7 +969,7 @@ mod tests {
     #[test]
     fn backstab_no_combat() {
         let mut state = GameState::new();
-        let c = Character::new("Shadow", Class::Thief);
+        let c = Character::new("Shadow", "Thief");
         state.party.add_member(c);
         let cmd = BackstabCommand;
         let result = cmd.execute(&["Shadow", "0"], &mut state);
@@ -1109,7 +1109,7 @@ mod tests {
     #[test]
     fn thief_check_basic() {
         let mut state = GameState::new();
-        let mut c = Character::new("Shadow", Class::Thief);
+        let mut c = Character::new("Shadow", "Thief");
         c.hp = 6;
         c.max_hp = 6;
         state.party.add_member(c);
@@ -1126,7 +1126,7 @@ mod tests {
     #[test]
     fn thief_check_multi_word_skill() {
         let mut state = GameState::new();
-        let mut c = Character::new("Shadow", Class::Thief);
+        let mut c = Character::new("Shadow", "Thief");
         c.hp = 6;
         c.max_hp = 6;
         state.party.add_member(c);
@@ -1143,7 +1143,7 @@ mod tests {
     #[test]
     fn thief_check_non_thief_rejected() {
         let mut state = GameState::new();
-        let c = Character::new("Aldric", Class::Fighter);
+        let c = Character::new("Aldric", "Fighter");
         state.party.add_member(c);
         let cmd = ThiefCheckCommand;
         let result = cmd.execute(&["Aldric", "climb_walls"], &mut state);
@@ -1163,7 +1163,7 @@ mod tests {
     #[test]
     fn thief_check_unknown_skill() {
         let mut state = GameState::new();
-        let c = Character::new("Shadow", Class::Thief);
+        let c = Character::new("Shadow", "Thief");
         state.party.add_member(c);
         let cmd = ThiefCheckCommand;
         let result = cmd.execute(&["Shadow", "fly"], &mut state);

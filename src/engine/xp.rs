@@ -100,12 +100,12 @@ pub fn apply_level_up_with<R: Rng>(rng: &mut R, character: &mut Character) -> Le
 mod tests {
     use super::*;
     use crate::model::AbilityScores;
-    use crate::rules::class::Class;
+    
     use rand::SeedableRng;
     use rand::rngs::StdRng;
 
     fn make_fighter(xp: u64, level: u32) -> Character {
-        let mut c = Character::new("Test", Class::Fighter);
+        let mut c = Character::new("Test", "Fighter");
         c.abilities = AbilityScores {
             strength: 16, intelligence: 10, wisdom: 10,
             dexterity: 10, constitution: 14, charisma: 10,
@@ -179,7 +179,7 @@ mod tests {
     #[test]
     fn hp_gain_minimum_1() {
         let mut rng = StdRng::seed_from_u64(42);
-        let mut c = Character::new("Sickly", Class::Fighter);
+        let mut c = Character::new("Sickly", "Fighter");
         c.abilities = AbilityScores {
             strength: 10, intelligence: 10, wisdom: 10,
             dexterity: 10, constitution: 3, charisma: 10, // CON 3 = -3 HP mod
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn low_prime_req_penalty() {
-        let mut c = Character::new("Weak", Class::Fighter);
+        let mut c = Character::new("Weak", "Fighter");
         c.abilities = AbilityScores {
             strength: 5, intelligence: 10, wisdom: 10,
             dexterity: 10, constitution: 10, charisma: 10,
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn thief_xp_with_dex_prime() {
-        let mut thief = Character::new("Sneaky", Class::Thief);
+        let mut thief = Character::new("Sneaky", "Thief");
         thief.abilities = AbilityScores {
             strength: 10, intelligence: 10, wisdom: 10,
             dexterity: 16, constitution: 10, charisma: 10,
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn level_up_updates_spell_slots_for_caster() {
         let mut rng = StdRng::seed_from_u64(42);
-        let mut mu = Character::new("Mage", Class::MagicUser);
+        let mut mu = Character::new("Mage", "Magic-User");
         mu.abilities = AbilityScores {
             strength: 10, intelligence: 16, wisdom: 10,
             dexterity: 10, constitution: 10, charisma: 10,

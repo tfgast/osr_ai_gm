@@ -1,7 +1,8 @@
 use serde::Serialize;
 
 use crate::rules::alignment::AlignmentId;
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
+
 use crate::state::wilderness::Terrain;
 
 /// Typed success payload for `encounter` / `RollEncounter`.
@@ -112,7 +113,7 @@ pub struct EvadeResult {
 /// Structured NPC member details returned by `spawn_npc_party`.
 #[derive(Debug, Clone, Serialize)]
 pub struct SpawnNpcPartyMemberInfo {
-    pub class: Class,
+    pub class: ClassId,
     pub level: u32,
     pub alignment: AlignmentId,
     #[serde(skip_serializing_if = "Option::is_none")]

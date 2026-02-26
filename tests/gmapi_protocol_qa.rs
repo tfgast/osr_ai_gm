@@ -13,7 +13,7 @@ use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{AbilityScores, Character, CombatState, Item, Monster};
 use osr_ai_gm::rules::alignment::{Alignment, AlignmentId};
-use osr_ai_gm::rules::class::Class;
+use osr_ai_gm::rules::class::ClassId;
 use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
 use osr_ai_gm::state::time::LightSourceKind;
@@ -37,7 +37,7 @@ fn req(id: &str, command: GMCommand) -> GMRequest {
 }
 
 fn make_fighter(name: &str) -> Character {
-    let mut c = Character::new(name, Class::Fighter);
+    let mut c = Character::new(name, "Fighter");
     c.abilities = AbilityScores {
         strength: 16, intelligence: 10, wisdom: 10,
         dexterity: 12, constitution: 14, charisma: 12,
@@ -53,7 +53,7 @@ fn make_fighter(name: &str) -> Character {
 }
 
 fn make_thief(name: &str) -> Character {
-    let mut c = Character::new(name, Class::Thief);
+    let mut c = Character::new(name, "Thief");
     c.abilities = AbilityScores {
         strength: 10, intelligence: 12, wisdom: 10,
         dexterity: 16, constitution: 10, charisma: 10,
@@ -69,7 +69,7 @@ fn make_thief(name: &str) -> Character {
 }
 
 fn make_cleric(name: &str) -> Character {
-    let mut c = Character::new(name, Class::Cleric);
+    let mut c = Character::new(name, "Cleric");
     c.abilities = AbilityScores {
         strength: 12, intelligence: 10, wisdom: 16,
         dexterity: 10, constitution: 12, charisma: 14,
@@ -85,7 +85,7 @@ fn make_cleric(name: &str) -> Character {
 }
 
 fn make_magic_user(name: &str) -> Character {
-    let mut c = Character::new(name, Class::MagicUser);
+    let mut c = Character::new(name, "Magic-User");
     c.abilities = AbilityScores {
         strength: 8, intelligence: 16, wisdom: 10,
         dexterity: 10, constitution: 10, charisma: 12,
@@ -391,7 +391,7 @@ fn create_character_happy_path() {
     let mut state = GameState::new();
     let resp = handle_request(&req("cc1", GMCommand::CreateCharacter {
         name: "Aldric".to_string(),
-        class: Class::Fighter.into(),
+        class: ClassId::new("Fighter"),
         alignment: AlignmentId::from_enum(Alignment::Lawful),
         abilities: None,
     }), &mut state);
@@ -408,7 +408,7 @@ fn create_character_with_abilities() {
     let mut state = GameState::new();
     let resp = handle_request(&req("cc_ab", GMCommand::CreateCharacter {
         name: "Hoyret".to_string(),
-        class: Class::Ranger.into(),
+        class: ClassId::new("Ranger"),
         alignment: AlignmentId::from_enum(Alignment::Neutral),
         abilities: Some([13, 13, 13, 13, 13, 13]),
     }), &mut state);
@@ -426,7 +426,7 @@ fn create_character_abilities_out_of_range() {
     let mut state = GameState::new();
     let resp = handle_request(&req("cc_bad", GMCommand::CreateCharacter {
         name: "BadStats".to_string(),
-        class: Class::Fighter.into(),
+        class: ClassId::new("Fighter"),
         alignment: AlignmentId::from_enum(Alignment::Neutral),
         abilities: Some([20, 10, 10, 10, 10, 10]),
     }), &mut state);
@@ -2312,7 +2312,7 @@ fn hire_retainer_happy_path() {
     let resp = handle_request(&req("hr1", GMCommand::HireRetainer {
         employer: "Father Gregory".to_string(),
         retainer_name: "Hrothgar".to_string(),
-        retainer_class: Class::Fighter.into(),
+        retainer_class: ClassId::new("Fighter"),
         retainer_level: 1,
     }), &mut state);
     assert_response_format(&resp, "hr1");
@@ -2340,7 +2340,7 @@ fn hire_retainer_unknown_employer() {
     let resp = handle_request(&req("hr2", GMCommand::HireRetainer {
         employer: "Nobody".to_string(),
         retainer_name: "Hrothgar".to_string(),
-        retainer_class: Class::Fighter.into(),
+        retainer_class: ClassId::new("Fighter"),
         retainer_level: 1,
     }), &mut state);
     assert!(!resp.success);
@@ -2552,8 +2552,8 @@ fn list_retainers_empty() {
 #[test]
 fn list_retainers_with_entries() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 6, 7, 25));
-    state.retainers.push(Retainer::new("Mira", Class::Cleric, 2, 8, 9, 50));
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Mira", "Cleric", 2, 8, 9, 50));
     let resp = handle_request(&req("lr2", GMCommand::ListRetainers), &mut state);
     assert_response_format(&resp, "lr2");
     assert!(resp.success);
@@ -2571,7 +2571,7 @@ fn list_retainers_with_entries() {
 #[test]
 fn list_retainers_dead_retainer() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 0, 7, 25));
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 0, 7, 25));
     let resp = handle_request(&req("lr3", GMCommand::ListRetainers), &mut state);
     assert!(resp.success);
     let data = resp.data.unwrap();
@@ -2587,7 +2587,7 @@ fn list_retainers_dead_retainer() {
 #[test]
 fn dismiss_retainer_happy_path() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
     let resp = handle_request(&req("dr1", GMCommand::DismissRetainer {
         name: "Gurd".to_string(),
     }), &mut state);
@@ -2603,7 +2603,7 @@ fn dismiss_retainer_happy_path() {
 #[test]
 fn dismiss_retainer_case_insensitive() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
     let resp = handle_request(&req("dr2", GMCommand::DismissRetainer {
         name: "gurd".to_string(),
     }), &mut state);
@@ -2614,7 +2614,7 @@ fn dismiss_retainer_case_insensitive() {
 #[test]
 fn dismiss_retainer_not_found() {
     let mut state = GameState::new();
-    state.retainers.push(Retainer::new("Gurd", Class::Fighter, 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Gurd", "Fighter", 1, 6, 7, 25));
     let resp = handle_request(&req("dr3", GMCommand::DismissRetainer {
         name: "Nobody".to_string(),
     }), &mut state);

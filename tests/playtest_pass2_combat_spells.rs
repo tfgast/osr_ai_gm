@@ -8,7 +8,7 @@ use osr_ai_gm::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use osr_ai_gm::model::{AbilityScores, Character, CombatState, Monster};
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::rules::alignment::{Alignment, AlignmentId};
-use osr_ai_gm::rules::class::Class;
+use osr_ai_gm::rules::class::ClassId;
 use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
 use osr_ai_gm::state::time::LightSourceKind;
@@ -41,7 +41,7 @@ fn unique_save_name(prefix: &str) -> String {
 // --- Character factories ---
 
 fn make_fighter(name: &str) -> Character {
-    let mut c = Character::new(name, Class::Fighter);
+    let mut c = Character::new(name, "Fighter");
     c.abilities = AbilityScores {
         strength: 16, intelligence: 10, wisdom: 9,
         dexterity: 12, constitution: 14, charisma: 11,
@@ -53,7 +53,7 @@ fn make_fighter(name: &str) -> Character {
 }
 
 fn make_cleric(name: &str) -> Character {
-    let mut c = Character::new(name, Class::Cleric);
+    let mut c = Character::new(name, "Cleric");
     c.abilities = AbilityScores {
         strength: 12, intelligence: 9, wisdom: 16,
         dexterity: 10, constitution: 13, charisma: 14,
@@ -65,7 +65,7 @@ fn make_cleric(name: &str) -> Character {
 }
 
 fn make_thief(name: &str) -> Character {
-    let mut c = Character::new(name, Class::Thief);
+    let mut c = Character::new(name, "Thief");
     c.abilities = AbilityScores {
         strength: 10, intelligence: 13, wisdom: 9,
         dexterity: 16, constitution: 11, charisma: 12,
@@ -77,7 +77,7 @@ fn make_thief(name: &str) -> Character {
 }
 
 fn make_elf(name: &str) -> Character {
-    let mut c = Character::new(name, Class::Elf);
+    let mut c = Character::new(name, "Elf");
     c.abilities = AbilityScores {
         strength: 13, intelligence: 16, wisdom: 10,
         dexterity: 13, constitution: 12, charisma: 11,
@@ -89,7 +89,7 @@ fn make_elf(name: &str) -> Character {
 }
 
 fn make_magic_user(name: &str) -> Character {
-    let mut c = Character::new(name, Class::MagicUser);
+    let mut c = Character::new(name, "Magic-User");
     c.abilities = AbilityScores {
         strength: 9, intelligence: 16, wisdom: 10,
         dexterity: 12, constitution: 11, charisma: 13,
@@ -101,7 +101,7 @@ fn make_magic_user(name: &str) -> Character {
 }
 
 fn make_dwarf(name: &str) -> Character {
-    let mut c = Character::new(name, Class::Dwarf);
+    let mut c = Character::new(name, "Dwarf");
     c.abilities = AbilityScores {
         strength: 14, intelligence: 9, wisdom: 10,
         dexterity: 10, constitution: 15, charisma: 11,
@@ -1126,7 +1126,7 @@ fn create_character_via_gmapi() {
 
     let resp = handle_request(&req("cc1", GMCommand::CreateCharacter {
         name: "Test Fighter".to_string(),
-        class: Class::Fighter.into(),
+        class: ClassId::new("Fighter"),
         alignment: AlignmentId::from_enum(Alignment::Lawful),
         abilities: Some([16, 10, 9, 12, 14, 11]),
     }), &mut state);

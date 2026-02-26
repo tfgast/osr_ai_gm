@@ -532,10 +532,10 @@ pub fn action_train(state: &mut GameState, char_name: &str) -> Result<TrainResul
 mod tests {
     use super::*;
     use crate::model::Character;
-    use crate::rules::class::Class;
+    
 
     fn make_character_with_xp(name: &str, xp: u64) -> Character {
-        let mut c = Character::new(name, Class::Fighter);
+        let mut c = Character::new(name, "Fighter");
         c.xp = xp;
         c
     }
@@ -622,7 +622,7 @@ mod tests {
     // --- action_award_treasure_xp (oag-mol-jqd) ---
 
     fn make_fighter_with_abilities(name: &str, xp: u64, gold: u32) -> Character {
-        let mut c = Character::new(name, Class::Fighter);
+        let mut c = Character::new(name, "Fighter");
         c.abilities = crate::model::AbilityScores {
             strength: 16,
             intelligence: 10,
@@ -726,7 +726,7 @@ mod tests {
     #[test]
     fn level_up_max_level() {
         let mut state = GameState::new();
-        let mut c = Character::new("Bilbo", Class::Halfling);
+        let mut c = Character::new("Bilbo", "Halfling");
         c.level = 8; // Halfling max
         c.xp = 999_999;
         c.gold_gp = 9999;
@@ -930,7 +930,7 @@ mod tests {
     #[test]
     fn thief_skill_check_dead_character_rejected() {
         let mut state = GameState::new();
-        let mut c = Character::new("Shadow", Class::Thief);
+        let mut c = Character::new("Shadow", "Thief");
         c.hp = -1;
         c.max_hp = 6;
         state.party.add_member(c);

@@ -653,7 +653,7 @@ pub fn exploration_status(time: &TimeTracker, dungeon: &DungeonState) -> String 
 mod tests {
     use super::*;
     use crate::model::AbilityScores;
-    use crate::rules::class::Class;
+    
     use crate::state::dungeon::{Door, Room};
     use crate::state::time::LightSourceKind;
     use rand::rngs::StdRng;
@@ -676,7 +676,7 @@ mod tests {
     }
 
     fn test_character() -> Character {
-        let mut c = Character::new("Arden", Class::Fighter);
+        let mut c = Character::new("Arden", "Fighter");
         c.abilities = AbilityScores {
             strength: 14,
             intelligence: 10,
@@ -894,7 +894,7 @@ mod tests {
     }
 
     fn test_thief() -> Character {
-        let mut c = Character::new("Shadow", Class::Thief);
+        let mut c = Character::new("Shadow", "Thief");
         c.level = 3; // OpenLocks at level 3 = 25%
         c
     }

@@ -7,7 +7,8 @@ use crate::gmapi::interface::handle_request;
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::model::Character;
 use crate::persist::GameState;
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
+
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -200,7 +201,7 @@ fn capture_parity(
 
 fn base_state(charisma: i32) -> GameState {
     let mut state = GameState::new();
-    let mut employer = Character::new("Aldric", Class::Fighter);
+    let mut employer = Character::new("Aldric", "Fighter");
     employer.abilities.charisma = charisma;
     state.party.add_member(employer);
     state
@@ -211,7 +212,7 @@ fn state_at_retainer_cap() -> GameState {
     for idx in 1..=5 {
         state
             .retainers
-            .push(Retainer::new(&format!("R{idx}"), Class::Fighter, 1, 4, 7, 25));
+            .push(Retainer::new(&format!("R{idx}"), "Fighter", 1, 4, 7, 25));
     }
     state
 }
@@ -220,7 +221,7 @@ fn state_with_one_retainer() -> GameState {
     let mut state = base_state(12);
     state
         .retainers
-        .push(Retainer::new("Hob", Class::Fighter, 1, 6, 7, 25));
+        .push(Retainer::new("Hob", "Fighter", 1, 6, 7, 25));
     state
 }
 
@@ -316,7 +317,7 @@ fn retainer_command_parity_golden_snapshots_capture_compatibility_gates() {
             GMCommand::HireRetainer {
                 employer: "Aldric".to_string(),
                 retainer_name: "Sven".to_string(),
-                retainer_class: Class::Fighter.into(),
+                retainer_class: ClassId::new("Fighter"),
                 retainer_level: 1,
             },
             "CLI enforces max-retainer cap before rolling; API inline path does not.",

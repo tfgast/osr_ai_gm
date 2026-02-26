@@ -372,11 +372,11 @@ mod tests {
     use crate::bridge::registry::{character_ref, monster_ref};
     use crate::model::AbilityScores;
     use crate::rules::attack::HitDice;
-    use crate::rules::class::Class;
+    
     use crate::rules::save::SavingThrows;
 
     fn test_character() -> Character {
-        let mut c = Character::new("Grond", Class::Fighter);
+        let mut c = Character::new("Grond", "Fighter");
         c.level = 3;
         c.hp = 18;
         c.max_hp = 24;
@@ -591,7 +591,7 @@ mod tests {
         let cases = [(1, 19u32), (3, 19), (4, 17), (7, 14)];
 
         for (level, expected_thac0) in cases {
-            let mut c = Character::new("TestFighter", Class::Fighter);
+            let mut c = Character::new("TestFighter", "Fighter");
             c.level = level;
             c.thac0 = expected_thac0;
             let state = BridgeState::new(vec![c], Vec::new(), Vec::new(), 0, 1);
@@ -610,7 +610,7 @@ mod tests {
     #[test]
     fn saving_throw_comparison_tables() {
         let st = SavingThrows::new(12, 13, 14, 15, 16);
-        let mut c = Character::new("TestFighter", Class::Fighter);
+        let mut c = Character::new("TestFighter", "Fighter");
         c.level = 1;
         c.saving_throws = Some(st);
 

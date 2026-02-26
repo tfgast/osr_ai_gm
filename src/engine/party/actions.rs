@@ -2,7 +2,7 @@ use crate::engine::chargen;
 use crate::engine::result::EngineError;
 use crate::persist::GameState;
 use crate::rules::alignment::AlignmentId;
-use crate::rules::class::{self, Class, ClassId};
+use crate::rules::class::{self, ClassId, CANONICAL_CLASS_NAMES};
 use crate::rules::encumbrance;
 use crate::rules::xp::{check_level_up, xp_for_level};
 
@@ -156,10 +156,10 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
 }
 
 pub fn action_list_classes() -> Result<ListClassesResult, EngineError> {
-    let classes = Class::ALL
+    let classes = CANONICAL_CLASS_NAMES
         .iter()
-        .map(|&class| {
-            let class_id: ClassId = class.into();
+        .map(|&name| {
+            let class_id = ClassId::new(name);
             let def = class::class_def(&class_id);
             let requirements = def
                 .requirements
@@ -207,7 +207,7 @@ mod tests {
 
     fn state_with_equipped_fighter() -> GameState {
         let mut state = GameState::new();
-        let mut fighter = Character::new("Grond", Class::Fighter);
+        let mut fighter = Character::new("Grond", "Fighter");
         fighter.hp = 8;
         fighter.max_hp = 8;
         fighter.ac = 4;
@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn query_party_empty_inventory() {
         let mut state = GameState::new();
-        let fighter = Character::new("Arden", Class::Fighter);
+        let fighter = Character::new("Arden", "Fighter");
         state.party.add_member(fighter);
 
         let result = action_query_party(&state).unwrap();
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn query_party_overloaded_character() {
         let mut state = GameState::new();
-        let mut fighter = Character::new("Mule", Class::Fighter);
+        let mut fighter = Character::new("Mule", "Fighter");
         fighter.gold_gp = 1700; // Over 1600cn max
         state.party.add_member(fighter);
 

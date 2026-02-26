@@ -1334,11 +1334,11 @@ pub fn action_coup_de_grace(
 mod tests {
     use super::*;
     use crate::model::{Character, CombatState, Monster};
-    use crate::rules::class::Class;
+    
     use crate::state::game::GameMode;
 
     fn test_fighter() -> Character {
-        let mut c = Character::new("Grond", Class::Fighter);
+        let mut c = Character::new("Grond", "Fighter");
         c.hp = 12;
         c.max_hp = 12;
         c.ac = 4;
@@ -1658,7 +1658,7 @@ mod tests {
 
     fn state_with_caster_combat() -> GameState {
         let mut state = GameState::new();
-        let mut caster = Character::new("Zara", Class::MagicUser);
+        let mut caster = Character::new("Zara", "Magic-User");
         caster.hp = 6;
         caster.max_hp = 6;
         caster.level = 3;
@@ -1811,7 +1811,7 @@ mod tests {
     #[test]
     fn cast_spell_no_combat_error() {
         let mut state = GameState::new();
-        let mut mage = crate::model::Character::new("Zara", crate::rules::class::Class::MagicUser);
+        let mut mage = crate::model::Character::new("Zara", "Magic-User");
         mage.hp = 3;
         mage.max_hp = 3;
         state.party.add_member(mage);
@@ -1848,7 +1848,7 @@ mod tests {
     // --- backstab damage cap (oag-bxwm9) ---
 
     fn test_thief(name: &str, str_score: i32) -> Character {
-        let mut c = Character::new(name, Class::Thief);
+        let mut c = Character::new(name, "Thief");
         c.hp = 6;
         c.max_hp = 6;
         c.ac = 6;
@@ -2024,7 +2024,7 @@ mod tests {
     fn declare_spell_rejected_when_slots_exhausted() {
         // Level 1 MU has 1 first-level slot. After casting, no more slots.
         let mut state = GameState::new();
-        let mut caster = Character::new("Zara", Class::MagicUser);
+        let mut caster = Character::new("Zara", "Magic-User");
         caster.hp = 6;
         caster.max_hp = 6;
         caster.level = 1; // ArcaneFullCaster level 1 = [1, 0, 0, 0, 0, 0]
@@ -2082,7 +2082,7 @@ mod tests {
     #[test]
     fn disrupted_spell_still_consumes_slot() {
         let mut state = GameState::new();
-        let mut caster = Character::new("Zara", Class::MagicUser);
+        let mut caster = Character::new("Zara", "Magic-User");
         caster.hp = 6;
         caster.max_hp = 6;
         caster.level = 1;
@@ -2122,7 +2122,7 @@ mod tests {
         let mut fighter = test_fighter();
         fighter.abilities.strength = 10; // no prime req bonus
         state.party.add_member(fighter);
-        let mut cleric = Character::new("Mira", Class::Cleric);
+        let mut cleric = Character::new("Mira", "Cleric");
         cleric.hp = 8;
         cleric.max_hp = 8;
         cleric.level = 1;
@@ -2159,7 +2159,7 @@ mod tests {
         let mut alive = test_fighter();
         alive.abilities.strength = 10;
         state.party.add_member(alive);
-        let mut dead = Character::new("Fallen", Class::Fighter);
+        let mut dead = Character::new("Fallen", "Fighter");
         dead.hp = 0;
         dead.max_hp = 8;
         dead.level = 1;

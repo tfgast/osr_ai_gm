@@ -780,13 +780,13 @@ fn dsl_should_check_morale(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rules::class::Class;
+    
 
     #[test]
     fn character_creation() {
-        let c = Character::new("Theron", Class::Fighter);
+        let c = Character::new("Theron", "Fighter");
         assert_eq!(c.name, "Theron");
-        assert_eq!(c.class, ClassId::from_enum(Class::Fighter));
+        assert_eq!(c.class, ClassId::new("Fighter"));
         assert_eq!(c.level, 1);
         assert!(c.is_alive());
     }
@@ -794,8 +794,8 @@ mod tests {
     #[test]
     fn party_operations() {
         let mut party = Party::new();
-        party.add_member(Character::new("Arden", Class::Cleric));
-        party.add_member(Character::new("Brin", Class::Thief));
+        party.add_member(Character::new("Arden", "Cleric"));
+        party.add_member(Character::new("Brin", "Thief"));
         assert_eq!(party.members.len(), 2);
         assert!(party.find_member("arden").is_some());
         assert!(party.find_member("nobody").is_none());
@@ -803,7 +803,7 @@ mod tests {
 
     #[test]
     fn serialization_roundtrip() {
-        let c = Character::new("Test", Class::MagicUser);
+        let c = Character::new("Test", "Magic-User");
         let json = serde_json::to_string(&c).unwrap();
         let c2: Character = serde_json::from_str(&json).unwrap();
         assert_eq!(c.name, c2.name);
@@ -822,6 +822,6 @@ mod tests {
             "inventory": [], "spells": []
         }"#;
         let c: Character = serde_json::from_str(old_json).unwrap();
-        assert_eq!(c.class, ClassId::from_enum(Class::MagicUser));
+        assert_eq!(c.class, ClassId::new("Magic-User"));
     }
 }

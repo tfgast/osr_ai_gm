@@ -198,11 +198,11 @@ pub fn action_long_rest(state: &mut GameState) -> Result<LongRestResult, EngineE
 mod tests {
     use super::*;
     use crate::model::{Character, Spell};
-    use crate::rules::class::Class;
+    
 
     fn setup_magic_user() -> GameState {
         let mut state = GameState::new();
-        let mut mu = Character::new("Zara", Class::MagicUser);
+        let mut mu = Character::new("Zara", "Magic-User");
         mu.level = 3; // Gets [2, 1, 0, 0, 0, 0] slots
         mu.spells = vec![
             Spell::new("Sleep", 1),
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn prepare_spells_rejects_non_caster() {
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Grond", Class::Fighter));
+        state.party.add_member(Character::new("Grond", "Fighter"));
         let spells = vec![
             PreparedSpellEntry { name: "Sleep".to_string(), level: 1 },
         ];
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn long_rest_skips_non_casters() {
         let mut state = GameState::new();
-        state.party.add_member(Character::new("Grond", Class::Fighter));
+        state.party.add_member(Character::new("Grond", "Fighter"));
         let result = action_long_rest(&mut state).unwrap();
         assert!(result.characters_recharged.is_empty());
         assert!(result.message.contains("no spell resources"));
@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn long_rest_recharges_spell_points() {
         let mut state = GameState::new();
-        let mut mu = Character::new("Pointy", Class::MagicUser);
+        let mut mu = Character::new("Pointy", "Magic-User");
         mu.level = 3;
         mu.spell_points_used = 5;
         state.party.add_member(mu);

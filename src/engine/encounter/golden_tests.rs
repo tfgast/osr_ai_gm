@@ -6,7 +6,7 @@ use crate::gmapi::interface::handle_request;
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::model::Character;
 use crate::persist::GameState;
-use crate::rules::class::Class;
+
 use crate::state::dungeon::DungeonState;
 use crate::state::game::GameMode;
 use serde::Serialize;
@@ -128,12 +128,12 @@ fn capture_parity(
 fn base_state() -> GameState {
     let mut state = GameState::new();
 
-    let mut aldric = Character::new("Aldric", Class::Cleric);
+    let mut aldric = Character::new("Aldric", "Cleric");
     aldric.hp = 9;
     aldric.max_hp = 9;
     aldric.abilities.charisma = 14;
 
-    let mut grond = Character::new("Grond", Class::Fighter);
+    let mut grond = Character::new("Grond", "Fighter");
     grond.hp = 12;
     grond.max_hp = 12;
 

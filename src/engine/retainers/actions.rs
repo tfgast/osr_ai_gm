@@ -319,11 +319,11 @@ pub fn action_retainer_morale(
 mod tests {
     use super::*;
     use crate::model::Character;
-    use crate::rules::class::Class;
+    
 
     fn state_with_party() -> GameState {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.abilities.charisma = 14;
         state.party.add_member(c);
         state
@@ -341,9 +341,9 @@ mod tests {
     #[test]
     fn unique_name_multiple_conflicts() {
         let existing = vec![
-            Retainer::new("Torchbearer", Class::Fighter, 0, 4, 7, 25),
-            Retainer::new("Torchbearer 2", Class::Fighter, 0, 4, 7, 25),
-            Retainer::new("Torchbearer 3", Class::Fighter, 0, 4, 7, 25),
+            Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer 2", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer 3", "Fighter", 0, 4, 7, 25),
         ];
         assert_eq!(
             unique_retainer_name("Torchbearer", &existing),
@@ -356,7 +356,7 @@ mod tests {
         let mut state = GameState::new();
         state
             .retainers
-            .push(Retainer::new("Hrothgar", Class::Fighter, 1, 6, 7, 25));
+            .push(Retainer::new("Hrothgar", "Fighter", 1, 6, 7, 25));
         let result = action_dismiss_retainer(&mut state, "hrothgar").unwrap();
         assert_eq!(result.name, "Hrothgar");
         assert!(state.retainers.is_empty());
@@ -368,7 +368,7 @@ mod tests {
         let result = action_hire_retainer(
             &mut state,
             "Hrothgar",
-            Class::Fighter.into(),
+            ClassId::new("Fighter"),
             Some("Nobody"),
             1,
             HireRetainerMode::AssessOnly,
@@ -382,13 +382,13 @@ mod tests {
         for i in 0..5 {
             state
                 .retainers
-                .push(Retainer::new(&format!("R{}", i), Class::Fighter, 1, 4, 7, 25));
+                .push(Retainer::new(&format!("R{}", i), "Fighter", 1, 4, 7, 25));
         }
 
         let result = action_hire_retainer(
             &mut state,
             "OneMore",
-            Class::Fighter.into(),
+            ClassId::new("Fighter"),
             None,
             1,
             HireRetainerMode::RecruitToParty,

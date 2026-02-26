@@ -538,7 +538,7 @@ pub fn starvation_penalty(days_without_food: u32) -> i32 {
 mod tests {
     use super::*;
     use crate::model::Character;
-    use crate::rules::class::Class;
+    
     use crate::state::wilderness::HexCell;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
@@ -559,7 +559,7 @@ mod tests {
 
     fn test_party() -> Party {
         let mut party = Party::new();
-        party.add_member(Character::new("Test", Class::Fighter));
+        party.add_member(Character::new("Test", "Fighter"));
         party.rations = 10; // Start with some rations
         party
     }
@@ -923,9 +923,9 @@ mod tests {
         let mut rng = test_rng();
         let mut ws = test_wilderness();
         let mut party = Party::new();
-        party.add_member(Character::new("Fighter", Class::Fighter));
-        party.add_member(Character::new("Cleric", Class::Cleric));
-        party.add_member(Character::new("Thief", Class::Thief));
+        party.add_member(Character::new("Fighter", "Fighter"));
+        party.add_member(Character::new("Cleric", "Cleric"));
+        party.add_member(Character::new("Thief", "Thief"));
         party.rations = 20;
 
         let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
@@ -955,9 +955,9 @@ mod tests {
         let mut rng = test_rng();
         let mut ws = test_wilderness();
         let mut party = Party::new();
-        party.add_member(Character::new("Fighter", Class::Fighter));
-        party.add_member(Character::new("Cleric", Class::Cleric));
-        party.add_member(Character::new("Thief", Class::Thief));
+        party.add_member(Character::new("Fighter", "Fighter"));
+        party.add_member(Character::new("Cleric", "Cleric"));
+        party.add_member(Character::new("Thief", "Thief"));
         party.rations = 2; // Only 2 rations for 3 people
 
         let result = travel_day_with(&mut rng, &mut ws, &mut party, 1, 0, 120);
@@ -1480,11 +1480,11 @@ mod tests {
         let mut party = Party::new();
 
         // Alice is alive, Bob is already dead
-        let mut alice = Character::new("Alice", Class::Fighter);
+        let mut alice = Character::new("Alice", "Fighter");
         alice.hp = 2; // low enough that 1d4 starvation can kill her
         party.add_member(alice);
 
-        let mut bob = Character::new("Bob", Class::Fighter);
+        let mut bob = Character::new("Bob", "Fighter");
         bob.hp = 0; // already dead
         party.add_member(bob);
 

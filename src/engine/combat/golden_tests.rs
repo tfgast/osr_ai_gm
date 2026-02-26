@@ -9,7 +9,7 @@ use crate::gmapi::interface::handle_request;
 use crate::gmapi::protocol::{EncounterParams, GMCommand, GMRequest, GMResponse};
 use crate::model::{Character, CombatState, Monster};
 use crate::persist::GameState;
-use crate::rules::class::Class;
+
 use crate::state::game::GameMode;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -140,21 +140,21 @@ fn summarize_state(state: &GameState) -> Value {
 fn base_state() -> GameState {
     let mut state = GameState::new();
 
-    let mut fighter = Character::new("Grond", Class::Fighter);
+    let mut fighter = Character::new("Grond", "Fighter");
     fighter.hp = 12;
     fighter.max_hp = 12;
     fighter.ac = 4;
     fighter.level = 2;
     fighter.abilities.strength = 16;
 
-    let mut cleric = Character::new("Aldric", Class::Cleric);
+    let mut cleric = Character::new("Aldric", "Cleric");
     cleric.hp = 9;
     cleric.max_hp = 9;
     cleric.ac = 5;
     cleric.level = 3;
     cleric.abilities.wisdom = 15;
 
-    let mut magic_user = Character::new("Elara", Class::MagicUser);
+    let mut magic_user = Character::new("Elara", "Magic-User");
     magic_user.hp = 5;
     magic_user.max_hp = 5;
     magic_user.ac = 7;
@@ -233,7 +233,7 @@ fn state_for_end_combat() -> GameState {
         combat.monsters[1].hp = 2;
         combat.monsters[1].xp_value = 25;
     }
-    state.retainers.push(Retainer::new("Hob", Class::Fighter, 1, 6, 7, 25));
+    state.retainers.push(Retainer::new("Hob", "Fighter", 1, 6, 7, 25));
     state
 }
 

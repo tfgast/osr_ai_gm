@@ -143,13 +143,13 @@ pub fn standard_wage(level: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rules::class::Class;
+    
     use rand::SeedableRng;
     use rand::rngs::StdRng;
 
     #[test]
     fn retainer_creation() {
-        let r = Retainer::new("Hrothgar", Class::Fighter, 1, 6, 7, 25);
+        let r = Retainer::new("Hrothgar", "Fighter", 1, 6, 7, 25);
         assert_eq!(r.name, "Hrothgar");
         assert!(r.is_alive());
         assert_eq!(r.loyalty, 7);

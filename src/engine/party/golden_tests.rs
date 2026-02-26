@@ -5,7 +5,8 @@ use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::model::Character;
 use crate::persist::GameState;
 use crate::rules::alignment::{Alignment, AlignmentId};
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
+
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -112,7 +113,7 @@ fn summarize_state(state: &GameState) -> Value {
 
 fn state_with_party_and_starvation() -> GameState {
     let mut state = GameState::new();
-    let mut fighter = Character::new("Grond", Class::Fighter);
+    let mut fighter = Character::new("Grond", "Fighter");
     fighter.level = 1;
     fighter.xp = 2_000;
     fighter.hp = 8;
@@ -151,7 +152,7 @@ fn party_command_parity_golden_scaffold_captures_snapshots() {
             },
             GMCommand::CreateCharacter {
                 name: "Borin".to_string(),
-                class: Class::Knight.into(),
+                class: ClassId::new("Knight"),
                 alignment: AlignmentId::from_enum(Alignment::Neutral),
                 abilities: Some([8, 8, 8, 8, 8, 8]),
             },

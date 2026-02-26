@@ -4,7 +4,7 @@ use crate::gmapi::interface::handle_request;
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::model::{Character, Item};
 use crate::persist::GameState;
-use crate::rules::class::Class;
+
 use crate::state::dungeon::{DungeonState, PlacedTreasureInstance, Room};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -149,7 +149,7 @@ fn capture_parity(
 
 fn base_state() -> GameState {
     let mut state = GameState::new();
-    let mut c = Character::new("Aldric", Class::Fighter);
+    let mut c = Character::new("Aldric", "Fighter");
     c.gold_gp = 100;
     c.abilities.dexterity = 10;
     state.party.add_member(c);

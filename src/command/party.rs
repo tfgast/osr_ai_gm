@@ -2,7 +2,7 @@ use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::engine::party;
 use crate::rules::alignment::{Alignment, AlignmentId};
-use crate::rules::class::Class;
+use crate::rules::class::normalize_class_name;
 use crate::rules::encumbrance::{EncumbranceLevel, MAX_CAPACITY_CN};
 
 pub struct ChargenCommand;
@@ -19,7 +19,7 @@ impl Command for ChargenCommand {
             );
         }
         let name = args[0];
-        let class = match Class::parse(args[1]) {
+        let class = match normalize_class_name(args[1]) {
             Some(c) => c,
             None => return CommandResult::error(format!(
                 "unknown class '{}'. Use 'classes' to list available classes.", args[1]
@@ -191,7 +191,7 @@ mod tests {
 
     fn state_with_inventory() -> GameState {
         let mut state = GameState::new();
-        let mut fighter = Character::new("Grond", Class::Fighter);
+        let mut fighter = Character::new("Grond", "Fighter");
         fighter.hp = 8;
         fighter.max_hp = 8;
         fighter.ac = 4;
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn party_command_shows_overloaded_tag() {
         let mut state = GameState::new();
-        let mut fighter = Character::new("Mule", Class::Fighter);
+        let mut fighter = Character::new("Mule", "Fighter");
         fighter.hp = 8;
         fighter.max_hp = 8;
         fighter.gold_gp = 1700;
@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn party_command_hides_inventory_when_empty() {
         let mut state = GameState::new();
-        let mut fighter = Character::new("Arden", Class::Fighter);
+        let mut fighter = Character::new("Arden", "Fighter");
         fighter.hp = 8;
         fighter.max_hp = 8;
         fighter.movement_rate = 120;
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn party_command_shows_encumbrance_tag() {
         let mut state = GameState::new();
-        let mut fighter = Character::new("Heavy", Class::Fighter);
+        let mut fighter = Character::new("Heavy", "Fighter");
         fighter.hp = 8;
         fighter.max_hp = 8;
         fighter.movement_rate = 120;

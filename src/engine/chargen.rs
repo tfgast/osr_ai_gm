@@ -10,8 +10,6 @@ use crate::rules::alignment::AlignmentId;
 #[cfg(test)]
 use crate::rules::alignment::Alignment;
 use crate::rules::class::{self, ClassId, CombatAptitude, class_def};
-#[cfg(test)]
-use crate::rules::class::Class;
 use crate::rules::save;
 use crate::rules::equipment;
 
@@ -409,10 +407,10 @@ mod tests {
     fn create_fighter() {
         let abilities = [14, 10, 10, 12, 13, 10];
         let c = create_character_with(
-            "Grond", Class::Fighter, abilities, Alignment::Neutral, &mut test_rng(),
+            "Grond", "Fighter", abilities, Alignment::Neutral, &mut test_rng(),
         );
         assert_eq!(c.name, "Grond");
-        assert_eq!(c.class, ClassId::from(Class::Fighter));
+        assert_eq!(c.class, ClassId::new("Fighter"));
         assert_eq!(c.level, 1);
         assert_eq!(c.alignment, AlignmentId::from_enum(Alignment::Neutral));
         assert_eq!(c.thac0, 19);
@@ -427,9 +425,9 @@ mod tests {
     fn create_magic_user() {
         let abilities = [8, 16, 10, 12, 10, 11];
         let c = create_character_with(
-            "Elara", Class::MagicUser, abilities, Alignment::Chaotic, &mut test_rng(),
+            "Elara", "Magic-User", abilities, Alignment::Chaotic, &mut test_rng(),
         );
-        assert_eq!(c.class, ClassId::from(Class::MagicUser));
+        assert_eq!(c.class, ClassId::new("Magic-User"));
         assert!(c.hp >= 1 && c.hp <= 4);
         assert_eq!(c.thac0, 19);
         let saves = c.saving_throws.unwrap();
@@ -439,13 +437,13 @@ mod tests {
     #[test]
     fn create_dwarf_with_racial_mods() {
         let mut abilities = [14, 10, 10, 10, 14, 10];
-        class::apply_racial_modifiers(&ClassId::from(Class::Dwarf), &mut abilities);
+        class::apply_racial_modifiers(&ClassId::new("Dwarf"), &mut abilities);
         assert_eq!(abilities[class::CON], 15); // +1
         assert_eq!(abilities[class::CHA], 9);  // -1
         let c = create_character_with(
-            "Thorin", Class::Dwarf, abilities, Alignment::Lawful, &mut test_rng(),
+            "Thorin", "Dwarf", abilities, Alignment::Lawful, &mut test_rng(),
         );
-        assert_eq!(c.class, ClassId::from(Class::Dwarf));
+        assert_eq!(c.class, ClassId::new("Dwarf"));
         assert_eq!(c.abilities.constitution, 15);
         assert_eq!(c.abilities.charisma, 9);
         let saves = c.saving_throws.unwrap();
@@ -457,7 +455,7 @@ mod tests {
         // DEX 16 gives AC mod of -2 (improves AC by 2)
         let abilities = [10, 10, 10, 16, 10, 10];
         let c = create_character_with(
-            "Shadow", Class::Thief, abilities, Alignment::Neutral, &mut test_rng(),
+            "Shadow", "Thief", abilities, Alignment::Neutral, &mut test_rng(),
         );
         assert_eq!(c.ac, 7); // 9 (unarmoured) - 2 (DEX mod)
     }
@@ -466,7 +464,7 @@ mod tests {
     fn character_sheet_contains_key_info() {
         let abilities = [14, 10, 10, 12, 13, 10];
         let c = create_character_with(
-            "Grond", Class::Fighter, abilities, Alignment::Neutral, &mut test_rng(),
+            "Grond", "Fighter", abilities, Alignment::Neutral, &mut test_rng(),
         );
         let sheet = character_sheet(&c);
         assert!(sheet.contains("Grond"));
@@ -512,7 +510,7 @@ mod tests {
     fn serialization_with_new_fields() {
         let abilities = [10, 10, 10, 10, 10, 10];
         let c = create_character_with(
-            "SerTest", Class::Fighter, abilities, Alignment::Lawful, &mut test_rng(),
+            "SerTest", "Fighter", abilities, Alignment::Lawful, &mut test_rng(),
         );
         let json = serde_json::to_string(&c).unwrap();
         let c2: Character = serde_json::from_str(&json).unwrap();

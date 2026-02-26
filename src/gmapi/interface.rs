@@ -497,7 +497,7 @@ mod tests {
     use super::*;
     use crate::gmapi::protocol::EncounterParams;
     use crate::model::CombatState;
-    use crate::rules::class::Class;
+    
     use crate::state::game::GameMode;
     use crate::state::time::LightSourceKind;
     use crate::state::wilderness::Terrain;
@@ -544,7 +544,7 @@ mod tests {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
-            class: Class::Fighter.into(),
+            class: ClassId::new("Fighter"),
             alignment: AlignmentId::from_enum(Alignment::Lawful),
             abilities: None,
         }), &mut state);
@@ -637,7 +637,7 @@ mod tests {
     #[test]
     fn initiative_twice_without_action_rejected() {
         let mut state = GameState::new();
-        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        let mut c = crate::model::Character::new("Aldric", "Fighter");
         c.hp = 10;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -688,7 +688,7 @@ mod tests {
         assert_eq!(state.mode, GameMode::Exploration);
 
         // Add a character so we can enter combat
-        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        let mut c = crate::model::Character::new("Aldric", "Fighter");
         c.hp = 10;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -733,7 +733,7 @@ mod tests {
         // Create a character
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
-            class: Class::Fighter.into(),
+            class: ClassId::new("Fighter"),
             alignment: AlignmentId::from_enum(Alignment::Lawful),
             abilities: None,
         }), &mut state);
@@ -789,7 +789,7 @@ mod tests {
         // Create a character
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
-            class: Class::Fighter.into(),
+            class: ClassId::new("Fighter"),
             alignment: AlignmentId::from_enum(Alignment::Lawful),
             abilities: None,
         }), &mut state);
@@ -835,7 +835,7 @@ mod tests {
     #[test]
     fn retreat_without_character_auto_selects_sole_member() {
         let mut state = GameState::new();
-        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        let mut c = crate::model::Character::new("Aldric", "Fighter");
         c.hp = 100;
         c.max_hp = 100;
         state.party.add_member(c);
@@ -866,11 +866,11 @@ mod tests {
     #[test]
     fn retreat_without_character_errors_with_multiple_members() {
         let mut state = GameState::new();
-        let mut c1 = crate::model::Character::new("Aldric", Class::Fighter);
+        let mut c1 = crate::model::Character::new("Aldric", "Fighter");
         c1.hp = 10;
         c1.max_hp = 10;
         state.party.add_member(c1);
-        let mut c2 = crate::model::Character::new("Bran", Class::Fighter);
+        let mut c2 = crate::model::Character::new("Bran", "Fighter");
         c2.hp = 10;
         c2.max_hp = 10;
         state.party.add_member(c2);
@@ -901,7 +901,7 @@ mod tests {
     #[test]
     fn fighting_withdrawal_without_character_auto_selects() {
         let mut state = GameState::new();
-        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        let mut c = crate::model::Character::new("Aldric", "Fighter");
         c.hp = 10;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -1083,7 +1083,7 @@ mod tests {
     fn full_combat_sequence() {
         let mut state = GameState::new();
         // Add a character
-        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        let mut c = crate::model::Character::new("Aldric", "Fighter");
         c.hp = 10;
         c.max_hp = 10;
         c.thac0 = 19;
@@ -1128,7 +1128,7 @@ mod tests {
     fn close_command_integration() {
         let mut state = GameState::new();
         // Add a character
-        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        let mut c = crate::model::Character::new("Aldric", "Fighter");
         c.hp = 10;
         c.max_hp = 10;
         c.thac0 = 19;
@@ -1375,7 +1375,7 @@ mod tests {
         );
 
         // Add a character for combat
-        let mut c = crate::model::Character::new("Aldric", Class::Fighter);
+        let mut c = crate::model::Character::new("Aldric", "Fighter");
         c.hp = 10;
         c.max_hp = 10;
         state.party.add_member(c);
@@ -1520,7 +1520,7 @@ mod tests {
     #[test]
     fn heal_dead_character_rejected() {
         let mut state = GameState::new();
-        let mut c = crate::model::Character::new("Shadow", Class::Fighter);
+        let mut c = crate::model::Character::new("Shadow", "Fighter");
         c.hp = -1;
         c.max_hp = 6;
         state.party.add_member(c);

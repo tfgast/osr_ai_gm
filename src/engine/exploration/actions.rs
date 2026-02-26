@@ -497,7 +497,7 @@ pub fn action_look(state: &GameState) -> Result<LookResult, EngineError> {
 mod tests {
     use super::*;
     use crate::model::Character;
-    use crate::rules::class::Class;
+    
     use crate::state::dungeon::{DungeonState, Room};
     use crate::state::effect::{ActiveEffect, EffectDuration};
     use crate::state::time::LightSourceKind;
@@ -505,7 +505,7 @@ mod tests {
     /// Build a minimal GameState in Exploration mode with one party member.
     fn exploration_state() -> GameState {
         let mut state = GameState::new();
-        let mut ch = Character::new("Arden", Class::Fighter);
+        let mut ch = Character::new("Arden", "Fighter");
         ch.hp = 8;
         ch.max_hp = 8;
         state.party.add_member(ch);

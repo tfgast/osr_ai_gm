@@ -1,7 +1,7 @@
 use super::{Command, CommandResult};
 use crate::engine::retainers::{self as retainer_actions, results::HireRetainerMode};
 use crate::persist::GameState;
-use crate::rules::class::Class;
+use crate::rules::class::{ClassId, normalize_class_name};
 
 #[cfg(test)]
 use crate::engine::retainer::Retainer;
@@ -56,7 +56,7 @@ impl Command for HireCommand {
             );
         }
         let ret_name = args[0];
-        let class = match Class::parse(args[1]) {
+        let class = match normalize_class_name(args[1]) {
             Some(c) => c,
             None => return CommandResult::error(format!(
                 "unknown class '{}'. Use 'classes' to list available classes.", args[1]
@@ -66,7 +66,7 @@ impl Command for HireCommand {
         match retainer_actions::action_hire_retainer(
             state,
             ret_name,
-            class.into(),
+            ClassId::new(class),
             employer,
             1,
             HireRetainerMode::RecruitToParty,
@@ -151,11 +151,11 @@ impl Command for RetainerMoraleCommand {
 mod tests {
     use super::*;
     use crate::model::Character;
-    use crate::rules::class::Class;
+    
 
     fn state_with_party() -> GameState {
         let mut state = GameState::new();
-        let mut c = Character::new("Aldric", Class::Fighter);
+        let mut c = Character::new("Aldric", "Fighter");
         c.abilities.charisma = 14; // max retainers = 5, loyalty = 8
         state.party.add_member(c);
         state
@@ -191,7 +191,7 @@ mod tests {
         // CHA 14 => max 5 retainers
         for i in 0..5 {
             state.retainers.push(Retainer::new(
-                &format!("R{}", i), Class::Fighter, 1, 4, 7, 25,
+                &format!("R{}", i), "Fighter", 1, 4, 7, 25,
             ));
         }
         let cmd = HireCommand;
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn retainers_lists_members() {
         let mut state = GameState::new();
-        state.retainers.push(Retainer::new("Hrothgar", Class::Fighter, 1, 6, 7, 25));
+        state.retainers.push(Retainer::new("Hrothgar", "Fighter", 1, 6, 7, 25));
         let cmd = RetainersCommand;
         let result = cmd.execute(&[], &mut state);
         assert!(result.output.contains("Hrothgar"));
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn dismiss_removes_retainer() {
         let mut state = GameState::new();
-        state.retainers.push(Retainer::new("Hrothgar", Class::Fighter, 1, 6, 7, 25));
+        state.retainers.push(Retainer::new("Hrothgar", "Fighter", 1, 6, 7, 25));
         let cmd = DismissCommand;
         let result = cmd.execute(&["Hrothgar"], &mut state);
         assert!(result.output.contains("dismissed"));
@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn dismiss_case_insensitive() {
         let mut state = GameState::new();
-        state.retainers.push(Retainer::new("Hrothgar", Class::Fighter, 1, 6, 7, 25));
+        state.retainers.push(Retainer::new("Hrothgar", "Fighter", 1, 6, 7, 25));
         let cmd = DismissCommand;
         let result = cmd.execute(&["hrothgar"], &mut state);
         assert!(result.output.contains("dismissed"));
@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn unique_name_one_conflict() {
         let existing = vec![
-            Retainer::new("Torchbearer", Class::Fighter, 0, 4, 7, 25),
+            Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25),
         ];
         assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer 2");
     }
@@ -262,9 +262,9 @@ mod tests {
     #[test]
     fn unique_name_multiple_conflicts() {
         let existing = vec![
-            Retainer::new("Torchbearer", Class::Fighter, 0, 4, 7, 25),
-            Retainer::new("Torchbearer 2", Class::Fighter, 0, 4, 7, 25),
-            Retainer::new("Torchbearer 3", Class::Fighter, 0, 4, 7, 25),
+            Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer 2", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer 3", "Fighter", 0, 4, 7, 25),
         ];
         assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer 4");
     }
@@ -273,8 +273,8 @@ mod tests {
     fn unique_name_gap_in_numbering() {
         // If there's a gap (e.g., 1, 3 but no 2), use max+1
         let existing = vec![
-            Retainer::new("Torchbearer", Class::Fighter, 0, 4, 7, 25),
-            Retainer::new("Torchbearer 3", Class::Fighter, 0, 4, 7, 25),
+            Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Torchbearer 3", "Fighter", 0, 4, 7, 25),
         ];
         assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer 4");
     }
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn unique_name_case_insensitive() {
         let existing = vec![
-            Retainer::new("TORCHBEARER", Class::Fighter, 0, 4, 7, 25),
+            Retainer::new("TORCHBEARER", "Fighter", 0, 4, 7, 25),
         ];
         assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer 2");
     }
@@ -290,8 +290,8 @@ mod tests {
     #[test]
     fn unique_name_different_names_no_conflict() {
         let existing = vec![
-            Retainer::new("Guard", Class::Fighter, 0, 4, 7, 25),
-            Retainer::new("Porter", Class::Fighter, 0, 4, 7, 25),
+            Retainer::new("Guard", "Fighter", 0, 4, 7, 25),
+            Retainer::new("Porter", "Fighter", 0, 4, 7, 25),
         ];
         assert_eq!(unique_retainer_name("Torchbearer", &existing), "Torchbearer");
     }
@@ -299,9 +299,9 @@ mod tests {
     #[test]
     fn dismiss_numbered_retainer() {
         let mut state = GameState::new();
-        state.retainers.push(Retainer::new("Torchbearer", Class::Fighter, 0, 4, 7, 25));
-        state.retainers.push(Retainer::new("Torchbearer 2", Class::Fighter, 0, 4, 7, 25));
-        state.retainers.push(Retainer::new("Torchbearer 3", Class::Fighter, 0, 4, 7, 25));
+        state.retainers.push(Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25));
+        state.retainers.push(Retainer::new("Torchbearer 2", "Fighter", 0, 4, 7, 25));
+        state.retainers.push(Retainer::new("Torchbearer 3", "Fighter", 0, 4, 7, 25));
 
         let cmd = DismissCommand;
 
@@ -316,8 +316,8 @@ mod tests {
     #[test]
     fn morale_check_numbered_retainer() {
         let mut state = GameState::new();
-        state.retainers.push(Retainer::new("Torchbearer", Class::Fighter, 0, 4, 7, 25));
-        state.retainers.push(Retainer::new("Torchbearer 2", Class::Fighter, 0, 4, 7, 25));
+        state.retainers.push(Retainer::new("Torchbearer", "Fighter", 0, 4, 7, 25));
+        state.retainers.push(Retainer::new("Torchbearer 2", "Fighter", 0, 4, 7, 25));
 
         let cmd = RetainerMoraleCommand;
 

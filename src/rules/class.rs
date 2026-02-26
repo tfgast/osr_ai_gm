@@ -7,107 +7,55 @@ use serde::{Deserialize, Serialize};
 use super::save::{SaveCategory, SaveCategoryId};
 use super::spell::{SpellProgression, SpellListType};
 
-/// All 22 character classes (7 B/X + 15 Advanced Fantasy).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Class {
-    Acrobat,
-    Assassin,
-    Barbarian,
-    Bard,
-    Cleric,
-    Drow,
-    Druid,
-    Duergar,
-    Dwarf,
-    Elf,
-    Fighter,
-    Gnome,
-    #[serde(rename = "Half-Elf", alias = "HalfElf")]
-    HalfElf,
-    Halfling,
-    #[serde(rename = "Half-Orc", alias = "HalfOrc")]
-    HalfOrc,
-    Illusionist,
-    Knight,
-    #[serde(rename = "Magic-User", alias = "MagicUser")]
-    MagicUser,
-    Paladin,
-    Ranger,
-    Svirfneblin,
-    Thief,
-}
+// ── Canonical class names ────────────────────────────────────
 
-impl Class {
-    /// All classes in alphabetical order.
-    pub const ALL: [Class; 22] = [
-        Class::Acrobat, Class::Assassin, Class::Barbarian, Class::Bard,
-        Class::Cleric, Class::Drow, Class::Druid, Class::Duergar,
-        Class::Dwarf, Class::Elf, Class::Fighter, Class::Gnome,
-        Class::HalfElf, Class::Halfling, Class::HalfOrc, Class::Illusionist,
-        Class::Knight, Class::MagicUser, Class::Paladin, Class::Ranger,
-        Class::Svirfneblin, Class::Thief,
-    ];
+/// All 22 canonical class names in alphabetical order.
+pub const CANONICAL_CLASS_NAMES: [&str; 22] = [
+    "Acrobat", "Assassin", "Barbarian", "Bard", "Cleric", "Drow",
+    "Druid", "Duergar", "Dwarf", "Elf", "Fighter", "Gnome",
+    "Half-Elf", "Halfling", "Half-Orc", "Illusionist", "Knight",
+    "Magic-User", "Paladin", "Ranger", "Svirfneblin", "Thief",
+];
 
-    pub fn name(self) -> &'static str {
-        match self {
-            Class::Acrobat => "Acrobat",
-            Class::Assassin => "Assassin",
-            Class::Barbarian => "Barbarian",
-            Class::Bard => "Bard",
-            Class::Cleric => "Cleric",
-            Class::Drow => "Drow",
-            Class::Druid => "Druid",
-            Class::Duergar => "Duergar",
-            Class::Dwarf => "Dwarf",
-            Class::Elf => "Elf",
-            Class::Fighter => "Fighter",
-            Class::Gnome => "Gnome",
-            Class::HalfElf => "Half-Elf",
-            Class::Halfling => "Halfling",
-            Class::HalfOrc => "Half-Orc",
-            Class::Illusionist => "Illusionist",
-            Class::Knight => "Knight",
-            Class::MagicUser => "Magic-User",
-            Class::Paladin => "Paladin",
-            Class::Ranger => "Ranger",
-            Class::Svirfneblin => "Svirfneblin",
-            Class::Thief => "Thief",
-        }
-    }
-
-    /// Parse class name (case-insensitive, accepts common variants).
-    pub fn parse(s: &str) -> Option<Class> {
-        match s.to_lowercase().replace(['-', '_', ' '], "").as_str() {
-            "acrobat" => Some(Class::Acrobat),
-            "assassin" => Some(Class::Assassin),
-            "barbarian" => Some(Class::Barbarian),
-            "bard" => Some(Class::Bard),
-            "cleric" => Some(Class::Cleric),
-            "drow" => Some(Class::Drow),
-            "druid" => Some(Class::Druid),
-            "duergar" => Some(Class::Duergar),
-            "dwarf" => Some(Class::Dwarf),
-            "elf" => Some(Class::Elf),
-            "fighter" => Some(Class::Fighter),
-            "gnome" => Some(Class::Gnome),
-            "halfelf" => Some(Class::HalfElf),
-            "halfling" => Some(Class::Halfling),
-            "halforc" => Some(Class::HalfOrc),
-            "illusionist" => Some(Class::Illusionist),
-            "knight" => Some(Class::Knight),
-            "magicuser" | "mu" | "mage" | "wizard" => Some(Class::MagicUser),
-            "paladin" => Some(Class::Paladin),
-            "ranger" => Some(Class::Ranger),
-            "svirfneblin" | "deepgnome" => Some(Class::Svirfneblin),
-            "thief" => Some(Class::Thief),
-            _ => None,
-        }
+/// Normalize a class name string to canonical form (case-insensitive,
+/// accepts common variants like "MU", "magic user", "half-elf").
+/// Returns `None` for unknown/homebrew class names.
+pub fn normalize_class_name(s: &str) -> Option<&'static str> {
+    match s.to_lowercase().replace(['-', '_', ' '], "").as_str() {
+        "acrobat" => Some("Acrobat"),
+        "assassin" => Some("Assassin"),
+        "barbarian" => Some("Barbarian"),
+        "bard" => Some("Bard"),
+        "cleric" => Some("Cleric"),
+        "drow" => Some("Drow"),
+        "druid" => Some("Druid"),
+        "duergar" => Some("Duergar"),
+        "dwarf" => Some("Dwarf"),
+        "elf" => Some("Elf"),
+        "fighter" => Some("Fighter"),
+        "gnome" => Some("Gnome"),
+        "halfelf" => Some("Half-Elf"),
+        "halfling" => Some("Halfling"),
+        "halforc" => Some("Half-Orc"),
+        "illusionist" => Some("Illusionist"),
+        "knight" => Some("Knight"),
+        "magicuser" | "mu" | "mage" | "wizard" => Some("Magic-User"),
+        "paladin" => Some("Paladin"),
+        "ranger" => Some("Ranger"),
+        "svirfneblin" | "deepgnome" => Some("Svirfneblin"),
+        "thief" => Some("Thief"),
+        _ => None,
     }
 }
 
-impl std::fmt::Display for Class {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.name())
+/// Map a canonical class display name to its DSL enum variant name.
+/// Most names are identical; only hyphenated/multi-word names differ.
+pub fn canonical_to_dsl_variant(name: &str) -> &str {
+    match name {
+        "Half-Elf" => "HalfElf",
+        "Half-Orc" => "HalfOrc",
+        "Magic-User" => "MagicUser",
+        _ => name,
     }
 }
 
@@ -123,25 +71,14 @@ pub struct ClassId(Arc<str>);
 
 impl ClassId {
     /// Create a ClassId, normalizing to canonical form.
-    /// Known classes (the core 22) are normalized via `Class::parse()`.
+    /// Known classes (the core 22) are normalized via `normalize_class_name()`.
     /// Unknown names (module/homebrew classes) are stored as-is.
     pub fn new(s: &str) -> Self {
-        if let Some(class) = Class::parse(s) {
-            ClassId(Arc::from(class.name()))
+        if let Some(canonical) = normalize_class_name(s) {
+            ClassId(Arc::from(canonical))
         } else {
             ClassId(Arc::from(s))
         }
-    }
-
-    /// Create a ClassId from a `Class` enum variant.
-    pub fn from_enum(class: Class) -> Self {
-        ClassId(Arc::from(class.name()))
-    }
-
-    /// Try to resolve this ClassId back to a `Class` enum variant.
-    /// Returns `None` for module/homebrew classes not in the core 22.
-    pub fn to_enum(&self) -> Option<Class> {
-        Class::parse(&self.0)
     }
 
     /// The canonical string form of this class identifier.
@@ -149,7 +86,7 @@ impl ClassId {
         &self.0
     }
 
-    /// Display name for this class (same as as_str, provided for API parity with Class).
+    /// Display name for this class (same as as_str, provided for API parity).
     pub fn name(&self) -> &str {
         &self.0
     }
@@ -158,12 +95,6 @@ impl ClassId {
 impl std::fmt::Display for ClassId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
-    }
-}
-
-impl From<Class> for ClassId {
-    fn from(class: Class) -> Self {
-        ClassId::from_enum(class)
     }
 }
 
@@ -201,7 +132,7 @@ pub type AbilityModifier = (usize, i32);
 /// Static definition of a character class.
 #[derive(Debug, Clone)]
 pub struct ClassDef {
-    pub class: Class,
+    pub class_id: ClassId,
     pub hit_die: u32,
     pub combat_aptitude: CombatAptitude,
     pub prime_requisites: &'static [usize], // ability indices
@@ -220,7 +151,7 @@ pub struct ClassDef {
     pub has_thief_skills: bool,
     pub can_backstab: bool,
     pub can_turn_undead: bool,
-    pub bx_equivalent: Option<Class>,
+    pub bx_equivalent: Option<ClassId>,
 }
 
 /// Ability index constants.
@@ -232,27 +163,21 @@ pub const CON: usize = 4;
 pub const CHA: usize = 5;
 
 /// Get the full class definition for a given class by ClassId.
-/// Resolves to the enum variant internally for DSL/native lookup.
 pub fn class_def(id: &ClassId) -> ClassDef {
-    let class = id.to_enum().unwrap_or_else(|| panic!("unknown class: {}", id));
-    class_def_enum(class)
-}
-
-/// Internal: get class def by enum variant (used by registry build and DSL gate).
-fn class_def_enum(class: Class) -> ClassDef {
+    let name = id.as_str();
     #[cfg(feature = "dsl-backend")]
     if crate::backend::is_dsl(crate::backend::MechanicGroup::Class) {
-        if let Some(def) = dsl_gate::dsl_class_def(class) {
+        if let Some(def) = dsl_gate::dsl_class_def(name) {
             return def;
         }
     }
-    native_class_def(class)
+    native_class_def(name)
 }
 
-fn native_class_def(class: Class) -> ClassDef {
-    match class {
-        Class::Acrobat => ClassDef {
-            class, hit_die: 4,
+fn native_class_def(name: &str) -> ClassDef {
+    match name {
+        "Acrobat" => ClassDef {
+            class_id: ClassId::new("Acrobat"), hit_die: 4,
             combat_aptitude: CombatAptitude::SemiMartial,
             prime_requisites: &[DEX],
             requirements: &[(DEX, 9)],
@@ -264,10 +189,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: true, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Thief),
+            bx_equivalent: Some(ClassId::new("Thief")),
         },
-        Class::Assassin => ClassDef {
-            class, hit_die: 4,
+        "Assassin" => ClassDef {
+            class_id: ClassId::new("Assassin"), hit_die: 4,
             combat_aptitude: CombatAptitude::SemiMartial,
             prime_requisites: &[DEX],
             requirements: &[(DEX, 9)],
@@ -279,10 +204,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: true, can_backstab: true, can_turn_undead: false,
-            bx_equivalent: Some(Class::Thief),
+            bx_equivalent: Some(ClassId::new("Thief")),
         },
-        Class::Barbarian => ClassDef {
-            class, hit_die: 8,
+        "Barbarian" => ClassDef {
+            class_id: ClassId::new("Barbarian"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR],
             requirements: &[(STR, 9), (DEX, 9), (CON, 9)],
@@ -294,10 +219,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Fighter),
+            bx_equivalent: Some(ClassId::new("Fighter")),
         },
-        Class::Bard => ClassDef {
-            class, hit_die: 6,
+        "Bard" => ClassDef {
+            class_id: ClassId::new("Bard"), hit_die: 6,
             combat_aptitude: CombatAptitude::SemiMartial,
             prime_requisites: &[CHA],
             requirements: &[(DEX, 9), (CHA, 9)],
@@ -309,10 +234,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: true, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Thief),
+            bx_equivalent: Some(ClassId::new("Thief")),
         },
-        Class::Cleric => ClassDef {
-            class, hit_die: 6,
+        "Cleric" => ClassDef {
+            class_id: ClassId::new("Cleric"), hit_die: 6,
             combat_aptitude: CombatAptitude::SemiMartial,
             prime_requisites: &[WIS],
             requirements: &[],
@@ -326,8 +251,8 @@ fn native_class_def(class: Class) -> ClassDef {
             has_thief_skills: false, can_backstab: false, can_turn_undead: true,
             bx_equivalent: None,
         },
-        Class::Drow => ClassDef {
-            class, hit_die: 6,
+        "Drow" => ClassDef {
+            class_id: ClassId::new("Drow"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR, INT],
             requirements: &[(INT, 9)],
@@ -339,10 +264,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::DrowArcaneAndDivine,
             starting_gold: "3d6x10", is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Elf),
+            bx_equivalent: Some(ClassId::new("Elf")),
         },
-        Class::Druid => ClassDef {
-            class, hit_die: 6,
+        "Druid" => ClassDef {
+            class_id: ClassId::new("Druid"), hit_die: 6,
             combat_aptitude: CombatAptitude::SemiMartial,
             prime_requisites: &[WIS],
             requirements: &[],
@@ -354,10 +279,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Cleric),
+            bx_equivalent: Some(ClassId::new("Cleric")),
         },
-        Class::Duergar => ClassDef {
-            class, hit_die: 8,
+        "Duergar" => ClassDef {
+            class_id: ClassId::new("Duergar"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR],
             requirements: &[(INT, 9), (CON, 9)],
@@ -369,10 +294,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Dwarf),
+            bx_equivalent: Some(ClassId::new("Dwarf")),
         },
-        Class::Dwarf => ClassDef {
-            class, hit_die: 8,
+        "Dwarf" => ClassDef {
+            class_id: ClassId::new("Dwarf"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR],
             requirements: &[(CON, 9)],
@@ -386,8 +311,8 @@ fn native_class_def(class: Class) -> ClassDef {
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
-        Class::Elf => ClassDef {
-            class, hit_die: 6,
+        "Elf" => ClassDef {
+            class_id: ClassId::new("Elf"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR, INT],
             requirements: &[(INT, 9)],
@@ -401,8 +326,8 @@ fn native_class_def(class: Class) -> ClassDef {
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
-        Class::Fighter => ClassDef {
-            class, hit_die: 8,
+        "Fighter" => ClassDef {
+            class_id: ClassId::new("Fighter"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR],
             requirements: &[],
@@ -416,8 +341,8 @@ fn native_class_def(class: Class) -> ClassDef {
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
-        Class::Gnome => ClassDef {
-            class, hit_die: 6,
+        "Gnome" => ClassDef {
+            class_id: ClassId::new("Gnome"), hit_die: 6,
             combat_aptitude: CombatAptitude::NonMartial,
             prime_requisites: &[DEX, INT],
             requirements: &[(INT, 9), (CON, 9)],
@@ -429,10 +354,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Halfling),
+            bx_equivalent: Some(ClassId::new("Halfling")),
         },
-        Class::HalfElf => ClassDef {
-            class, hit_die: 6,
+        "Half-Elf" => ClassDef {
+            class_id: ClassId::new("Half-Elf"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR, INT],
             requirements: &[(CON, 9), (CHA, 9)],
@@ -444,10 +369,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::MagicUser,
             starting_gold: "3d6x10", is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Elf),
+            bx_equivalent: Some(ClassId::new("Elf")),
         },
-        Class::Halfling => ClassDef {
-            class, hit_die: 6,
+        "Halfling" => ClassDef {
+            class_id: ClassId::new("Halfling"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR, DEX],
             requirements: &[(CON, 9), (DEX, 9)],
@@ -461,8 +386,8 @@ fn native_class_def(class: Class) -> ClassDef {
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
-        Class::HalfOrc => ClassDef {
-            class, hit_die: 6,
+        "Half-Orc" => ClassDef {
+            class_id: ClassId::new("Half-Orc"), hit_die: 6,
             combat_aptitude: CombatAptitude::SemiMartial,
             prime_requisites: &[STR, DEX],
             requirements: &[],
@@ -474,10 +399,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
             has_thief_skills: true, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Dwarf),
+            bx_equivalent: Some(ClassId::new("Dwarf")),
         },
-        Class::Illusionist => ClassDef {
-            class, hit_die: 4,
+        "Illusionist" => ClassDef {
+            class_id: ClassId::new("Illusionist"), hit_die: 4,
             combat_aptitude: CombatAptitude::NonMartial,
             prime_requisites: &[INT],
             requirements: &[(DEX, 9), (INT, 9)],
@@ -489,10 +414,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::MagicUser),
+            bx_equivalent: Some(ClassId::new("Magic-User")),
         },
-        Class::Knight => ClassDef {
-            class, hit_die: 8,
+        "Knight" => ClassDef {
+            class_id: ClassId::new("Knight"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR],
             requirements: &[(STR, 9), (CHA, 9)],
@@ -504,10 +429,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Fighter),
+            bx_equivalent: Some(ClassId::new("Fighter")),
         },
-        Class::MagicUser => ClassDef {
-            class, hit_die: 4,
+        "Magic-User" => ClassDef {
+            class_id: ClassId::new("Magic-User"), hit_die: 4,
             combat_aptitude: CombatAptitude::NonMartial,
             prime_requisites: &[INT],
             requirements: &[],
@@ -521,8 +446,8 @@ fn native_class_def(class: Class) -> ClassDef {
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
             bx_equivalent: None,
         },
-        Class::Paladin => ClassDef {
-            class, hit_die: 8,
+        "Paladin" => ClassDef {
+            class_id: ClassId::new("Paladin"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR],
             requirements: &[(CHA, 9)],
@@ -534,10 +459,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::Cleric,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: true,
-            bx_equivalent: Some(Class::Fighter),
+            bx_equivalent: Some(ClassId::new("Fighter")),
         },
-        Class::Ranger => ClassDef {
-            class, hit_die: 8,
+        "Ranger" => ClassDef {
+            class_id: ClassId::new("Ranger"), hit_die: 8,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[STR],
             requirements: &[(STR, 9), (WIS, 9)],
@@ -549,10 +474,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Fighter),
+            bx_equivalent: Some(ClassId::new("Fighter")),
         },
-        Class::Svirfneblin => ClassDef {
-            class, hit_die: 6,
+        "Svirfneblin" => ClassDef {
+            class_id: ClassId::new("Svirfneblin"), hit_die: 6,
             combat_aptitude: CombatAptitude::Martial,
             prime_requisites: &[DEX, INT],
             requirements: &[(CON, 9)],
@@ -564,10 +489,10 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: true,
             has_thief_skills: false, can_backstab: false, can_turn_undead: false,
-            bx_equivalent: Some(Class::Halfling),
+            bx_equivalent: Some(ClassId::new("Halfling")),
         },
-        Class::Thief => ClassDef {
-            class, hit_die: 4,
+        "Thief" => ClassDef {
+            class_id: ClassId::new("Thief"), hit_die: 4,
             combat_aptitude: CombatAptitude::SemiMartial,
             prime_requisites: &[DEX],
             requirements: &[],
@@ -581,16 +506,16 @@ fn native_class_def(class: Class) -> ClassDef {
             has_thief_skills: true, can_backstab: true, can_turn_undead: false,
             bx_equivalent: None,
         },
+        _ => panic!("unknown class: {}", name),
     }
 }
 
 /// Check if a set of ability scores meets the requirements for a class.
 /// Abilities array: [STR, INT, WIS, DEX, CON, CHA] (after racial modifiers).
 pub fn meets_requirements(id: &ClassId, abilities: &[i32; 6]) -> bool {
-    let _class = id.to_enum().unwrap_or_else(|| panic!("unknown class: {}", id));
     #[cfg(feature = "dsl-backend")]
     if crate::backend::is_dsl(crate::backend::MechanicGroup::Class) {
-        if let Some(val) = dsl_gate::dsl_meets_requirements(_class, abilities) {
+        if let Some(val) = dsl_gate::dsl_meets_requirements(id.as_str(), abilities) {
             return val;
         }
     }
@@ -615,10 +540,9 @@ pub fn apply_racial_modifiers(id: &ClassId, abilities: &mut [i32; 6]) {
 /// Get all classes that a given set of abilities qualifies for.
 /// For demihuman classes, racial modifiers are applied before checking requirements.
 pub fn eligible_classes(abilities: &[i32; 6]) -> Vec<ClassId> {
-    Class::ALL.iter()
-        .copied()
-        .filter(|&c| {
-            let id = ClassId::from_enum(c);
+    CANONICAL_CLASS_NAMES.iter()
+        .filter(|&&name| {
+            let id = ClassId::new(name);
             let def = class_def(&id);
             if def.racial_modifiers.is_empty() {
                 meets_requirements(&id, abilities)
@@ -628,7 +552,7 @@ pub fn eligible_classes(abilities: &[i32; 6]) -> Vec<ClassId> {
                 meets_requirements(&id, &modified)
             }
         })
-        .map(ClassId::from_enum)
+        .map(|&name| ClassId::new(name))
         .collect()
 }
 
@@ -663,10 +587,10 @@ mod dsl_gate {
         fn handle(&mut self, _: Effect) -> Response { Response::Acknowledged }
     }
 
-    fn class_to_dsl(class: Class) -> Value {
+    fn class_to_dsl(name: &str) -> Value {
         Value::EnumVariant {
             enum_name: "Class".into(),
-            variant: Name::from(format!("{:?}", class)),
+            variant: Name::from(canonical_to_dsl_variant(name)),
             fields: BTreeMap::new(),
         }
     }
@@ -743,9 +667,9 @@ mod dsl_gate {
         }
     }
 
-    pub fn dsl_class_def(class: Class) -> Option<ClassDef> {
+    pub fn dsl_class_def(name: &str) -> Option<ClassDef> {
         let rt = backend::dsl()?;
-        let args = vec![class_to_dsl(class)];
+        let args = vec![class_to_dsl(name)];
         let result = rt.evaluate_derive(&NullState, &mut NullHandler, "class_def", args).ok()?;
 
         let fields = match &result {
@@ -765,7 +689,7 @@ mod dsl_gate {
         let spell_list = parse_spell_list(dsl_variant(fields, "spell_list")?)?;
         let is_demihuman = dsl_bool(fields, "is_demihuman")?;
 
-        // Capability tags (new fields from extended ClassDef)
+        // Capability tags
         let has_thief_skills = dsl_bool(fields, "has_thief_skills")?;
         let can_backstab = dsl_bool(fields, "can_backstab")?;
         let can_turn_undead = dsl_bool(fields, "can_turn_undead")?;
@@ -773,19 +697,20 @@ mod dsl_gate {
             Some(Value::EnumVariant { variant, .. }) => {
                 // DSL uses bare Class (not option<Class>). Self-mapping means
                 // "this IS a B/X class" → None. Different class → Some(equivalent).
-                match Class::parse(variant.as_str()) {
-                    Some(equiv) if equiv == class => None,
-                    other => other,
+                match normalize_class_name(variant.as_str()) {
+                    Some(equiv_name) if equiv_name == name => None,
+                    Some(equiv_name) => Some(ClassId::new(equiv_name)),
+                    None => None,
                 }
             }
             _ => None,
         };
 
         // Fields not in DSL — backfill from native
-        let native = native_class_def(class);
+        let native = native_class_def(name);
 
         Some(ClassDef {
-            class,
+            class_id: ClassId::new(name),
             hit_die,
             combat_aptitude,
             prime_requisites: native.prime_requisites,
@@ -807,23 +732,23 @@ mod dsl_gate {
         })
     }
 
-    pub fn dsl_meets_requirements(class: Class, abilities: &[i32; 6]) -> Option<bool> {
+    pub fn dsl_meets_requirements(name: &str, abilities: &[i32; 6]) -> Option<bool> {
         let rt = backend::dsl()?;
 
         // Build DSL map<Ability, int> from ability array
         let ability_names = ["STR", "INT", "WIS", "DEX", "CON", "CHA"];
         let mut ability_map = BTreeMap::new();
-        for (i, &name) in ability_names.iter().enumerate() {
+        for (i, &aname) in ability_names.iter().enumerate() {
             let key = Value::EnumVariant {
                 enum_name: "Ability".into(),
-                variant: Name::from(name),
+                variant: Name::from(aname),
                 fields: BTreeMap::new(),
             };
             ability_map.insert(key, Value::Int(abilities[i] as i64));
         }
 
         let args = vec![
-            class_to_dsl(class),
+            class_to_dsl(name),
             Value::Map(ability_map),
         ];
         let result = rt.evaluate_derive(&NullState, &mut NullHandler, "meets_requirements", args).ok()?;
@@ -844,26 +769,19 @@ pub struct ClassRegistry {
 }
 
 impl ClassRegistry {
-    /// Build the registry by evaluating DSL class_def for each Class variant.
-    /// Falls back to native_class_def if DSL is unavailable or evaluation fails.
+    /// Build the registry by evaluating class_def for each canonical class name.
     fn build() -> Self {
-        let mut classes = Vec::with_capacity(Class::ALL.len());
-        let mut by_name = std::collections::HashMap::with_capacity(Class::ALL.len());
+        let mut classes = Vec::with_capacity(CANONICAL_CLASS_NAMES.len());
+        let mut by_name = std::collections::HashMap::with_capacity(CANONICAL_CLASS_NAMES.len());
 
-        for &class in &Class::ALL {
-            let def = class_def_enum(class);
-            by_name.insert(class.name().to_string(), classes.len());
+        for &name in &CANONICAL_CLASS_NAMES {
+            let id = ClassId::new(name);
+            let def = class_def(&id);
+            by_name.insert(name.to_string(), classes.len());
             classes.push(def);
         }
 
         ClassRegistry { classes, by_name }
-    }
-
-    /// Look up a class definition by Class enum variant.
-    pub fn get(&self, class: Class) -> &ClassDef {
-        // Safe: registry is built from Class::ALL which covers all variants
-        let idx = self.by_name[class.name()];
-        &self.classes[idx]
     }
 
     /// Look up a class definition by name (case-sensitive, display name).
@@ -894,26 +812,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn class_count() {
-        assert_eq!(Class::ALL.len(), 22);
+    fn canonical_class_count() {
+        assert_eq!(CANONICAL_CLASS_NAMES.len(), 22);
     }
 
     #[test]
-    fn parse_classes() {
-        assert_eq!(Class::parse("fighter"), Some(Class::Fighter));
-        assert_eq!(Class::parse("Magic-User"), Some(Class::MagicUser));
-        assert_eq!(Class::parse("magic user"), Some(Class::MagicUser));
-        assert_eq!(Class::parse("MU"), Some(Class::MagicUser));
-        assert_eq!(Class::parse("half-elf"), Some(Class::HalfElf));
-        assert_eq!(Class::parse("halfelf"), Some(Class::HalfElf));
-        assert_eq!(Class::parse("svirfneblin"), Some(Class::Svirfneblin));
-        assert_eq!(Class::parse("deep gnome"), Some(Class::Svirfneblin));
-        assert_eq!(Class::parse("nonsense"), None);
+    fn normalize_class_names() {
+        assert_eq!(normalize_class_name("fighter"), Some("Fighter"));
+        assert_eq!(normalize_class_name("Magic-User"), Some("Magic-User"));
+        assert_eq!(normalize_class_name("magic user"), Some("Magic-User"));
+        assert_eq!(normalize_class_name("MU"), Some("Magic-User"));
+        assert_eq!(normalize_class_name("half-elf"), Some("Half-Elf"));
+        assert_eq!(normalize_class_name("halfelf"), Some("Half-Elf"));
+        assert_eq!(normalize_class_name("svirfneblin"), Some("Svirfneblin"));
+        assert_eq!(normalize_class_name("deep gnome"), Some("Svirfneblin"));
+        assert_eq!(normalize_class_name("nonsense"), None);
     }
 
     #[test]
     fn fighter_def() {
-        let def = class_def(&ClassId::from_enum(Class::Fighter));
+        let def = class_def(&ClassId::new("Fighter"));
         assert_eq!(def.hit_die, 8);
         assert_eq!(def.combat_aptitude, CombatAptitude::Martial);
         assert_eq!(def.max_level, 14);
@@ -924,7 +842,7 @@ mod tests {
 
     #[test]
     fn magic_user_def() {
-        let def = class_def(&ClassId::from_enum(Class::MagicUser));
+        let def = class_def(&ClassId::new("Magic-User"));
         assert_eq!(def.hit_die, 4);
         assert_eq!(def.combat_aptitude, CombatAptitude::NonMartial);
         assert_eq!(def.armour, ArmourPermission::None);
@@ -934,7 +852,7 @@ mod tests {
 
     #[test]
     fn dwarf_def() {
-        let def = class_def(&ClassId::from_enum(Class::Dwarf));
+        let def = class_def(&ClassId::new("Dwarf"));
         assert_eq!(def.hit_die, 8);
         assert!(def.is_demihuman);
         assert_eq!(def.max_level, 12);
@@ -947,61 +865,61 @@ mod tests {
         use CombatAptitude::*;
         // Per OSE Reference Booklet p19
         let martial = [
-            Class::Barbarian, Class::Drow, Class::Duergar, Class::Dwarf,
-            Class::Elf, Class::HalfElf, Class::Halfling, Class::Knight,
-            Class::Paladin, Class::Ranger, Class::Svirfneblin,
+            "Barbarian", "Drow", "Duergar", "Dwarf",
+            "Elf", "Half-Elf", "Halfling", "Knight",
+            "Paladin", "Ranger", "Svirfneblin",
         ];
         let semi = [
-            Class::Acrobat, Class::Assassin, Class::Bard,
-            Class::Cleric, Class::Druid, Class::HalfOrc, Class::Thief,
+            "Acrobat", "Assassin", "Bard",
+            "Cleric", "Druid", "Half-Orc", "Thief",
         ];
-        let non = [Class::Gnome, Class::Illusionist, Class::MagicUser];
+        let non = ["Gnome", "Illusionist", "Magic-User"];
         // Also Fighter is martial
-        assert_eq!(class_def(&ClassId::from_enum(Class::Fighter)).combat_aptitude, Martial);
+        assert_eq!(class_def(&ClassId::new("Fighter")).combat_aptitude, Martial);
 
-        for c in martial { assert_eq!(class_def(&ClassId::from_enum(c)).combat_aptitude, Martial, "{:?}", c); }
-        for c in semi { assert_eq!(class_def(&ClassId::from_enum(c)).combat_aptitude, SemiMartial, "{:?}", c); }
-        for c in non { assert_eq!(class_def(&ClassId::from_enum(c)).combat_aptitude, NonMartial, "{:?}", c); }
+        for name in martial { assert_eq!(class_def(&ClassId::new(name)).combat_aptitude, Martial, "{}", name); }
+        for name in semi { assert_eq!(class_def(&ClassId::new(name)).combat_aptitude, SemiMartial, "{}", name); }
+        for name in non { assert_eq!(class_def(&ClassId::new(name)).combat_aptitude, NonMartial, "{}", name); }
     }
 
     #[test]
     fn meets_fighter_requirements() {
         let abilities = [10, 10, 10, 10, 10, 10];
-        assert!(meets_requirements(&ClassId::from_enum(Class::Fighter), &abilities));
+        assert!(meets_requirements(&ClassId::new("Fighter"), &abilities));
     }
 
     #[test]
     fn meets_barbarian_requirements() {
         // Barbarian needs STR 9, DEX 9, CON 9
-        assert!(meets_requirements(&ClassId::from_enum(Class::Barbarian), &[9, 10, 10, 9, 9, 10]));
-        assert!(!meets_requirements(&ClassId::from_enum(Class::Barbarian), &[8, 10, 10, 9, 9, 10]));
-        assert!(!meets_requirements(&ClassId::from_enum(Class::Barbarian), &[9, 10, 10, 8, 9, 10]));
+        assert!(meets_requirements(&ClassId::new("Barbarian"), &[9, 10, 10, 9, 9, 10]));
+        assert!(!meets_requirements(&ClassId::new("Barbarian"), &[8, 10, 10, 9, 9, 10]));
+        assert!(!meets_requirements(&ClassId::new("Barbarian"), &[9, 10, 10, 8, 9, 10]));
     }
 
     #[test]
     fn meets_dwarf_requirements() {
-        assert!(meets_requirements(&ClassId::from_enum(Class::Dwarf), &[10, 10, 10, 10, 9, 10]));
-        assert!(!meets_requirements(&ClassId::from_enum(Class::Dwarf), &[10, 10, 10, 10, 8, 10]));
+        assert!(meets_requirements(&ClassId::new("Dwarf"), &[10, 10, 10, 10, 9, 10]));
+        assert!(!meets_requirements(&ClassId::new("Dwarf"), &[10, 10, 10, 10, 8, 10]));
     }
 
     #[test]
     fn apply_dwarf_modifiers() {
         let mut abilities = [10, 10, 10, 10, 10, 10];
-        apply_racial_modifiers(&ClassId::from_enum(Class::Dwarf), &mut abilities);
+        apply_racial_modifiers(&ClassId::new("Dwarf"), &mut abilities);
         assert_eq!(abilities, [10, 10, 10, 10, 11, 9]); // CON+1, CHA-1
     }
 
     #[test]
     fn apply_halfling_modifiers() {
         let mut abilities = [10, 10, 10, 10, 10, 10];
-        apply_racial_modifiers(&ClassId::from_enum(Class::Halfling), &mut abilities);
+        apply_racial_modifiers(&ClassId::new("Halfling"), &mut abilities);
         assert_eq!(abilities, [9, 10, 10, 11, 10, 10]); // STR-1, DEX+1
     }
 
     #[test]
     fn apply_modifier_clamping() {
         let mut abilities = [3, 10, 10, 10, 10, 10];
-        apply_racial_modifiers(&ClassId::from_enum(Class::Halfling), &mut abilities);
+        apply_racial_modifiers(&ClassId::new("Halfling"), &mut abilities);
         assert_eq!(abilities[0], 3); // STR can't go below 3
     }
 
@@ -1010,12 +928,12 @@ mod tests {
         let abilities = [10, 10, 10, 10, 10, 10];
         let eligible = eligible_classes(&abilities);
         // Should include Fighter, Cleric, MU, Thief, etc.
-        assert!(eligible.contains(&ClassId::from_enum(Class::Fighter)));
-        assert!(eligible.contains(&ClassId::from_enum(Class::Cleric)));
-        assert!(eligible.contains(&ClassId::from_enum(Class::MagicUser)));
-        assert!(eligible.contains(&ClassId::from_enum(Class::Thief)));
+        assert!(eligible.contains(&ClassId::new("Fighter")));
+        assert!(eligible.contains(&ClassId::new("Cleric")));
+        assert!(eligible.contains(&ClassId::new("Magic-User")));
+        assert!(eligible.contains(&ClassId::new("Thief")));
         // Should not include classes with CON 9 requirement if CON is 10
-        assert!(eligible.contains(&ClassId::from_enum(Class::Dwarf)));
+        assert!(eligible.contains(&ClassId::new("Dwarf")));
     }
 
     #[test]
@@ -1023,54 +941,51 @@ mod tests {
         let abilities = [3, 3, 3, 3, 3, 3];
         let eligible = eligible_classes(&abilities);
         // Only classes with no requirements
-        assert!(eligible.contains(&ClassId::from_enum(Class::Fighter)));
-        assert!(eligible.contains(&ClassId::from_enum(Class::Cleric)));
-        assert!(eligible.contains(&ClassId::from_enum(Class::MagicUser)));
-        assert!(eligible.contains(&ClassId::from_enum(Class::Thief)));
-        assert!(!eligible.contains(&ClassId::from_enum(Class::Dwarf))); // needs CON 9
-        assert!(!eligible.contains(&ClassId::from_enum(Class::Barbarian))); // needs STR/DEX/CON 9
+        assert!(eligible.contains(&ClassId::new("Fighter")));
+        assert!(eligible.contains(&ClassId::new("Cleric")));
+        assert!(eligible.contains(&ClassId::new("Magic-User")));
+        assert!(eligible.contains(&ClassId::new("Thief")));
+        assert!(!eligible.contains(&ClassId::new("Dwarf"))); // needs CON 9
+        assert!(!eligible.contains(&ClassId::new("Barbarian"))); // needs STR/DEX/CON 9
     }
 
     // ── Capability tag tests ──────────────────────────────────
 
     #[test]
     fn has_thief_skills_tags() {
-        let thief_classes = [
-            Class::Thief, Class::Acrobat, Class::Assassin,
-            Class::HalfOrc, Class::Bard,
-        ];
-        for c in Class::ALL {
-            let def = class_def(&ClassId::from_enum(c));
-            if thief_classes.contains(&c) {
-                assert!(def.has_thief_skills, "{:?} should have thief skills", c);
+        let thief_classes = ["Thief", "Acrobat", "Assassin", "Half-Orc", "Bard"];
+        for &name in &CANONICAL_CLASS_NAMES {
+            let def = class_def(&ClassId::new(name));
+            if thief_classes.contains(&name) {
+                assert!(def.has_thief_skills, "{} should have thief skills", name);
             } else {
-                assert!(!def.has_thief_skills, "{:?} should NOT have thief skills", c);
+                assert!(!def.has_thief_skills, "{} should NOT have thief skills", name);
             }
         }
     }
 
     #[test]
     fn can_backstab_tags() {
-        let backstab_classes = [Class::Thief, Class::Assassin];
-        for c in Class::ALL {
-            let def = class_def(&ClassId::from_enum(c));
-            if backstab_classes.contains(&c) {
-                assert!(def.can_backstab, "{:?} should be able to backstab", c);
+        let backstab_classes = ["Thief", "Assassin"];
+        for &name in &CANONICAL_CLASS_NAMES {
+            let def = class_def(&ClassId::new(name));
+            if backstab_classes.contains(&name) {
+                assert!(def.can_backstab, "{} should be able to backstab", name);
             } else {
-                assert!(!def.can_backstab, "{:?} should NOT be able to backstab", c);
+                assert!(!def.can_backstab, "{} should NOT be able to backstab", name);
             }
         }
     }
 
     #[test]
     fn can_turn_undead_tags() {
-        let turn_classes = [Class::Cleric, Class::Paladin];
-        for c in Class::ALL {
-            let def = class_def(&ClassId::from_enum(c));
-            if turn_classes.contains(&c) {
-                assert!(def.can_turn_undead, "{:?} should be able to turn undead", c);
+        let turn_classes = ["Cleric", "Paladin"];
+        for &name in &CANONICAL_CLASS_NAMES {
+            let def = class_def(&ClassId::new(name));
+            if turn_classes.contains(&name) {
+                assert!(def.can_turn_undead, "{} should be able to turn undead", name);
             } else {
-                assert!(!def.can_turn_undead, "{:?} should NOT be able to turn undead", c);
+                assert!(!def.can_turn_undead, "{} should NOT be able to turn undead", name);
             }
         }
     }
@@ -1078,38 +993,26 @@ mod tests {
     #[test]
     fn bx_equivalent_tags() {
         // B/X classes map to None (they ARE the base class)
-        let bx_classes = [
-            Class::Fighter, Class::Cleric, Class::MagicUser, Class::Thief,
-            Class::Elf, Class::Dwarf, Class::Halfling,
-        ];
-        for c in Class::ALL {
-            let def = class_def(&ClassId::from_enum(c));
-            if bx_classes.contains(&c) {
-                assert_eq!(def.bx_equivalent, None, "{:?} is a B/X class, bx_equivalent should be None", c);
+        let bx_classes = ["Fighter", "Cleric", "Magic-User", "Thief", "Elf", "Dwarf", "Halfling"];
+        for &name in &CANONICAL_CLASS_NAMES {
+            let def = class_def(&ClassId::new(name));
+            if bx_classes.contains(&name) {
+                assert_eq!(def.bx_equivalent, None, "{} is a B/X class, bx_equivalent should be None", name);
             } else {
-                assert!(def.bx_equivalent.is_some(), "{:?} is AF, bx_equivalent should be Some", c);
+                assert!(def.bx_equivalent.is_some(), "{} is AF, bx_equivalent should be Some", name);
             }
         }
         // Spot-check specific mappings
-        assert_eq!(class_def(&ClassId::from_enum(Class::Barbarian)).bx_equivalent, Some(Class::Fighter));
-        assert_eq!(class_def(&ClassId::from_enum(Class::Acrobat)).bx_equivalent, Some(Class::Thief));
-        assert_eq!(class_def(&ClassId::from_enum(Class::Druid)).bx_equivalent, Some(Class::Cleric));
-        assert_eq!(class_def(&ClassId::from_enum(Class::Illusionist)).bx_equivalent, Some(Class::MagicUser));
-        assert_eq!(class_def(&ClassId::from_enum(Class::Drow)).bx_equivalent, Some(Class::Elf));
-        assert_eq!(class_def(&ClassId::from_enum(Class::Duergar)).bx_equivalent, Some(Class::Dwarf));
-        assert_eq!(class_def(&ClassId::from_enum(Class::Gnome)).bx_equivalent, Some(Class::Halfling));
+        assert_eq!(class_def(&ClassId::new("Barbarian")).bx_equivalent, Some(ClassId::new("Fighter")));
+        assert_eq!(class_def(&ClassId::new("Acrobat")).bx_equivalent, Some(ClassId::new("Thief")));
+        assert_eq!(class_def(&ClassId::new("Druid")).bx_equivalent, Some(ClassId::new("Cleric")));
+        assert_eq!(class_def(&ClassId::new("Illusionist")).bx_equivalent, Some(ClassId::new("Magic-User")));
+        assert_eq!(class_def(&ClassId::new("Drow")).bx_equivalent, Some(ClassId::new("Elf")));
+        assert_eq!(class_def(&ClassId::new("Duergar")).bx_equivalent, Some(ClassId::new("Dwarf")));
+        assert_eq!(class_def(&ClassId::new("Gnome")).bx_equivalent, Some(ClassId::new("Halfling")));
     }
 
     // ── ClassId tests ─────────────────────────────────────────
-
-    #[test]
-    fn class_id_from_enum_roundtrip() {
-        for &c in &Class::ALL {
-            let id = ClassId::from_enum(c);
-            assert_eq!(id.to_enum(), Some(c), "roundtrip failed for {:?}", c);
-            assert_eq!(id.as_str(), c.name());
-        }
-    }
 
     #[test]
     fn class_id_new_normalizes() {
@@ -1127,36 +1030,32 @@ mod tests {
     fn class_id_unknown_class_preserved() {
         let id = ClassId::new("Necromancer");
         assert_eq!(id.as_str(), "Necromancer");
-        assert_eq!(id.to_enum(), None);
     }
 
     #[test]
     fn class_id_from_trait() {
-        let id: ClassId = Class::Fighter.into();
-        assert_eq!(id.as_str(), "Fighter");
-
         let id: ClassId = "thief".into();
         assert_eq!(id.as_str(), "Thief");
     }
 
     #[test]
     fn class_id_display() {
-        assert_eq!(format!("{}", ClassId::from_enum(Class::MagicUser)), "Magic-User");
+        assert_eq!(format!("{}", ClassId::new("Magic-User")), "Magic-User");
         assert_eq!(format!("{}", ClassId::new("Necromancer")), "Necromancer");
     }
 
     #[test]
     fn class_id_equality() {
         // Same canonical form
-        assert_eq!(ClassId::new("fighter"), ClassId::from_enum(Class::Fighter));
+        assert_eq!(ClassId::new("fighter"), ClassId::new("Fighter"));
         assert_eq!(ClassId::new("MU"), ClassId::new("Magic-User"));
         // Different classes
-        assert_ne!(ClassId::from_enum(Class::Fighter), ClassId::from_enum(Class::Thief));
+        assert_ne!(ClassId::new("Fighter"), ClassId::new("Thief"));
     }
 
     #[test]
     fn class_id_serde_roundtrip() {
-        let id = ClassId::from_enum(Class::MagicUser);
+        let id = ClassId::new("Magic-User");
         let json = serde_json::to_string(&id).unwrap();
         assert_eq!(json, "\"Magic-User\"");
 
@@ -1169,14 +1068,13 @@ mod tests {
         let json = "\"Necromancer\"";
         let id: ClassId = serde_json::from_str(json).unwrap();
         assert_eq!(id.as_str(), "Necromancer");
-        assert_eq!(id.to_enum(), None);
     }
 
     #[test]
     fn class_id_hash_consistent() {
         use std::collections::HashSet;
         let mut set = HashSet::new();
-        set.insert(ClassId::from_enum(Class::Fighter));
+        set.insert(ClassId::new("Fighter"));
         assert!(set.contains(&ClassId::new("fighter")));
         assert!(!set.contains(&ClassId::new("Thief")));
     }
@@ -1187,29 +1085,29 @@ mod tests {
     fn registry_covers_all_classes() {
         let reg = class_registry();
         assert_eq!(reg.all().len(), 22);
-        for &c in &Class::ALL {
-            let def = reg.get(c);
-            assert_eq!(def.class, c, "registry entry class mismatch for {:?}", c);
+        for &name in &CANONICAL_CLASS_NAMES {
+            let def = reg.get_by_name(name).unwrap();
+            assert_eq!(def.class_id.as_str(), name, "registry entry class mismatch for {}", name);
         }
     }
 
     #[test]
     fn registry_lookup_by_name() {
         let reg = class_registry();
-        assert_eq!(reg.get_by_name("Fighter").unwrap().class, Class::Fighter);
-        assert_eq!(reg.get_by_name("Magic-User").unwrap().class, Class::MagicUser);
-        assert_eq!(reg.get_by_name("Half-Elf").unwrap().class, Class::HalfElf);
+        assert_eq!(reg.get_by_name("Fighter").unwrap().class_id.as_str(), "Fighter");
+        assert_eq!(reg.get_by_name("Magic-User").unwrap().class_id.as_str(), "Magic-User");
+        assert_eq!(reg.get_by_name("Half-Elf").unwrap().class_id.as_str(), "Half-Elf");
         assert!(reg.get_by_name("Nonexistent").is_none());
     }
 
     #[test]
     fn registry_lookup_by_class_id() {
         let reg = class_registry();
-        let id = ClassId::from_enum(Class::Fighter);
-        assert_eq!(reg.get_by_id(&id).unwrap().class, Class::Fighter);
+        let id = ClassId::new("Fighter");
+        assert_eq!(reg.get_by_id(&id).unwrap().class_id.as_str(), "Fighter");
 
         let id = ClassId::new("magic-user");
-        assert_eq!(reg.get_by_id(&id).unwrap().class, Class::MagicUser);
+        assert_eq!(reg.get_by_id(&id).unwrap().class_id.as_str(), "Magic-User");
 
         let id = ClassId::new("Necromancer");
         assert!(reg.get_by_id(&id).is_none());
@@ -1218,23 +1116,23 @@ mod tests {
     #[test]
     fn registry_parity_with_native() {
         let reg = class_registry();
-        for &c in &Class::ALL {
-            let reg_def = reg.get(c);
-            let native = native_class_def(c);
-            assert_eq!(reg_def.hit_die, native.hit_die, "{:?} hit_die", c);
-            assert_eq!(reg_def.combat_aptitude, native.combat_aptitude, "{:?} combat_aptitude", c);
-            assert_eq!(reg_def.max_level, native.max_level, "{:?} max_level", c);
-            assert_eq!(reg_def.armour, native.armour, "{:?} armour", c);
-            assert_eq!(reg_def.weapons_any, native.weapons_any, "{:?} weapons_any", c);
-            assert_eq!(reg_def.weapons_blunt_only, native.weapons_blunt_only, "{:?} weapons_blunt_only", c);
-            assert_eq!(reg_def.save_category, native.save_category, "{:?} save_category", c);
-            assert_eq!(reg_def.spell_progression, native.spell_progression, "{:?} spell_progression", c);
-            assert_eq!(reg_def.spell_list, native.spell_list, "{:?} spell_list", c);
-            assert_eq!(reg_def.is_demihuman, native.is_demihuman, "{:?} is_demihuman", c);
-            assert_eq!(reg_def.has_thief_skills, native.has_thief_skills, "{:?} has_thief_skills", c);
-            assert_eq!(reg_def.can_backstab, native.can_backstab, "{:?} can_backstab", c);
-            assert_eq!(reg_def.can_turn_undead, native.can_turn_undead, "{:?} can_turn_undead", c);
-            assert_eq!(reg_def.bx_equivalent, native.bx_equivalent, "{:?} bx_equivalent", c);
+        for &name in &CANONICAL_CLASS_NAMES {
+            let reg_def = reg.get_by_name(name).unwrap();
+            let native = native_class_def(name);
+            assert_eq!(reg_def.hit_die, native.hit_die, "{} hit_die", name);
+            assert_eq!(reg_def.combat_aptitude, native.combat_aptitude, "{} combat_aptitude", name);
+            assert_eq!(reg_def.max_level, native.max_level, "{} max_level", name);
+            assert_eq!(reg_def.armour, native.armour, "{} armour", name);
+            assert_eq!(reg_def.weapons_any, native.weapons_any, "{} weapons_any", name);
+            assert_eq!(reg_def.weapons_blunt_only, native.weapons_blunt_only, "{} weapons_blunt_only", name);
+            assert_eq!(reg_def.save_category, native.save_category, "{} save_category", name);
+            assert_eq!(reg_def.spell_progression, native.spell_progression, "{} spell_progression", name);
+            assert_eq!(reg_def.spell_list, native.spell_list, "{} spell_list", name);
+            assert_eq!(reg_def.is_demihuman, native.is_demihuman, "{} is_demihuman", name);
+            assert_eq!(reg_def.has_thief_skills, native.has_thief_skills, "{} has_thief_skills", name);
+            assert_eq!(reg_def.can_backstab, native.can_backstab, "{} can_backstab", name);
+            assert_eq!(reg_def.can_turn_undead, native.can_turn_undead, "{} can_turn_undead", name);
+            assert_eq!(reg_def.bx_equivalent, native.bx_equivalent, "{} bx_equivalent", name);
         }
     }
 }
@@ -1245,30 +1143,28 @@ mod dsl_parity_tests {
 
     #[test]
     fn dsl_class_def_parity_all_22() {
-        // Explicitly evaluate each class through the DSL path and compare
-        // field-by-field against the native definition.
-        for &class in &Class::ALL {
-            let dsl = dsl_gate::dsl_class_def(class);
+        for &name in &CANONICAL_CLASS_NAMES {
+            let dsl = dsl_gate::dsl_class_def(name);
             let dsl = match dsl {
                 Some(d) => d,
-                None => panic!("DSL class_def returned None for {:?}", class),
+                None => panic!("DSL class_def returned None for {}", name),
             };
-            let native = native_class_def(class);
+            let native = native_class_def(name);
 
-            assert_eq!(dsl.hit_die, native.hit_die, "{:?} hit_die", class);
-            assert_eq!(dsl.combat_aptitude, native.combat_aptitude, "{:?} combat_aptitude", class);
-            assert_eq!(dsl.max_level, native.max_level, "{:?} max_level", class);
-            assert_eq!(dsl.armour, native.armour, "{:?} armour", class);
-            assert_eq!(dsl.weapons_any, native.weapons_any, "{:?} weapons_any", class);
-            assert_eq!(dsl.weapons_blunt_only, native.weapons_blunt_only, "{:?} weapons_blunt_only", class);
-            assert_eq!(dsl.save_category, native.save_category, "{:?} save_category", class);
-            assert_eq!(dsl.spell_progression, native.spell_progression, "{:?} spell_progression", class);
-            assert_eq!(dsl.spell_list, native.spell_list, "{:?} spell_list", class);
-            assert_eq!(dsl.is_demihuman, native.is_demihuman, "{:?} is_demihuman", class);
-            assert_eq!(dsl.has_thief_skills, native.has_thief_skills, "{:?} has_thief_skills", class);
-            assert_eq!(dsl.can_backstab, native.can_backstab, "{:?} can_backstab", class);
-            assert_eq!(dsl.can_turn_undead, native.can_turn_undead, "{:?} can_turn_undead", class);
-            assert_eq!(dsl.bx_equivalent, native.bx_equivalent, "{:?} bx_equivalent", class);
+            assert_eq!(dsl.hit_die, native.hit_die, "{} hit_die", name);
+            assert_eq!(dsl.combat_aptitude, native.combat_aptitude, "{} combat_aptitude", name);
+            assert_eq!(dsl.max_level, native.max_level, "{} max_level", name);
+            assert_eq!(dsl.armour, native.armour, "{} armour", name);
+            assert_eq!(dsl.weapons_any, native.weapons_any, "{} weapons_any", name);
+            assert_eq!(dsl.weapons_blunt_only, native.weapons_blunt_only, "{} weapons_blunt_only", name);
+            assert_eq!(dsl.save_category, native.save_category, "{} save_category", name);
+            assert_eq!(dsl.spell_progression, native.spell_progression, "{} spell_progression", name);
+            assert_eq!(dsl.spell_list, native.spell_list, "{} spell_list", name);
+            assert_eq!(dsl.is_demihuman, native.is_demihuman, "{} is_demihuman", name);
+            assert_eq!(dsl.has_thief_skills, native.has_thief_skills, "{} has_thief_skills", name);
+            assert_eq!(dsl.can_backstab, native.can_backstab, "{} can_backstab", name);
+            assert_eq!(dsl.can_turn_undead, native.can_turn_undead, "{} can_turn_undead", name);
+            assert_eq!(dsl.bx_equivalent, native.bx_equivalent, "{} bx_equivalent", name);
         }
     }
 
@@ -1279,9 +1175,9 @@ mod dsl_parity_tests {
         let variants = rt.enum_variants("Class").expect("Class enum should exist");
         assert_eq!(variants.len(), 22, "should have 22 Class variants");
         // Verify all expected variants are present
-        for &class in &Class::ALL {
-            let name = format!("{:?}", class);
-            assert!(variants.contains(&name), "missing variant: {}", name);
+        for &name in &CANONICAL_CLASS_NAMES {
+            let variant = canonical_to_dsl_variant(name);
+            assert!(variants.contains(&variant.to_string()), "missing variant: {}", variant);
         }
     }
 }
