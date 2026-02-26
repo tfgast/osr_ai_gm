@@ -152,6 +152,11 @@ pub struct ClassDef {
     pub spell_list: SpellListType,
     pub starting_gold: &'static str, // dice notation for gold in gp
     pub is_demihuman: bool,
+    // Capability tags (populated from DSL or native fallback)
+    pub has_thief_skills: bool,
+    pub can_backstab: bool,
+    pub can_turn_undead: bool,
+    pub bx_equivalent: Option<Class>,
 }
 
 /// Ability index constants.
@@ -187,6 +192,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: true, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Thief),
         },
         Class::Assassin => ClassDef {
             class, hit_die: 4,
@@ -200,6 +207,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: true, can_backstab: true, can_turn_undead: false,
+            bx_equivalent: Some(Class::Thief),
         },
         Class::Barbarian => ClassDef {
             class, hit_die: 8,
@@ -213,6 +222,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Fighter),
         },
         Class::Bard => ClassDef {
             class, hit_die: 6,
@@ -226,6 +237,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::Bard,
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: true, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Thief),
         },
         Class::Cleric => ClassDef {
             class, hit_die: 6,
@@ -239,6 +252,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::Cleric,
             spell_list: SpellListType::Cleric,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: true,
+            bx_equivalent: None,
         },
         Class::Drow => ClassDef {
             class, hit_die: 6,
@@ -252,6 +267,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::Drow,
             spell_list: SpellListType::DrowArcaneAndDivine,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Elf),
         },
         Class::Druid => ClassDef {
             class, hit_die: 6,
@@ -265,6 +282,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::Druid,
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Cleric),
         },
         Class::Duergar => ClassDef {
             class, hit_die: 8,
@@ -278,6 +297,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Dwarf),
         },
         Class::Dwarf => ClassDef {
             class, hit_die: 8,
@@ -291,6 +312,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: None,
         },
         Class::Elf => ClassDef {
             class, hit_die: 6,
@@ -304,6 +327,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::MagicUser,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: None,
         },
         Class::Fighter => ClassDef {
             class, hit_die: 8,
@@ -317,6 +342,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: None,
         },
         Class::Gnome => ClassDef {
             class, hit_die: 6,
@@ -330,6 +357,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Halfling),
         },
         Class::HalfElf => ClassDef {
             class, hit_die: 6,
@@ -343,6 +372,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::HalfElf,
             spell_list: SpellListType::MagicUser,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Elf),
         },
         Class::Halfling => ClassDef {
             class, hit_die: 6,
@@ -356,6 +387,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: None,
         },
         Class::HalfOrc => ClassDef {
             class, hit_die: 6,
@@ -369,6 +402,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: true, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Dwarf),
         },
         Class::Illusionist => ClassDef {
             class, hit_die: 4,
@@ -382,6 +417,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::MagicUser),
         },
         Class::Knight => ClassDef {
             class, hit_die: 8,
@@ -395,6 +432,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Fighter),
         },
         Class::MagicUser => ClassDef {
             class, hit_die: 4,
@@ -408,6 +447,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::MagicUser,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: None,
         },
         Class::Paladin => ClassDef {
             class, hit_die: 8,
@@ -421,6 +462,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::Paladin,
             spell_list: SpellListType::Cleric,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: true,
+            bx_equivalent: Some(Class::Fighter),
         },
         Class::Ranger => ClassDef {
             class, hit_die: 8,
@@ -434,6 +477,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::Ranger,
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Fighter),
         },
         Class::Svirfneblin => ClassDef {
             class, hit_die: 6,
@@ -447,6 +492,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: true,
+            has_thief_skills: false, can_backstab: false, can_turn_undead: false,
+            bx_equivalent: Some(Class::Halfling),
         },
         Class::Thief => ClassDef {
             class, hit_die: 4,
@@ -460,6 +507,8 @@ fn native_class_def(class: Class) -> ClassDef {
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
+            has_thief_skills: true, can_backstab: true, can_turn_undead: false,
+            bx_equivalent: None,
         },
     }
 }
@@ -657,6 +706,22 @@ mod dsl_gate {
         let spell_list = parse_spell_list(dsl_variant(fields, "spell_list")?)?;
         let is_demihuman = dsl_bool(fields, "is_demihuman")?;
 
+        // Capability tags (new fields from extended ClassDef)
+        let has_thief_skills = dsl_bool(fields, "has_thief_skills")?;
+        let can_backstab = dsl_bool(fields, "can_backstab")?;
+        let can_turn_undead = dsl_bool(fields, "can_turn_undead")?;
+        let bx_equivalent = match fields.get(&Name::from("bx_equivalent")) {
+            Some(Value::EnumVariant { variant, .. }) => {
+                // DSL uses bare Class (not option<Class>). Self-mapping means
+                // "this IS a B/X class" → None. Different class → Some(equivalent).
+                match Class::parse(variant.as_str()) {
+                    Some(equiv) if equiv == class => None,
+                    other => other,
+                }
+            }
+            _ => None,
+        };
+
         // Fields not in DSL — backfill from native
         let native = native_class_def(class);
 
@@ -676,6 +741,10 @@ mod dsl_gate {
             spell_list,
             starting_gold: native.starting_gold,
             is_demihuman,
+            has_thief_skills,
+            can_backstab,
+            can_turn_undead,
+            bx_equivalent,
         })
     }
 
@@ -704,6 +773,56 @@ mod dsl_gate {
             _ => None,
         }
     }
+}
+
+// ── ClassRegistry: DSL-populated class data cache ────────────
+
+/// Registry of all class definitions, populated from DSL evaluation at startup.
+/// Falls back to native definitions if DSL is unavailable.
+pub struct ClassRegistry {
+    classes: Vec<ClassDef>,
+    by_name: std::collections::HashMap<String, usize>,
+}
+
+impl ClassRegistry {
+    /// Build the registry by evaluating DSL class_def for each Class variant.
+    /// Falls back to native_class_def if DSL is unavailable or evaluation fails.
+    fn build() -> Self {
+        let mut classes = Vec::with_capacity(Class::ALL.len());
+        let mut by_name = std::collections::HashMap::with_capacity(Class::ALL.len());
+
+        for &class in &Class::ALL {
+            let def = class_def(class);
+            by_name.insert(class.name().to_string(), classes.len());
+            classes.push(def);
+        }
+
+        ClassRegistry { classes, by_name }
+    }
+
+    /// Look up a class definition by Class enum variant.
+    pub fn get(&self, class: Class) -> &ClassDef {
+        // Safe: registry is built from Class::ALL which covers all variants
+        let idx = self.by_name[class.name()];
+        &self.classes[idx]
+    }
+
+    /// Look up a class definition by name (case-sensitive, display name).
+    pub fn get_by_name(&self, name: &str) -> Option<&ClassDef> {
+        self.by_name.get(name).map(|&idx| &self.classes[idx])
+    }
+
+    /// Iterate over all registered class definitions.
+    pub fn all(&self) -> &[ClassDef] {
+        &self.classes
+    }
+}
+
+static CLASS_REGISTRY: std::sync::OnceLock<ClassRegistry> = std::sync::OnceLock::new();
+
+/// Get the global class registry (lazily built from DSL or native definitions).
+pub fn class_registry() -> &'static ClassRegistry {
+    CLASS_REGISTRY.get_or_init(ClassRegistry::build)
 }
 
 #[cfg(test)]
@@ -846,5 +965,165 @@ mod tests {
         assert!(eligible.contains(&Class::Thief));
         assert!(!eligible.contains(&Class::Dwarf)); // needs CON 9
         assert!(!eligible.contains(&Class::Barbarian)); // needs STR/DEX/CON 9
+    }
+
+    // ── Capability tag tests ──────────────────────────────────
+
+    #[test]
+    fn has_thief_skills_tags() {
+        let thief_classes = [
+            Class::Thief, Class::Acrobat, Class::Assassin,
+            Class::HalfOrc, Class::Bard,
+        ];
+        for c in Class::ALL {
+            let def = class_def(c);
+            if thief_classes.contains(&c) {
+                assert!(def.has_thief_skills, "{:?} should have thief skills", c);
+            } else {
+                assert!(!def.has_thief_skills, "{:?} should NOT have thief skills", c);
+            }
+        }
+    }
+
+    #[test]
+    fn can_backstab_tags() {
+        let backstab_classes = [Class::Thief, Class::Assassin];
+        for c in Class::ALL {
+            let def = class_def(c);
+            if backstab_classes.contains(&c) {
+                assert!(def.can_backstab, "{:?} should be able to backstab", c);
+            } else {
+                assert!(!def.can_backstab, "{:?} should NOT be able to backstab", c);
+            }
+        }
+    }
+
+    #[test]
+    fn can_turn_undead_tags() {
+        let turn_classes = [Class::Cleric, Class::Paladin];
+        for c in Class::ALL {
+            let def = class_def(c);
+            if turn_classes.contains(&c) {
+                assert!(def.can_turn_undead, "{:?} should be able to turn undead", c);
+            } else {
+                assert!(!def.can_turn_undead, "{:?} should NOT be able to turn undead", c);
+            }
+        }
+    }
+
+    #[test]
+    fn bx_equivalent_tags() {
+        // B/X classes map to None (they ARE the base class)
+        let bx_classes = [
+            Class::Fighter, Class::Cleric, Class::MagicUser, Class::Thief,
+            Class::Elf, Class::Dwarf, Class::Halfling,
+        ];
+        for c in Class::ALL {
+            let def = class_def(c);
+            if bx_classes.contains(&c) {
+                assert_eq!(def.bx_equivalent, None, "{:?} is a B/X class, bx_equivalent should be None", c);
+            } else {
+                assert!(def.bx_equivalent.is_some(), "{:?} is AF, bx_equivalent should be Some", c);
+            }
+        }
+        // Spot-check specific mappings
+        assert_eq!(class_def(Class::Barbarian).bx_equivalent, Some(Class::Fighter));
+        assert_eq!(class_def(Class::Acrobat).bx_equivalent, Some(Class::Thief));
+        assert_eq!(class_def(Class::Druid).bx_equivalent, Some(Class::Cleric));
+        assert_eq!(class_def(Class::Illusionist).bx_equivalent, Some(Class::MagicUser));
+        assert_eq!(class_def(Class::Drow).bx_equivalent, Some(Class::Elf));
+        assert_eq!(class_def(Class::Duergar).bx_equivalent, Some(Class::Dwarf));
+        assert_eq!(class_def(Class::Gnome).bx_equivalent, Some(Class::Halfling));
+    }
+
+    // ── ClassRegistry tests ───────────────────────────────────
+
+    #[test]
+    fn registry_covers_all_classes() {
+        let reg = class_registry();
+        assert_eq!(reg.all().len(), 22);
+        for &c in &Class::ALL {
+            let def = reg.get(c);
+            assert_eq!(def.class, c, "registry entry class mismatch for {:?}", c);
+        }
+    }
+
+    #[test]
+    fn registry_lookup_by_name() {
+        let reg = class_registry();
+        assert_eq!(reg.get_by_name("Fighter").unwrap().class, Class::Fighter);
+        assert_eq!(reg.get_by_name("Magic-User").unwrap().class, Class::MagicUser);
+        assert_eq!(reg.get_by_name("Half-Elf").unwrap().class, Class::HalfElf);
+        assert!(reg.get_by_name("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn registry_parity_with_native() {
+        let reg = class_registry();
+        for &c in &Class::ALL {
+            let reg_def = reg.get(c);
+            let native = native_class_def(c);
+            assert_eq!(reg_def.hit_die, native.hit_die, "{:?} hit_die", c);
+            assert_eq!(reg_def.combat_aptitude, native.combat_aptitude, "{:?} combat_aptitude", c);
+            assert_eq!(reg_def.max_level, native.max_level, "{:?} max_level", c);
+            assert_eq!(reg_def.armour, native.armour, "{:?} armour", c);
+            assert_eq!(reg_def.weapons_any, native.weapons_any, "{:?} weapons_any", c);
+            assert_eq!(reg_def.weapons_blunt_only, native.weapons_blunt_only, "{:?} weapons_blunt_only", c);
+            assert_eq!(reg_def.save_category, native.save_category, "{:?} save_category", c);
+            assert_eq!(reg_def.spell_progression, native.spell_progression, "{:?} spell_progression", c);
+            assert_eq!(reg_def.spell_list, native.spell_list, "{:?} spell_list", c);
+            assert_eq!(reg_def.is_demihuman, native.is_demihuman, "{:?} is_demihuman", c);
+            assert_eq!(reg_def.has_thief_skills, native.has_thief_skills, "{:?} has_thief_skills", c);
+            assert_eq!(reg_def.can_backstab, native.can_backstab, "{:?} can_backstab", c);
+            assert_eq!(reg_def.can_turn_undead, native.can_turn_undead, "{:?} can_turn_undead", c);
+            assert_eq!(reg_def.bx_equivalent, native.bx_equivalent, "{:?} bx_equivalent", c);
+        }
+    }
+}
+
+#[cfg(all(test, feature = "dsl-backend"))]
+mod dsl_parity_tests {
+    use super::*;
+
+    #[test]
+    fn dsl_class_def_parity_all_22() {
+        // Explicitly evaluate each class through the DSL path and compare
+        // field-by-field against the native definition.
+        for &class in &Class::ALL {
+            let dsl = dsl_gate::dsl_class_def(class);
+            let dsl = match dsl {
+                Some(d) => d,
+                None => panic!("DSL class_def returned None for {:?}", class),
+            };
+            let native = native_class_def(class);
+
+            assert_eq!(dsl.hit_die, native.hit_die, "{:?} hit_die", class);
+            assert_eq!(dsl.combat_aptitude, native.combat_aptitude, "{:?} combat_aptitude", class);
+            assert_eq!(dsl.max_level, native.max_level, "{:?} max_level", class);
+            assert_eq!(dsl.armour, native.armour, "{:?} armour", class);
+            assert_eq!(dsl.weapons_any, native.weapons_any, "{:?} weapons_any", class);
+            assert_eq!(dsl.weapons_blunt_only, native.weapons_blunt_only, "{:?} weapons_blunt_only", class);
+            assert_eq!(dsl.save_category, native.save_category, "{:?} save_category", class);
+            assert_eq!(dsl.spell_progression, native.spell_progression, "{:?} spell_progression", class);
+            assert_eq!(dsl.spell_list, native.spell_list, "{:?} spell_list", class);
+            assert_eq!(dsl.is_demihuman, native.is_demihuman, "{:?} is_demihuman", class);
+            assert_eq!(dsl.has_thief_skills, native.has_thief_skills, "{:?} has_thief_skills", class);
+            assert_eq!(dsl.can_backstab, native.can_backstab, "{:?} can_backstab", class);
+            assert_eq!(dsl.can_turn_undead, native.can_turn_undead, "{:?} can_turn_undead", class);
+            assert_eq!(dsl.bx_equivalent, native.bx_equivalent, "{:?} bx_equivalent", class);
+        }
+    }
+
+    #[test]
+    fn dsl_enum_variants_lists_all_classes() {
+        use crate::backend;
+        let rt = backend::dsl().expect("DSL should load in test");
+        let variants = rt.enum_variants("Class").expect("Class enum should exist");
+        assert_eq!(variants.len(), 22, "should have 22 Class variants");
+        // Verify all expected variants are present
+        for &class in &Class::ALL {
+            let name = format!("{:?}", class);
+            assert!(variants.contains(&name), "missing variant: {}", name);
+        }
     }
 }

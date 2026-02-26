@@ -323,6 +323,20 @@ mod dsl_runtime {
         pub fn interpreter(&self) -> Result<Interpreter<'_>, RuntimeError> {
             Interpreter::new(&self.program, &self.check_result.env)
         }
+
+        /// List all variant names of a DSL enum type.
+        ///
+        /// Returns variant names in declaration order, or None if the
+        /// type doesn't exist or isn't an enum.
+        pub fn enum_variants(&self, enum_name: &str) -> Option<Vec<String>> {
+            use ttrpg_checker::env::DeclInfo;
+            match self.check_result.env.types.get(enum_name)? {
+                DeclInfo::Enum(info) => {
+                    Some(info.variants.iter().map(|v| v.name.to_string()).collect())
+                }
+                _ => None,
+            }
+        }
     }
 
     static DSL: OnceLock<Option<DslRuntime>> = OnceLock::new();
