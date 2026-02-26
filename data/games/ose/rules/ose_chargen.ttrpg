@@ -41,15 +41,6 @@ system "OSE Chargen" {
 
     // --- Derives (pure computation) ---
 
-    // INT literacy level: score 3-5 → illiterate, 6-8 → basic, 9+ → literate.
-    derive int_literacy(score: int) -> Literacy {
-        match {
-            score <= 5 => illiterate,
-            score <= 8 => basic,
-            _          => literate
-        }
-    }
-
     // Base AC from DEX modifier. Descending AC: 9 (unarmoured) minus DEX bonus.
     derive base_ac(dex_mod: int) -> int {
         9 - dex_mod

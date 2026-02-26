@@ -22,10 +22,6 @@ files = [
     "ose_equipment.ttrpg",
     "ose_spells.ttrpg",
     "ose_time_economy.ttrpg",
-    "ose_exploration.ttrpg",
-    "ose_wilderness.ttrpg",
-    "ose_retainers.ttrpg",
-    "ose_npc_party.ttrpg",
 ]
 
 [data]
@@ -52,10 +48,6 @@ supported = [
     "class",
     "chargen",
     "encounter",
-    "exploration",
-    "wilderness",
-    "retainers",
-    "npc_party",
 ]
 
 [features]

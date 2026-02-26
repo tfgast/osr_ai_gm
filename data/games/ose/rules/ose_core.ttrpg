@@ -145,10 +145,6 @@ system "OSE" {
         overloaded
     }
 
-    // --- Literacy levels (INT-based) ---
-
-    enum Literacy { illiterate, basic, literate }
-
     // --- Thief skills (8 total) ---
 
     enum ThiefSkill {
