@@ -21,6 +21,7 @@ pub enum MechanicGroup {
     Encounter,
     Exploration,
     Wilderness,
+    NpcParty,
 }
 
 impl MechanicGroup {
@@ -40,6 +41,7 @@ impl MechanicGroup {
             MechanicGroup::Encounter => "ENCOUNTER",
             MechanicGroup::Exploration => "EXPLORATION",
             MechanicGroup::Wilderness => "WILDERNESS",
+            MechanicGroup::NpcParty => "NPC_PARTY",
         }
     }
 }
@@ -59,6 +61,7 @@ pub struct BackendConfig {
     pub encounter: Backend,
     pub exploration: Backend,
     pub wilderness: Backend,
+    pub npc_party: Backend,
 }
 
 impl BackendConfig {
@@ -79,6 +82,7 @@ impl BackendConfig {
             encounter: parse_backend_env("OSR_BACKEND_ENCOUNTER").or(global).unwrap_or(Backend::Dsl),
             exploration: parse_backend_env("OSR_BACKEND_EXPLORATION").or(global).unwrap_or(Backend::Dsl),
             wilderness: parse_backend_env("OSR_BACKEND_WILDERNESS").or(global).unwrap_or(Backend::Dsl),
+            npc_party: parse_backend_env("OSR_BACKEND_NPC_PARTY").or(global).unwrap_or(Backend::Dsl),
         }
     }
 
@@ -97,6 +101,7 @@ impl BackendConfig {
             MechanicGroup::Encounter => self.encounter,
             MechanicGroup::Exploration => self.exploration,
             MechanicGroup::Wilderness => self.wilderness,
+            MechanicGroup::NpcParty => self.npc_party,
         }
     }
 }
@@ -396,6 +401,7 @@ mod tests {
         assert_eq!(config.encounter, Backend::Dsl);
         assert_eq!(config.exploration, Backend::Dsl);
         assert_eq!(config.wilderness, Backend::Dsl);
+        assert_eq!(config.npc_party, Backend::Dsl);
     }
 
     #[test]
@@ -421,6 +427,7 @@ mod tests {
             encounter: Backend::Native,
             exploration: Backend::Native,
             wilderness: Backend::Dsl,
+            npc_party: Backend::Native,
         };
         assert_eq!(config.get(MechanicGroup::Combat), Backend::Dsl);
         assert_eq!(config.get(MechanicGroup::Morale), Backend::Native);

@@ -25,6 +25,7 @@ files = [
     "ose_exploration.ttrpg",
     "ose_wilderness.ttrpg",
     "ose_retainers.ttrpg",
+    "ose_npc_party.ttrpg",
 ]
 
 [data]
@@ -54,6 +55,7 @@ supported = [
     "exploration",
     "wilderness",
     "retainers",
+    "npc_party",
 ]
 
 [features]

@@ -1,0 +1,83 @@
+// ============================================================
+// OSE NPC Party Generation — ruler level dice, combat stats
+//
+// DSL-side derives for values previously hardcoded in:
+//   src/rules/npc_party.rs
+//
+// Stronghold ruler level dice by type:
+//   Arcane  → 1d4+10 (levels 11–14)
+//   Divine  → 1d8+6  (levels  7–14)
+//   Martial → 1d6+8  (levels  9–14)
+//
+// NPC-to-monster AC (descending) by combat aptitude:
+//   Martial     → 5 (chainmail)
+//   SemiMartial → 7 (leather + shield)
+//   NonMartial  → 9 (unarmored)
+//
+// NPC default damage dice by combat aptitude:
+//   Martial     → 1d8 (sword / battle axe)
+//   Other       → 1d6 (hand weapon)
+//
+// Reference: OSE Rules Tome — Strongholds, NPC Adventurers.
+// ============================================================
+
+use "OSE"
+
+system "OSE NPC Party" {
+
+    // --------------------------------------------------------
+    // RULER TYPES
+    //
+    // Prefixed with npc_ruler_ to avoid variant name collisions
+    // with other enums in the combined DSL namespace.
+    // --------------------------------------------------------
+
+    enum NpcRulerType {
+        npc_ruler_arcane,
+        npc_ruler_divine,
+        npc_ruler_martial
+    }
+
+    // Dice expression for rolling a stronghold ruler's level by type.
+    derive ruler_level_dice(ruler_type: NpcRulerType) -> string {
+        match ruler_type {
+            npc_ruler_arcane  => "1d4+10",
+            npc_ruler_divine  => "1d8+6",
+            npc_ruler_martial => "1d6+8"
+        }
+    }
+
+
+    // --------------------------------------------------------
+    // COMBAT APTITUDE
+    //
+    // Prefixed with npc_apt_ to avoid variant name collisions.
+    // --------------------------------------------------------
+
+    enum NpcCombatAptitude {
+        npc_apt_martial,
+        npc_apt_semi_martial,
+        npc_apt_non_martial
+    }
+
+    // NPC-to-monster AC (descending) by combat aptitude.
+    // Martial: chainmail (AC 5), SemiMartial: leather+shield (AC 7),
+    // NonMartial: unarmored (AC 9).
+    derive npc_aptitude_ac(aptitude: NpcCombatAptitude) -> int {
+        match aptitude {
+            npc_apt_martial      => 5,
+            npc_apt_semi_martial => 7,
+            npc_apt_non_martial  => 9
+        }
+    }
+
+    // Default damage dice string for NPC attacks by combat aptitude.
+    // Martial: 1d8 (sword or battle axe), others: 1d6 (hand weapon).
+    derive npc_aptitude_damage(aptitude: NpcCombatAptitude) -> string {
+        match aptitude {
+            npc_apt_martial      => "1d8",
+            npc_apt_semi_martial => "1d6",
+            npc_apt_non_martial  => "1d6"
+        }
+    }
+}
