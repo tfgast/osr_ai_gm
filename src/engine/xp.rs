@@ -38,12 +38,12 @@ pub struct LevelUpResult {
 pub fn award_xp(character: &mut Character, treasure_gp: u64, monster_xp: u64) -> XpAwardResult {
     let base_xp = treasure_gp.saturating_add(monster_xp);
     let abilities = character.abilities.to_array();
-    let modifier_pct = prime_req_xp_modifier(character.class, &abilities);
+    let modifier_pct = prime_req_xp_modifier(&character.class, &abilities);
     let adjusted_xp = adjust_xp(base_xp, modifier_pct);
 
     character.xp = character.xp.saturating_add(adjusted_xp);
     let new_total = character.xp;
-    let ready_to_train = check_level_up(character.class, character.level, character.xp).is_some();
+    let ready_to_train = check_level_up(&character.class, character.level, character.xp).is_some();
 
     XpAwardResult {
         base_xp,
@@ -65,7 +65,7 @@ pub fn apply_level_up(character: &mut Character) -> LevelUpResult {
 pub fn apply_level_up_with<R: Rng>(rng: &mut R, character: &mut Character) -> LevelUpResult {
     let old_level = character.level;
     let new_level = old_level + 1;
-    let def = class_def(character.class);
+    let def = class_def(&character.class);
 
     // Capture old spell slots for report
     let old_spell_slots = spell::spell_slots(def.spell_progression, old_level);

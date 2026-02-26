@@ -7,7 +7,7 @@ use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{Character, AbilityScores};
 use osr_ai_gm::rules::alignment::Alignment;
-use osr_ai_gm::rules::class::Class;
+use osr_ai_gm::rules::class::{Class, ClassId};
 use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
 use osr_ai_gm::state::time::LightSourceKind;
@@ -468,7 +468,7 @@ fn retainer_hiring() {
     let resp = handle_request(&req("1", GMCommand::HireRetainer {
         employer: "Father Gregory".to_string(),
         retainer_name: "Hrothgar".to_string(),
-        retainer_class: Class::Fighter,
+        retainer_class: Class::Fighter.into(),
         retainer_level: 1,
     }), &mut state);
     assert!(resp.success, "hire retainer failed: {}", resp.message);
@@ -768,7 +768,7 @@ fn complete_ose_session() {
     let resp = handle_request(&req("r1", GMCommand::HireRetainer {
         employer: "Sir Aldric".to_string(),
         retainer_name: "Bort the Torchbearer".to_string(),
-        retainer_class: Class::Fighter,
+        retainer_class: Class::Fighter.into(),
         retainer_level: 0,
     }), &mut state);
     assert!(resp.success);
@@ -1921,7 +1921,7 @@ fn session_c_retainers() {
     let resp = handle_request(&req("c1", GMCommand::HireRetainer {
         employer: "Captain Kael".to_string(),
         retainer_name: "Tormund".to_string(),
-        retainer_class: Class::Fighter,
+        retainer_class: Class::Fighter.into(),
         retainer_level: 1,
     }), &mut state);
     assert!(resp.success, "hire retainer failed: {}", resp.message);
@@ -1935,7 +1935,7 @@ fn session_c_retainers() {
     let resp = handle_request(&req("c2", GMCommand::HireRetainer {
         employer: "Captain Kael".to_string(),
         retainer_name: "Greta".to_string(),
-        retainer_class: Class::Thief,
+        retainer_class: Class::Thief.into(),
         retainer_level: 2,
     }), &mut state);
     assert!(resp.success);
@@ -2198,7 +2198,7 @@ fn save_load_complex_state() {
     // Character state preserved
     let grom = loaded.party.find_member("Grom").unwrap();
     assert_eq!(grom.hp, pre_grom_hp, "Grom HP mismatch");
-    assert_eq!(grom.class, Class::Fighter);
+    assert_eq!(grom.class, ClassId::from(Class::Fighter));
 
     // Notes preserved
     assert!(loaded.notes.iter().any(|n| n.contains("unnaturally cold")));

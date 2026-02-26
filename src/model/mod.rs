@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::log_entry::LogEntry;
 use crate::rules::alignment::Alignment;
 use crate::rules::attack::HitDice;
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
 use crate::rules::save::SavingThrows;
 use crate::state::effect::ActiveEffect;
 
@@ -48,7 +48,7 @@ impl AbilityScores {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Character {
     pub name: String,
-    pub class: Class,
+    pub class: ClassId,
     pub level: u32,
     pub abilities: AbilityScores,
     pub hp: i32,
@@ -85,10 +85,10 @@ pub struct Character {
 }
 
 impl Character {
-    pub fn new(name: &str, class: Class) -> Self {
+    pub fn new(name: &str, class: impl Into<ClassId>) -> Self {
         Character {
             name: name.to_string(),
-            class,
+            class: class.into(),
             level: 1,
             abilities: AbilityScores::default(),
             hp: 1,
@@ -669,12 +669,13 @@ fn dsl_should_check_morale(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rules::class::Class;
 
     #[test]
     fn character_creation() {
         let c = Character::new("Theron", Class::Fighter);
         assert_eq!(c.name, "Theron");
-        assert_eq!(c.class, Class::Fighter);
+        assert_eq!(c.class, ClassId::from_enum(Class::Fighter));
         assert_eq!(c.level, 1);
         assert!(c.is_alive());
     }
@@ -710,6 +711,6 @@ mod tests {
             "inventory": [], "spells": []
         }"#;
         let c: Character = serde_json::from_str(old_json).unwrap();
-        assert_eq!(c.class, Class::MagicUser);
+        assert_eq!(c.class, ClassId::from_enum(Class::MagicUser));
     }
 }

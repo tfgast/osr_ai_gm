@@ -60,7 +60,7 @@ pub fn action_prepare_spells(
         .find_member(char_name)
         .ok_or_else(|| EngineError::InvalidInput(format!("no party member named '{}'.", char_name)))?;
 
-    let def = class_def(character.class);
+    let def = class_def(&character.class);
 
     if def.spell_progression == SpellProgression::NonCaster {
         return Err(EngineError::InvalidInput(format!(
@@ -164,7 +164,7 @@ pub fn action_long_rest(state: &mut GameState) -> Result<LongRestResult, EngineE
             continue;
         }
 
-        let def = class_def(member.class);
+        let def = class_def(&member.class);
         if def.spell_progression == SpellProgression::NonCaster {
             continue;
         }

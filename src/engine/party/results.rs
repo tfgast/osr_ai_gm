@@ -1,21 +1,21 @@
 use serde::Serialize;
 
 use crate::rules::alignment::Alignment;
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
 use crate::rules::encumbrance::EncumbranceLevel;
 
 /// Result payload for create character flow.
 #[derive(Debug, Clone, Serialize)]
 pub struct CreateCharacterResult {
     pub name: String,
-    pub class: Class,
+    pub class: ClassId,
     pub alignment: Alignment,
     pub used_provided_abilities: bool,
     pub base_abilities: [i32; 6],
     pub abilities: [i32; 6],
     pub applied_racial_modifiers: bool,
     pub created: bool,
-    pub eligible_classes: Vec<Class>,
+    pub eligible_classes: Vec<ClassId>,
     pub character_sheet: Option<String>,
 }
 
@@ -32,7 +32,7 @@ pub struct MemberInventorySummary {
 #[derive(Debug, Clone, Serialize)]
 pub struct PartyMemberSummary {
     pub name: String,
-    pub class: Class,
+    pub class: ClassId,
     pub level: u32,
     pub hp: i32,
     pub max_hp: i32,
@@ -82,5 +82,5 @@ pub struct ListClassesResult {
 #[derive(Debug, Clone, Serialize)]
 pub struct EligibleClassesResult {
     pub abilities: [i32; 6],
-    pub eligible: Vec<Class>,
+    pub eligible: Vec<ClassId>,
 }

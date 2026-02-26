@@ -3,7 +3,7 @@ use crate::engine::result::EngineError;
 use crate::engine::retainer::{self, LoyaltyResult};
 use crate::model::{CombatState, Monster};
 use crate::persist::GameState;
-use crate::rules::class::{class_def, Class};
+use crate::rules::class::{class_def, class_registry};
 use crate::rules::{ability, equipment, monster as monster_db, spell, spell_data, thief};
 use crate::state::effect;
 
@@ -727,7 +727,7 @@ pub fn action_turn_undead(
     let character = state.party.find_member(char_name).cloned().ok_or_else(|| {
         EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
     })?;
-    if !matches!(character.class, Class::Cleric | Class::Paladin) {
+    if !class_registry().get_by_id(&character.class).is_some_and(|d| d.can_turn_undead) {
         return Err(EngineError::InvalidInput(format!(
             "{} ({}) cannot turn undead. Only Clerics and Paladins can turn undead.",
             character.name,
@@ -845,7 +845,7 @@ pub fn action_declare_spell(
         EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
     })?;
 
-    let cdef = class_def(character.class);
+    let cdef = class_def(&character.class);
     if !spell::can_cast(cdef.spell_progression, character.level) {
         return Err(EngineError::InvalidInput(format!(
             "{} ({}) cannot cast spells.",
@@ -1135,7 +1135,7 @@ pub fn action_backstab(
         EngineError::InvalidInput(format!("no party member named '{}'.", char_name))
     })?;
 
-    if !thief::can_backstab(character.class) {
+    if !thief::can_backstab(&character.class) {
         return Err(EngineError::InvalidInput(format!(
             "{} ({}) cannot backstab.",
             character.name,

@@ -316,7 +316,7 @@ fn retainer_command_parity_golden_snapshots_capture_compatibility_gates() {
             GMCommand::HireRetainer {
                 employer: "Aldric".to_string(),
                 retainer_name: "Sven".to_string(),
-                retainer_class: Class::Fighter,
+                retainer_class: Class::Fighter.into(),
                 retainer_level: 1,
             },
             "CLI enforces max-retainer cap before rolling; API inline path does not.",

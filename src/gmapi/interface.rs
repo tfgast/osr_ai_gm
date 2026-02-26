@@ -2,7 +2,7 @@ use crate::engine::{gm, party, retainers, system};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
 use super::{combat_handlers, exploration_handlers, query_handlers};
 use super::ok_with_typed_data;
 use serde::Serialize;
@@ -25,7 +25,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 
         // -- Character management --
         GMCommand::CreateCharacter { name, class, alignment, abilities } => {
-            create_character(id, state, name, *class, *alignment, abilities.as_ref())
+            create_character(id, state, name, class.clone(), *alignment, abilities.as_ref())
         }
 
         // -- Combat --
@@ -119,7 +119,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::LookupSpell { name, list } => query_handlers::lookup_spell(id, state, name, list),
         GMCommand::SpellInfo { name } => query_handlers::spell_info(id, state, name),
         GMCommand::HireRetainer { employer, retainer_name, retainer_class, retainer_level } => {
-            hire_retainer(id, state, employer, retainer_name, *retainer_class, *retainer_level)
+            hire_retainer(id, state, employer, retainer_name, retainer_class.clone(), *retainer_level)
         }
         GMCommand::LoyaltyCheck { retainer_name, loyalty } => {
             loyalty_check(id, state, retainer_name, *loyalty)
@@ -185,8 +185,8 @@ struct CreateCharacterData {
     character_sheet: String,
 }
 
-fn create_character(id: &str, state: &mut GameState, name: &str, class: Class, alignment: Alignment, provided_abilities: Option<&[i32; 6]>) -> GMResponse {
-    match party::action_create_character(state, name, class, alignment, provided_abilities.copied()) {
+fn create_character(id: &str, state: &mut GameState, name: &str, class: ClassId, alignment: Alignment, provided_abilities: Option<&[i32; 6]>) -> GMResponse {
+    match party::action_create_character(state, name, class.clone(), alignment, provided_abilities.copied()) {
         Ok(result) => {
             if !result.created {
                 let source = if result.used_provided_abilities { "provided" } else { "rolled" };
@@ -253,7 +253,7 @@ fn thief_skill_check(id: &str, state: &GameState, char_name: &str, skill_name: &
     }
 }
 
-fn hire_retainer(id: &str, state: &mut GameState, employer_name: &str, ret_name: &str, ret_class: Class, ret_level: u32) -> GMResponse {
+fn hire_retainer(id: &str, state: &mut GameState, employer_name: &str, ret_name: &str, ret_class: ClassId, ret_level: u32) -> GMResponse {
     match retainers::action_hire_retainer(
         state,
         ret_name,
@@ -495,6 +495,7 @@ mod tests {
     use super::*;
     use crate::gmapi::protocol::EncounterParams;
     use crate::model::CombatState;
+    use crate::rules::class::Class;
     use crate::state::game::GameMode;
     use crate::state::time::LightSourceKind;
     use crate::state::wilderness::Terrain;
@@ -541,7 +542,7 @@ mod tests {
         let mut state = GameState::new();
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
-            class: Class::Fighter,
+            class: Class::Fighter.into(),
             alignment: Alignment::Lawful,
             abilities: None,
         }), &mut state);
@@ -730,7 +731,7 @@ mod tests {
         // Create a character
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
-            class: Class::Fighter,
+            class: Class::Fighter.into(),
             alignment: Alignment::Lawful,
             abilities: None,
         }), &mut state);
@@ -786,7 +787,7 @@ mod tests {
         // Create a character
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
-            class: Class::Fighter,
+            class: Class::Fighter.into(),
             alignment: Alignment::Lawful,
             abilities: None,
         }), &mut state);

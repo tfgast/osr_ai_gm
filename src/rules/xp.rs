@@ -5,11 +5,12 @@
 //! XP lookups and level advancement checks delegate to the DSL runtime.
 //! Falls back to native on DSL failure.
 
-use super::class::Class;
+use super::class::{Class, ClassId};
 
 /// XP required to reach each level (index 0 = level 1 = 0 XP).
 /// Tables go up to level 14 for most human classes, less for demihumans.
-pub fn xp_for_level(class: Class, level: u32) -> u64 {
+pub fn xp_for_level(id: &ClassId, level: u32) -> u64 {
+    let class = id.to_enum().unwrap_or_else(|| panic!("unknown class: {}", id));
     #[cfg(feature = "dsl-backend")]
     if crate::backend::is_dsl(crate::backend::MechanicGroup::Xp) {
         if let Some(val) = dsl_gate::dsl_xp_for_level(class, level) {
@@ -21,26 +22,28 @@ pub fn xp_for_level(class: Class, level: u32) -> u64 {
 
 /// Check if a character has enough XP to advance to the next level.
 /// Returns the new level if advancement is possible, None otherwise.
-pub fn check_level_up(class: Class, current_level: u32, xp: u64) -> Option<u32> {
+pub fn check_level_up(id: &ClassId, current_level: u32, xp: u64) -> Option<u32> {
+    let _class = id.to_enum().unwrap_or_else(|| panic!("unknown class: {}", id));
     #[cfg(feature = "dsl-backend")]
     if crate::backend::is_dsl(crate::backend::MechanicGroup::Xp) {
-        if let Some(can_advance) = dsl_gate::dsl_check_level_up(class, current_level, xp) {
+        if let Some(can_advance) = dsl_gate::dsl_check_level_up(_class, current_level, xp) {
             return if can_advance { Some(current_level + 1) } else { None };
         }
     }
-    native_check_level_up(class, current_level, xp)
+    native_check_level_up(id, current_level, xp)
 }
 
 /// Calculate XP bonus/penalty from prime requisite score.
 /// Returns a percentage modifier: -20, -10, 0, +5, or +10.
-pub fn prime_req_xp_modifier(class: Class, abilities: &[i32; 6]) -> i32 {
+pub fn prime_req_xp_modifier(id: &ClassId, abilities: &[i32; 6]) -> i32 {
+    let _class = id.to_enum().unwrap_or_else(|| panic!("unknown class: {}", id));
     #[cfg(feature = "dsl-backend")]
     if crate::backend::is_dsl(crate::backend::MechanicGroup::Xp) {
-        if let Some(val) = dsl_gate::dsl_prime_req_xp_modifier(class, abilities) {
+        if let Some(val) = dsl_gate::dsl_prime_req_xp_modifier(_class, abilities) {
             return val;
         }
     }
-    native_prime_req_xp_modifier(class, abilities)
+    native_prime_req_xp_modifier(id, abilities)
 }
 
 /// Apply XP modifier and return adjusted XP amount.
@@ -69,13 +72,13 @@ fn native_xp_for_level(class: Class, level: u32) -> u64 {
     }
 }
 
-fn native_check_level_up(class: Class, current_level: u32, xp: u64) -> Option<u32> {
-    let max = super::class::class_def(class).max_level;
+fn native_check_level_up(id: &ClassId, current_level: u32, xp: u64) -> Option<u32> {
+    let max = super::class::class_def(id).max_level;
     if current_level >= max {
         return None;
     }
     let next = current_level + 1;
-    let needed = xp_for_level(class, next);
+    let needed = xp_for_level(id, next);
     if needed != u64::MAX && xp >= needed {
         Some(next)
     } else {
@@ -83,11 +86,11 @@ fn native_check_level_up(class: Class, current_level: u32, xp: u64) -> Option<u3
     }
 }
 
-fn native_prime_req_xp_modifier(class: Class, abilities: &[i32; 6]) -> i32 {
+fn native_prime_req_xp_modifier(id: &ClassId, abilities: &[i32; 6]) -> i32 {
     use super::class::class_def;
     use super::ability::prime_req_xp_mod;
 
-    let def = class_def(class);
+    let def = class_def(id);
     if def.prime_requisites.is_empty() {
         return 0;
     }
@@ -288,87 +291,87 @@ mod tests {
 
     #[test]
     fn fighter_xp_table() {
-        assert_eq!(xp_for_level(Class::Fighter, 1), 0);
-        assert_eq!(xp_for_level(Class::Fighter, 2), 2_000);
-        assert_eq!(xp_for_level(Class::Fighter, 3), 4_000);
-        assert_eq!(xp_for_level(Class::Fighter, 9), 240_000);
-        assert_eq!(xp_for_level(Class::Fighter, 14), 840_000);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Fighter), 1), 0);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Fighter), 2), 2_000);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Fighter), 3), 4_000);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Fighter), 9), 240_000);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Fighter), 14), 840_000);
     }
 
     #[test]
     fn thief_xp_table() {
-        assert_eq!(xp_for_level(Class::Thief, 1), 0);
-        assert_eq!(xp_for_level(Class::Thief, 2), 1_200);
-        assert_eq!(xp_for_level(Class::Thief, 5), 9_600);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Thief), 1), 0);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Thief), 2), 1_200);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Thief), 5), 9_600);
     }
 
     #[test]
     fn cleric_xp_table() {
-        assert_eq!(xp_for_level(Class::Cleric, 1), 0);
-        assert_eq!(xp_for_level(Class::Cleric, 2), 1_500);
-        assert_eq!(xp_for_level(Class::Cleric, 14), 700_000);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Cleric), 1), 0);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Cleric), 2), 1_500);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Cleric), 14), 700_000);
     }
 
     #[test]
     fn magic_user_xp_table() {
-        assert_eq!(xp_for_level(Class::MagicUser, 1), 0);
-        assert_eq!(xp_for_level(Class::MagicUser, 2), 2_500);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::MagicUser), 1), 0);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::MagicUser), 2), 2_500);
     }
 
     #[test]
     fn dwarf_xp_table() {
-        assert_eq!(xp_for_level(Class::Dwarf, 1), 0);
-        assert_eq!(xp_for_level(Class::Dwarf, 2), 2_200);
-        assert_eq!(xp_for_level(Class::Dwarf, 12), 660_000);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Dwarf), 1), 0);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Dwarf), 2), 2_200);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Dwarf), 12), 660_000);
     }
 
     #[test]
     fn beyond_max_level() {
         // Halfling max level 8, level 9 should return MAX
-        assert_eq!(xp_for_level(Class::Halfling, 9), u64::MAX);
+        assert_eq!(xp_for_level(&ClassId::from_enum(Class::Halfling), 9), u64::MAX);
     }
 
     #[test]
     fn check_level_up_ready() {
-        assert_eq!(check_level_up(Class::Fighter, 1, 2_000), Some(2));
-        assert_eq!(check_level_up(Class::Fighter, 1, 3_000), Some(2));
+        assert_eq!(check_level_up(&ClassId::from_enum(Class::Fighter), 1, 2_000), Some(2));
+        assert_eq!(check_level_up(&ClassId::from_enum(Class::Fighter), 1, 3_000), Some(2));
     }
 
     #[test]
     fn check_level_up_not_ready() {
-        assert_eq!(check_level_up(Class::Fighter, 1, 1_999), None);
+        assert_eq!(check_level_up(&ClassId::from_enum(Class::Fighter), 1, 1_999), None);
     }
 
     #[test]
     fn check_level_up_at_max() {
-        assert_eq!(check_level_up(Class::Halfling, 8, 999_999), None);
+        assert_eq!(check_level_up(&ClassId::from_enum(Class::Halfling), 8, 999_999), None);
     }
 
     #[test]
     fn duergar_cannot_exceed_max_level() {
         // Duergar max_level=10 but shares Dwarf XP table (12 levels).
         // Should not level past 10 even with enough XP.
-        assert_eq!(check_level_up(Class::Duergar, 10, 999_999), None);
+        assert_eq!(check_level_up(&ClassId::from_enum(Class::Duergar), 10, 999_999), None);
     }
 
     #[test]
     fn prime_req_modifier_fighter_high_str() {
         // Fighter prime req is STR. STR 16 = +10%
         let abilities = [16, 10, 10, 10, 10, 10];
-        assert_eq!(prime_req_xp_modifier(Class::Fighter, &abilities), 10);
+        assert_eq!(prime_req_xp_modifier(&ClassId::from_enum(Class::Fighter), &abilities), 10);
     }
 
     #[test]
     fn prime_req_modifier_fighter_low_str() {
         let abilities = [5, 10, 10, 10, 10, 10];
-        assert_eq!(prime_req_xp_modifier(Class::Fighter, &abilities), -20);
+        assert_eq!(prime_req_xp_modifier(&ClassId::from_enum(Class::Fighter), &abilities), -20);
     }
 
     #[test]
     fn prime_req_modifier_elf_dual() {
         // Elf has STR + INT prime requisites, uses lowest
         let abilities = [16, 10, 10, 10, 10, 10]; // INT 10 is the low one
-        assert_eq!(prime_req_xp_modifier(Class::Elf, &abilities), 0);
+        assert_eq!(prime_req_xp_modifier(&ClassId::from_enum(Class::Elf), &abilities), 0);
     }
 
     #[test]

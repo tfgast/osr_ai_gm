@@ -7,7 +7,9 @@ use crate::dice;
 use crate::model::{AbilityScores, Character};
 use crate::rules::ability;
 use crate::rules::alignment::Alignment;
-use crate::rules::class::{self, Class, CombatAptitude, class_def};
+use crate::rules::class::{self, ClassId, CombatAptitude, class_def};
+#[cfg(test)]
+use crate::rules::class::Class;
 use crate::rules::save;
 use crate::rules::equipment;
 
@@ -201,11 +203,12 @@ pub fn thac0(aptitude: CombatAptitude, level: u32) -> u32 {
 /// entry point — see `create_character_with` for a deterministic test variant.
 pub fn create_character(
     name: &str,
-    class: Class,
+    class: impl Into<ClassId>,
     abilities: [i32; 6],
     alignment: Alignment,
 ) -> Character {
-    let def = class_def(class);
+    let class_id: ClassId = class.into();
+    let def = class_def(&class_id);
 
     let con_mod = ability::con_hp_mod(abilities[class::CON]);
     let hp = roll_hp(def.hit_die, con_mod);
@@ -219,7 +222,7 @@ pub fn create_character(
 
     Character {
         name: name.to_string(),
-        class,
+        class: class_id,
         level: 1,
         abilities: AbilityScores::from_array(&abilities),
         hp,
@@ -243,12 +246,13 @@ pub fn create_character(
 /// Create a complete level-1 character with a specific RNG (for testing).
 pub fn create_character_with<R: Rng>(
     name: &str,
-    class: Class,
+    class: impl Into<ClassId>,
     abilities: [i32; 6],
     alignment: Alignment,
     rng: &mut R,
 ) -> Character {
-    let def = class_def(class);
+    let class_id: ClassId = class.into();
+    let def = class_def(&class_id);
 
     let con_mod = ability::con_hp_mod(abilities[class::CON]);
     let hp = roll_hp_with(def.hit_die, con_mod, rng);
@@ -262,7 +266,7 @@ pub fn create_character_with<R: Rng>(
 
     Character {
         name: name.to_string(),
-        class,
+        class: class_id,
         level: 1,
         abilities: AbilityScores::from_array(&abilities),
         hp,
@@ -404,7 +408,7 @@ mod tests {
             "Grond", Class::Fighter, abilities, Alignment::Neutral, &mut test_rng(),
         );
         assert_eq!(c.name, "Grond");
-        assert_eq!(c.class, Class::Fighter);
+        assert_eq!(c.class, ClassId::from(Class::Fighter));
         assert_eq!(c.level, 1);
         assert_eq!(c.alignment, Alignment::Neutral);
         assert_eq!(c.thac0, 19);
@@ -421,7 +425,7 @@ mod tests {
         let c = create_character_with(
             "Elara", Class::MagicUser, abilities, Alignment::Chaotic, &mut test_rng(),
         );
-        assert_eq!(c.class, Class::MagicUser);
+        assert_eq!(c.class, ClassId::from(Class::MagicUser));
         assert!(c.hp >= 1 && c.hp <= 4);
         assert_eq!(c.thac0, 19);
         let saves = c.saving_throws.unwrap();
@@ -431,13 +435,13 @@ mod tests {
     #[test]
     fn create_dwarf_with_racial_mods() {
         let mut abilities = [14, 10, 10, 10, 14, 10];
-        class::apply_racial_modifiers(Class::Dwarf, &mut abilities);
+        class::apply_racial_modifiers(&ClassId::from(Class::Dwarf), &mut abilities);
         assert_eq!(abilities[class::CON], 15); // +1
         assert_eq!(abilities[class::CHA], 9);  // -1
         let c = create_character_with(
             "Thorin", Class::Dwarf, abilities, Alignment::Lawful, &mut test_rng(),
         );
-        assert_eq!(c.class, Class::Dwarf);
+        assert_eq!(c.class, ClassId::from(Class::Dwarf));
         assert_eq!(c.abilities.constitution, 15);
         assert_eq!(c.abilities.charisma, 9);
         let saves = c.saving_throws.unwrap();
@@ -481,7 +485,7 @@ mod tests {
         assert!(!eligible.is_empty(), "at least one class should be eligible");
 
         // Pick first eligible class
-        let chosen = eligible[0];
+        let chosen = &eligible[0];
         let mut final_abilities = abilities;
         class::apply_racial_modifiers(chosen, &mut final_abilities);
 
@@ -492,7 +496,7 @@ mod tests {
         );
 
         let c = create_character_with(
-            "TestChar", chosen, final_abilities, Alignment::Neutral, &mut rng,
+            "TestChar", chosen.clone(), final_abilities, Alignment::Neutral, &mut rng,
         );
         assert_eq!(c.level, 1);
         assert!(c.hp >= 1);

@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
 
 /// Result payload for awarding XP.
 #[derive(Debug, Clone, Serialize)]
@@ -45,7 +45,7 @@ pub struct DeleteNoteResult {
 #[derive(Debug, Clone, Serialize)]
 pub struct RetainerSummary {
     pub name: String,
-    pub class: Class,
+    pub class: ClassId,
     pub level: u32,
     pub hp: i32,
     pub max_hp: i32,
@@ -64,7 +64,7 @@ pub struct ListRetainersResult {
 #[derive(Debug, Clone, Serialize)]
 pub struct DismissRetainerResult {
     pub name: String,
-    pub class: Class,
+    pub class: ClassId,
 }
 
 /// Result payload for healing a character.

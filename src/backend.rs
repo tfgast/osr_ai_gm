@@ -21,6 +21,7 @@ pub enum MechanicGroup {
 }
 
 impl MechanicGroup {
+    #[cfg(test)]
     fn env_suffix(&self) -> &'static str {
         match self {
             MechanicGroup::Combat => "COMBAT",

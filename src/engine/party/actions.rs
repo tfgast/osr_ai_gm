@@ -2,7 +2,7 @@ use crate::engine::chargen;
 use crate::engine::result::EngineError;
 use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
-use crate::rules::class::{self, Class};
+use crate::rules::class::{self, Class, ClassId};
 use crate::rules::encumbrance;
 use crate::rules::xp::{check_level_up, xp_for_level};
 
@@ -18,10 +18,11 @@ fn ability_name(idx: usize) -> &'static str {
 pub fn action_create_character(
     state: &mut GameState,
     name: &str,
-    class: Class,
+    class: impl Into<ClassId>,
     alignment: Alignment,
     provided_abilities: Option<[i32; 6]>,
 ) -> Result<CreateCharacterResult, EngineError> {
+    let class_id: ClassId = class.into();
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return Err(EngineError::InvalidInput(
@@ -48,17 +49,17 @@ pub fn action_create_character(
     let base_abilities = provided_abilities.unwrap_or_else(chargen::roll_abilities);
     let mut abilities = base_abilities;
 
-    let def = class::class_def(class);
+    let def = class::class_def(&class_id);
     let applied_racial_modifiers = !def.racial_modifiers.is_empty();
     if applied_racial_modifiers {
-        class::apply_racial_modifiers(class, &mut abilities);
+        class::apply_racial_modifiers(&class_id, &mut abilities);
     }
 
-    if !class::meets_requirements(class, &abilities) {
+    if !class::meets_requirements(&class_id, &abilities) {
         let eligible_classes = class::eligible_classes(&abilities);
         return Ok(CreateCharacterResult {
             name: name.to_string(),
-            class,
+            class: class_id,
             alignment,
             used_provided_abilities: provided_abilities.is_some(),
             base_abilities,
@@ -70,13 +71,13 @@ pub fn action_create_character(
         });
     }
 
-    let character = chargen::create_character(name, class, abilities, alignment);
+    let character = chargen::create_character(name, class_id.clone(), abilities, alignment);
     let character_sheet = chargen::character_sheet(&character);
     state.party.add_member(character);
 
     Ok(CreateCharacterResult {
         name: name.to_string(),
-        class,
+        class: class_id,
         alignment,
         used_provided_abilities: provided_abilities.is_some(),
         base_abilities,
@@ -95,7 +96,7 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
         .iter()
         .map(|character| {
             let next_level_xp = if character.is_alive() {
-                let next = xp_for_level(character.class, character.level + 1);
+                let next = xp_for_level(&character.class, character.level + 1);
                 if next == u64::MAX {
                     None
                 } else {
@@ -122,7 +123,7 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
 
             PartyMemberSummary {
                 name: character.name.clone(),
-                class: character.class,
+                class: character.class.clone(),
                 level: character.level,
                 hp: character.hp,
                 max_hp: character.max_hp,
@@ -134,7 +135,7 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
                 movement_rate: character.movement_rate,
                 next_level_xp,
                 ready_to_train: character.is_alive()
-                    && check_level_up(character.class, character.level, character.xp).is_some(),
+                    && check_level_up(&character.class, character.level, character.xp).is_some(),
                 inventory: MemberInventorySummary {
                     total_weight_cn,
                     encumbrance_level,
@@ -157,7 +158,8 @@ pub fn action_list_classes() -> Result<ListClassesResult, EngineError> {
     let classes = Class::ALL
         .iter()
         .map(|&class| {
-            let def = class::class_def(class);
+            let class_id: ClassId = class.into();
+            let def = class::class_def(&class_id);
             let requirements = def
                 .requirements
                 .iter()
@@ -167,7 +169,7 @@ pub fn action_list_classes() -> Result<ListClassesResult, EngineError> {
                 })
                 .collect();
             ClassSummary {
-                name: class.name().to_string(),
+                name: class_id.name().to_string(),
                 hit_die: def.hit_die,
                 requirements,
                 is_demihuman: def.is_demihuman,

@@ -153,7 +153,7 @@ mod tests {
     fn test_fighter() -> Character {
         Character {
             name: "Grond".to_string(),
-            class: Class::Fighter,
+            class: Class::Fighter.into(),
             level: 1,
             abilities: AbilityScores {
                 strength: 16,
@@ -184,7 +184,7 @@ mod tests {
     fn test_cleric() -> Character {
         Character {
             name: "Brother Aldric".to_string(),
-            class: Class::Cleric,
+            class: Class::Cleric.into(),
             level: 3,
             abilities: AbilityScores {
                 strength: 12,
@@ -215,7 +215,7 @@ mod tests {
     fn test_magic_user() -> Character {
         Character {
             name: "Elara".to_string(),
-            class: Class::MagicUser,
+            class: Class::MagicUser.into(),
             level: 1,
             abilities: AbilityScores {
                 strength: 8,

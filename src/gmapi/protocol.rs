@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::rules::alignment::Alignment;
 use crate::rules::attack::HitDice;
-use crate::rules::class::Class;
+use crate::rules::class::{Class, ClassId};
 use crate::state::dungeon::DoorState;
 use crate::state::game::GameMode;
 use crate::state::time::LightSourceKind;
@@ -69,7 +69,7 @@ pub enum GMCommand {
     CreateCharacter {
         name: String,
         #[serde(deserialize_with = "deserialize_class")]
-        class: Class,
+        class: ClassId,
         #[serde(default)]
         alignment: Alignment,
         /// Optional pre-rolled ability scores [STR, INT, WIS, DEX, CON, CHA].
@@ -298,7 +298,7 @@ pub enum GMCommand {
         employer: String,
         retainer_name: String,
         #[serde(deserialize_with = "deserialize_class")]
-        retainer_class: Class,
+        retainer_class: ClassId,
         retainer_level: u32,
     },
     /// Check retainer loyalty.
@@ -419,9 +419,12 @@ fn default_save_path() -> String { "save.json".to_string() }
 fn default_distance() -> u32 { 60 }
 
 /// Deserialize a `Class` from a string, using `Class::parse` for flexible matching.
-fn deserialize_class<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Class, D::Error> {
+fn deserialize_class<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<ClassId, D::Error> {
     let s = String::deserialize(deserializer)?;
-    Class::parse(&s).ok_or_else(|| serde::de::Error::custom(format!("unknown class '{}'", s)))
+    // Validate the class name is known, then return as ClassId
+    Class::parse(&s)
+        .map(ClassId::from_enum)
+        .ok_or_else(|| serde::de::Error::custom(format!("unknown class '{}'", s)))
 }
 
 // =============================================================================
@@ -716,7 +719,7 @@ mod tests {
         match &req.command {
             GMCommand::CreateCharacter { name, class, alignment, abilities } => {
                 assert_eq!(name, "Aldric");
-                assert_eq!(*class, Class::Fighter);
+                assert_eq!(*class, ClassId::from_enum(Class::Fighter));
                 assert_eq!(*alignment, Alignment::default()); // default
                 assert!(abilities.is_none()); // default
             }
@@ -731,7 +734,7 @@ mod tests {
         match &req.command {
             GMCommand::CreateCharacter { name, class, alignment, abilities } => {
                 assert_eq!(name, "Hoyret");
-                assert_eq!(*class, Class::Ranger);
+                assert_eq!(*class, ClassId::from_enum(Class::Ranger));
                 assert_eq!(*alignment, Alignment::Neutral);
                 assert_eq!(*abilities, Some([12, 13, 11, 12, 5, 6]));
             }

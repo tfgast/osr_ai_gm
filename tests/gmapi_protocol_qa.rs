@@ -391,7 +391,7 @@ fn create_character_happy_path() {
     let mut state = GameState::new();
     let resp = handle_request(&req("cc1", GMCommand::CreateCharacter {
         name: "Aldric".to_string(),
-        class: Class::Fighter,
+        class: Class::Fighter.into(),
         alignment: Alignment::Lawful,
         abilities: None,
     }), &mut state);
@@ -408,7 +408,7 @@ fn create_character_with_abilities() {
     let mut state = GameState::new();
     let resp = handle_request(&req("cc_ab", GMCommand::CreateCharacter {
         name: "Hoyret".to_string(),
-        class: Class::Ranger,
+        class: Class::Ranger.into(),
         alignment: Alignment::Neutral,
         abilities: Some([13, 13, 13, 13, 13, 13]),
     }), &mut state);
@@ -426,7 +426,7 @@ fn create_character_abilities_out_of_range() {
     let mut state = GameState::new();
     let resp = handle_request(&req("cc_bad", GMCommand::CreateCharacter {
         name: "BadStats".to_string(),
-        class: Class::Fighter,
+        class: Class::Fighter.into(),
         alignment: Alignment::Neutral,
         abilities: Some([20, 10, 10, 10, 10, 10]),
     }), &mut state);
@@ -2308,7 +2308,7 @@ fn hire_retainer_happy_path() {
     let resp = handle_request(&req("hr1", GMCommand::HireRetainer {
         employer: "Father Gregory".to_string(),
         retainer_name: "Hrothgar".to_string(),
-        retainer_class: Class::Fighter,
+        retainer_class: Class::Fighter.into(),
         retainer_level: 1,
     }), &mut state);
     assert_response_format(&resp, "hr1");
@@ -2336,7 +2336,7 @@ fn hire_retainer_unknown_employer() {
     let resp = handle_request(&req("hr2", GMCommand::HireRetainer {
         employer: "Nobody".to_string(),
         retainer_name: "Hrothgar".to_string(),
-        retainer_class: Class::Fighter,
+        retainer_class: Class::Fighter.into(),
         retainer_level: 1,
     }), &mut state);
     assert!(!resp.success);

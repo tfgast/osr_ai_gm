@@ -66,7 +66,7 @@ impl Command for HireCommand {
         match retainer_actions::action_hire_retainer(
             state,
             ret_name,
-            class,
+            class.into(),
             employer,
             1,
             HireRetainerMode::RecruitToParty,

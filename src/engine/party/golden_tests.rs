@@ -151,7 +151,7 @@ fn party_command_parity_golden_scaffold_captures_snapshots() {
             },
             GMCommand::CreateCharacter {
                 name: "Borin".to_string(),
-                class: Class::Knight,
+                class: Class::Knight.into(),
                 alignment: Alignment::Neutral,
                 abilities: Some([8, 8, 8, 8, 8, 8]),
             },

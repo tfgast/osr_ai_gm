@@ -148,6 +148,11 @@ impl ClassId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// Display name for this class (same as as_str, provided for API parity with Class).
+    pub fn name(&self) -> &str {
+        &self.0
+    }
 }
 
 impl std::fmt::Display for ClassId {
@@ -226,8 +231,15 @@ pub const DEX: usize = 3;
 pub const CON: usize = 4;
 pub const CHA: usize = 5;
 
-/// Get the full class definition for a given class.
-pub fn class_def(class: Class) -> ClassDef {
+/// Get the full class definition for a given class by ClassId.
+/// Resolves to the enum variant internally for DSL/native lookup.
+pub fn class_def(id: &ClassId) -> ClassDef {
+    let class = id.to_enum().unwrap_or_else(|| panic!("unknown class: {}", id));
+    class_def_enum(class)
+}
+
+/// Internal: get class def by enum variant (used by registry build and DSL gate).
+fn class_def_enum(class: Class) -> ClassDef {
     #[cfg(feature = "dsl-backend")]
     if crate::backend::is_dsl(crate::backend::MechanicGroup::Class) {
         if let Some(def) = dsl_gate::dsl_class_def(class) {
@@ -574,14 +586,15 @@ fn native_class_def(class: Class) -> ClassDef {
 
 /// Check if a set of ability scores meets the requirements for a class.
 /// Abilities array: [STR, INT, WIS, DEX, CON, CHA] (after racial modifiers).
-pub fn meets_requirements(class: Class, abilities: &[i32; 6]) -> bool {
+pub fn meets_requirements(id: &ClassId, abilities: &[i32; 6]) -> bool {
+    let _class = id.to_enum().unwrap_or_else(|| panic!("unknown class: {}", id));
     #[cfg(feature = "dsl-backend")]
     if crate::backend::is_dsl(crate::backend::MechanicGroup::Class) {
-        if let Some(val) = dsl_gate::dsl_meets_requirements(class, abilities) {
+        if let Some(val) = dsl_gate::dsl_meets_requirements(_class, abilities) {
             return val;
         }
     }
-    let def = class_def(class);
+    let def = class_def(id);
     for &(idx, min) in def.requirements {
         if abilities[idx] < min {
             return false;
@@ -592,8 +605,8 @@ pub fn meets_requirements(class: Class, abilities: &[i32; 6]) -> bool {
 
 /// Apply racial ability modifiers for a demihuman class.
 /// Modifies abilities in place and clamps to 3..=18.
-pub fn apply_racial_modifiers(class: Class, abilities: &mut [i32; 6]) {
-    let def = class_def(class);
+pub fn apply_racial_modifiers(id: &ClassId, abilities: &mut [i32; 6]) {
+    let def = class_def(id);
     for &(idx, modifier) in def.racial_modifiers {
         abilities[idx] = (abilities[idx] + modifier).clamp(3, 18);
     }
@@ -601,19 +614,21 @@ pub fn apply_racial_modifiers(class: Class, abilities: &mut [i32; 6]) {
 
 /// Get all classes that a given set of abilities qualifies for.
 /// For demihuman classes, racial modifiers are applied before checking requirements.
-pub fn eligible_classes(abilities: &[i32; 6]) -> Vec<Class> {
+pub fn eligible_classes(abilities: &[i32; 6]) -> Vec<ClassId> {
     Class::ALL.iter()
         .copied()
         .filter(|&c| {
-            let def = class_def(c);
+            let id = ClassId::from_enum(c);
+            let def = class_def(&id);
             if def.racial_modifiers.is_empty() {
-                meets_requirements(c, abilities)
+                meets_requirements(&id, abilities)
             } else {
                 let mut modified = *abilities;
-                apply_racial_modifiers(c, &mut modified);
-                meets_requirements(c, &modified)
+                apply_racial_modifiers(&id, &mut modified);
+                meets_requirements(&id, &modified)
             }
         })
+        .map(ClassId::from_enum)
         .collect()
 }
 
@@ -851,7 +866,7 @@ impl ClassRegistry {
         let mut by_name = std::collections::HashMap::with_capacity(Class::ALL.len());
 
         for &class in &Class::ALL {
-            let def = class_def(class);
+            let def = class_def_enum(class);
             by_name.insert(class.name().to_string(), classes.len());
             classes.push(def);
         }
@@ -913,7 +928,7 @@ mod tests {
 
     #[test]
     fn fighter_def() {
-        let def = class_def(Class::Fighter);
+        let def = class_def(&ClassId::from_enum(Class::Fighter));
         assert_eq!(def.hit_die, 8);
         assert_eq!(def.combat_aptitude, CombatAptitude::Martial);
         assert_eq!(def.max_level, 14);
@@ -924,7 +939,7 @@ mod tests {
 
     #[test]
     fn magic_user_def() {
-        let def = class_def(Class::MagicUser);
+        let def = class_def(&ClassId::from_enum(Class::MagicUser));
         assert_eq!(def.hit_die, 4);
         assert_eq!(def.combat_aptitude, CombatAptitude::NonMartial);
         assert_eq!(def.armour, ArmourPermission::None);
@@ -934,7 +949,7 @@ mod tests {
 
     #[test]
     fn dwarf_def() {
-        let def = class_def(Class::Dwarf);
+        let def = class_def(&ClassId::from_enum(Class::Dwarf));
         assert_eq!(def.hit_die, 8);
         assert!(def.is_demihuman);
         assert_eq!(def.max_level, 12);
@@ -957,51 +972,51 @@ mod tests {
         ];
         let non = [Class::Gnome, Class::Illusionist, Class::MagicUser];
         // Also Fighter is martial
-        assert_eq!(class_def(Class::Fighter).combat_aptitude, Martial);
+        assert_eq!(class_def(&ClassId::from_enum(Class::Fighter)).combat_aptitude, Martial);
 
-        for c in martial { assert_eq!(class_def(c).combat_aptitude, Martial, "{:?}", c); }
-        for c in semi { assert_eq!(class_def(c).combat_aptitude, SemiMartial, "{:?}", c); }
-        for c in non { assert_eq!(class_def(c).combat_aptitude, NonMartial, "{:?}", c); }
+        for c in martial { assert_eq!(class_def(&ClassId::from_enum(c)).combat_aptitude, Martial, "{:?}", c); }
+        for c in semi { assert_eq!(class_def(&ClassId::from_enum(c)).combat_aptitude, SemiMartial, "{:?}", c); }
+        for c in non { assert_eq!(class_def(&ClassId::from_enum(c)).combat_aptitude, NonMartial, "{:?}", c); }
     }
 
     #[test]
     fn meets_fighter_requirements() {
         let abilities = [10, 10, 10, 10, 10, 10];
-        assert!(meets_requirements(Class::Fighter, &abilities));
+        assert!(meets_requirements(&ClassId::from_enum(Class::Fighter), &abilities));
     }
 
     #[test]
     fn meets_barbarian_requirements() {
         // Barbarian needs STR 9, DEX 9, CON 9
-        assert!(meets_requirements(Class::Barbarian, &[9, 10, 10, 9, 9, 10]));
-        assert!(!meets_requirements(Class::Barbarian, &[8, 10, 10, 9, 9, 10]));
-        assert!(!meets_requirements(Class::Barbarian, &[9, 10, 10, 8, 9, 10]));
+        assert!(meets_requirements(&ClassId::from_enum(Class::Barbarian), &[9, 10, 10, 9, 9, 10]));
+        assert!(!meets_requirements(&ClassId::from_enum(Class::Barbarian), &[8, 10, 10, 9, 9, 10]));
+        assert!(!meets_requirements(&ClassId::from_enum(Class::Barbarian), &[9, 10, 10, 8, 9, 10]));
     }
 
     #[test]
     fn meets_dwarf_requirements() {
-        assert!(meets_requirements(Class::Dwarf, &[10, 10, 10, 10, 9, 10]));
-        assert!(!meets_requirements(Class::Dwarf, &[10, 10, 10, 10, 8, 10]));
+        assert!(meets_requirements(&ClassId::from_enum(Class::Dwarf), &[10, 10, 10, 10, 9, 10]));
+        assert!(!meets_requirements(&ClassId::from_enum(Class::Dwarf), &[10, 10, 10, 10, 8, 10]));
     }
 
     #[test]
     fn apply_dwarf_modifiers() {
         let mut abilities = [10, 10, 10, 10, 10, 10];
-        apply_racial_modifiers(Class::Dwarf, &mut abilities);
+        apply_racial_modifiers(&ClassId::from_enum(Class::Dwarf), &mut abilities);
         assert_eq!(abilities, [10, 10, 10, 10, 11, 9]); // CON+1, CHA-1
     }
 
     #[test]
     fn apply_halfling_modifiers() {
         let mut abilities = [10, 10, 10, 10, 10, 10];
-        apply_racial_modifiers(Class::Halfling, &mut abilities);
+        apply_racial_modifiers(&ClassId::from_enum(Class::Halfling), &mut abilities);
         assert_eq!(abilities, [9, 10, 10, 11, 10, 10]); // STR-1, DEX+1
     }
 
     #[test]
     fn apply_modifier_clamping() {
         let mut abilities = [3, 10, 10, 10, 10, 10];
-        apply_racial_modifiers(Class::Halfling, &mut abilities);
+        apply_racial_modifiers(&ClassId::from_enum(Class::Halfling), &mut abilities);
         assert_eq!(abilities[0], 3); // STR can't go below 3
     }
 
@@ -1010,12 +1025,12 @@ mod tests {
         let abilities = [10, 10, 10, 10, 10, 10];
         let eligible = eligible_classes(&abilities);
         // Should include Fighter, Cleric, MU, Thief, etc.
-        assert!(eligible.contains(&Class::Fighter));
-        assert!(eligible.contains(&Class::Cleric));
-        assert!(eligible.contains(&Class::MagicUser));
-        assert!(eligible.contains(&Class::Thief));
+        assert!(eligible.contains(&ClassId::from_enum(Class::Fighter)));
+        assert!(eligible.contains(&ClassId::from_enum(Class::Cleric)));
+        assert!(eligible.contains(&ClassId::from_enum(Class::MagicUser)));
+        assert!(eligible.contains(&ClassId::from_enum(Class::Thief)));
         // Should not include classes with CON 9 requirement if CON is 10
-        assert!(eligible.contains(&Class::Dwarf));
+        assert!(eligible.contains(&ClassId::from_enum(Class::Dwarf)));
     }
 
     #[test]
@@ -1023,12 +1038,12 @@ mod tests {
         let abilities = [3, 3, 3, 3, 3, 3];
         let eligible = eligible_classes(&abilities);
         // Only classes with no requirements
-        assert!(eligible.contains(&Class::Fighter));
-        assert!(eligible.contains(&Class::Cleric));
-        assert!(eligible.contains(&Class::MagicUser));
-        assert!(eligible.contains(&Class::Thief));
-        assert!(!eligible.contains(&Class::Dwarf)); // needs CON 9
-        assert!(!eligible.contains(&Class::Barbarian)); // needs STR/DEX/CON 9
+        assert!(eligible.contains(&ClassId::from_enum(Class::Fighter)));
+        assert!(eligible.contains(&ClassId::from_enum(Class::Cleric)));
+        assert!(eligible.contains(&ClassId::from_enum(Class::MagicUser)));
+        assert!(eligible.contains(&ClassId::from_enum(Class::Thief)));
+        assert!(!eligible.contains(&ClassId::from_enum(Class::Dwarf))); // needs CON 9
+        assert!(!eligible.contains(&ClassId::from_enum(Class::Barbarian))); // needs STR/DEX/CON 9
     }
 
     // ── Capability tag tests ──────────────────────────────────
@@ -1040,7 +1055,7 @@ mod tests {
             Class::HalfOrc, Class::Bard,
         ];
         for c in Class::ALL {
-            let def = class_def(c);
+            let def = class_def(&ClassId::from_enum(c));
             if thief_classes.contains(&c) {
                 assert!(def.has_thief_skills, "{:?} should have thief skills", c);
             } else {
@@ -1053,7 +1068,7 @@ mod tests {
     fn can_backstab_tags() {
         let backstab_classes = [Class::Thief, Class::Assassin];
         for c in Class::ALL {
-            let def = class_def(c);
+            let def = class_def(&ClassId::from_enum(c));
             if backstab_classes.contains(&c) {
                 assert!(def.can_backstab, "{:?} should be able to backstab", c);
             } else {
@@ -1066,7 +1081,7 @@ mod tests {
     fn can_turn_undead_tags() {
         let turn_classes = [Class::Cleric, Class::Paladin];
         for c in Class::ALL {
-            let def = class_def(c);
+            let def = class_def(&ClassId::from_enum(c));
             if turn_classes.contains(&c) {
                 assert!(def.can_turn_undead, "{:?} should be able to turn undead", c);
             } else {
@@ -1083,7 +1098,7 @@ mod tests {
             Class::Elf, Class::Dwarf, Class::Halfling,
         ];
         for c in Class::ALL {
-            let def = class_def(c);
+            let def = class_def(&ClassId::from_enum(c));
             if bx_classes.contains(&c) {
                 assert_eq!(def.bx_equivalent, None, "{:?} is a B/X class, bx_equivalent should be None", c);
             } else {
@@ -1091,13 +1106,13 @@ mod tests {
             }
         }
         // Spot-check specific mappings
-        assert_eq!(class_def(Class::Barbarian).bx_equivalent, Some(Class::Fighter));
-        assert_eq!(class_def(Class::Acrobat).bx_equivalent, Some(Class::Thief));
-        assert_eq!(class_def(Class::Druid).bx_equivalent, Some(Class::Cleric));
-        assert_eq!(class_def(Class::Illusionist).bx_equivalent, Some(Class::MagicUser));
-        assert_eq!(class_def(Class::Drow).bx_equivalent, Some(Class::Elf));
-        assert_eq!(class_def(Class::Duergar).bx_equivalent, Some(Class::Dwarf));
-        assert_eq!(class_def(Class::Gnome).bx_equivalent, Some(Class::Halfling));
+        assert_eq!(class_def(&ClassId::from_enum(Class::Barbarian)).bx_equivalent, Some(Class::Fighter));
+        assert_eq!(class_def(&ClassId::from_enum(Class::Acrobat)).bx_equivalent, Some(Class::Thief));
+        assert_eq!(class_def(&ClassId::from_enum(Class::Druid)).bx_equivalent, Some(Class::Cleric));
+        assert_eq!(class_def(&ClassId::from_enum(Class::Illusionist)).bx_equivalent, Some(Class::MagicUser));
+        assert_eq!(class_def(&ClassId::from_enum(Class::Drow)).bx_equivalent, Some(Class::Elf));
+        assert_eq!(class_def(&ClassId::from_enum(Class::Duergar)).bx_equivalent, Some(Class::Dwarf));
+        assert_eq!(class_def(&ClassId::from_enum(Class::Gnome)).bx_equivalent, Some(Class::Halfling));
     }
 
     // ── ClassId tests ─────────────────────────────────────────

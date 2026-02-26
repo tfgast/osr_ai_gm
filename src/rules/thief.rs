@@ -124,32 +124,18 @@ pub fn backstab_multiplier(level: u32) -> u32 {
 /// Backstab attack bonus: +4 to hit.
 pub const BACKSTAB_ATTACK_BONUS: i32 = 4;
 
-/// Whether a class has thief skills.
-pub fn has_thief_skills(class: crate::rules::class::Class) -> bool {
-    #[cfg(feature = "dsl-backend")]
-    {
-        if crate::backend::is_dsl(crate::backend::MechanicGroup::Thief) {
-            if let Some(val) = dsl_gate::dsl_has_thief_skills(class) {
-                return val;
-            }
-        }
-    }
-    use crate::rules::class::Class;
-    matches!(class, Class::Thief | Class::Acrobat | Class::Assassin | Class::HalfOrc | Class::Bard)
+/// Whether a class has thief skills. Uses ClassDef capability field via registry.
+pub fn has_thief_skills(id: &crate::rules::class::ClassId) -> bool {
+    crate::rules::class::class_registry()
+        .get_by_id(id)
+        .is_some_and(|d| d.has_thief_skills)
 }
 
-/// Whether a class can backstab.
-pub fn can_backstab(class: crate::rules::class::Class) -> bool {
-    #[cfg(feature = "dsl-backend")]
-    {
-        if crate::backend::is_dsl(crate::backend::MechanicGroup::Thief) {
-            if let Some(val) = dsl_gate::dsl_can_backstab(class) {
-                return val;
-            }
-        }
-    }
-    use crate::rules::class::Class;
-    matches!(class, Class::Thief | Class::Assassin)
+/// Whether a class can backstab. Uses ClassDef capability field via registry.
+pub fn can_backstab(id: &crate::rules::class::ClassId) -> bool {
+    crate::rules::class::class_registry()
+        .get_by_id(id)
+        .is_some_and(|d| d.can_backstab)
 }
 
 // ── DSL gate helpers ──────────────────────────────────────────
@@ -305,21 +291,21 @@ mod tests {
 
     #[test]
     fn thief_has_skills() {
-        use crate::rules::class::Class;
-        assert!(has_thief_skills(Class::Thief));
-        assert!(has_thief_skills(Class::Assassin));
-        assert!(has_thief_skills(Class::Acrobat));
-        assert!(!has_thief_skills(Class::Fighter));
-        assert!(!has_thief_skills(Class::Cleric));
+        use crate::rules::class::{Class, ClassId};
+        assert!(has_thief_skills(&ClassId::from_enum(Class::Thief)));
+        assert!(has_thief_skills(&ClassId::from_enum(Class::Assassin)));
+        assert!(has_thief_skills(&ClassId::from_enum(Class::Acrobat)));
+        assert!(!has_thief_skills(&ClassId::from_enum(Class::Fighter)));
+        assert!(!has_thief_skills(&ClassId::from_enum(Class::Cleric)));
     }
 
     #[test]
     fn thief_can_backstab() {
-        use crate::rules::class::Class;
-        assert!(can_backstab(Class::Thief));
-        assert!(can_backstab(Class::Assassin));
-        assert!(!can_backstab(Class::Acrobat));
-        assert!(!can_backstab(Class::Fighter));
+        use crate::rules::class::{Class, ClassId};
+        assert!(can_backstab(&ClassId::from_enum(Class::Thief)));
+        assert!(can_backstab(&ClassId::from_enum(Class::Assassin)));
+        assert!(!can_backstab(&ClassId::from_enum(Class::Acrobat)));
+        assert!(!can_backstab(&ClassId::from_enum(Class::Fighter)));
     }
 
     #[test]

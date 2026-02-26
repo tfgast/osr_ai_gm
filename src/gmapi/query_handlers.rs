@@ -2,7 +2,7 @@ use crate::engine::{combat, exploration, lookup, party, rumor, wilderness_engine
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
 use crate::rules::encumbrance;
 use crate::rules::spell_data;
 use crate::state::effect::ActiveEffect;
@@ -235,7 +235,7 @@ struct ModifierData {
 #[derive(Serialize)]
 struct QueryPartyMemberData {
     name: String,
-    class: Class,
+    class: ClassId,
     level: u32,
     hp: i32,
     max_hp: i32,
@@ -271,7 +271,7 @@ fn effect_to_typed(e: &ActiveEffect) -> EffectData {
 fn query_party_member_data(member: &party::results::PartyMemberSummary, effects: &[ActiveEffect]) -> QueryPartyMemberData {
     QueryPartyMemberData {
         name: member.name.clone(),
-        class: member.class,
+        class: member.class.clone(),
         level: member.level,
         hp: member.hp,
         max_hp: member.max_hp,
@@ -358,7 +358,7 @@ struct EligibleAbilitiesData {
 #[derive(Serialize)]
 struct EligibleClassesData {
     abilities: EligibleAbilitiesData,
-    eligible: Vec<Class>,
+    eligible: Vec<ClassId>,
     count: usize,
 }
 

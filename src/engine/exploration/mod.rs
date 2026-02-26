@@ -403,7 +403,7 @@ pub fn pick_lock_with<R: Rng>(
         };
     }
 
-    if !thief::has_thief_skills(character.class) {
+    if !thief::has_thief_skills(&character.class) {
         return PickLockResult {
             success: false,
             message: format!("{} does not have lockpicking skills.", character.name),

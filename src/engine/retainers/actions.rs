@@ -3,7 +3,7 @@ use rand::Rng;
 use crate::engine::result::EngineError;
 use crate::engine::retainer::{self, HireReaction, LoyaltyResult, Retainer};
 use crate::persist::GameState;
-use crate::rules::class::{self, Class};
+use crate::rules::class::{self, ClassId};
 
 use super::results::{
     DismissRetainerResult, HireRetainerMode, HireRetainerResult, ListRetainersResult,
@@ -49,7 +49,7 @@ fn loyalty_result_name(result: LoyaltyResult) -> &'static str {
 pub fn action_hire_retainer(
     state: &mut GameState,
     retainer_name: &str,
-    retainer_class: Class,
+    retainer_class: ClassId,
     employer_name: Option<&str>,
     retainer_level: u32,
     mode: HireRetainerMode,
@@ -129,7 +129,7 @@ pub fn action_hire_retainer(
                     ));
                 }
                 HireReaction::Accepts | HireReaction::Eager => {
-                    let def = class::class_def(retainer_class);
+                    let def = class::class_def(&retainer_class);
                     let rolled_hp: i32 = {
                         let mut rng = rand::thread_rng();
                         let roll: i32 = rng.gen_range(1..=def.hit_die as i32);
@@ -142,7 +142,7 @@ pub fn action_hire_retainer(
 
                     let retainer = Retainer::new(
                         &final_name,
-                        retainer_class,
+                        retainer_class.clone(),
                         level,
                         rolled_hp,
                         loyalty,
@@ -179,7 +179,7 @@ pub fn action_hire_retainer(
         message,
         employer: employer.name,
         retainer: final_name,
-        class: retainer_class,
+        class: retainer_class.clone(),
         level,
         reaction: reaction.name().to_string(),
         hired,
@@ -215,7 +215,7 @@ pub fn action_list_retainers(state: &GameState) -> Result<ListRetainersResult, E
         .iter()
         .map(|r| RetainerSummary {
             name: r.name.clone(),
-            class: r.class,
+            class: r.class.clone(),
             level: r.level,
             hp: r.hp,
             max_hp: r.max_hp,
@@ -319,6 +319,7 @@ pub fn action_retainer_morale(
 mod tests {
     use super::*;
     use crate::model::Character;
+    use crate::rules::class::Class;
 
     fn state_with_party() -> GameState {
         let mut state = GameState::new();
@@ -367,7 +368,7 @@ mod tests {
         let result = action_hire_retainer(
             &mut state,
             "Hrothgar",
-            Class::Fighter,
+            Class::Fighter.into(),
             Some("Nobody"),
             1,
             HireRetainerMode::AssessOnly,
@@ -387,7 +388,7 @@ mod tests {
         let result = action_hire_retainer(
             &mut state,
             "OneMore",
-            Class::Fighter,
+            Class::Fighter.into(),
             None,
             1,
             HireRetainerMode::RecruitToParty,

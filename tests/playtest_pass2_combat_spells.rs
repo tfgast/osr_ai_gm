@@ -1126,7 +1126,7 @@ fn create_character_via_gmapi() {
 
     let resp = handle_request(&req("cc1", GMCommand::CreateCharacter {
         name: "Test Fighter".to_string(),
-        class: Class::Fighter,
+        class: Class::Fighter.into(),
         alignment: Alignment::Lawful,
         abilities: Some([16, 10, 9, 12, 14, 11]),
     }), &mut state);

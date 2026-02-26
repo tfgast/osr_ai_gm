@@ -604,7 +604,8 @@ pub fn npc_member_to_monster(member: &NpcMember) -> crate::model::Monster {
     use crate::rules::class::{class_def, CombatAptitude};
     use crate::dice;
 
-    let def = class_def(member.class);
+    let class_id = crate::rules::class::ClassId::from_enum(member.class);
+    let def = class_def(&class_id);
     let (hit_die, aptitude) = (def.hit_die, def.combat_aptitude);
 
     // Roll HP: level * hit_die (e.g. level 3 Fighter = 3d8)

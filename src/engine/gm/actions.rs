@@ -46,11 +46,11 @@ pub fn action_award_xp(
         )
     } else {
         character.xp += amount;
-        let ready = check_level_up(character.class, character.level, character.xp).is_some();
+        let ready = check_level_up(&character.class, character.level, character.xp).is_some();
         (amount, 0, character.xp, ready)
     };
 
-    let next_xp = xp_for_level(character.class, character.level + 1);
+    let next_xp = xp_for_level(&character.class, character.level + 1);
     let next_level_xp = if next_xp == u64::MAX {
         None
     } else {
@@ -116,7 +116,7 @@ pub fn action_list_retainers(state: &GameState) -> Result<ListRetainersResult, E
         .iter()
         .map(|r| RetainerSummary {
             name: r.name.clone(),
-            class: r.class,
+            class: r.class.clone(),
             level: r.level,
             hp: r.hp,
             max_hp: r.max_hp,
@@ -143,7 +143,7 @@ pub fn action_dismiss_retainer(
             let removed = state.retainers.remove(i);
             Ok(DismissRetainerResult {
                 name: removed.name,
-                class: removed.class,
+                class: removed.class.clone(),
             })
         }
         None => Err(EngineError::InvalidInput(format!(
@@ -358,9 +358,9 @@ pub fn action_level_up(state: &mut GameState, char_name: &str) -> Result<TrainRe
         .party
         .find_member_mut(char_name)
         .ok_or_else(|| no_party_member_err(char_name))?;
-    let cls = character.class;
-    let _next_level = check_level_up(cls, character.level, character.xp).ok_or_else(|| {
-        let needed = xp_for_level(cls, character.level + 1);
+    let cls = character.class.clone();
+    let _next_level = check_level_up(&cls, character.level, character.xp).ok_or_else(|| {
+        let needed = xp_for_level(&cls, character.level + 1);
         if needed == u64::MAX {
             EngineError::InvalidInput(format!(
                 "{} is at maximum level ({}).",
@@ -380,11 +380,11 @@ pub fn action_level_up(state: &mut GameState, char_name: &str) -> Result<TrainRe
     let old_saves = character.saving_throws.clone();
     let old_thac0 = character.thac0;
     let old_hp = character.max_hp;
-    let def = class_def(cls);
+    let def = class_def(&cls);
 
     let lu = xp::apply_level_up(character);
 
-    let has_thief_skills = thief::has_thief_skills(cls);
+    let has_thief_skills = thief::has_thief_skills(&cls);
     let spell_list_name = match def.spell_list {
         spell::SpellListType::Cleric => "cleric",
         spell::SpellListType::Druid => "druid",
@@ -398,7 +398,7 @@ pub fn action_level_up(state: &mut GameState, char_name: &str) -> Result<TrainRe
     let gained_first_spells = lu.old_spell_slots.iter().all(|&s| s == 0)
         && lu.new_spell_slots.iter().any(|&s| s > 0);
 
-    let ready_for_next = check_level_up(cls, character.level, character.xp).is_some();
+    let ready_for_next = check_level_up(&cls, character.level, character.xp).is_some();
     let next_cost = if ready_for_next {
         Some((character.level + 1) * 100)
     } else {
@@ -445,10 +445,10 @@ pub fn action_train(state: &mut GameState, char_name: &str) -> Result<TrainResul
             character.name
         )));
     }
-    let cls = character.class;
-    let next_level = match check_level_up(cls, character.level, character.xp) {
+    let cls = character.class.clone();
+    let next_level = match check_level_up(&cls, character.level, character.xp) {
         None => {
-            let needed = xp_for_level(cls, character.level + 1);
+            let needed = xp_for_level(&cls, character.level + 1);
             if needed == u64::MAX {
                 return Err(EngineError::InvalidInput(format!(
                     "{} is at maximum level ({}).",
@@ -478,13 +478,13 @@ pub fn action_train(state: &mut GameState, char_name: &str) -> Result<TrainResul
     let old_saves = character.saving_throws.clone();
     let old_thac0 = character.thac0;
     let old_hp = character.max_hp;
-    let def = class_def(cls);
+    let def = class_def(&cls);
 
     // Deduct gold and apply level-up
     character.gold_gp -= cost;
     let lu = xp::apply_level_up(character);
 
-    let has_thief_skills = thief::has_thief_skills(cls);
+    let has_thief_skills = thief::has_thief_skills(&cls);
     let spell_list_name = match def.spell_list {
         spell::SpellListType::Cleric => "cleric",
         spell::SpellListType::Druid => "druid",
@@ -498,7 +498,7 @@ pub fn action_train(state: &mut GameState, char_name: &str) -> Result<TrainResul
     let gained_first_spells = lu.old_spell_slots.iter().all(|&s| s == 0)
         && lu.new_spell_slots.iter().any(|&s| s > 0);
 
-    let ready_for_next = check_level_up(cls, character.level, character.xp).is_some();
+    let ready_for_next = check_level_up(&cls, character.level, character.xp).is_some();
     let next_cost = if ready_for_next {
         Some((character.level + 1) * 100)
     } else {
@@ -962,7 +962,7 @@ pub fn action_thief_skill_check(
         )));
     }
 
-    if !thief::has_thief_skills(character.class) {
+    if !thief::has_thief_skills(&character.class) {
         return Err(EngineError::InvalidInput(format!(
             "{} ({}) does not have thief skills.",
             character.name,

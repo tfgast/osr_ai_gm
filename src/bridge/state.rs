@@ -200,7 +200,7 @@ impl WritableState for BridgeState {
 fn read_character_field(c: &Character, field: &str) -> Option<Value> {
     match field {
         "name" => Some(Value::Str(c.name.clone())),
-        "class" => Some(Value::Str(format!("{:?}", c.class))),
+        "class" => Some(Value::Str(c.class.to_string())),
         "level" => Some(Value::Int(c.level as i64)),
         "hp" | "HP" => Some(Value::Int(c.hp as i64)),
         "max_hp" => Some(Value::Int(c.max_hp as i64)),

@@ -4,13 +4,13 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use crate::rules::ability::{cha_max_retainers, cha_loyalty, cha_reaction_mod};
-use crate::rules::class::Class;
+use crate::rules::class::ClassId;
 
 /// A retainer (hired NPC follower).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Retainer {
     pub name: String,
-    pub class: Class,
+    pub class: ClassId,
     pub level: u32,
     pub hp: i32,
     pub max_hp: i32,
@@ -19,10 +19,10 @@ pub struct Retainer {
 }
 
 impl Retainer {
-    pub fn new(name: &str, class: Class, level: u32, hp: i32, loyalty: u32, wage_gp: u32) -> Self {
+    pub fn new(name: &str, class: impl Into<ClassId>, level: u32, hp: i32, loyalty: u32, wage_gp: u32) -> Self {
         Retainer {
             name: name.to_string(),
-            class,
+            class: class.into(),
             level,
             hp,
             max_hp: hp,
@@ -143,6 +143,7 @@ pub fn standard_wage(level: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rules::class::Class;
     use rand::SeedableRng;
     use rand::rngs::StdRng;
 
