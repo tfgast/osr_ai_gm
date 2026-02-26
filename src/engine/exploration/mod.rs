@@ -18,17 +18,35 @@ use crate::state::time::TimeTracker;
 
 /// Check for wandering monsters (1-in-6 every 2 turns).
 /// Should be called after any action that consumes a dungeon turn.
+/// Tries the DSL `wandering_monster_roll` mechanic first; falls back to native d6.
 fn check_wandering_monster<R: Rng>(
     rng: &mut R,
     time: &TimeTracker,
     dungeon_level: u32,
 ) -> Option<encounter::EncounterEntry> {
-    if time.total_turns.is_multiple_of(2) {
-        let roll: u32 = rng.gen_range(1..=6);
-        if roll == 1 {
-            let table_roll: u32 = rng.gen_range(1..=40);
-            return encounter::dungeon_encounter_d40(dungeon_level, table_roll);
+    // Interval gate: DSL has no modulo operator, so Rust owns the every-2-turns check.
+    if !time.total_turns.is_multiple_of(2) {
+        return None;
+    }
+
+    let triggered = {
+        #[cfg(feature = "dsl-backend")]
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Exploration) {
+            if let Some(result) = dsl_gate::dsl_wandering_monster_roll() {
+                result
+            } else {
+                rng.gen_range(1u32..=6) == 1
+            }
+        } else {
+            rng.gen_range(1u32..=6) == 1
         }
+        #[cfg(not(feature = "dsl-backend"))]
+        { rng.gen_range(1u32..=6) == 1 }
+    };
+
+    if triggered {
+        let table_roll: u32 = rng.gen_range(1..=40);
+        return encounter::dungeon_encounter_d40(dungeon_level, table_roll);
     }
     None
 }
@@ -108,6 +126,11 @@ pub fn advance_dungeon_turn(
 }
 
 /// Testable version with explicit RNG.
+///
+/// The turn is driven by the phase list from `get_exploration_turn_phases()`.
+/// Each phase is evaluated against `should_skip_exploration_phase()` before execution.
+/// When the DSL backend is active, both the phase list and skip conditions come from
+/// the DSL; otherwise, the native 6-phase sequence is used.
 pub fn advance_dungeon_turn_with<R: Rng>(
     rng: &mut R,
     time: &mut TimeTracker,
@@ -116,43 +139,57 @@ pub fn advance_dungeon_turn_with<R: Rng>(
 ) -> ExplorationResult {
     let mut result = ExplorationResult::new();
 
-    // Advance time (ticks lights, increments turn counter)
-    let light_msgs = time.advance_turn();
-    for msg in light_msgs {
-        result.msg(msg);
-    }
+    let phases = get_exploration_turn_phases();
+    // Capture light/rest state once at turn start (before AdvanceTime ticks sources).
+    let has_light = time.has_light();
+    let needs_rest = time.needs_rest();
 
-    // Darkness — block exploration movement
-    if !time.has_light() {
-        result.msg("The party is in DARKNESS! Movement is impossible without light.");
-        result.msg("Light a torch or lantern before exploring.");
-        return result;
-    }
-
-    // Rest requirement — per OSE, -1 to attack and damage when rest is overdue
-    if time.needs_rest() {
-        result.msg("The party must rest this turn (1 turn per 5 turns of activity). Penalty: -1 to attack and damage rolls.");
-    }
-
-    // Mark current room as explored
-    dungeon.explore_current();
-
-    let current_room_name = dungeon.current_room
-        .and_then(|id| dungeon.find_room(id))
-        .map(|r| r.name.as_str())
-        .unwrap_or("unknown area");
-    result.msg(format!("Turn {}: Exploring {}.",
-        time.total_turns, current_room_name
-    ));
-
-    // Always show light status so the GM can track torch burn
-    if let Some(summary) = time.light_summary() {
-        result.msg(summary);
-    }
-
-    // Wandering monster check every 2 turns (1-in-6)
-    if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
-        result.set_encounter(entry);
+    for phase in &phases {
+        if should_skip_exploration_phase(phase, has_light, needs_rest) {
+            continue;
+        }
+        match phase.as_str() {
+            "CheckLight" => {
+                if !has_light {
+                    result.msg("The party is in DARKNESS! Movement is impossible without light.");
+                    result.msg("Light a torch or lantern before exploring.");
+                    // Subsequent phases will be skipped via the skip conditions.
+                }
+            }
+            "AdvanceTime" => {
+                let light_msgs = time.advance_turn();
+                for msg in light_msgs {
+                    result.msg(msg);
+                }
+            }
+            "CheckRest" => {
+                // Re-evaluate needs_rest after time has advanced.
+                if time.needs_rest() {
+                    result.msg("The party must rest this turn (1 turn per 5 turns of activity). Penalty: -1 to attack and damage rolls.");
+                }
+            }
+            "ExecuteAction" => {
+                dungeon.explore_current();
+                let current_room_name = dungeon.current_room
+                    .and_then(|id| dungeon.find_room(id))
+                    .map(|r| r.name.as_str())
+                    .unwrap_or("unknown area");
+                result.msg(format!("Turn {}: Exploring {}.",
+                    time.total_turns, current_room_name
+                ));
+            }
+            "LightSummary" => {
+                if let Some(summary) = time.light_summary() {
+                    result.msg(summary);
+                }
+            }
+            "WanderingMonsterCheck" => {
+                if let Some(entry) = check_wandering_monster(rng, time, dungeon_level) {
+                    result.set_encounter(entry);
+                }
+            }
+            _ => {}
+        }
     }
 
     result
@@ -192,9 +229,26 @@ pub fn search_room_with<R: Rng>(
         None => return result,
     };
 
-    let threshold = if is_elf { 2 } else { 1 };
-    let roll: u32 = rng.gen_range(1..=6);
-    let success = roll <= threshold;
+    // DSL-first roll: tries `search_room_roll(is_elf)` mechanic; falls back to native d6.
+    let success = {
+        #[cfg(feature = "dsl-backend")]
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Exploration) {
+            if let Some(v) = dsl_gate::dsl_search_room_roll(is_elf) {
+                v
+            } else {
+                let threshold = if is_elf { 2 } else { 1 };
+                rng.gen_range(1u32..=6) <= threshold
+            }
+        } else {
+            let threshold = if is_elf { 2 } else { 1 };
+            rng.gen_range(1u32..=6) <= threshold
+        }
+        #[cfg(not(feature = "dsl-backend"))]
+        {
+            let threshold = if is_elf { 2 } else { 1 };
+            rng.gen_range(1u32..=6) <= threshold
+        }
+    };
 
     if let Some(room) = dungeon.find_room_mut(current) {
         room.searched = true;
@@ -290,9 +344,27 @@ pub fn listen_at_door_with<R: Rng>(
         result.msg(msg);
     }
 
-    let threshold = if is_elf_or_halfling { 2 } else { 1 };
-    let roll: u32 = rng.gen_range(1..=6);
-    if roll <= threshold {
+    // DSL-first roll: tries `listen_at_door_roll(is_demihuman)` mechanic; falls back to native d6.
+    let heard = {
+        #[cfg(feature = "dsl-backend")]
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Exploration) {
+            if let Some(v) = dsl_gate::dsl_listen_at_door_roll(is_elf_or_halfling) {
+                v
+            } else {
+                let threshold = if is_elf_or_halfling { 2 } else { 1 };
+                rng.gen_range(1u32..=6) <= threshold
+            }
+        } else {
+            let threshold = if is_elf_or_halfling { 2 } else { 1 };
+            rng.gen_range(1u32..=6) <= threshold
+        }
+        #[cfg(not(feature = "dsl-backend"))]
+        {
+            let threshold = if is_elf_or_halfling { 2 } else { 1 };
+            rng.gen_range(1u32..=6) <= threshold
+        }
+    };
+    if heard {
         result.msg("You hear sounds beyond the door!");
     } else {
         result.msg("You hear nothing.");
@@ -647,6 +719,227 @@ pub fn exploration_status(time: &TimeTracker, dungeon: &DungeonState) -> String 
     out.push('\n');
     out.push_str(&dungeon.status());
     out
+}
+
+// ── Exploration phase API (DSL-first / native-fallback) ───────────────────
+
+/// Return the ordered phase list for any dungeon exploration turn.
+///
+/// Tries the DSL `exploration_turn_phases` derive first; falls back to the
+/// native 6-phase sequence when the DSL backend is unavailable.
+///
+/// Phases in declaration order:
+///   1. `CheckLight`           — gate: block if darkness
+///   2. `AdvanceTime`          — tick light sources, increment turn counter
+///   3. `CheckRest`            — warn if rest is overdue
+///   4. `ExecuteAction`        — action-specific sub-mechanics
+///   5. `LightSummary`         — report remaining light duration
+///   6. `WanderingMonsterCheck`— 1-in-6 every 2 turns
+pub fn get_exploration_turn_phases() -> Vec<String> {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Exploration) {
+        if let Some(phases) = dsl_gate::dsl_exploration_turn_phases() {
+            return phases;
+        }
+    }
+    native_exploration_turn_phases()
+}
+
+/// Return the sub-phase list for a specific exploration action's `ExecuteAction` phase.
+///
+/// Tries the DSL `exploration_action_phases` derive first; falls back to native.
+///
+/// `action` must be one of the `ExplorationAction` enum variant names:
+/// `"exp_advance"`, `"exp_search"`, `"exp_listen"`, `"exp_move"`, `"exp_force"`, `"exp_pick"`.
+pub fn get_exploration_action_phases(action: &str) -> Vec<String> {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Exploration) {
+        if let Some(phases) = dsl_gate::dsl_exploration_action_phases(action) {
+            return phases;
+        }
+    }
+    native_exploration_action_phases(action)
+}
+
+/// Return true if the given exploration phase should be skipped this turn.
+///
+/// Tries the DSL `skip_exploration_phase` derive first; falls back to native logic.
+///
+/// - `has_light`: true if the party has at least one active light source.
+/// - `needs_rest`: true if the party has exceeded the rest interval.
+pub fn should_skip_exploration_phase(phase: &str, has_light: bool, needs_rest: bool) -> bool {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Exploration) {
+        if let Some(skip) = dsl_gate::dsl_skip_exploration_phase(phase, has_light, needs_rest) {
+            return skip;
+        }
+    }
+    native_skip_exploration_phase(phase, has_light, needs_rest)
+}
+
+/// Native ordered phase list for any dungeon exploration turn.
+fn native_exploration_turn_phases() -> Vec<String> {
+    ["CheckLight", "AdvanceTime", "CheckRest", "ExecuteAction", "LightSummary", "WanderingMonsterCheck"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Native per-action sub-phase list for the `ExecuteAction` phase.
+fn native_exploration_action_phases(action: &str) -> Vec<String> {
+    let phases: &[&str] = match action {
+        "exp_advance" => &["MarkExplored"],
+        "exp_search"  => &["RollSearch", "ReportFindings", "TreasureCheck"],
+        "exp_listen"  => &["ValidateDoors", "RollListen"],
+        "exp_move"    => &["ValidateDoor", "TransitionRoom", "CheckTrap", "SpawnMonsters"],
+        "exp_force"   => &["ValidateDoor", "RollForce"],
+        "exp_pick"    => &["ValidateLock", "ValidateThiefSkill", "RollPick"],
+        _             => &[],
+    };
+    phases.iter().map(|s| s.to_string()).collect()
+}
+
+/// Native skip condition for an exploration phase.
+fn native_skip_exploration_phase(phase: &str, has_light: bool, needs_rest: bool) -> bool {
+    match phase {
+        // CheckLight always runs — it is the gate, not gated itself.
+        "CheckLight" => false,
+        // All subsequent phases are blocked when party is in darkness.
+        _ if !has_light => true,
+        // Rest warning is skipped when the party does not need rest.
+        "CheckRest" if !needs_rest => true,
+        _ => false,
+    }
+}
+
+// ── DSL gate (exploration) ─────────────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_gate {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::value::Value;
+
+    use crate::backend::{NullState, SimpleDiceHandler};
+
+    pub fn dsl_exploration_turn_phases() -> Option<Vec<String>> {
+        let runtime = crate::backend::dsl()?;
+        let state = NullState;
+        let mut handler = SimpleDiceHandler::new();
+        let result = runtime
+            .evaluate_derive(&state, &mut handler, "exploration_turn_phases", vec![])
+            .ok()?;
+        extract_string_list(result)
+    }
+
+    pub fn dsl_exploration_action_phases(action: &str) -> Option<Vec<String>> {
+        let runtime = crate::backend::dsl()?;
+        let state = NullState;
+        let mut handler = SimpleDiceHandler::new();
+
+        let action_val = Value::EnumVariant {
+            enum_name: Name::from("ExplorationAction"),
+            variant: Name::from(action),
+            fields: BTreeMap::new(),
+        };
+
+        let result = runtime
+            .evaluate_derive(&state, &mut handler, "exploration_action_phases", vec![action_val])
+            .ok()?;
+        extract_string_list(result)
+    }
+
+    pub fn dsl_skip_exploration_phase(phase: &str, has_light: bool, needs_rest: bool) -> Option<bool> {
+        let runtime = crate::backend::dsl()?;
+        let state = NullState;
+        let mut handler = SimpleDiceHandler::new();
+        let result = runtime
+            .evaluate_derive(
+                &state,
+                &mut handler,
+                "skip_exploration_phase",
+                vec![
+                    Value::Str(phase.to_string()),
+                    Value::Bool(has_light),
+                    Value::Bool(needs_rest),
+                ],
+            )
+            .ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_wandering_monster_roll() -> Option<bool> {
+        let runtime = crate::backend::dsl()?;
+        let state = NullState;
+        let mut handler = SimpleDiceHandler::new();
+        let result = runtime
+            .evaluate_mechanic(&state, &mut handler, "wandering_monster_roll", vec![])
+            .ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_search_room_roll(is_elf: bool) -> Option<bool> {
+        let runtime = crate::backend::dsl()?;
+        let state = NullState;
+        let mut handler = SimpleDiceHandler::new();
+        let result = runtime
+            .evaluate_mechanic(
+                &state,
+                &mut handler,
+                "search_room_roll",
+                vec![Value::Bool(is_elf)],
+            )
+            .ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_listen_at_door_roll(is_demihuman: bool) -> Option<bool> {
+        let runtime = crate::backend::dsl()?;
+        let state = NullState;
+        let mut handler = SimpleDiceHandler::new();
+        let result = runtime
+            .evaluate_mechanic(
+                &state,
+                &mut handler,
+                "listen_at_door_roll",
+                vec![Value::Bool(is_demihuman)],
+            )
+            .ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    fn extract_string_list(value: Value) -> Option<Vec<String>> {
+        match value {
+            Value::List(items) => {
+                let mut result = Vec::new();
+                for item in items {
+                    match item {
+                        Value::Str(s) => result.push(s),
+                        _ => return None,
+                    }
+                }
+                if result.is_empty() {
+                    None
+                } else {
+                    Some(result)
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1832,5 +2125,117 @@ mod tests {
         let output = result.unwrap().to_string();
         assert!(!output.contains("Descended"));
         assert!(!output.contains("Ascended"));
+    }
+
+    // =========================================================================
+    // Exploration phase API (get_exploration_turn_phases, get_exploration_action_phases,
+    // should_skip_exploration_phase)
+    // =========================================================================
+
+    #[test]
+    fn turn_phases_contains_six_expected_phases() {
+        let phases = get_exploration_turn_phases();
+        assert_eq!(phases.len(), 6, "expected 6 exploration turn phases, got: {:?}", phases);
+        let expected = ["CheckLight", "AdvanceTime", "CheckRest", "ExecuteAction",
+                        "LightSummary", "WanderingMonsterCheck"];
+        for name in &expected {
+            assert!(phases.contains(&name.to_string()),
+                "expected phase '{}' in {:?}", name, phases);
+        }
+    }
+
+    #[test]
+    fn turn_phases_check_light_is_first() {
+        let phases = get_exploration_turn_phases();
+        assert_eq!(phases[0], "CheckLight",
+            "CheckLight must be the first phase (it is the gate)");
+    }
+
+    #[test]
+    fn action_phases_exp_search() {
+        let phases = get_exploration_action_phases("exp_search");
+        assert!(phases.contains(&"RollSearch".to_string()));
+        assert!(phases.contains(&"ReportFindings".to_string()));
+        assert!(phases.contains(&"TreasureCheck".to_string()));
+    }
+
+    #[test]
+    fn action_phases_exp_advance() {
+        let phases = get_exploration_action_phases("exp_advance");
+        assert!(phases.contains(&"MarkExplored".to_string()));
+    }
+
+    #[test]
+    fn action_phases_exp_listen() {
+        let phases = get_exploration_action_phases("exp_listen");
+        assert!(phases.contains(&"ValidateDoors".to_string()));
+        assert!(phases.contains(&"RollListen".to_string()));
+    }
+
+    #[test]
+    fn action_phases_exp_move() {
+        let phases = get_exploration_action_phases("exp_move");
+        assert!(phases.contains(&"ValidateDoor".to_string()));
+        assert!(phases.contains(&"TransitionRoom".to_string()));
+        assert!(phases.contains(&"CheckTrap".to_string()));
+        assert!(phases.contains(&"SpawnMonsters".to_string()));
+    }
+
+    #[test]
+    fn action_phases_exp_force() {
+        let phases = get_exploration_action_phases("exp_force");
+        assert!(phases.contains(&"ValidateDoor".to_string()));
+        assert!(phases.contains(&"RollForce".to_string()));
+    }
+
+    #[test]
+    fn action_phases_exp_pick() {
+        let phases = get_exploration_action_phases("exp_pick");
+        assert!(phases.contains(&"ValidateLock".to_string()));
+        assert!(phases.contains(&"ValidateThiefSkill".to_string()));
+        assert!(phases.contains(&"RollPick".to_string()));
+    }
+
+    #[test]
+    fn skip_exploration_phase_check_light_never_skipped() {
+        // CheckLight always runs regardless of light/rest state
+        assert!(!should_skip_exploration_phase("CheckLight", false, false));
+        assert!(!should_skip_exploration_phase("CheckLight", true, false));
+        assert!(!should_skip_exploration_phase("CheckLight", false, true));
+        assert!(!should_skip_exploration_phase("CheckLight", true, true));
+    }
+
+    #[test]
+    fn skip_exploration_phase_darkness_blocks_all_after_check_light() {
+        let no_light = false;
+        let phases = ["AdvanceTime", "CheckRest", "ExecuteAction", "LightSummary", "WanderingMonsterCheck"];
+        for phase in &phases {
+            assert!(
+                should_skip_exploration_phase(phase, no_light, false),
+                "phase '{}' should be skipped in darkness", phase
+            );
+        }
+    }
+
+    #[test]
+    fn skip_exploration_phase_no_skip_when_light_present() {
+        let has_light = true;
+        // AdvanceTime, ExecuteAction, LightSummary, WanderingMonsterCheck run normally
+        for phase in &["AdvanceTime", "ExecuteAction", "LightSummary", "WanderingMonsterCheck"] {
+            assert!(
+                !should_skip_exploration_phase(phase, has_light, false),
+                "phase '{}' should NOT be skipped when party has light", phase
+            );
+        }
+    }
+
+    #[test]
+    fn skip_exploration_phase_check_rest_skipped_when_not_needed() {
+        // CheckRest is skipped when the party does not need rest
+        assert!(should_skip_exploration_phase("CheckRest", true, false),
+            "CheckRest should be skipped when needs_rest=false");
+        // But runs when rest is overdue
+        assert!(!should_skip_exploration_phase("CheckRest", true, true),
+            "CheckRest should run when needs_rest=true");
     }
 }

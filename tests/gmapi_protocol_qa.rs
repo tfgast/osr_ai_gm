@@ -1230,6 +1230,11 @@ fn enter_dungeon_rejected_when_already_exploring() {
 fn advance_turn_happy_path() {
     let mut state = GameState::new();
     setup_exploration(&mut state);
+    // Light a torch so the exploration turn can proceed (CheckLight is the first phase).
+    handle_request(&req("s", GMCommand::Light {
+        source: LightSourceKind::Torch,
+        carrier: "Aldric".to_string(),
+    }), &mut state);
 
     let pre_turns = state.time.as_ref().unwrap().total_turns;
     let resp = handle_request(&req("at1", GMCommand::AdvanceTurn), &mut state);
