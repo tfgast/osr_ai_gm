@@ -8,13 +8,28 @@ use crate::model::CombatState;
 /// and clears disruptions from the previous round. (Spell declarations
 /// and pending spells are cleared at the start of the declaration phase
 /// so they survive the Declare → Initiative → Cast sequence.)
+///
+/// When the DSL backend is enabled, delegates to the `group_initiative`
+/// mechanic for each side's roll. Falls back to native on DSL failure.
 pub fn roll_initiative(combat: &mut CombatState) -> (i32, i32) {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        if let Some((p, m)) = dsl_group_initiative() {
+            return apply_initiative(combat, p, m);
+        }
+        // DSL failed — fall through to native
+    }
+
     roll_initiative_with(combat, &mut rand::thread_rng())
 }
 
 pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i32, i32) {
     let party = rng.gen_range(1..=6i32);
     let monsters = rng.gen_range(1..=6i32);
+    apply_initiative(combat, party, monsters)
+}
+
+fn apply_initiative(combat: &mut CombatState, party: i32, monsters: i32) -> (i32, i32) {
     combat.party_initiative = party;
     combat.monster_initiative = monsters;
     combat.round += 1;
@@ -35,6 +50,69 @@ pub fn roll_initiative_with<R: Rng>(combat: &mut CombatState, rng: &mut R) -> (i
     combat.log_event(msg);
     combat.log_len_at_initiative = combat.log.len();
     (party, monsters)
+}
+
+// ── DSL backend ──────────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+fn dsl_group_initiative() -> Option<(i32, i32)> {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider};
+    use ttrpg_interp::value::Value;
+
+    use crate::bridge::handler::BridgeHandler;
+
+    struct NullState;
+    impl StateProvider for NullState {
+        fn read_field(&self, _: &EntityRef, _: &str) -> Option<Value> { None }
+        fn read_conditions(&self, _: &EntityRef) -> Option<Vec<ActiveCondition>> { None }
+        fn read_turn_budget(&self, _: &EntityRef) -> Option<BTreeMap<Name, Value>> { None }
+        fn read_enabled_options(&self) -> Vec<Name> { Vec::new() }
+        fn position_eq(&self, _: &Value, _: &Value) -> bool { false }
+        fn distance(&self, _: &Value, _: &Value) -> Option<i64> { None }
+    }
+
+    struct InitHandler {
+        inner: BridgeHandler,
+        roll_total: Option<i64>,
+    }
+
+    impl EffectHandler for InitHandler {
+        fn handle(&mut self, effect: Effect) -> Response {
+            let response = self.inner.handle(effect);
+            if let Response::Rolled(ref result) = response {
+                self.roll_total = Some(result.total);
+            }
+            response
+        }
+    }
+
+    let runtime = crate::backend::dsl()?;
+
+    // Roll for party
+    let mut party_handler = InitHandler { inner: BridgeHandler::new(), roll_total: None };
+    let party_result = runtime.evaluate_mechanic(
+        &NullState, &mut party_handler, "group_initiative", vec![],
+    ).ok()?;
+    let party = match party_result {
+        Value::Int(n) => n as i32,
+        _ => return None,
+    };
+
+    // Roll for monsters
+    let mut monster_handler = InitHandler { inner: BridgeHandler::new(), roll_total: None };
+    let monster_result = runtime.evaluate_mechanic(
+        &NullState, &mut monster_handler, "group_initiative", vec![],
+    ).ok()?;
+    let monsters = match monster_result {
+        Value::Int(n) => n as i32,
+        _ => return None,
+    };
+
+    Some((party, monsters))
 }
 
 /// Declare a spell cast for a character (must be done during declaration phase).

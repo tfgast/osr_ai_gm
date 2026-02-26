@@ -3,21 +3,49 @@
 //! Supports DSL backend gate: when `OSR_BACKEND_SAVES=dsl` is set and the
 //! `dsl-backend` feature is enabled, saving throw lookups are evaluated
 //! through the DSL runtime instead of the hardcoded tables below.
+//!
+//! SavingThrows is a dynamic map (HashMap<String, u32>) so that different
+//! game systems can define their own save categories (e.g. OSE has 5,
+//! other systems may have 3 or 1).
 
-/// Five saving throw categories (D, W, P, B, S).
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct SavingThrows {
-    pub death: u32,
-    pub wands: u32,
-    pub paralysis: u32,
-    pub breath: u32,
-    pub spells: u32,
-}
+use std::collections::HashMap;
+
+/// Dynamic saving throw map: save_name → target number.
+///
+/// OSE uses five saves (death, wands, paralysis, breath, spells).
+/// Other game systems may define different save categories.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SavingThrows(pub HashMap<String, u32>);
 
 impl SavingThrows {
-    pub const fn new(d: u32, w: u32, p: u32, b: u32, s: u32) -> Self {
-        SavingThrows { death: d, wands: w, paralysis: p, breath: b, spells: s }
+    /// Create a new empty SavingThrows map.
+    pub fn new_empty() -> Self {
+        SavingThrows(HashMap::new())
     }
+
+    /// Create SavingThrows from the standard OSE 5-save format.
+    /// Convenience constructor preserving backward compatibility.
+    pub fn new(d: u32, w: u32, p: u32, b: u32, s: u32) -> Self {
+        let mut map = HashMap::new();
+        map.insert("death".to_string(), d);
+        map.insert("wands".to_string(), w);
+        map.insert("paralysis".to_string(), p);
+        map.insert("breath".to_string(), b);
+        map.insert("spells".to_string(), s);
+        SavingThrows(map)
+    }
+
+    /// Get a save value by name. Returns None if the save type doesn't exist.
+    pub fn get(&self, name: &str) -> Option<u32> {
+        self.0.get(name).copied()
+    }
+
+    /// Convenience accessors for OSE's five save types.
+    pub fn death(&self) -> u32 { self.0.get("death").copied().unwrap_or(20) }
+    pub fn wands(&self) -> u32 { self.0.get("wands").copied().unwrap_or(20) }
+    pub fn paralysis(&self) -> u32 { self.0.get("paralysis").copied().unwrap_or(20) }
+    pub fn breath(&self) -> u32 { self.0.get("breath").copied().unwrap_or(20) }
+    pub fn spells(&self) -> u32 { self.0.get("spells").copied().unwrap_or(20) }
 }
 
 /// Each class maps to one of these save table groups.
@@ -290,5 +318,33 @@ mod tests {
     fn svirfneblin_saves_level_7() {
         let s = saving_throws(SaveCategory::Svirfneblin, 7);
         assert_eq!(s, SavingThrows::new(4, 5, 6, 9, 7));
+    }
+
+    #[test]
+    fn dynamic_map_access() {
+        let s = SavingThrows::new(12, 13, 14, 15, 16);
+        assert_eq!(s.get("death"), Some(12));
+        assert_eq!(s.get("wands"), Some(13));
+        assert_eq!(s.get("paralysis"), Some(14));
+        assert_eq!(s.get("breath"), Some(15));
+        assert_eq!(s.get("spells"), Some(16));
+        assert_eq!(s.get("nonexistent"), None);
+    }
+
+    #[test]
+    fn convenience_accessors_match_map() {
+        let s = SavingThrows::new(12, 13, 14, 15, 16);
+        assert_eq!(s.death(), 12);
+        assert_eq!(s.wands(), 13);
+        assert_eq!(s.paralysis(), 14);
+        assert_eq!(s.breath(), 15);
+        assert_eq!(s.spells(), 16);
+    }
+
+    #[test]
+    fn missing_save_defaults_to_20() {
+        let s = SavingThrows::new_empty();
+        assert_eq!(s.death(), 20);
+        assert_eq!(s.wands(), 20);
     }
 }

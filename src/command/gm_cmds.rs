@@ -278,9 +278,9 @@ impl Command for TrainCommand {
                     if old != *new {
                         out.push_str(&format!(
                             "  Saves: D{}->{} W{}->{} P{}->{} B{}->{} S{}->{}\n",
-                            old.death, new.death, old.wands, new.wands,
-                            old.paralysis, new.paralysis, old.breath, new.breath,
-                            old.spells, new.spells,
+                            old.death(), new.death(), old.wands(), new.wands(),
+                            old.paralysis(), new.paralysis(), old.breath(), new.breath(),
+                            old.spells(), new.spells(),
                         ));
                     }
                 }

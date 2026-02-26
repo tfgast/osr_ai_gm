@@ -402,8 +402,36 @@ impl CombatState {
 
     /// Check whether a morale trigger condition has been newly met.
     /// Returns true if morale should be checked (first death, or half killed).
+    ///
+    /// When the DSL backend is enabled, delegates to the `should_check_morale`
+    /// derive. Falls back to native logic on DSL failure.
     pub fn should_check_morale(&mut self) -> bool {
         let dead = self.initial_monster_count - self.living_monster_count();
+
+        #[cfg(feature = "dsl-backend")]
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+            if let Some(result) = dsl_should_check_morale(
+                dead,
+                self.initial_monster_count,
+                self.first_death_checked,
+                self.half_killed_checked,
+            ) {
+                if result {
+                    // Update flags the same way the native code would
+                    if dead >= 1 && !self.first_death_checked {
+                        self.first_death_checked = true;
+                    } else if self.initial_monster_count > 0
+                        && dead * 2 >= self.initial_monster_count
+                        && !self.half_killed_checked
+                    {
+                        self.half_killed_checked = true;
+                    }
+                }
+                return result;
+            }
+            // DSL failed — fall through to native
+        }
+
         if dead >= 1 && !self.first_death_checked {
             self.first_death_checked = true;
             return true;
@@ -416,6 +444,47 @@ impl CombatState {
             return true;
         }
         false
+    }
+}
+
+/// DSL evaluation of the should_check_morale derive.
+#[cfg(feature = "dsl-backend")]
+fn dsl_should_check_morale(
+    deaths: usize,
+    initial: usize,
+    first_death_checked: bool,
+    half_killed_checked: bool,
+) -> Option<bool> {
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::reference_state::GameState;
+    use ttrpg_interp::value::Value;
+
+    struct NullHandler;
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response {
+            Response::Acknowledged
+        }
+    }
+
+    let runtime = crate::backend::dsl()?;
+    let state = GameState::new();
+    let mut handler = NullHandler;
+
+    let result = runtime.evaluate_derive(
+        &state,
+        &mut handler,
+        "should_check_morale",
+        vec![
+            Value::Int(deaths as i64),
+            Value::Int(initial as i64),
+            Value::Int(if first_death_checked { 1 } else { 0 }),
+            Value::Int(if half_killed_checked { 1 } else { 0 }),
+        ],
+    ).ok()?;
+
+    match result {
+        Value::Int(n) => Some(n != 0),
+        _ => None,
     }
 }
 

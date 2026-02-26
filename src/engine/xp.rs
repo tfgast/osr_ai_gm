@@ -82,7 +82,7 @@ pub fn apply_level_up_with<R: Rng>(rng: &mut R, character: &mut Character) -> Le
     character.thac0 = crate::engine::chargen::thac0(def.combat_aptitude, new_level);
     let save_cat = def.save_category;
     let new_saves = saving_throws(save_cat, new_level);
-    character.saving_throws = Some(new_saves);
+    character.saving_throws = Some(new_saves.clone());
 
     let new_spell_slots = spell::spell_slots(def.spell_progression, new_level);
 
@@ -266,10 +266,10 @@ mod tests {
         let mut fighter = make_fighter(8_100, 3);
         // Set saves for level 3 (Fighter L1-3 bracket)
         fighter.saving_throws = Some(saving_throws(SaveCategory::Fighter, 3));
-        let old_saves = fighter.saving_throws.unwrap();
+        let old_saves = fighter.saving_throws.clone().unwrap();
         let result = apply_level_up_with(&mut rng, &mut fighter);
         assert_eq!(result.new_level, 4);
         // Fighter saves improve at level 4 (new bracket)
-        assert!(result.new_saves.death <= old_saves.death);
+        assert!(result.new_saves.death() <= old_saves.death());
     }
 }

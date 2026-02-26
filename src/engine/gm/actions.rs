@@ -377,7 +377,7 @@ pub fn action_level_up(state: &mut GameState, char_name: &str) -> Result<TrainRe
         }
     })?;
 
-    let old_saves = character.saving_throws;
+    let old_saves = character.saving_throws.clone();
     let old_thac0 = character.thac0;
     let old_hp = character.max_hp;
     let def = class_def(cls);
@@ -475,7 +475,7 @@ pub fn action_train(state: &mut GameState, char_name: &str) -> Result<TrainResul
     }
 
     // Capture old state for report
-    let old_saves = character.saving_throws;
+    let old_saves = character.saving_throws.clone();
     let old_thac0 = character.thac0;
     let old_hp = character.max_hp;
     let def = class_def(cls);

@@ -1,0 +1,187 @@
+// ============================================================
+// OSE Combat & Morale — attack resolution, morale, reactions
+//
+// Descending AC system (lower = better). All derives/mechanics
+// take primitive (int) inputs — no cross-file derive calls.
+//
+// Reference: oag/src/rules/attack.rs (OSE Reference Booklet p19-20)
+// ============================================================
+
+system "OSE Combat" {
+
+    // --- Enums ---
+
+    enum AttackOutcome { atk_miss, atk_hit }
+
+    enum MoraleOutcome { morale_hold, morale_fail }
+
+    enum ReactionOutcome {
+        rx_hostile,
+        rx_unfriendly,
+        rx_neutral,
+        rx_indifferent,
+        rx_friendly
+    }
+
+
+    // --- Tables (static lookup, pattern-matched) ---
+
+    // Monster HD to THAC0 (8 entries).
+    // Monsters fight as Fighters of equivalent HD level.
+    // HD 0 = normal humans. Wildcard covers HD 19+.
+    table monster_thac0(hd: int) -> int {
+        0       => 20,
+        1..=3   => 19,
+        4..=6   => 17,
+        7..=9   => 14,
+        10..=12 => 12,
+        13..=15 => 10,
+        16..=18 => 8,
+        _       => 6
+    }
+
+    // Reaction roll outcome table (2d6 + CHA modifier).
+    // Applied when encountering wandering monsters or NPCs.
+    table reaction_outcome(roll: int) -> ReactionOutcome {
+        2       => rx_hostile,
+        3..=5   => rx_unfriendly,
+        6..=8   => rx_neutral,
+        9..=11  => rx_indifferent,
+        12      => rx_friendly
+    }
+
+
+    // --- Derives (pure computations, no dice) ---
+
+    // Target number: THAC0 minus defender's AC.
+    // Example: THAC0 19 vs AC 5 (chain mail) = need 14 on d20.
+    // Negative AC increases the target number (harder to hit).
+    derive target_number(thac0: int, ac: int) -> int {
+        thac0 - ac
+    }
+
+    // AC calculation from equipment and DEX.
+    // In descending AC, bonuses subtract (lower = better).
+    // armour_ac: base AC of worn armour (9 = unarmoured).
+    // shield_bonus: 1 if shield equipped, 0 otherwise.
+    // dex_mod: DEX modifier (positive = bonus, negative = penalty).
+    derive calc_ac(armour_ac: int, shield_bonus: int, dex_mod: int) -> int {
+        armour_ac - shield_bonus - dex_mod
+    }
+
+    // Missile range modifier.
+    // Short range: +1 to hit. Medium range: no modifier. Long range: -1.
+    // Caller should verify distance <= long_range before calling.
+    derive missile_range_mod(
+        distance: int,
+        short_range: int,
+        medium_range: int,
+        long_range: int
+    ) -> int {
+        match {
+            distance <= short_range  => 1,
+            distance <= medium_range => 0,
+            _                        => -1
+        }
+    }
+
+    // --- Morale trigger derive ---
+    // Determines whether a morale check should be triggered based on
+    // casualties. OSE triggers morale checks when:
+    //   1. First monster death in the encounter
+    //   2. Half or more of the monsters have been killed
+    //
+    // Arguments are ints (booleans encoded as 0/1) because the DSL
+    // doesn't have bool args for derives yet.
+    //
+    // deaths: number of dead monsters
+    // initial: initial monster count
+    // first_death_checked: 1 if first-death morale already checked, 0 otherwise
+    // half_killed_checked: 1 if half-killed morale already checked, 0 otherwise
+    //
+    // Returns 1 if morale should be checked, 0 otherwise.
+    derive should_check_morale(
+        deaths: int,
+        initial: int,
+        first_death_checked: int,
+        half_killed_checked: int
+    ) -> int {
+        match {
+            deaths >= 1 && first_death_checked == 0 => 1,
+            initial > 0 && deaths * 2 >= initial && half_killed_checked == 0 => 1,
+            _ => 0
+        }
+    }
+
+
+    // --- Mechanics (can roll dice, no mutation) ---
+
+    // Attack resolution: d20 + modifiers vs target number.
+    // Natural 1 always misses; natural 20 always hits.
+    // attack_mod covers STR (melee), DEX (missile), magic bonuses, etc.
+    mechanic attack_roll(
+        thac0: int,
+        target_ac: int,
+        attack_mod: int = 0
+    ) -> AttackOutcome {
+        let target = target_number(thac0, target_ac)
+        let result = roll(1d20)
+        match {
+            result.unmodified == 1  => AttackOutcome.atk_miss,
+            result.unmodified == 20 => AttackOutcome.atk_hit,
+            result.total + attack_mod >= target => AttackOutcome.atk_hit,
+            _ => AttackOutcome.atk_miss
+        }
+    }
+
+    // Damage roll: roll dice notation for damage.
+    // damage_dice: number of dice (e.g. 1 for 1d8)
+    // damage_sides: sides per die (e.g. 8 for 1d8)
+    // damage_mod: flat modifier to add (e.g. +2 for STR bonus)
+    // Minimum damage is always 1.
+    mechanic damage_roll(
+        damage_dice: int,
+        damage_sides: int,
+        damage_mod: int = 0
+    ) -> int {
+        let result = roll(damage_dice, damage_sides)
+        let total = result.total + damage_mod
+        match {
+            total < 1 => 1,
+            _ => total
+        }
+    }
+
+    // Morale check: 2d6 vs morale score.
+    // If 2d6 > morale score, creatures flee or surrender.
+    // Triggered when: first death on a side, half the group is down.
+    mechanic morale_check(morale: int) -> MoraleOutcome {
+        let result = roll(2d6)
+        if result > morale {
+            MoraleOutcome.morale_fail
+        } else {
+            MoraleOutcome.morale_hold
+        }
+    }
+
+    // Group initiative: each side rolls 1d6.
+    // Returns the party's roll. Caller also gets monster roll separately.
+    mechanic group_initiative() -> int {
+        let result = roll(1d6)
+        result.total
+    }
+
+    // Reaction roll: 2d6 + CHA modifier, consult outcome table.
+    // Result clamped to valid table range (2-12).
+    // Used for initial NPC/monster reactions to the party.
+    mechanic reaction_roll(cha_mod: int = 0) -> ReactionOutcome {
+        let result = roll(2d6)
+        let total = result.total + cha_mod
+        let clamped = match {
+            total < 2  => 2,
+            total > 12 => 12,
+            _          => total
+        }
+        reaction_outcome(clamped)
+    }
+}

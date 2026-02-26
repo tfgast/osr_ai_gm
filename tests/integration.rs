@@ -825,7 +825,7 @@ fn level_up_from_treasure() {
     assert_eq!(gb.level, 2);
     assert!(gb.max_hp > 8); // gained HP
     let saves = gb.saving_throws.as_ref().expect("saving throws should be set after level up");
-    assert!(saves.death > 0, "death save should be positive");
+    assert!(saves.death() > 0, "death save should be positive");
 }
 
 // ===========================================================================
@@ -1738,7 +1738,7 @@ fn session_a_dungeon_crawl() {
     assert_eq!(fighter.level, 2);
     assert!(fighter.max_hp > 8);
     let saves = fighter.saving_throws.as_ref().expect("fighter should have saving throws after level up");
-    assert!(saves.death > 0, "death save should be positive");
+    assert!(saves.death() > 0, "death save should be positive");
 
     // === STEP 7: Save state ===
     let save_name = unique_save_name("session_a");
@@ -2395,7 +2395,7 @@ fn character_progression_multi_level() {
     assert!(amara.max_hp > cleric_base_hp, "cleric HP should increase");
     // Cleric saving throws should be set
     let saves = amara.saving_throws.as_ref().expect("cleric should have saving throws after level up");
-    assert!(saves.death > 0, "cleric death save should be positive");
+    assert!(saves.death() > 0, "cleric death save should be positive");
 
     // Fighter needs 2000 for L2 (STR 16 = +10%)
     let resp = handle_request(&req("p23", GMCommand::AwardTreasureXp {
@@ -2414,7 +2414,7 @@ fn character_progression_multi_level() {
     assert_eq!(bjorn.level, 2);
     assert!(bjorn.max_hp > fighter_base_hp, "fighter HP should increase");
     let saves = bjorn.saving_throws.as_ref().expect("fighter should have saving throws");
-    assert!(saves.death > 0, "fighter death save should be positive");
+    assert!(saves.death() > 0, "fighter death save should be positive");
     // Fighter THAC0 stays 19 at L2 (changes at L4 for martial)
     assert_eq!(bjorn.thac0, 19, "fighter THAC0 should still be 19 at L2");
 
@@ -2507,8 +2507,8 @@ fn character_progression_multi_level() {
     let bjorn = state.party.find_member("Bjorn").unwrap();
     let saves = bjorn.saving_throws.as_ref().unwrap();
     // Fighter L4-6 saves: D10 W11 P12 B13 S14
-    assert_eq!(saves.death, 10, "fighter L4 death save should be 10");
-    assert_eq!(saves.wands, 11, "fighter L4 wands save should be 11");
+    assert_eq!(saves.death(), 10, "fighter L4 death save should be 10");
+    assert_eq!(saves.wands(), 11, "fighter L4 wands save should be 11");
 
     // === Verify all characters accumulated HP ===
     let bjorn = state.party.find_member("Bjorn").unwrap();

@@ -273,7 +273,7 @@ pub fn character_sheet(c: &Character) -> String {
         out.push_str("\nSaving Throws:\n");
         out.push_str(&format!(
             "  Death: {}  Wands: {}  Paralysis: {}  Breath: {}  Spells: {}\n",
-            saves.death, saves.wands, saves.paralysis, saves.breath, saves.spells
+            saves.death(), saves.wands(), saves.paralysis(), saves.breath(), saves.spells()
         ));
     }
 

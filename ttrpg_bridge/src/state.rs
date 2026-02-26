@@ -218,12 +218,11 @@ fn read_character_field(c: &Character, field: &str) -> Option<Value> {
         "constitution" | "CON" => Some(Value::Int(c.abilities.constitution as i64)),
         "charisma" | "CHA" => Some(Value::Int(c.abilities.charisma as i64)),
         "alignment" => Some(Value::Str(format!("{:?}", c.alignment))),
-        // Saving throws
-        "save_death" => c.saving_throws.map(|st| Value::Int(st.death as i64)),
-        "save_wands" => c.saving_throws.map(|st| Value::Int(st.wands as i64)),
-        "save_paralysis" => c.saving_throws.map(|st| Value::Int(st.paralysis as i64)),
-        "save_breath" => c.saving_throws.map(|st| Value::Int(st.breath as i64)),
-        "save_spells" => c.saving_throws.map(|st| Value::Int(st.spells as i64)),
+        // Saving throws (dynamic map lookup with save_ prefix)
+        f if f.starts_with("save_") => {
+            let save_name = &f[5..]; // strip "save_" prefix
+            c.saving_throws.as_ref().and_then(|st| st.get(save_name).map(|v| Value::Int(v as i64)))
+        }
         _ => None,
     }
 }
