@@ -1963,7 +1963,7 @@ source = "git+https://github.com/tfgast/ttrpg-ose-data.git?branch=main#8355c90c9
 [[package]]
 name = "ttrpg_ast"
 version = "0.1.0"
-source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#f5d554e760fd17ce2f895497ffa8c8bad136c295"
+source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#afe76f7c58788b407c26c46a4705b322ce944a07"
 
 [[package]]
 name = "ttrpg_bridge"
@@ -1978,7 +1978,7 @@ dependencies = [
 [[package]]
 name = "ttrpg_checker"
 version = "0.1.0"
-source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#f5d554e760fd17ce2f895497ffa8c8bad136c295"
+source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#afe76f7c58788b407c26c46a4705b322ce944a07"
 dependencies = [
  "ttrpg_ast",
 ]
@@ -1986,7 +1986,7 @@ dependencies = [
 [[package]]
 name = "ttrpg_interp"
 version = "0.1.0"
-source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#f5d554e760fd17ce2f895497ffa8c8bad136c295"
+source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#afe76f7c58788b407c26c46a4705b322ce944a07"
 dependencies = [
  "ttrpg_ast",
  "ttrpg_checker",
@@ -1995,7 +1995,7 @@ dependencies = [
 [[package]]
 name = "ttrpg_lexer"
 version = "0.1.0"
-source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#f5d554e760fd17ce2f895497ffa8c8bad136c295"
+source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#afe76f7c58788b407c26c46a4705b322ce944a07"
 dependencies = [
  "ttrpg_ast",
 ]
@@ -2003,7 +2003,7 @@ dependencies = [
 [[package]]
 name = "ttrpg_parser"
 version = "0.1.0"
-source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#f5d554e760fd17ce2f895497ffa8c8bad136c295"
+source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#afe76f7c58788b407c26c46a4705b322ce944a07"
 dependencies = [
  "ttrpg_ast",
  "ttrpg_lexer",

@@ -198,7 +198,7 @@ system "OSE Combat" {
         damage_sides: int,
         damage_mod: int = 0
     ) -> int {
-        let result = roll(damage_dice, damage_sides)
+        let result = roll(dice(damage_dice, damage_sides))
         let total = result.total + damage_mod
         match {
             total < 1 => 1,
@@ -211,7 +211,7 @@ system "OSE Combat" {
     // Triggered when: first death on a side, half the group is down.
     mechanic morale_check(morale: int) -> MoraleOutcome {
         let result = roll(2d6)
-        if result > morale {
+        if result.total > morale {
             MoraleOutcome.morale_fail
         } else {
             MoraleOutcome.morale_hold

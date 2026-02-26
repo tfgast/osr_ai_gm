@@ -756,6 +756,8 @@ mod tests {
     fn phase_advancement_full_cycle() {
         let mut combat = CombatState::new(vec![test_goblin()], 10);
         assert_eq!(combat.phase, "Declaration");
+        // Declare a spell so the Magic phase is not skipped by the DSL skip_phase rule
+        declare_spell(&mut combat, "Tester", "Sleep");
         combat.advance_phase();
         assert_eq!(combat.phase, "Initiative");
         combat.advance_phase();
