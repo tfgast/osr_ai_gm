@@ -1597,13 +1597,20 @@ mod tests {
         let mut rng = test_rng();
         let mut ws = test_wilderness();
         ws.move_to(1, 0).unwrap(); // Forest
-        let mut party = test_party();
+        // Use 7 members so even a max forage roll (6 rations) can't feed the
+        // whole party.  This makes the test deterministic regardless of whether
+        // the DSL backend's forage check (which uses its own RNG) succeeds.
+        let mut party = Party::new();
+        for i in 0..7 {
+            let mut c = Character::new(&format!("Starver{i}"), "Fighter");
+            c.hp = 10;
+            party.add_member(c);
+        }
         party.rations = 0;
         party.days_without_food = 2; // Next day will be day 3 (HP damage)
-        party.members[0].hp = 10;
 
         let result = forage_with(&mut rng, &mut ws, &mut party);
-        assert!(result.overhead.starving, "should be starving with no rations");
+        assert!(result.overhead.starving, "should be starving with insufficient rations for 7 members");
         assert!(result.overhead.starvation_damage > 0, "day 3+ starvation should deal HP damage");
     }
 
