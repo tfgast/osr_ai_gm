@@ -85,6 +85,60 @@ system "OSE Combat" {
         }
     }
 
+    // --- Phase sequence ---
+    // OSE combat round phases in execution order.
+    // Reference: OSE Reference Booklet p116-124.
+    derive phase_sequence() -> list<string> {
+        [
+            "Declaration",
+            "Initiative",
+            "Morale",
+            "Movement",
+            "Missile",
+            "Magic",
+            "Melee",
+            "EndOfRound"
+        ]
+    }
+
+    // --- Action budgets ---
+    // Per-phase action budget: how many of each action type a combatant
+    // gets during a given phase. Returns an empty map for phases that
+    // don't consume discrete actions (Declaration, Initiative, EndOfRound).
+    derive action_budget(phase: string) -> map<string, int> {
+        match {
+            phase == "Morale"   => ({"morale": 1}),
+            phase == "Movement" => ({"movement": 1}),
+            phase == "Missile"  => ({"attack": 1}),
+            phase == "Magic"    => ({"spell": 1}),
+            phase == "Melee"    => ({"attack": 1}),
+            _                   => ({"actions": 0})
+        }
+    }
+
+    // --- Phase-skip conditions ---
+    // Determines whether a phase can be skipped for the current round.
+    // phase: the phase to check
+    // round: current combat round (0 = pre-initiative)
+    // has_spells_declared: 1 if any spells were declared, 0 otherwise
+    // has_living_monsters: 1 if monsters are still alive, 0 otherwise
+    //
+    // Returns 1 if the phase should be skipped, 0 otherwise.
+    derive skip_phase(
+        phase: string,
+        round: int,
+        has_spells_declared: int,
+        has_living_monsters: int
+    ) -> int {
+        match {
+            // Skip Magic phase if no spells were declared
+            phase == "Magic" && has_spells_declared == 0 => 1,
+            // Skip Morale if no living monsters (combat about to end)
+            phase == "Morale" && has_living_monsters == 0 => 1,
+            _ => 0
+        }
+    }
+
     // --- Morale trigger derive ---
     // Determines whether a morale check should be triggered based on
     // casualties. OSE triggers morale checks when:

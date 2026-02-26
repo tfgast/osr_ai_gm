@@ -256,8 +256,8 @@ impl Spell {
     }
 }
 
-/// OSE combat phase sequence. Temporary const array — will become a DSL derive
-/// once list literals land (tdsl-jd5).
+/// OSE combat phase sequence — native fallback used when DSL backend is
+/// unavailable. Prefer [`get_phase_sequence`] which tries the DSL first.
 pub const PHASE_SEQUENCE: &[&str] = &[
     "Declaration",
     "Initiative",
@@ -268,6 +268,148 @@ pub const PHASE_SEQUENCE: &[&str] = &[
     "Melee",
     "EndOfRound",
 ];
+
+/// Get the combat phase sequence, trying the DSL `phase_sequence` derive first
+/// and falling back to the native [`PHASE_SEQUENCE`] const.
+pub fn get_phase_sequence() -> Vec<String> {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        if let Some(seq) = dsl_phase_sequence() {
+            return seq;
+        }
+    }
+    PHASE_SEQUENCE.iter().map(|s| s.to_string()).collect()
+}
+
+/// Evaluate the DSL `phase_sequence` derive.
+#[cfg(feature = "dsl-backend")]
+fn dsl_phase_sequence() -> Option<Vec<String>> {
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::reference_state::GameState;
+    use ttrpg_interp::value::Value;
+
+    struct NullHandler;
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response {
+            Response::Acknowledged
+        }
+    }
+
+    let runtime = crate::backend::dsl()?;
+    let state = GameState::new();
+    let mut handler = NullHandler;
+
+    let result = runtime
+        .evaluate_derive(&state, &mut handler, "phase_sequence", vec![])
+        .ok()?;
+
+    match result {
+        Value::List(items) => {
+            let mut phases = Vec::new();
+            for item in items {
+                match item {
+                    Value::Str(s) => phases.push(s),
+                    _ => return None,
+                }
+            }
+            if phases.is_empty() {
+                return None;
+            }
+            Some(phases)
+        }
+        _ => None,
+    }
+}
+
+/// Get the action budget for a combat phase from the DSL.
+/// Returns a map of action-type → count (e.g. {"attack": 1}).
+/// Falls back to None if the DSL is unavailable.
+#[cfg(feature = "dsl-backend")]
+pub fn dsl_action_budget(phase: &str) -> Option<HashMap<String, i32>> {
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::reference_state::GameState;
+    use ttrpg_interp::value::Value;
+
+    struct NullHandler;
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response {
+            Response::Acknowledged
+        }
+    }
+
+    if !crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        return None;
+    }
+
+    let runtime = crate::backend::dsl()?;
+    let state = GameState::new();
+    let mut handler = NullHandler;
+
+    let result = runtime
+        .evaluate_derive(
+            &state,
+            &mut handler,
+            "action_budget",
+            vec![Value::Str(phase.to_string())],
+        )
+        .ok()?;
+
+    match result {
+        Value::Map(entries) => {
+            let mut budget = HashMap::new();
+            for (k, v) in entries {
+                if let (Value::Str(key), Value::Int(val)) = (k, v) {
+                    budget.insert(key, val as i32);
+                }
+            }
+            Some(budget)
+        }
+        _ => None,
+    }
+}
+
+/// Check whether a phase should be skipped via the DSL `skip_phase` derive.
+/// Returns Some(true) to skip, Some(false) to run, None if DSL unavailable.
+#[cfg(feature = "dsl-backend")]
+fn dsl_skip_phase(phase: &str, round: u32, has_spells_declared: bool, has_living_monsters: bool) -> Option<bool> {
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::reference_state::GameState;
+    use ttrpg_interp::value::Value;
+
+    struct NullHandler;
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response {
+            Response::Acknowledged
+        }
+    }
+
+    if !crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        return None;
+    }
+
+    let runtime = crate::backend::dsl()?;
+    let state = GameState::new();
+    let mut handler = NullHandler;
+
+    let result = runtime
+        .evaluate_derive(
+            &state,
+            &mut handler,
+            "skip_phase",
+            vec![
+                Value::Str(phase.to_string()),
+                Value::Int(round as i64),
+                Value::Int(if has_spells_declared { 1 } else { 0 }),
+                Value::Int(if has_living_monsters { 1 } else { 0 }),
+            ],
+        )
+        .ok()?;
+
+    match result {
+        Value::Int(n) => Some(n != 0),
+        _ => None,
+    }
+}
 
 /// Display name for a phase ID. Returns the ID itself for most phases,
 /// but formats "EndOfRound" as "End of Round" for human display.
@@ -336,7 +478,7 @@ impl CombatState {
             spell_declarations: Vec::new(),
             pending_spells: Vec::new(),
             disrupted: Vec::new(),
-            phase: PHASE_SEQUENCE[0].to_string(),
+            phase: get_phase_sequence().first().cloned().unwrap_or_else(|| PHASE_SEQUENCE[0].to_string()),
             first_death_checked: false,
             half_killed_checked: false,
             initial_monster_count: initial_count,
@@ -353,24 +495,66 @@ impl CombatState {
     }
 
     fn default_phase() -> String {
-        PHASE_SEQUENCE[0].to_string()
+        get_phase_sequence().first().cloned().unwrap_or_else(|| PHASE_SEQUENCE[0].to_string())
     }
 
-    /// Advance to the next combat phase by walking PHASE_SEQUENCE.
+    /// Advance to the next combat phase using the DSL-sourced (or fallback)
+    /// phase sequence. Phases flagged by `skip_phase` are automatically skipped.
     pub fn advance_phase(&mut self) {
-        let idx = PHASE_SEQUENCE.iter().position(|&p| p == self.phase);
-        let next_idx = match idx {
-            Some(i) if i + 1 < PHASE_SEQUENCE.len() => i + 1,
+        let sequence = get_phase_sequence();
+        let idx = sequence.iter().position(|p| p == &self.phase);
+        let len = sequence.len();
+
+        // Walk forward, skipping phases the DSL says to skip.
+        // Guard: at most `len` iterations to avoid infinite loops if all phases skip.
+        let mut steps = 0;
+        let mut next_idx = match idx {
+            Some(i) if i + 1 < len => i + 1,
             _ => {
-                // Wrap: last phase (EndOfRound) → first phase (Declaration).
-                // Clear stale spell state from the completed round so the
-                // next declaration phase starts fresh.
+                // Wrap: last phase → first phase.
+                // Clear stale spell state from the completed round.
                 self.spell_declarations.clear();
                 self.pending_spells.clear();
                 0
             }
         };
-        self.phase = PHASE_SEQUENCE[next_idx].to_string();
+
+        loop {
+            // Check DSL skip_phase condition
+            let should_skip = {
+                #[cfg(feature = "dsl-backend")]
+                {
+                    dsl_skip_phase(
+                        &sequence[next_idx],
+                        self.round,
+                        !self.spell_declarations.is_empty(),
+                        self.living_monster_count() > 0,
+                    )
+                    .unwrap_or(false)
+                }
+                #[cfg(not(feature = "dsl-backend"))]
+                {
+                    let _ = &sequence[next_idx];
+                    false
+                }
+            };
+
+            steps += 1;
+            if !should_skip || steps >= len {
+                break;
+            }
+
+            // Advance past skipped phase
+            if next_idx + 1 < len {
+                next_idx += 1;
+            } else {
+                self.spell_declarations.clear();
+                self.pending_spells.clear();
+                next_idx = 0;
+            }
+        }
+
+        self.phase = sequence[next_idx].clone();
     }
 
     pub fn living_monsters(&self) -> Vec<(usize, &Monster)> {
