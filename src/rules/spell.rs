@@ -238,6 +238,44 @@ pub fn cast_cost(spell_level: u32) -> u32 {
     1 // Vancian: always 1 slot per cast
 }
 
+/// Returns the spell point cost for a given spell level.
+/// Used by spell-point casting systems where each spell level has a different cost.
+pub fn spell_point_cost(spell_level: u32) -> u32 {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Spell) {
+            if let Some(cost) = dsl_gate::dsl_spell_point_cost(spell_level) {
+                return cost;
+            }
+        }
+    }
+    // Native fallback: standard OSR spell point conversion
+    match spell_level {
+        1 => 2,
+        2 => 3,
+        3 => 5,
+        4 => 6,
+        5 => 7,
+        6 => 9,
+        _ => 0,
+    }
+}
+
+/// Check whether all casting resources recharge on long rest.
+/// Returns true if the casting model fully recharges on rest (all known models do).
+pub fn rest_recovery(prog: SpellProgression) -> bool {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if crate::backend::is_dsl(crate::backend::MechanicGroup::Spell) {
+            if let Some(result) = dsl_gate::dsl_rest_recovery(prog) {
+                return result;
+            }
+        }
+    }
+    let _ = prog;
+    true // All resource types fully recharge on rest
+}
+
 // ── DSL gate helpers ──────────────────────────────────────────
 
 #[cfg(feature = "dsl-backend")]
@@ -371,6 +409,27 @@ mod dsl_gate {
         let result = rt.evaluate_derive(&NullState, &mut NullHandler, "cast_cost", args).ok()?;
         match result {
             Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_spell_point_cost(spell_level: u32) -> Option<u32> {
+        let rt = backend::dsl()?;
+        let args = vec![Value::Int(spell_level as i64)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "spell_point_cost", args).ok()?;
+        match result {
+            Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
+    }
+
+    pub fn dsl_rest_recovery(prog: SpellProgression) -> Option<bool> {
+        let rt = backend::dsl()?;
+        let resource = dsl_casting_resource_type(prog)?;
+        let args = vec![casting_resource_to_dsl(&resource)];
+        let result = rt.evaluate_derive(&NullState, &mut NullHandler, "rest_recovery", args).ok()?;
+        match result {
+            Value::Bool(b) => Some(b),
             _ => None,
         }
     }
@@ -512,6 +571,24 @@ mod tests {
         assert_eq!(cast_cost(1), 1);
         assert_eq!(cast_cost(3), 1);
         assert_eq!(cast_cost(6), 1);
+    }
+
+    #[test]
+    fn spell_point_costs() {
+        assert_eq!(spell_point_cost(1), 2);
+        assert_eq!(spell_point_cost(2), 3);
+        assert_eq!(spell_point_cost(3), 5);
+        assert_eq!(spell_point_cost(4), 6);
+        assert_eq!(spell_point_cost(5), 7);
+        assert_eq!(spell_point_cost(6), 9);
+        assert_eq!(spell_point_cost(7), 0);
+    }
+
+    #[test]
+    fn rest_recovery_always_true() {
+        assert!(rest_recovery(SpellProgression::Cleric));
+        assert!(rest_recovery(SpellProgression::ArcaneFullCaster));
+        assert!(rest_recovery(SpellProgression::NonCaster));
     }
 }
 
@@ -676,5 +753,23 @@ mod dsl_tests {
                 level
             );
         }
+    }
+
+    #[test]
+    fn dsl_spell_point_costs() {
+        assert_eq!(dsl_gate::dsl_spell_point_cost(1), Some(2));
+        assert_eq!(dsl_gate::dsl_spell_point_cost(2), Some(3));
+        assert_eq!(dsl_gate::dsl_spell_point_cost(3), Some(5));
+        assert_eq!(dsl_gate::dsl_spell_point_cost(4), Some(6));
+        assert_eq!(dsl_gate::dsl_spell_point_cost(5), Some(7));
+        assert_eq!(dsl_gate::dsl_spell_point_cost(6), Some(9));
+    }
+
+    #[test]
+    fn dsl_rest_recovery_true() {
+        assert_eq!(
+            dsl_gate::dsl_rest_recovery(SpellProgression::Cleric),
+            Some(true)
+        );
     }
 }

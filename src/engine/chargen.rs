@@ -234,6 +234,8 @@ pub fn create_character(
         thac0: thac0_val,
         movement_rate: BASE_MOVEMENT,
         spell_slots_used: [0; 6],
+        prepared_spells: Vec::new(),
+        spell_points_used: 0,
         effects: Vec::new(),
     }
 }
@@ -275,6 +277,8 @@ pub fn create_character_with<R: Rng>(
         thac0: thac0_val,
         movement_rate: BASE_MOVEMENT,
         spell_slots_used: [0; 6],
+        prepared_spells: Vec::new(),
+        spell_points_used: 0,
         effects: Vec::new(),
     }
 }

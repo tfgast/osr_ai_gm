@@ -187,6 +187,16 @@ pub enum GMCommand {
     },
     /// Rest for one turn (resets activity counter).
     Rest,
+    /// Prepare (memorize) spells for a character. Vancian casting only.
+    /// Replaces any previously prepared spells.
+    PrepareSpells {
+        character: String,
+        spells: Vec<crate::engine::spell_management::PreparedSpellEntry>,
+    },
+    /// Long rest: sleep overnight and recharge all spell resources for the party.
+    /// Vancian: resets spell slots used. Spell points: resets points spent.
+    /// Prepared spells are retained.
+    LongRest,
 
     // -- GM-only: wilderness --
     /// Enter wilderness travel mode.

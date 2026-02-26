@@ -119,6 +119,25 @@ pub(super) fn rest(id: &str, state: &mut GameState) -> GMResponse {
     }
 }
 
+pub(super) fn prepare_spells(
+    id: &str,
+    state: &mut GameState,
+    character: &str,
+    spells: &[crate::engine::spell_management::PreparedSpellEntry],
+) -> GMResponse {
+    match crate::engine::spell_management::action_prepare_spells(state, character, spells) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
+    }
+}
+
+pub(super) fn long_rest(id: &str, state: &mut GameState) -> GMResponse {
+    match crate::engine::spell_management::action_long_rest(state) {
+        Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),
+        Err(e) => GMResponse::err(id, e.to_string(), state.mode),
+    }
+}
+
 pub(super) fn look(id: &str, state: &GameState) -> GMResponse {
     match exploration::action_look(state) {
         Ok(result) => ok_with_typed_data(id, state, result.message.clone(), result),

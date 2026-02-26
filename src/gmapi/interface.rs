@@ -73,6 +73,10 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
         GMCommand::PickLock { door_id, character } => exploration_handlers::pick_lock(id, state, *door_id, character),
         GMCommand::Listen { is_demihuman } => exploration_handlers::listen(id, state, *is_demihuman),
         GMCommand::Rest => exploration_handlers::rest(id, state),
+        GMCommand::PrepareSpells { character, spells } => {
+            exploration_handlers::prepare_spells(id, state, character, spells)
+        }
+        GMCommand::LongRest => exploration_handlers::long_rest(id, state),
 
         // -- Wilderness --
         GMCommand::EnterWilderness { terrain } => exploration_handlers::enter_wilderness(id, state, *terrain),

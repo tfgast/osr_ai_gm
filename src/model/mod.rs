@@ -67,9 +67,18 @@ pub struct Character {
     pub thac0: u32,
     #[serde(default)]
     pub movement_rate: u32,
-    /// Spell slots used since last rest (index 0 = 1st level, etc.). Resets on rest.
+    /// Spell slots used since last rest (index 0 = 1st level, etc.). Resets on long rest.
     #[serde(default)]
     pub spell_slots_used: [u32; 6],
+    /// Prepared (memorized) spells by level. Index 0 = 1st level spells.
+    /// Each inner Vec contains spell names prepared at that level.
+    /// For Vancian casting: length of each vec <= max_slots at that level.
+    /// Empty if no spells prepared yet (or for non-Vancian systems).
+    #[serde(default)]
+    pub prepared_spells: Vec<Vec<String>>,
+    /// Spell points used since last rest. For spell-point casting systems.
+    #[serde(default)]
+    pub spell_points_used: u32,
     /// Active effects on this character.
     #[serde(default)]
     pub effects: Vec<ActiveEffect>,
@@ -94,6 +103,8 @@ impl Character {
             thac0: 19,
             movement_rate: 120,
             spell_slots_used: [0; 6],
+            prepared_spells: Vec::new(),
+            spell_points_used: 0,
             effects: Vec::new(),
         }
     }

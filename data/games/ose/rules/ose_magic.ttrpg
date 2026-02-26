@@ -178,11 +178,14 @@ system "OSE Magic" {
     //  slot at the spell's level.
     // ========================================================
 
-    // Casting resource types. OSE only uses vancian_slots.
-    // Future systems may add: spell_points, spontaneous_slots.
-    enum CastingResource { vancian_slots }
+    // Casting resource types.
+    // vancian_slots: OSE default — prepare spells, each cast uses 1 slot at spell level.
+    // spell_points: alternative — each cast costs points based on spell level.
+    // spontaneous_slots: 5e-like — slot-based but any known spell can fill any slot >= its level.
+    enum CastingResource { vancian_slots, spell_points, spontaneous_slots }
 
     // Returns the casting resource type for this game system.
+    // OSE uses Vancian slots for all progressions.
     derive casting_resource_type(progression: SpellProgression) -> CastingResource {
         match progression {
             _ => vancian_slots
@@ -191,17 +194,62 @@ system "OSE Magic" {
 
     // Check if a character can cast a spell at a given spell level,
     // considering their current slot usage vs maximum slots.
+    //
+    // vancian_slots: slot at spell level must be available.
+    // spell_points: points_used + cost <= max_points (encoded in slots_used[0] / max_slots[0]).
+    // spontaneous_slots: any slot at spell level or higher must be available.
     derive can_cast_spell(resource_type: CastingResource, slots_used: list<int>, max_slots: list<int>, spell_level: int) -> bool {
         match resource_type {
-            vancian_slots => slots_used[spell_level - 1] < max_slots[spell_level - 1]
+            vancian_slots => slots_used[spell_level - 1] < max_slots[spell_level - 1],
+            spell_points => slots_used[0] + spell_point_cost(spell_level) <= max_slots[0],
+            spontaneous_slots => {
+                // Check if any slot at spell_level or higher is available
+                let idx = spell_level - 1
+                let found = match {
+                    idx <= 0 && max_slots[0] > slots_used[0] => true,
+                    idx <= 1 && max_slots[1] > slots_used[1] => true,
+                    idx <= 2 && max_slots[2] > slots_used[2] => true,
+                    idx <= 3 && max_slots[3] > slots_used[3] => true,
+                    idx <= 4 && max_slots[4] > slots_used[4] => true,
+                    idx <= 5 && max_slots[5] > slots_used[5] => true,
+                    _ => false
+                }
+                found
+            }
         }
     }
 
     // Returns the cost in resources to cast a spell of the given level.
-    // For Vancian casting, always 1 slot per cast regardless of spell level.
+    // vancian_slots: always 1 slot per cast.
+    // spell_points: variable cost based on spell level.
+    // spontaneous_slots: 1 slot (consumed at the actual slot level used).
     derive cast_cost(resource_type: CastingResource, spell_level: int) -> int {
         match resource_type {
-            vancian_slots => 1
+            vancian_slots => 1,
+            spell_points => spell_point_cost(spell_level),
+            spontaneous_slots => 1
+        }
+    }
+
+    // Spell point cost by spell level.
+    // Standard OSR spell point conversion: roughly 2×level - 1, with adjustments.
+    derive spell_point_cost(spell_level: int) -> int {
+        match spell_level {
+            1 => 2,
+            2 => 3,
+            3 => 5,
+            4 => 6,
+            5 => 7,
+            6 => 9,
+            _ => 0
+        }
+    }
+
+    // Rest recovery: determines what happens to casting resources on long rest.
+    // All resource types fully recharge (slots reset to 0 used, points reset to 0 spent).
+    derive rest_recovery(resource_type: CastingResource) -> bool {
+        match resource_type {
+            _ => true
         }
     }
 

@@ -175,6 +175,8 @@ mod tests {
             thac0: 19,
             movement_rate: 120,
             spell_slots_used: [0; 6],
+            prepared_spells: Vec::new(),
+            spell_points_used: 0,
             effects: vec![],
         }
     }
@@ -204,6 +206,8 @@ mod tests {
             thac0: 19,
             movement_rate: 120,
             spell_slots_used: [0; 6],
+            prepared_spells: Vec::new(),
+            spell_points_used: 0,
             effects: vec![],
         }
     }
@@ -233,6 +237,8 @@ mod tests {
             thac0: 19,
             movement_rate: 120,
             spell_slots_used: [0; 6],
+            prepared_spells: Vec::new(),
+            spell_points_used: 0,
             effects: vec![],
         }
     }

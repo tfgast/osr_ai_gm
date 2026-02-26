@@ -11,6 +11,7 @@ pub mod party;
 pub mod result;
 pub mod retainer;
 pub mod rumor;
+pub mod spell_management;
 pub mod retainers;
 pub mod system;
 pub mod treasure;
