@@ -1,7 +1,7 @@
 use crate::engine::chargen;
 use crate::engine::result::EngineError;
 use crate::persist::GameState;
-use crate::rules::alignment::Alignment;
+use crate::rules::alignment::AlignmentId;
 use crate::rules::class::{self, Class, ClassId};
 use crate::rules::encumbrance;
 use crate::rules::xp::{check_level_up, xp_for_level};
@@ -19,10 +19,11 @@ pub fn action_create_character(
     state: &mut GameState,
     name: &str,
     class: impl Into<ClassId>,
-    alignment: Alignment,
+    alignment: impl Into<AlignmentId>,
     provided_abilities: Option<[i32; 6]>,
 ) -> Result<CreateCharacterResult, EngineError> {
     let class_id: ClassId = class.into();
+    let alignment_id: AlignmentId = alignment.into();
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return Err(EngineError::InvalidInput(
@@ -60,7 +61,7 @@ pub fn action_create_character(
         return Ok(CreateCharacterResult {
             name: name.to_string(),
             class: class_id,
-            alignment,
+            alignment: alignment_id,
             used_provided_abilities: provided_abilities.is_some(),
             base_abilities,
             abilities,
@@ -71,14 +72,14 @@ pub fn action_create_character(
         });
     }
 
-    let character = chargen::create_character(name, class_id.clone(), abilities, alignment);
+    let character = chargen::create_character(name, class_id.clone(), abilities, alignment_id.clone());
     let character_sheet = chargen::character_sheet(&character);
     state.party.add_member(character);
 
     Ok(CreateCharacterResult {
         name: name.to_string(),
         class: class_id,
-        alignment,
+        alignment: alignment_id,
         used_provided_abilities: provided_abilities.is_some(),
         base_abilities,
         abilities,
@@ -131,7 +132,7 @@ pub fn action_query_party(state: &GameState) -> Result<QueryPartyResult, EngineE
                 thac0: character.thac0,
                 xp: character.xp,
                 alive: character.is_alive(),
-                alignment: character.alignment,
+                alignment: character.alignment.clone(),
                 movement_rate: character.movement_rate,
                 next_level_xp,
                 ready_to_train: character.is_alive()

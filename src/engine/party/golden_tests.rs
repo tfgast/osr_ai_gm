@@ -4,7 +4,7 @@ use crate::gmapi::interface::handle_request;
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::model::Character;
 use crate::persist::GameState;
-use crate::rules::alignment::Alignment;
+use crate::rules::alignment::{Alignment, AlignmentId};
 use crate::rules::class::Class;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -152,7 +152,7 @@ fn party_command_parity_golden_scaffold_captures_snapshots() {
             GMCommand::CreateCharacter {
                 name: "Borin".to_string(),
                 class: Class::Knight.into(),
-                alignment: Alignment::Neutral,
+                alignment: AlignmentId::from_enum(Alignment::Neutral),
                 abilities: Some([8, 8, 8, 8, 8, 8]),
             },
         ),

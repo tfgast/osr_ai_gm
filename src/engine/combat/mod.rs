@@ -148,7 +148,7 @@ mod golden_tests;
 mod tests {
     use super::*;
     use crate::model::{AbilityScores, Monster};
-    use crate::rules::alignment::Alignment;
+    use crate::rules::alignment::{Alignment, AlignmentId};
     use crate::rules::class::Class;
     use crate::rules::equipment;
     use crate::rules::turn::TurnResult;
@@ -178,7 +178,7 @@ mod tests {
             xp: 0,
             inventory: vec![],
             spells: vec![],
-            alignment: Alignment::Neutral,
+            alignment: AlignmentId::from_enum(Alignment::Neutral),
             gold_gp: 100,
             saving_throws: None,
             thac0: 19,
@@ -209,7 +209,7 @@ mod tests {
             xp: 0,
             inventory: vec![],
             spells: vec![],
-            alignment: Alignment::Lawful,
+            alignment: AlignmentId::from_enum(Alignment::Lawful),
             gold_gp: 50,
             saving_throws: None,
             thac0: 19,
@@ -240,7 +240,7 @@ mod tests {
             xp: 0,
             inventory: vec![],
             spells: vec![],
-            alignment: Alignment::Neutral,
+            alignment: AlignmentId::from_enum(Alignment::Neutral),
             gold_gp: 40,
             saving_throws: None,
             thac0: 19,

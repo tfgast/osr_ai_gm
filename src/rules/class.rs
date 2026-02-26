@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use super::save::SaveCategory;
+use super::save::{SaveCategory, SaveCategoryId};
 use super::spell::{SpellProgression, SpellListType};
 
 /// All 22 character classes (7 B/X + 15 Advanced Fantasy).
@@ -211,7 +211,7 @@ pub struct ClassDef {
     pub armour: ArmourPermission,
     pub weapons_any: bool,       // true = any weapon, false = restricted
     pub weapons_blunt_only: bool, // if !weapons_any, only blunt weapons
-    pub save_category: SaveCategory,
+    pub save_category: SaveCategoryId,
     pub spell_progression: SpellProgression,
     pub spell_list: SpellListType,
     pub starting_gold: &'static str, // dice notation for gold in gp
@@ -259,7 +259,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::None,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Thief,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Thief),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -274,7 +274,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Thief,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Thief),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -289,7 +289,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Barbarian,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Barbarian),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -304,7 +304,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::LeatherShield,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Thief,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Thief),
             spell_progression: SpellProgression::Bard,
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -319,7 +319,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: false, weapons_blunt_only: true,
-            save_category: SaveCategory::Cleric,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Cleric),
             spell_progression: SpellProgression::Cleric,
             spell_list: SpellListType::Cleric,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -334,7 +334,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[(DEX, 1), (CON, -1)],
             max_level: 10, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Drow,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Drow),
             spell_progression: SpellProgression::Drow,
             spell_list: SpellListType::DrowArcaneAndDivine,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -349,7 +349,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Leather,
             weapons_any: false, weapons_blunt_only: true,
-            save_category: SaveCategory::Cleric,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Cleric),
             spell_progression: SpellProgression::Druid,
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -364,7 +364,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[(CON, 1), (CHA, -1)],
             max_level: 10, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Dwarf,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Dwarf),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -379,7 +379,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[(CON, 1), (CHA, -1)],
             max_level: 12, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Dwarf,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Dwarf),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -394,7 +394,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[(DEX, 1), (CON, -1)],
             max_level: 10, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Elf,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Elf),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::MagicUser,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -409,7 +409,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Fighter,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Fighter),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -424,7 +424,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 8, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Gnome,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Gnome),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -439,7 +439,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 12, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::HalfElf,
+            save_category: SaveCategoryId::from_enum(SaveCategory::HalfElf),
             spell_progression: SpellProgression::HalfElf,
             spell_list: SpellListType::MagicUser,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -454,7 +454,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[(STR, -1), (DEX, 1)],
             max_level: 8, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Dwarf,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Dwarf),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -469,7 +469,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[(STR, 1), (CON, 1), (CHA, -2)],
             max_level: 8, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::HalfOrc,
+            save_category: SaveCategoryId::from_enum(SaveCategory::HalfOrc),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -484,7 +484,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::None,
             weapons_any: false, weapons_blunt_only: false, // dagger only
-            save_category: SaveCategory::MagicUser,
+            save_category: SaveCategoryId::from_enum(SaveCategory::MagicUser),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -499,7 +499,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Fighter,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Fighter),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -514,7 +514,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::None,
             weapons_any: false, weapons_blunt_only: false, // dagger only
-            save_category: SaveCategory::MagicUser,
+            save_category: SaveCategoryId::from_enum(SaveCategory::MagicUser),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::MagicUser,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -529,7 +529,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Paladin,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Paladin),
             spell_progression: SpellProgression::Paladin,
             spell_list: SpellListType::Cleric,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -544,7 +544,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Any,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Fighter,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Fighter),
             spell_progression: SpellProgression::Ranger,
             spell_list: SpellListType::Druid,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -559,7 +559,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 8, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Svirfneblin,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Svirfneblin),
             spell_progression: SpellProgression::ArcaneFullCaster,
             spell_list: SpellListType::Illusionist,
             starting_gold: "3d6x10", is_demihuman: true,
@@ -574,7 +574,7 @@ fn native_class_def(class: Class) -> ClassDef {
             racial_modifiers: &[],
             max_level: 14, armour: ArmourPermission::Leather,
             weapons_any: true, weapons_blunt_only: false,
-            save_category: SaveCategory::Thief,
+            save_category: SaveCategoryId::from_enum(SaveCategory::Thief),
             spell_progression: SpellProgression::NonCaster,
             spell_list: SpellListType::None,
             starting_gold: "3d6x10", is_demihuman: false,
@@ -712,23 +712,8 @@ mod dsl_gate {
         }
     }
 
-    fn parse_save_category(s: &str) -> Option<SaveCategory> {
-        match s {
-            "save_thief" => Some(SaveCategory::Thief),
-            "save_barbarian" => Some(SaveCategory::Barbarian),
-            "save_cleric" => Some(SaveCategory::Cleric),
-            "save_drow" => Some(SaveCategory::Drow),
-            "save_dwarf" => Some(SaveCategory::Dwarf),
-            "save_elf" => Some(SaveCategory::Elf),
-            "save_fighter" => Some(SaveCategory::Fighter),
-            "save_gnome" => Some(SaveCategory::Gnome),
-            "save_half_elf" => Some(SaveCategory::HalfElf),
-            "save_half_orc" => Some(SaveCategory::HalfOrc),
-            "save_magic_user" => Some(SaveCategory::MagicUser),
-            "save_paladin" => Some(SaveCategory::Paladin),
-            "save_svirfneblin" => Some(SaveCategory::Svirfneblin),
-            _ => None,
-        }
+    fn parse_save_category(s: &str) -> Option<SaveCategoryId> {
+        SaveCategory::parse(s).map(SaveCategoryId::from_enum)
     }
 
     fn parse_spell_progression(s: &str) -> Option<SpellProgression> {

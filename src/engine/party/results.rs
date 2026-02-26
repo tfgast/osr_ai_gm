@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::rules::alignment::Alignment;
+use crate::rules::alignment::AlignmentId;
 use crate::rules::class::ClassId;
 use crate::rules::encumbrance::EncumbranceLevel;
 
@@ -9,7 +9,7 @@ use crate::rules::encumbrance::EncumbranceLevel;
 pub struct CreateCharacterResult {
     pub name: String,
     pub class: ClassId,
-    pub alignment: Alignment,
+    pub alignment: AlignmentId,
     pub used_provided_abilities: bool,
     pub base_abilities: [i32; 6],
     pub abilities: [i32; 6],
@@ -40,7 +40,7 @@ pub struct PartyMemberSummary {
     pub thac0: u32,
     pub xp: u64,
     pub alive: bool,
-    pub alignment: Alignment,
+    pub alignment: AlignmentId,
     pub movement_rate: u32,
     pub next_level_xp: Option<u64>,
     pub ready_to_train: bool,

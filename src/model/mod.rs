@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use crate::log_entry::LogEntry;
-use crate::rules::alignment::Alignment;
+use crate::rules::alignment::AlignmentId;
 use crate::rules::attack::HitDice;
 use crate::rules::class::ClassId;
 use crate::rules::save::SavingThrows;
@@ -58,7 +58,7 @@ pub struct Character {
     pub inventory: Vec<Item>,
     pub spells: Vec<Spell>,
     #[serde(default)]
-    pub alignment: Alignment,
+    pub alignment: AlignmentId,
     #[serde(default)]
     pub gold_gp: u32,
     #[serde(default)]
@@ -97,7 +97,7 @@ impl Character {
             xp: 0,
             inventory: Vec::new(),
             spells: Vec::new(),
-            alignment: Alignment::default(),
+            alignment: AlignmentId::default(),
             gold_gp: 0,
             saving_throws: None,
             thac0: 19,

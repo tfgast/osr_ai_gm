@@ -1,6 +1,8 @@
 use crate::engine::{gm, party, retainers, system};
 use crate::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use crate::persist::GameState;
+use crate::rules::alignment::AlignmentId;
+#[cfg(test)]
 use crate::rules::alignment::Alignment;
 use crate::rules::class::ClassId;
 use super::{combat_handlers, exploration_handlers, query_handlers};
@@ -25,7 +27,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
 
         // -- Character management --
         GMCommand::CreateCharacter { name, class, alignment, abilities } => {
-            create_character(id, state, name, class.clone(), *alignment, abilities.as_ref())
+            create_character(id, state, name, class.clone(), alignment.clone(), abilities.as_ref())
         }
 
         // -- Combat --
@@ -185,7 +187,7 @@ struct CreateCharacterData {
     character_sheet: String,
 }
 
-fn create_character(id: &str, state: &mut GameState, name: &str, class: ClassId, alignment: Alignment, provided_abilities: Option<&[i32; 6]>) -> GMResponse {
+fn create_character(id: &str, state: &mut GameState, name: &str, class: ClassId, alignment: AlignmentId, provided_abilities: Option<&[i32; 6]>) -> GMResponse {
     match party::action_create_character(state, name, class.clone(), alignment, provided_abilities.copied()) {
         Ok(result) => {
             if !result.created {
@@ -543,7 +545,7 @@ mod tests {
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
             class: Class::Fighter.into(),
-            alignment: Alignment::Lawful,
+            alignment: AlignmentId::from_enum(Alignment::Lawful),
             abilities: None,
         }), &mut state);
         // Character creation might fail due to random ability rolls not meeting requirements.
@@ -732,7 +734,7 @@ mod tests {
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
             class: Class::Fighter.into(),
-            alignment: Alignment::Lawful,
+            alignment: AlignmentId::from_enum(Alignment::Lawful),
             abilities: None,
         }), &mut state);
         assert!(resp.success);
@@ -788,7 +790,7 @@ mod tests {
         let resp = handle_request(&make_req("1", GMCommand::CreateCharacter {
             name: "Aldric".to_string(),
             class: Class::Fighter.into(),
-            alignment: Alignment::Lawful,
+            alignment: AlignmentId::from_enum(Alignment::Lawful),
             abilities: None,
         }), &mut state);
         assert!(resp.success);

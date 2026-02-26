@@ -12,7 +12,7 @@ use osr_ai_gm::gmapi::protocol::{EncounterParams, GMCommand, GMRequest, GMRespon
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{AbilityScores, Character, CombatState, Item, Monster};
-use osr_ai_gm::rules::alignment::Alignment;
+use osr_ai_gm::rules::alignment::{Alignment, AlignmentId};
 use osr_ai_gm::rules::class::Class;
 use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
@@ -46,7 +46,7 @@ fn make_fighter(name: &str) -> Character {
     c.max_hp = 8;
     c.ac = 3;
     c.thac0 = 19;
-    c.alignment = Alignment::Lawful;
+    c.alignment = AlignmentId::from_enum(Alignment::Lawful);
     c.gold_gp = 120;
     c.movement_rate = 60;
     c
@@ -62,7 +62,7 @@ fn make_thief(name: &str) -> Character {
     c.max_hp = 4;
     c.ac = 6;
     c.thac0 = 19;
-    c.alignment = Alignment::Neutral;
+    c.alignment = AlignmentId::from_enum(Alignment::Neutral);
     c.gold_gp = 80;
     c.movement_rate = 120;
     c
@@ -78,7 +78,7 @@ fn make_cleric(name: &str) -> Character {
     c.max_hp = 6;
     c.ac = 4;
     c.thac0 = 19;
-    c.alignment = Alignment::Lawful;
+    c.alignment = AlignmentId::from_enum(Alignment::Lawful);
     c.gold_gp = 100;
     c.movement_rate = 60;
     c
@@ -94,7 +94,7 @@ fn make_magic_user(name: &str) -> Character {
     c.max_hp = 4;
     c.ac = 9;
     c.thac0 = 19;
-    c.alignment = Alignment::Neutral;
+    c.alignment = AlignmentId::from_enum(Alignment::Neutral);
     c.gold_gp = 80;
     c.movement_rate = 120;
     c
@@ -392,7 +392,7 @@ fn create_character_happy_path() {
     let resp = handle_request(&req("cc1", GMCommand::CreateCharacter {
         name: "Aldric".to_string(),
         class: Class::Fighter.into(),
-        alignment: Alignment::Lawful,
+        alignment: AlignmentId::from_enum(Alignment::Lawful),
         abilities: None,
     }), &mut state);
     assert_response_format(&resp, "cc1");
@@ -409,7 +409,7 @@ fn create_character_with_abilities() {
     let resp = handle_request(&req("cc_ab", GMCommand::CreateCharacter {
         name: "Hoyret".to_string(),
         class: Class::Ranger.into(),
-        alignment: Alignment::Neutral,
+        alignment: AlignmentId::from_enum(Alignment::Neutral),
         abilities: Some([13, 13, 13, 13, 13, 13]),
     }), &mut state);
     assert_response_format(&resp, "cc_ab");
@@ -427,7 +427,7 @@ fn create_character_abilities_out_of_range() {
     let resp = handle_request(&req("cc_bad", GMCommand::CreateCharacter {
         name: "BadStats".to_string(),
         class: Class::Fighter.into(),
-        alignment: Alignment::Neutral,
+        alignment: AlignmentId::from_enum(Alignment::Neutral),
         abilities: Some([20, 10, 10, 10, 10, 10]),
     }), &mut state);
     assert_response_format(&resp, "cc_bad");
@@ -445,11 +445,15 @@ fn create_character_invalid_class() {
 }
 
 #[test]
-fn create_character_invalid_alignment() {
-    // Invalid alignment is caught at JSON deserialization.
+fn create_character_unknown_alignment_accepted() {
+    // With data-driven AlignmentId, unknown alignments (e.g., "Evil") are
+    // accepted and stored as-is, supporting homebrew alignment systems.
     let json = r#"{"id":"cc3","command":{"type":"CreateCharacter","params":{"name":"BadAlign","class":"Fighter","alignment":"Evil"}}}"#;
-    let result = parse_request(json);
-    assert!(result.is_err(), "parsing invalid alignment should fail");
+    let req = parse_request(json).unwrap();
+    match &req.command {
+        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(alignment.as_str(), "Evil"),
+        _ => panic!("expected CreateCharacter"),
+    }
 }
 
 #[test]
@@ -458,21 +462,21 @@ fn create_character_alignment_abbreviations() {
     let json_l = r#"{"id":"cc4","command":{"type":"CreateCharacter","params":{"name":"Knight","class":"Fighter","alignment":"L"}}}"#;
     let req_l = parse_request(json_l).unwrap();
     match &req_l.command {
-        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, Alignment::Lawful),
+        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, AlignmentId::from_enum(Alignment::Lawful)),
         _ => panic!("expected CreateCharacter"),
     }
 
     let json_c = r#"{"id":"cc5","command":{"type":"CreateCharacter","params":{"name":"Rogue","class":"Thief","alignment":"C"}}}"#;
     let req_c = parse_request(json_c).unwrap();
     match &req_c.command {
-        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, Alignment::Chaotic),
+        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, AlignmentId::from_enum(Alignment::Chaotic)),
         _ => panic!("expected CreateCharacter"),
     }
 
     let json_n = r#"{"id":"cc6","command":{"type":"CreateCharacter","params":{"name":"Druid","class":"Cleric","alignment":"N"}}}"#;
     let req_n = parse_request(json_n).unwrap();
     match &req_n.command {
-        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, Alignment::Neutral),
+        GMCommand::CreateCharacter { alignment, .. } => assert_eq!(*alignment, AlignmentId::from_enum(Alignment::Neutral)),
         _ => panic!("expected CreateCharacter"),
     }
 }

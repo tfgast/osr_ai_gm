@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::OnceLock;
 
-use super::alignment::Alignment;
+use super::alignment::{Alignment, AlignmentId};
 use super::class::Class;
 
 // ============================================================================
@@ -122,7 +122,7 @@ struct ReactionEntry {
 pub struct NpcMember {
     pub class: Class,
     pub level: u32,
-    pub alignment: Alignment,
+    pub alignment: AlignmentId,
     pub role: Option<String>,
 }
 
@@ -305,21 +305,21 @@ pub fn roll_class_and_level<R: Rng>(rng: &mut R, tier: &str) -> (Class, u32) {
 }
 
 /// Roll a random alignment.
-pub fn roll_alignment<R: Rng>(rng: &mut R) -> Alignment {
+pub fn roll_alignment<R: Rng>(rng: &mut R) -> AlignmentId {
     let data = load_data();
     let roll: u32 = rng.gen_range(1..=6);
 
     for entry in &data.alignment_table {
         if roll >= entry.min_roll && roll <= entry.max_roll {
             return match entry.alignment.as_str() {
-                "Lawful" => Alignment::Lawful,
-                "Chaotic" => Alignment::Chaotic,
-                _ => Alignment::Neutral,
+                "Lawful" => AlignmentId::from_enum(Alignment::Lawful),
+                "Chaotic" => AlignmentId::from_enum(Alignment::Chaotic),
+                _ => AlignmentId::from_enum(Alignment::Neutral),
             };
         }
     }
 
-    Alignment::Neutral
+    AlignmentId::from_enum(Alignment::Neutral)
 }
 
 /// Generate a basic adventuring party (1d4+4 members, levels 1-3).
@@ -475,7 +475,7 @@ pub fn generate_high_level_magic_user_party<R: Rng>(rng: &mut R) -> NpcParty {
     members.push(NpcMember {
         class: Class::MagicUser,
         level: leader_level,
-        alignment: leader_alignment,
+        alignment: leader_alignment.clone(),
         role: Some("Leader".to_string()),
     });
 
@@ -486,7 +486,7 @@ pub fn generate_high_level_magic_user_party<R: Rng>(rng: &mut R) -> NpcParty {
         members.push(NpcMember {
             class: Class::MagicUser,
             level,
-            alignment: leader_alignment,
+            alignment: leader_alignment.clone(),
             role: Some("Apprentice".to_string()),
         });
     }
@@ -662,10 +662,7 @@ mod tests {
         let mut rng = test_rng();
         for _ in 0..100 {
             let alignment = roll_alignment(&mut rng);
-            assert!(matches!(
-                alignment,
-                Alignment::Lawful | Alignment::Neutral | Alignment::Chaotic
-            ));
+            assert!(alignment.to_enum().is_some(), "unknown alignment: {}", alignment);
         }
     }
 
@@ -814,7 +811,7 @@ mod tests {
             let mut rng = StdRng::seed_from_u64(seed);
             let party = generate_basic_party(&mut rng);
             let alignments: std::collections::HashSet<_> =
-                party.members.iter().map(|m| m.alignment).collect();
+                party.members.iter().map(|m| m.alignment.clone()).collect();
             if alignments.len() > 1 {
                 found_variation = true;
                 break;
@@ -835,16 +832,16 @@ mod tests {
             let mut rng = StdRng::seed_from_u64(seed);
             let party = generate_basic_party(&mut rng);
             for member in &party.members {
-                found.insert(member.alignment);
+                found.insert(member.alignment.clone());
             }
             if found.len() == 3 {
                 break;
             }
         }
 
-        assert!(found.contains(&Alignment::Lawful), "should find Lawful members");
-        assert!(found.contains(&Alignment::Neutral), "should find Neutral members");
-        assert!(found.contains(&Alignment::Chaotic), "should find Chaotic members");
+        assert!(found.contains(&AlignmentId::from_enum(Alignment::Lawful)), "should find Lawful members");
+        assert!(found.contains(&AlignmentId::from_enum(Alignment::Neutral)), "should find Neutral members");
+        assert!(found.contains(&AlignmentId::from_enum(Alignment::Chaotic)), "should find Chaotic members");
     }
 
     #[test]
@@ -852,7 +849,7 @@ mod tests {
         let member = NpcMember {
             class: Class::Fighter,
             level: 5,
-            alignment: Alignment::Neutral,
+            alignment: AlignmentId::from_enum(Alignment::Neutral),
             role: None,
         };
         let m = npc_member_to_monster(&member);
@@ -869,7 +866,7 @@ mod tests {
         let member = NpcMember {
             class: Class::MagicUser,
             level: 3,
-            alignment: Alignment::Chaotic,
+            alignment: AlignmentId::from_enum(Alignment::Chaotic),
             role: None,
         };
         let m = npc_member_to_monster(&member);

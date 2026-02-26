@@ -1,7 +1,7 @@
 use super::{Command, CommandResult};
 use crate::persist::GameState;
 use crate::engine::party;
-use crate::rules::alignment::Alignment;
+use crate::rules::alignment::{Alignment, AlignmentId};
 use crate::rules::class::Class;
 use crate::rules::encumbrance::{EncumbranceLevel, MAX_CAPACITY_CN};
 
@@ -30,13 +30,13 @@ impl Command for ChargenCommand {
         let abilities_pos = args.iter().position(|&a| a == "--abilities");
         let positional_end = abilities_pos.unwrap_or(args.len());
 
-        let alignment: Alignment = if positional_end >= 3 {
-            match args[2].parse() {
-                Ok(a) => a,
+        let alignment: AlignmentId = if positional_end >= 3 {
+            match args[2].parse::<Alignment>() {
+                Ok(a) => AlignmentId::from_enum(a),
                 Err(e) => return CommandResult::error(e),
             }
         } else {
-            Alignment::default()
+            AlignmentId::default()
         };
 
         let provided_abilities = if let Some(pos) = abilities_pos {

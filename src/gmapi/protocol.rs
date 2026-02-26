@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::rules::alignment::Alignment;
+use crate::rules::alignment::AlignmentId;
 use crate::rules::attack::HitDice;
 use crate::rules::class::{Class, ClassId};
 use crate::state::dungeon::DoorState;
@@ -71,7 +71,7 @@ pub enum GMCommand {
         #[serde(deserialize_with = "deserialize_class")]
         class: ClassId,
         #[serde(default)]
-        alignment: Alignment,
+        alignment: AlignmentId,
         /// Optional pre-rolled ability scores [STR, INT, WIS, DEX, CON, CHA].
         /// Each score must be 3-18. If omitted, abilities are rolled randomly.
         #[serde(default)]
@@ -720,7 +720,7 @@ mod tests {
             GMCommand::CreateCharacter { name, class, alignment, abilities } => {
                 assert_eq!(name, "Aldric");
                 assert_eq!(*class, ClassId::from_enum(Class::Fighter));
-                assert_eq!(*alignment, Alignment::default()); // default
+                assert_eq!(*alignment, AlignmentId::default()); // default
                 assert!(abilities.is_none()); // default
             }
             _ => panic!("expected CreateCharacter"),
@@ -735,7 +735,7 @@ mod tests {
             GMCommand::CreateCharacter { name, class, alignment, abilities } => {
                 assert_eq!(name, "Hoyret");
                 assert_eq!(*class, ClassId::from_enum(Class::Ranger));
-                assert_eq!(*alignment, Alignment::Neutral);
+                assert_eq!(*alignment, AlignmentId::new("Neutral"));
                 assert_eq!(*abilities, Some([12, 13, 11, 12, 5, 6]));
             }
             _ => panic!("expected CreateCharacter"),

@@ -6,6 +6,8 @@ use rand::Rng;
 use crate::dice;
 use crate::model::{AbilityScores, Character};
 use crate::rules::ability;
+use crate::rules::alignment::AlignmentId;
+#[cfg(test)]
 use crate::rules::alignment::Alignment;
 use crate::rules::class::{self, ClassId, CombatAptitude, class_def};
 #[cfg(test)]
@@ -205,9 +207,10 @@ pub fn create_character(
     name: &str,
     class: impl Into<ClassId>,
     abilities: [i32; 6],
-    alignment: Alignment,
+    alignment: impl Into<AlignmentId>,
 ) -> Character {
     let class_id: ClassId = class.into();
+    let alignment_id: AlignmentId = alignment.into();
     let def = class_def(&class_id);
 
     let con_mod = ability::con_hp_mod(abilities[class::CON]);
@@ -217,7 +220,7 @@ pub fn create_character(
     let dex_mod = ability::dex_ac_mod(abilities[class::DEX]);
     let ac = equipment::calculate_ac(9, false, dex_mod);
 
-    let saves = save::saving_throws(def.save_category, 1);
+    let saves = save::saving_throws(&def.save_category, 1);
     let thac0_val = thac0(def.combat_aptitude, 1);
 
     Character {
@@ -231,7 +234,7 @@ pub fn create_character(
         xp: 0,
         inventory: Vec::new(),
         spells: Vec::new(),
-        alignment,
+        alignment: alignment_id,
         gold_gp: gold,
         saving_throws: Some(saves),
         thac0: thac0_val,
@@ -248,10 +251,11 @@ pub fn create_character_with<R: Rng>(
     name: &str,
     class: impl Into<ClassId>,
     abilities: [i32; 6],
-    alignment: Alignment,
+    alignment: impl Into<AlignmentId>,
     rng: &mut R,
 ) -> Character {
     let class_id: ClassId = class.into();
+    let alignment_id: AlignmentId = alignment.into();
     let def = class_def(&class_id);
 
     let con_mod = ability::con_hp_mod(abilities[class::CON]);
@@ -261,7 +265,7 @@ pub fn create_character_with<R: Rng>(
     let dex_mod = ability::dex_ac_mod(abilities[class::DEX]);
     let ac = equipment::calculate_ac(9, false, dex_mod); // unarmoured at creation
 
-    let saves = save::saving_throws(def.save_category, 1);
+    let saves = save::saving_throws(&def.save_category, 1);
     let thac0_val = thac0(def.combat_aptitude, 1);
 
     Character {
@@ -275,7 +279,7 @@ pub fn create_character_with<R: Rng>(
         xp: 0,
         inventory: Vec::new(),
         spells: Vec::new(),
-        alignment,
+        alignment: alignment_id,
         gold_gp: gold,
         saving_throws: Some(saves),
         thac0: thac0_val,
@@ -410,7 +414,7 @@ mod tests {
         assert_eq!(c.name, "Grond");
         assert_eq!(c.class, ClassId::from(Class::Fighter));
         assert_eq!(c.level, 1);
-        assert_eq!(c.alignment, Alignment::Neutral);
+        assert_eq!(c.alignment, AlignmentId::from_enum(Alignment::Neutral));
         assert_eq!(c.thac0, 19);
         assert_eq!(c.movement_rate, 120);
         assert!(c.hp >= 1);
@@ -532,7 +536,7 @@ mod tests {
         }"#;
         let c: Character = serde_json::from_str(old_json).unwrap();
         assert_eq!(c.name, "OldChar");
-        assert_eq!(c.alignment, Alignment::Neutral); // default
+        assert_eq!(c.alignment, AlignmentId::from_enum(Alignment::Neutral)); // default
         assert_eq!(c.gold_gp, 0);   // default
         assert_eq!(c.thac0, 0);     // default
         assert!(c.saving_throws.is_none());

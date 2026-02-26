@@ -7,7 +7,7 @@ use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::gmapi::protocol::{GMCommand, GMRequest, GMResponse};
 use osr_ai_gm::model::{AbilityScores, Character, CombatState, Monster};
 use osr_ai_gm::persist::GameState;
-use osr_ai_gm::rules::alignment::Alignment;
+use osr_ai_gm::rules::alignment::{Alignment, AlignmentId};
 use osr_ai_gm::rules::class::Class;
 use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
@@ -47,7 +47,7 @@ fn make_fighter(name: &str) -> Character {
         dexterity: 12, constitution: 14, charisma: 11,
     };
     c.hp = 8; c.max_hp = 8; c.ac = 3; c.thac0 = 19;
-    c.alignment = Alignment::Lawful;
+    c.alignment = AlignmentId::from_enum(Alignment::Lawful);
     c.gold_gp = 120; c.movement_rate = 60;
     c
 }
@@ -59,7 +59,7 @@ fn make_cleric(name: &str) -> Character {
         dexterity: 10, constitution: 13, charisma: 14,
     };
     c.hp = 6; c.max_hp = 6; c.ac = 4; c.thac0 = 19;
-    c.alignment = Alignment::Lawful;
+    c.alignment = AlignmentId::from_enum(Alignment::Lawful);
     c.gold_gp = 100; c.movement_rate = 60;
     c
 }
@@ -71,7 +71,7 @@ fn make_thief(name: &str) -> Character {
         dexterity: 16, constitution: 11, charisma: 12,
     };
     c.hp = 4; c.max_hp = 4; c.ac = 6; c.thac0 = 19;
-    c.alignment = Alignment::Neutral;
+    c.alignment = AlignmentId::from_enum(Alignment::Neutral);
     c.gold_gp = 80; c.movement_rate = 120;
     c
 }
@@ -83,7 +83,7 @@ fn make_elf(name: &str) -> Character {
         dexterity: 13, constitution: 12, charisma: 11,
     };
     c.hp = 5; c.max_hp = 5; c.ac = 5; c.thac0 = 19;
-    c.alignment = Alignment::Neutral;
+    c.alignment = AlignmentId::from_enum(Alignment::Neutral);
     c.gold_gp = 90; c.movement_rate = 90;
     c
 }
@@ -95,7 +95,7 @@ fn make_magic_user(name: &str) -> Character {
         dexterity: 12, constitution: 11, charisma: 13,
     };
     c.hp = 4; c.max_hp = 4; c.ac = 9; c.thac0 = 19;
-    c.alignment = Alignment::Neutral;
+    c.alignment = AlignmentId::from_enum(Alignment::Neutral);
     c.gold_gp = 80; c.movement_rate = 120;
     c
 }
@@ -107,7 +107,7 @@ fn make_dwarf(name: &str) -> Character {
         dexterity: 10, constitution: 15, charisma: 11,
     };
     c.hp = 7; c.max_hp = 7; c.ac = 3; c.thac0 = 19;
-    c.alignment = Alignment::Lawful;
+    c.alignment = AlignmentId::from_enum(Alignment::Lawful);
     c.gold_gp = 100; c.movement_rate = 60;
     c
 }
@@ -1127,7 +1127,7 @@ fn create_character_via_gmapi() {
     let resp = handle_request(&req("cc1", GMCommand::CreateCharacter {
         name: "Test Fighter".to_string(),
         class: Class::Fighter.into(),
-        alignment: Alignment::Lawful,
+        alignment: AlignmentId::from_enum(Alignment::Lawful),
         abilities: Some([16, 10, 9, 12, 14, 11]),
     }), &mut state);
     assert_ok(&resp, "CreateCharacter");

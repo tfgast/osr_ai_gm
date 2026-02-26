@@ -6,7 +6,7 @@ use osr_ai_gm::gmapi::protocol::{EncounterParams, GMCommand, GMRequest};
 use osr_ai_gm::gmapi::interface::handle_request;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::model::{Character, AbilityScores};
-use osr_ai_gm::rules::alignment::Alignment;
+use osr_ai_gm::rules::alignment::{Alignment, AlignmentId};
 use osr_ai_gm::rules::class::{Class, ClassId};
 use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
@@ -42,7 +42,7 @@ fn make_fighter(name: &str) -> Character {
     c.max_hp = 8;
     c.ac = 3;  // plate mail + shield
     c.thac0 = 19;
-    c.alignment = Alignment::Lawful;
+    c.alignment = AlignmentId::from_enum(Alignment::Lawful);
     c.gold_gp = 120;
     c.movement_rate = 60;
     c
@@ -59,7 +59,7 @@ fn make_thief(name: &str) -> Character {
     c.max_hp = 4;
     c.ac = 6;  // leather + DEX
     c.thac0 = 19;
-    c.alignment = Alignment::Neutral;
+    c.alignment = AlignmentId::from_enum(Alignment::Neutral);
     c.gold_gp = 80;
     c.movement_rate = 120;
     c
@@ -76,7 +76,7 @@ fn make_cleric(name: &str) -> Character {
     c.max_hp = 6;
     c.ac = 4;  // chain + shield
     c.thac0 = 19;
-    c.alignment = Alignment::Lawful;
+    c.alignment = AlignmentId::from_enum(Alignment::Lawful);
     c.gold_gp = 100;
     c.movement_rate = 60;
     c
@@ -93,7 +93,7 @@ fn make_magic_user(name: &str) -> Character {
     c.max_hp = 3;
     c.ac = 9;  // no armour
     c.thac0 = 19;
-    c.alignment = Alignment::Neutral;
+    c.alignment = AlignmentId::from_enum(Alignment::Neutral);
     c.gold_gp = 60;
     c.movement_rate = 120;
     c

@@ -1,7 +1,7 @@
 use crate::engine::{combat, exploration, lookup, party, rumor, wilderness_engine};
 use crate::gmapi::protocol::GMResponse;
 use crate::persist::GameState;
-use crate::rules::alignment::Alignment;
+use crate::rules::alignment::AlignmentId;
 use crate::rules::class::ClassId;
 use crate::rules::encumbrance;
 use crate::rules::spell_data;
@@ -246,7 +246,7 @@ struct QueryPartyMemberData {
     thac0: u32,
     xp: u64,
     alive: bool,
-    alignment: Alignment,
+    alignment: AlignmentId,
     movement_rate: u32,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     effects: Vec<EffectData>,
@@ -282,7 +282,7 @@ fn query_party_member_data(member: &party::results::PartyMemberSummary, effects:
         thac0: member.thac0,
         xp: member.xp,
         alive: member.alive,
-        alignment: member.alignment,
+        alignment: member.alignment.clone(),
         movement_rate: member.movement_rate,
         effects: effects.iter().map(effect_to_typed).collect(),
     }

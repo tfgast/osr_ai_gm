@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::rules::alignment::Alignment;
+use crate::rules::alignment::AlignmentId;
 use crate::rules::class::Class;
 use crate::state::wilderness::Terrain;
 
@@ -114,7 +114,7 @@ pub struct EvadeResult {
 pub struct SpawnNpcPartyMemberInfo {
     pub class: Class,
     pub level: u32,
-    pub alignment: Alignment,
+    pub alignment: AlignmentId,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
 }

@@ -9,6 +9,7 @@
 //! other systems may have 3 or 1).
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Dynamic saving throw map: save_name → target number.
 ///
@@ -66,19 +67,137 @@ pub enum SaveCategory {
     Svirfneblin,
 }
 
+impl SaveCategory {
+    /// Canonical display name for this save category.
+    pub fn name(self) -> &'static str {
+        match self {
+            SaveCategory::Thief => "Thief",
+            SaveCategory::Barbarian => "Barbarian",
+            SaveCategory::Cleric => "Cleric",
+            SaveCategory::Drow => "Drow",
+            SaveCategory::Dwarf => "Dwarf",
+            SaveCategory::Elf => "Elf",
+            SaveCategory::Fighter => "Fighter",
+            SaveCategory::Gnome => "Gnome",
+            SaveCategory::HalfElf => "Half-Elf",
+            SaveCategory::HalfOrc => "Half-Orc",
+            SaveCategory::MagicUser => "Magic-User",
+            SaveCategory::Paladin => "Paladin",
+            SaveCategory::Svirfneblin => "Svirfneblin",
+        }
+    }
+
+    /// Parse save category name (case-insensitive, accepts common variants).
+    pub fn parse(s: &str) -> Option<SaveCategory> {
+        match s.to_lowercase().replace(['-', '_', ' '], "").as_str() {
+            "thief" | "savethief" => Some(SaveCategory::Thief),
+            "barbarian" | "savebarbarian" => Some(SaveCategory::Barbarian),
+            "cleric" | "savecleric" => Some(SaveCategory::Cleric),
+            "drow" | "savedrow" => Some(SaveCategory::Drow),
+            "dwarf" | "savedwarf" => Some(SaveCategory::Dwarf),
+            "elf" | "saveelf" => Some(SaveCategory::Elf),
+            "fighter" | "savefighter" => Some(SaveCategory::Fighter),
+            "gnome" | "savegnome" => Some(SaveCategory::Gnome),
+            "halfelf" | "savehalfelf" => Some(SaveCategory::HalfElf),
+            "halforc" | "savehalforc" => Some(SaveCategory::HalfOrc),
+            "magicuser" | "mu" | "savemagicuser" => Some(SaveCategory::MagicUser),
+            "paladin" | "savepaladin" => Some(SaveCategory::Paladin),
+            "svirfneblin" | "deepgnome" | "savesvirfneblin" => Some(SaveCategory::Svirfneblin),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for SaveCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+// ── SaveCategoryId: string-based save category identifier ───
+
+/// String-based save category identifier for data-driven lookups.
+/// Wraps `Arc<str>` for O(1) clone. Canonical form is the display name
+/// (e.g., "Fighter", "Magic-User", "Half-Elf").
+/// Serializes transparently as a plain string for backward compatibility.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
+#[serde(transparent)]
+pub struct SaveCategoryId(Arc<str>);
+
+impl<'de> serde::Deserialize<'de> for SaveCategoryId {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(SaveCategoryId::new(&s))
+    }
+}
+
+impl SaveCategoryId {
+    /// Create a SaveCategoryId, normalizing to canonical form.
+    /// Known categories are normalized via `SaveCategory::parse()`.
+    /// Unknown names (homebrew categories) are stored as-is.
+    pub fn new(s: &str) -> Self {
+        if let Some(cat) = SaveCategory::parse(s) {
+            SaveCategoryId(Arc::from(cat.name()))
+        } else {
+            SaveCategoryId(Arc::from(s))
+        }
+    }
+
+    /// Create a SaveCategoryId from a `SaveCategory` enum variant.
+    pub fn from_enum(cat: SaveCategory) -> Self {
+        SaveCategoryId(Arc::from(cat.name()))
+    }
+
+    /// Try to resolve this SaveCategoryId back to a `SaveCategory` enum variant.
+    /// Returns `None` for homebrew categories not in the core 13.
+    pub fn to_enum(&self) -> Option<SaveCategory> {
+        SaveCategory::parse(&self.0)
+    }
+
+    /// The canonical string form of this save category identifier.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Display name for this save category (same as as_str).
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for SaveCategoryId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl From<SaveCategory> for SaveCategoryId {
+    fn from(cat: SaveCategory) -> Self {
+        SaveCategoryId::from_enum(cat)
+    }
+}
+
+impl From<&str> for SaveCategoryId {
+    fn from(s: &str) -> Self {
+        SaveCategoryId::new(s)
+    }
+}
+
 /// Look up saving throws by category and character level.
 ///
 /// When `dsl-backend` feature is enabled and `OSR_BACKEND_SAVES=dsl`,
 /// delegates to the DSL runtime. Falls back to native on DSL failure.
-pub fn saving_throws(cat: SaveCategory, level: u32) -> SavingThrows {
+pub fn saving_throws(cat: &SaveCategoryId, level: u32) -> SavingThrows {
+    let cat_enum = cat.to_enum()
+        .unwrap_or_else(|| panic!("unknown save category: {}", cat));
     #[cfg(feature = "dsl-backend")]
     if crate::backend::is_dsl(crate::backend::MechanicGroup::Saves) {
-        match dsl_saving_throws(cat, level) {
+        match dsl_saving_throws(cat_enum, level) {
             Some(saves) => return saves,
-            None => eprintln!("DSL saves evaluation failed for {:?} L{}, falling back to native", cat, level),
+            None => eprintln!("DSL saves evaluation failed for {:?} L{}, falling back to native", cat_enum, level),
         }
     }
-    native_saving_throws(cat, level)
+    native_saving_throws(cat_enum, level)
 }
 
 // ── DSL backend ─────────────────────────────────────────────────
@@ -235,88 +354,87 @@ mod tests {
 
     #[test]
     fn level_0_gets_worst_saves() {
-        // Level 0 should use the first (worst) tier, not the last (best)
-        let s = saving_throws(SaveCategory::Fighter, 0);
-        assert_eq!(s, SavingThrows::new(12, 13, 14, 15, 16)); // same as level 1-3
-        let s = saving_throws(SaveCategory::Thief, 0);
-        assert_eq!(s, SavingThrows::new(13, 14, 13, 16, 15)); // same as level 1-4
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Fighter), 0);
+        assert_eq!(s, SavingThrows::new(12, 13, 14, 15, 16));
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Thief), 0);
+        assert_eq!(s, SavingThrows::new(13, 14, 13, 16, 15));
     }
 
     #[test]
     fn thief_saves_level_1() {
-        let s = saving_throws(SaveCategory::Thief, 1);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Thief), 1);
         assert_eq!(s, SavingThrows::new(13, 14, 13, 16, 15));
     }
 
     #[test]
     fn thief_saves_level_5() {
-        let s = saving_throws(SaveCategory::Thief, 5);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Thief), 5);
         assert_eq!(s, SavingThrows::new(12, 13, 11, 14, 13));
     }
 
     #[test]
     fn fighter_saves_level_1() {
-        let s = saving_throws(SaveCategory::Fighter, 1);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Fighter), 1);
         assert_eq!(s, SavingThrows::new(12, 13, 14, 15, 16));
     }
 
     #[test]
     fn fighter_saves_level_13() {
-        let s = saving_throws(SaveCategory::Fighter, 13);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Fighter), 13);
         assert_eq!(s, SavingThrows::new(4, 5, 6, 5, 8));
     }
 
     #[test]
     fn cleric_saves_level_4() {
-        let s = saving_throws(SaveCategory::Cleric, 4);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Cleric), 4);
         assert_eq!(s, SavingThrows::new(11, 12, 14, 16, 15));
     }
 
     #[test]
     fn cleric_saves_level_5() {
-        let s = saving_throws(SaveCategory::Cleric, 5);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Cleric), 5);
         assert_eq!(s, SavingThrows::new(9, 10, 12, 14, 12));
     }
 
     #[test]
     fn dwarf_saves_level_1() {
-        let s = saving_throws(SaveCategory::Dwarf, 1);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Dwarf), 1);
         assert_eq!(s, SavingThrows::new(8, 9, 10, 13, 12));
     }
 
     #[test]
     fn magic_user_saves_level_1() {
-        let s = saving_throws(SaveCategory::MagicUser, 1);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::MagicUser), 1);
         assert_eq!(s, SavingThrows::new(13, 14, 13, 16, 15));
     }
 
     #[test]
     fn magic_user_saves_level_6() {
-        let s = saving_throws(SaveCategory::MagicUser, 6);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::MagicUser), 6);
         assert_eq!(s, SavingThrows::new(11, 12, 11, 14, 12));
     }
 
     #[test]
     fn paladin_saves_level_13() {
-        let s = saving_throws(SaveCategory::Paladin, 13);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Paladin), 13);
         assert_eq!(s, SavingThrows::new(2, 3, 4, 3, 6));
     }
 
     #[test]
     fn barbarian_saves_level_7() {
-        let s = saving_throws(SaveCategory::Barbarian, 7);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Barbarian), 7);
         assert_eq!(s, SavingThrows::new(6, 9, 8, 10, 10));
     }
 
     #[test]
     fn drow_saves_level_10() {
-        let s = saving_throws(SaveCategory::Drow, 10);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Drow), 10);
         assert_eq!(s, SavingThrows::new(6, 7, 8, 8, 6));
     }
 
     #[test]
     fn svirfneblin_saves_level_7() {
-        let s = saving_throws(SaveCategory::Svirfneblin, 7);
+        let s = saving_throws(&SaveCategoryId::from_enum(SaveCategory::Svirfneblin), 7);
         assert_eq!(s, SavingThrows::new(4, 5, 6, 9, 7));
     }
 
@@ -346,5 +464,59 @@ mod tests {
         let s = SavingThrows::new_empty();
         assert_eq!(s.death(), 20);
         assert_eq!(s.wands(), 20);
+    }
+
+    // ── SaveCategoryId tests ──
+
+    #[test]
+    fn save_category_id_from_enum() {
+        let id = SaveCategoryId::from_enum(SaveCategory::Fighter);
+        assert_eq!(id.as_str(), "Fighter");
+        assert_eq!(id.to_enum(), Some(SaveCategory::Fighter));
+    }
+
+    #[test]
+    fn save_category_id_new_normalizes() {
+        let id = SaveCategoryId::new("fighter");
+        assert_eq!(id.as_str(), "Fighter");
+        assert_eq!(id.to_enum(), Some(SaveCategory::Fighter));
+    }
+
+    #[test]
+    fn save_category_id_hyphenated() {
+        let id = SaveCategoryId::new("Half-Elf");
+        assert_eq!(id.as_str(), "Half-Elf");
+        assert_eq!(id.to_enum(), Some(SaveCategory::HalfElf));
+    }
+
+    #[test]
+    fn save_category_id_dsl_name() {
+        let id = SaveCategoryId::new("save_magic_user");
+        assert_eq!(id.as_str(), "Magic-User");
+        assert_eq!(id.to_enum(), Some(SaveCategory::MagicUser));
+    }
+
+    #[test]
+    fn save_category_id_unknown_stored_as_is() {
+        let id = SaveCategoryId::new("Homebrew");
+        assert_eq!(id.as_str(), "Homebrew");
+        assert_eq!(id.to_enum(), None);
+    }
+
+    #[test]
+    fn save_category_id_serde_roundtrip() {
+        let id = SaveCategoryId::from_enum(SaveCategory::MagicUser);
+        let json = serde_json::to_string(&id).unwrap();
+        assert_eq!(json, "\"Magic-User\"");
+        let parsed: SaveCategoryId = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, id);
+    }
+
+    #[test]
+    fn save_category_id_from_trait() {
+        let id: SaveCategoryId = SaveCategory::Thief.into();
+        assert_eq!(id.as_str(), "Thief");
+        let id2: SaveCategoryId = "dwarf".into();
+        assert_eq!(id2.as_str(), "Dwarf");
     }
 }

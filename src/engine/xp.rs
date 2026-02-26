@@ -80,8 +80,7 @@ pub fn apply_level_up_with<R: Rng>(rng: &mut R, character: &mut Character) -> Le
     character.max_hp = character.max_hp.saturating_add(hp_gained);
     character.hp = character.hp.saturating_add(hp_gained);
     character.thac0 = crate::engine::chargen::thac0(def.combat_aptitude, new_level);
-    let save_cat = def.save_category;
-    let new_saves = saving_throws(save_cat, new_level);
+    let new_saves = saving_throws(&def.save_category, new_level);
     character.saving_throws = Some(new_saves.clone());
 
     let new_spell_slots = spell::spell_slots(def.spell_progression, new_level);
@@ -260,12 +259,12 @@ mod tests {
 
     #[test]
     fn level_up_updates_saves() {
-        use crate::rules::save::{saving_throws, SaveCategory};
+        use crate::rules::save::{saving_throws, SaveCategory, SaveCategoryId};
         let mut rng = StdRng::seed_from_u64(42);
         // Fighter saves change at level 4
         let mut fighter = make_fighter(8_100, 3);
         // Set saves for level 3 (Fighter L1-3 bracket)
-        fighter.saving_throws = Some(saving_throws(SaveCategory::Fighter, 3));
+        fighter.saving_throws = Some(saving_throws(&SaveCategoryId::from_enum(SaveCategory::Fighter), 3));
         let old_saves = fighter.saving_throws.clone().unwrap();
         let result = apply_level_up_with(&mut rng, &mut fighter);
         assert_eq!(result.new_level, 4);
