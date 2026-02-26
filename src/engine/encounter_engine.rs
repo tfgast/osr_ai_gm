@@ -352,6 +352,12 @@ pub fn begin_encounter_dungeon() -> EncounterSequence {
 
 /// Testable version.
 pub fn begin_encounter_dungeon_with<R: Rng>(rng: &mut R) -> EncounterSequence {
+    // DSL gate: use dungeon_encounter_sequence procedure if available.
+    #[cfg(feature = "dsl-backend")]
+    if let Some(seq) = dsl_dungeon_encounter_sequence() {
+        return seq;
+    }
+
     let (surprise, p_roll, m_roll) = check_surprise_with(rng);
     let is_surprised = matches!(
         surprise,
@@ -383,6 +389,12 @@ pub fn begin_encounter_wilderness() -> EncounterSequence {
 
 /// Testable version.
 pub fn begin_encounter_wilderness_with<R: Rng>(rng: &mut R) -> EncounterSequence {
+    // DSL gate: use wilderness_encounter_sequence procedure if available.
+    #[cfg(feature = "dsl-backend")]
+    if let Some(seq) = dsl_wilderness_encounter_sequence() {
+        return seq;
+    }
+
     let (surprise, p_roll, m_roll) = check_surprise_with(rng);
     let is_surprised = matches!(
         surprise,
@@ -523,6 +535,87 @@ fn dsl_evasion_chance(party_size: u32, fewer_monsters: bool) -> Option<i32> {
         Ok(Value::Int(n)) => Some(n as i32),
         _ => None,
     }
+}
+
+/// Evaluate the DSL `dungeon_encounter_sequence` procedure mechanic.
+/// Returns None on DSL error or if the DSL backend is not active.
+#[cfg(feature = "dsl-backend")]
+fn dsl_dungeon_encounter_sequence() -> Option<EncounterSequence> {
+    dsl_encounter_sequence("dungeon_encounter_sequence", /* is_dungeon */ true)
+}
+
+/// Evaluate the DSL `wilderness_encounter_sequence` procedure mechanic.
+/// Returns None on DSL error or if the DSL backend is not active.
+#[cfg(feature = "dsl-backend")]
+fn dsl_wilderness_encounter_sequence() -> Option<EncounterSequence> {
+    dsl_encounter_sequence("wilderness_encounter_sequence", /* is_dungeon */ false)
+}
+
+/// Shared implementation for DSL encounter procedure mechanics.
+/// Calls the named mechanic and parses the returned `EncounterStart` struct.
+#[cfg(feature = "dsl-backend")]
+fn dsl_encounter_sequence(mechanic_name: &str, is_dungeon: bool) -> Option<EncounterSequence> {
+    use crate::backend::{self, MechanicGroup};
+    use ttrpg_ast::Name;
+    use ttrpg_interp::value::Value;
+
+    if !backend::is_dsl(MechanicGroup::Encounter) {
+        return None;
+    }
+    let runtime = backend::dsl()?;
+    let mut handler = backend::SimpleDiceHandler::new();
+
+    let result = runtime
+        .evaluate_mechanic(&backend::NullState, &mut handler, mechanic_name, vec![])
+        .ok()?;
+
+    let fields = match &result {
+        Value::Struct { fields, .. } => fields,
+        _ => return None,
+    };
+
+    let party_roll = match fields.get(&Name::from("party_roll")) {
+        Some(Value::Int(n)) => *n as u32,
+        _ => return None,
+    };
+    let monster_roll = match fields.get(&Name::from("monster_roll")) {
+        Some(Value::Int(n)) => *n as u32,
+        _ => return None,
+    };
+    let surprise = match fields.get(&Name::from("surprise")) {
+        Some(Value::EnumVariant { variant, .. }) => match variant.as_str() {
+            "sr_none"             => SurpriseResult::None,
+            "sr_party_surprises"  => SurpriseResult::PartySurprises,
+            "sr_monsters_surprise" => SurpriseResult::MonstersSurprise,
+            "sr_both"             => SurpriseResult::BothSurprised,
+            _ => return None,
+        },
+        _ => return None,
+    };
+    let distance = match fields.get(&Name::from("distance")) {
+        Some(Value::Int(n)) => *n as u32,
+        _ => return None,
+    };
+
+    let mut messages = Vec::new();
+    messages.push(format!(
+        "Surprise: party rolled {}, monsters rolled {}.",
+        party_roll, monster_roll
+    ));
+    messages.push(surprise.to_string());
+    if is_dungeon {
+        messages.push(format!("Encounter distance: {}' feet.", distance));
+    } else {
+        messages.push(format!("Encounter distance: {} yards.", distance));
+    }
+
+    Some(EncounterSequence {
+        surprise,
+        party_surprise_roll: party_roll,
+        monster_surprise_roll: monster_roll,
+        distance,
+        messages,
+    })
 }
 
 #[cfg(test)]

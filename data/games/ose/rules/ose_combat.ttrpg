@@ -258,6 +258,27 @@ system "OSE Combat" {
     // --- Encounter mechanics ---
     // Reference: OSE Reference Booklet — Encounters chapter.
 
+    // 4-way surprise matrix: which side (if any) was surprised.
+    // sr_none:              neither side surprised
+    // sr_party_surprises:   party surprises monsters (monsters surprised)
+    // sr_monsters_surprise: monsters surprise party  (party surprised)
+    // sr_both:              both sides surprised
+    enum SurpriseState {
+        sr_none,
+        sr_party_surprises,
+        sr_monsters_surprise,
+        sr_both
+    }
+
+    // Encounter opening result: raw rolls, resolved surprise, and distance.
+    // distance is in feet for dungeon encounters, yards for wilderness.
+    struct EncounterStart {
+        party_roll:   int
+        monster_roll: int
+        surprise:     SurpriseState
+        distance:     int
+    }
+
     // Surprise roll: each side rolls 1d6. A result of 1-2 means that side is surprised.
     // Call once per side (party and monsters roll independently).
     // Returns the raw d6 value; caller compares vs 2 to determine surprise.
@@ -303,6 +324,58 @@ system "OSE Combat" {
             party_size <= 24                        => 25,
             fewer_monsters == 1                     => 25,
             _                                       => 10
+        }
+    }
+
+    // --- Encounter procedure mechanics ---
+    // These express the full opening sequence for an encounter: roll surprise
+    // for both sides, interpret the 4-way surprise matrix, determine distance.
+    // Game systems can override these mechanics to implement different encounter
+    // flows (e.g. no surprise in certain terrain, different distance tables).
+
+    // Dungeon encounter opening sequence.
+    // Returns party/monster rolls, the resolved surprise state, and distance in feet.
+    mechanic dungeon_encounter_sequence() -> EncounterStart {
+        let party_roll    = surprise_roll()
+        let monster_roll  = surprise_roll()
+        let party_surp    = party_roll <= 2
+        let monster_surp  = monster_roll <= 2
+        let surprised_flag = if party_surp || monster_surp { 1 } else { 0 }
+        let surprise = match {
+            party_surp && monster_surp => SurpriseState.sr_both,
+            party_surp                 => SurpriseState.sr_monsters_surprise,
+            monster_surp               => SurpriseState.sr_party_surprises,
+            _                          => SurpriseState.sr_none
+        }
+        let distance = dungeon_encounter_distance(surprised_flag)
+        EncounterStart {
+            party_roll:   party_roll,
+            monster_roll: monster_roll,
+            surprise:     surprise,
+            distance:     distance
+        }
+    }
+
+    // Wilderness encounter opening sequence.
+    // Returns party/monster rolls, the resolved surprise state, and distance in yards.
+    mechanic wilderness_encounter_sequence() -> EncounterStart {
+        let party_roll    = surprise_roll()
+        let monster_roll  = surprise_roll()
+        let party_surp    = party_roll <= 2
+        let monster_surp  = monster_roll <= 2
+        let surprised_flag = if party_surp || monster_surp { 1 } else { 0 }
+        let surprise = match {
+            party_surp && monster_surp => SurpriseState.sr_both,
+            party_surp                 => SurpriseState.sr_monsters_surprise,
+            monster_surp               => SurpriseState.sr_party_surprises,
+            _                          => SurpriseState.sr_none
+        }
+        let distance = wilderness_encounter_distance(surprised_flag)
+        EncounterStart {
+            party_roll:   party_roll,
+            monster_roll: monster_roll,
+            surprise:     surprise,
+            distance:     distance
         }
     }
 }
