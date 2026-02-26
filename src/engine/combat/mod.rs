@@ -46,17 +46,26 @@ pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
     out.push_str(&format!("Distance: {}'\n", combat.distance));
 
     if combat.round > 0 {
-        let winner = if combat.party_initiative > combat.monster_initiative {
-            "Party"
-        } else if combat.monster_initiative > combat.party_initiative {
-            "Monsters"
+        if !combat.initiative_order.is_empty() {
+            // Individual initiative display
+            let order_desc: Vec<String> = combat.initiative_order.iter()
+                .map(|e| format!("{} ({})", e.name, e.roll))
+                .collect();
+            out.push_str(&format!("Initiative order: {}\n", order_desc.join(", ")));
         } else {
-            "Simultaneous"
-        };
-        out.push_str(&format!(
-            "Initiative: Party {} vs Monsters {} — {} acts first\n",
-            combat.party_initiative, combat.monster_initiative, winner
-        ));
+            // Group initiative display
+            let winner = if combat.party_initiative > combat.monster_initiative {
+                "Party"
+            } else if combat.monster_initiative > combat.party_initiative {
+                "Monsters"
+            } else {
+                "Simultaneous"
+            };
+            out.push_str(&format!(
+                "Initiative: Party {} vs Monsters {} — {} acts first\n",
+                combat.party_initiative, combat.monster_initiative, winner
+            ));
+        }
     }
 
     out.push_str("\nParty:\n");
@@ -331,7 +340,7 @@ mod tests {
     fn initiative_roll_advances_round() {
         let mut combat = CombatState::new(vec![test_goblin()], 60);
         let mut rng = test_rng();
-        let (p, m) = roll_initiative_with(&mut combat, &mut rng);
+        let (p, m) = roll_initiative_with(&mut combat, &[], &mut rng);
         assert!(p >= 1 && p <= 6);
         assert!(m >= 1 && m <= 6);
         assert_eq!(combat.round, 1);
@@ -345,7 +354,7 @@ mod tests {
         combat.spell_declarations.push("Elara".to_string());
         combat.pending_spells.push(("Elara".to_string(), "Sleep".to_string()));
         combat.disrupted.push("Elara".to_string());
-        roll_initiative_with(&mut combat, &mut test_rng());
+        roll_initiative_with(&mut combat, &[], &mut test_rng());
         // Declarations survive initiative so the Declare → Initiative → Cast flow works
         assert!(!combat.spell_declarations.is_empty());
         assert!(!combat.pending_spells.is_empty());
@@ -634,7 +643,7 @@ mod tests {
     #[test]
     fn combat_status_display() {
         let mut combat = CombatState::new(vec![test_goblin(), test_goblin()], 60);
-        roll_initiative_with(&mut combat, &mut test_rng());
+        roll_initiative_with(&mut combat, &[], &mut test_rng());
         let party = vec![test_fighter(), test_cleric()];
         let status = combat_status(&combat, &party);
         assert!(status.contains("Round 1"));
@@ -664,7 +673,7 @@ mod tests {
 
         // Initiative
         assert_eq!(combat.phase, "Initiative");
-        let (_p, _m) = roll_initiative_with(&mut combat, &mut rng);
+        let (_p, _m) = roll_initiative_with(&mut combat, &[], &mut rng);
         // roll_initiative sets phase to Morale
         assert_eq!(combat.phase, "Morale");
         assert_eq!(combat.round, 1);
@@ -714,7 +723,7 @@ mod tests {
         assert_eq!(combat.phase, "Declaration");
         // Initiative
         combat.advance_phase();
-        let (_p2, _m2) = roll_initiative_with(&mut combat, &mut rng);
+        let (_p2, _m2) = roll_initiative_with(&mut combat, &[], &mut rng);
         assert_eq!(combat.round, 2);
         // Spell declarations should be cleared from round 1
         assert!(combat.spell_declarations.is_empty());
@@ -907,7 +916,7 @@ mod tests {
         assert!(is_disrupted(&combat, "Elara"));
 
         // New round clears disruption but preserves declarations
-        roll_initiative_with(&mut combat, &mut test_rng());
+        roll_initiative_with(&mut combat, &[], &mut test_rng());
         assert!(!is_disrupted(&combat, "Elara"));
         assert!(!combat.spell_declarations.is_empty());
     }
@@ -923,7 +932,7 @@ mod tests {
         let mut found_tie = false;
         for _ in 0..100 {
             let mut c = CombatState::new(vec![test_goblin()], 10);
-            let (p, m) = roll_initiative_with(&mut c, &mut rng);
+            let (p, m) = roll_initiative_with(&mut c, &[], &mut rng);
             if p == m {
                 // Tied — log should say "Simultaneous"
                 assert!(
@@ -949,7 +958,7 @@ mod tests {
         let mut monster_first = false;
         for _ in 0..100 {
             let mut c = CombatState::new(vec![test_goblin()], 10);
-            let (p, m) = roll_initiative_with(&mut c, &mut rng);
+            let (p, m) = roll_initiative_with(&mut c, &[], &mut rng);
             if p > m {
                 assert!(c.log.last().unwrap().contains("Party acts first"));
                 party_first = true;
@@ -1380,7 +1389,7 @@ mod tests {
         let fighter = test_fighter();
         let mut rng = test_rng();
 
-        roll_initiative_with(&mut combat, &mut rng);
+        roll_initiative_with(&mut combat, &[], &mut rng);
 
         // Kill the only goblin
         combat.monsters[0].hp = 1; // set to 1 HP for easy kill
@@ -1511,7 +1520,7 @@ mod tests {
         let mut rng = test_rng();
 
         // 1. Roll initiative
-        let (_p, _m) = roll_initiative_with(&mut combat, &mut rng);
+        let (_p, _m) = roll_initiative_with(&mut combat, &[], &mut rng);
         assert_eq!(combat.round, 1);
 
         // 2. Fighter attacks goblin 0
@@ -1694,5 +1703,159 @@ mod tests {
             "Error should list missile weapons: {}",
             err
         );
+    }
+
+    // --- Individual initiative tests (oag-4vgtp) ---
+
+    #[test]
+    fn individual_initiative_populates_order() {
+        let mut combat = CombatState::new(vec![test_goblin(), test_goblin()], 60);
+        let party = vec![test_fighter(), test_cleric()];
+        roll_initiative(&mut combat, &party);
+
+        // Group initiative: initiative_order should be empty (OSE default is "group")
+        // since get_initiative_model returns "group" without DSL
+        assert!(combat.initiative_order.is_empty());
+        assert_eq!(combat.round, 1);
+    }
+
+    #[test]
+    fn initiative_model_defaults_to_group() {
+        let model = crate::model::get_initiative_model();
+        assert_eq!(model, "group");
+    }
+
+    #[test]
+    fn combat_state_initiative_order_clears_on_new_round() {
+        use crate::model::InitiativeEntry;
+
+        let mut combat = CombatState::new(vec![test_goblin()], 60);
+        // Manually set initiative order as if individual initiative was used
+        combat.initiative_order.push(InitiativeEntry {
+            name: "Test".to_string(),
+            side: "character".to_string(),
+            index: 0,
+            roll: 5,
+        });
+        assert!(!combat.initiative_order.is_empty());
+
+        // Rolling new initiative should clear it
+        roll_initiative_with(&mut combat, &[], &mut test_rng());
+        assert!(combat.initiative_order.is_empty());
+    }
+
+    // --- Action budget tracking tests (oag-4vgtp) ---
+
+    #[test]
+    fn action_budget_consume_and_query() {
+        let mut combat = CombatState::new(vec![test_goblin()], 60);
+        roll_initiative_with(&mut combat, &[], &mut test_rng());
+
+        // Initially no actions consumed
+        assert!(combat.action_budget_used.is_empty());
+
+        // Consume an attack action
+        combat.consume_action("Grond", "attack");
+        assert_eq!(
+            combat.action_budget_used.get("Grond")
+                .and_then(|m| m.get("attack"))
+                .copied(),
+            Some(1)
+        );
+
+        // Consume another
+        combat.consume_action("Grond", "attack");
+        assert_eq!(
+            combat.action_budget_used.get("Grond")
+                .and_then(|m| m.get("attack"))
+                .copied(),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn action_budget_clears_on_phase_advance() {
+        let mut combat = CombatState::new(vec![test_goblin()], 60);
+        roll_initiative_with(&mut combat, &[], &mut test_rng());
+
+        combat.consume_action("Grond", "attack");
+        assert!(!combat.action_budget_used.is_empty());
+
+        // Advancing phase clears the action budget
+        combat.advance_phase();
+        assert!(combat.action_budget_used.is_empty());
+    }
+
+    #[test]
+    fn combat_status_shows_group_initiative() {
+        let mut combat = CombatState::new(vec![test_goblin()], 60);
+        roll_initiative_with(&mut combat, &[], &mut test_rng());
+        let party = vec![test_fighter()];
+        let status = combat_status(&combat, &party);
+        // Should show group initiative format
+        assert!(
+            status.contains("Initiative:") && status.contains("vs"),
+            "Should show group initiative: {}", status
+        );
+    }
+
+    #[test]
+    fn combat_status_shows_individual_initiative() {
+        use crate::model::InitiativeEntry;
+
+        let mut combat = CombatState::new(vec![test_goblin()], 60);
+        combat.round = 1;
+        combat.initiative_order = vec![
+            InitiativeEntry {
+                name: "Grond".to_string(),
+                side: "character".to_string(),
+                index: 0,
+                roll: 6,
+            },
+            InitiativeEntry {
+                name: "Goblin".to_string(),
+                side: "monster".to_string(),
+                index: 0,
+                roll: 3,
+            },
+        ];
+        let party = vec![test_fighter()];
+        let status = combat_status(&combat, &party);
+        assert!(
+            status.contains("Initiative order:"),
+            "Should show individual initiative order: {}", status
+        );
+        assert!(
+            status.contains("Grond (6)"),
+            "Should show character with roll: {}", status
+        );
+        assert!(
+            status.contains("Goblin (3)"),
+            "Should show monster with roll: {}", status
+        );
+    }
+
+    #[test]
+    fn initiative_result_includes_order_for_individual() {
+        use crate::model::InitiativeEntry;
+
+        // Manually create an InitiativeResult with individual order
+        let result = super::results::InitiativeResult {
+            message: "test".to_string(),
+            round: 1,
+            party_initiative: 0,
+            monster_initiative: 0,
+            winner: super::results::InitiativeWinner::Party,
+            initiative_order: vec![
+                InitiativeEntry {
+                    name: "Grond".to_string(),
+                    side: "character".to_string(),
+                    index: 0,
+                    roll: 6,
+                },
+            ],
+        };
+        assert_eq!(result.initiative_order.len(), 1);
+        assert_eq!(result.initiative_order[0].name, "Grond");
     }
 }

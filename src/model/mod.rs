@@ -332,6 +332,18 @@ fn dsl_phase_sequence() -> Option<Vec<String>> {
     }
 }
 
+/// Get the initiative model, trying the DSL `initiative_model` derive first
+/// and falling back to "group" (the OSE default).
+pub fn get_initiative_model() -> String {
+    #[cfg(feature = "dsl-backend")]
+    if crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        if let Some(model) = dsl_initiative_model() {
+            return model;
+        }
+    }
+    "group".to_string()
+}
+
 /// Get the action budget for a combat phase from the DSL.
 /// Returns a map of action-type → count (e.g. {"attack": 1}).
 /// Falls back to None if the DSL is unavailable.
@@ -375,6 +387,44 @@ pub fn dsl_action_budget(phase: &str) -> Option<HashMap<String, i32>> {
             }
             Some(budget)
         }
+        _ => None,
+    }
+}
+
+/// Get the initiative model from the DSL (`initiative_model` derive).
+/// Returns "group" or "individual". Falls back to None if DSL unavailable.
+#[cfg(feature = "dsl-backend")]
+pub fn dsl_initiative_model() -> Option<String> {
+    use ttrpg_interp::effect::{Effect, EffectHandler, Response};
+    use ttrpg_interp::reference_state::GameState;
+    use ttrpg_interp::value::Value;
+
+    struct NullHandler;
+    impl EffectHandler for NullHandler {
+        fn handle(&mut self, _: Effect) -> Response {
+            Response::Acknowledged
+        }
+    }
+
+    if !crate::backend::is_dsl(crate::backend::MechanicGroup::Combat) {
+        return None;
+    }
+
+    let runtime = crate::backend::dsl()?;
+    let state = GameState::new();
+    let mut handler = NullHandler;
+
+    let result = runtime
+        .evaluate_derive(
+            &state,
+            &mut handler,
+            "initiative_model",
+            vec![],
+        )
+        .ok()?;
+
+    match result {
+        Value::Str(s) => Some(s),
         _ => None,
     }
 }
@@ -431,6 +481,23 @@ pub fn phase_display_name(phase: &str) -> &str {
     }
 }
 
+/// A single entry in the individual initiative order.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitiativeEntry {
+    /// Display name of the combatant.
+    pub name: String,
+    /// "character" or "monster".
+    pub side: String,
+    /// Index into the party members or monsters list.
+    pub index: usize,
+    /// Initiative roll result (e.g. 1d6 + DEX mod).
+    pub roll: i32,
+}
+
+/// Per-entity action usage tracking for DSL-driven action budgets.
+/// Maps entity name → action_type → uses remaining this phase.
+pub type ActionBudgetTracker = HashMap<String, HashMap<String, i32>>;
+
 /// State of an active combat encounter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
@@ -473,6 +540,14 @@ pub struct CombatState {
     /// Characters who have already acted (attacked/backstabbed) this round.
     #[serde(default)]
     pub characters_acted: Vec<String>,
+    /// Individual initiative order (populated when initiative_model is "individual").
+    /// Sorted from highest to lowest roll. Empty when using group initiative.
+    #[serde(default)]
+    pub initiative_order: Vec<InitiativeEntry>,
+    /// Per-entity action budget tracking for the current phase.
+    /// Maps entity name → action_type → uses consumed.
+    #[serde(default)]
+    pub action_budget_used: ActionBudgetTracker,
 }
 
 impl CombatState {
@@ -496,6 +571,8 @@ impl CombatState {
             log_len_at_initiative: 0,
             monsters_attacked_this_round: HashMap::new(),
             characters_acted: Vec::new(),
+            initiative_order: Vec::new(),
+            action_budget_used: HashMap::new(),
         }
     }
 
@@ -566,6 +643,40 @@ impl CombatState {
         }
 
         self.phase = sequence[next_idx].clone();
+        // Reset per-entity action budgets for the new phase
+        self.action_budget_used.clear();
+    }
+
+    /// Check whether an entity has budget remaining for the given action type
+    /// in the current phase. Uses DSL `action_budget` if available, otherwise
+    /// falls back to allowing the action (preserving existing behavior).
+    pub fn has_action_budget(&self, _entity_name: &str, _action_type: &str) -> bool {
+        #[cfg(feature = "dsl-backend")]
+        {
+            if let Some(budget) = dsl_action_budget(&self.phase) {
+                let max = budget.get(_action_type).copied().unwrap_or(0);
+                if max <= 0 {
+                    return false;
+                }
+                let used = self.action_budget_used
+                    .get(_entity_name)
+                    .and_then(|m| m.get(_action_type))
+                    .copied()
+                    .unwrap_or(0);
+                return used < max;
+            }
+        }
+        // No DSL budget available — allow the action (legacy behavior)
+        true
+    }
+
+    /// Record that an entity consumed one use of the given action type.
+    pub fn consume_action(&mut self, entity_name: &str, action_type: &str) {
+        *self.action_budget_used
+            .entry(entity_name.to_string())
+            .or_default()
+            .entry(action_type.to_string())
+            .or_insert(0) += 1;
     }
 
     pub fn living_monsters(&self) -> Vec<(usize, &Monster)> {

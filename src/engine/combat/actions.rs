@@ -491,10 +491,26 @@ pub fn action_roll_initiative(state: &mut GameState) -> Result<InitiativeResult,
         tick_round_effects_on_combat(state);
     }
 
+    let party_members: Vec<_> = state.party.members.clone();
     let combat = state.combat.as_mut().unwrap();
-    let (party_initiative, monster_initiative) = roll_initiative(combat);
+    let (party_initiative, monster_initiative) = roll_initiative(combat, &party_members);
     combat.log_len_at_initiative = combat.log.len();
-    let winner = if party_initiative > monster_initiative {
+
+    let initiative_order = combat.initiative_order.clone();
+    let is_individual = !initiative_order.is_empty();
+
+    let winner = if is_individual {
+        // For individual initiative, winner is determined by who has highest roll
+        if let Some(first) = initiative_order.first() {
+            if first.side == "character" {
+                InitiativeWinner::Party
+            } else {
+                InitiativeWinner::Monsters
+            }
+        } else {
+            InitiativeWinner::Simultaneous
+        }
+    } else if party_initiative > monster_initiative {
         InitiativeWinner::Party
     } else if monster_initiative > party_initiative {
         InitiativeWinner::Monsters
@@ -502,18 +518,31 @@ pub fn action_roll_initiative(state: &mut GameState) -> Result<InitiativeResult,
         InitiativeWinner::Simultaneous
     };
 
-    Ok(InitiativeResult {
-        message: format!(
+    let message = if is_individual {
+        let order_desc: Vec<String> = initiative_order.iter()
+            .map(|e| format!("{} ({})", e.name, e.roll))
+            .collect();
+        format!(
+            "round {} individual initiative: {}",
+            combat.round, order_desc.join(", ")
+        )
+    } else {
+        format!(
             "round {} initiative: party {} vs monsters {} — {} acts first.",
             combat.round,
             party_initiative,
             monster_initiative,
             winner.as_str()
-        ),
+        )
+    };
+
+    Ok(InitiativeResult {
+        message,
         round: combat.round,
         party_initiative,
         monster_initiative,
         winner,
+        initiative_order,
     })
 }
 
@@ -607,12 +636,14 @@ pub fn action_attack(
         let result =
             coup_de_grace(combat, &character, monster_idx).map_err(EngineError::InvalidInput)?;
         combat.characters_acted.push(char_name.to_string());
+        combat.consume_action(char_name, "attack");
         return Ok(AttackResult::from(result));
     }
 
     let result = resolve_character_attack(combat, &character, monster_idx, weapon, rest_penalty)
         .map_err(EngineError::InvalidInput)?;
     combat.characters_acted.push(char_name.to_string());
+    combat.consume_action(char_name, "attack");
     Ok(AttackResult::from(result))
 }
 
@@ -679,6 +710,7 @@ pub fn action_monster_attack(
     let max_attacks = combat.monsters[monster_idx].attack_routines.len().max(1);
     let result = monster_attack(combat, monster_idx, character, attacks_used);
     *combat.monsters_attacked_this_round.entry(monster_idx).or_insert(0) += 1;
+    combat.consume_action(&combat.monsters[monster_idx].name.clone(), "attack");
     let attacks_remaining = max_attacks - (attacks_used + 1);
     let routine_name = combat.monsters[monster_idx].attack_routines
         .get(attacks_used)
@@ -940,6 +972,7 @@ pub fn action_cast_spell(
 
     // Mark character as having acted.
     combat.characters_acted.push(char_name.to_string());
+    combat.consume_action(char_name, "spell");
 
     let result = if was_disrupted {
         combat.log_event(format!(
@@ -1207,6 +1240,7 @@ pub fn action_backstab(
     let hit = attack_roll == 20 || (attack_roll != 1 && attack_roll >= target_number);
 
     combat.characters_acted.push(char_name.to_string());
+    combat.consume_action(char_name, "attack");
 
     if hit {
         let base_damage = match dice::roll_str(weapon.damage_dice()) {

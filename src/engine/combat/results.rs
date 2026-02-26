@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use crate::model::InitiativeEntry;
 use crate::rules::attack::HitDice;
 use crate::rules::turn::TurnResult;
 use crate::state::game::GameMode;
@@ -115,6 +116,9 @@ pub struct InitiativeResult {
     pub party_initiative: i32,
     pub monster_initiative: i32,
     pub winner: InitiativeWinner,
+    /// Individual initiative order (empty for group initiative).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub initiative_order: Vec<InitiativeEntry>,
 }
 
 /// Typed success payload for `attack`.

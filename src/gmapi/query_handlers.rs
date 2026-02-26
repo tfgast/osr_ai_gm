@@ -108,6 +108,9 @@ pub(super) fn query_combat(id: &str, state: &GameState) -> GMResponse {
                 "monster_initiative": combat_state.monster_initiative,
                 "monsters": monsters,
             });
+            if !combat_state.initiative_order.is_empty() {
+                data["initiative_order"] = serde_json::json!(combat_state.initiative_order);
+            }
             if !party_effects.is_empty() {
                 data["party_effects"] = serde_json::json!(party_effects);
             }

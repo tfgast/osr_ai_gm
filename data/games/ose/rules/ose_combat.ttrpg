@@ -218,11 +218,26 @@ system "OSE Combat" {
         }
     }
 
+    // --- Initiative model ---
+    // Returns the initiative model used by this game system.
+    // "group" = 1d6 per side (OSE default)
+    // "individual" = 1d6 + DEX modifier per combatant
+    derive initiative_model() -> string {
+        "group"
+    }
+
     // Group initiative: each side rolls 1d6.
     // Returns the party's roll. Caller also gets monster roll separately.
     mechanic group_initiative() -> int {
         let result = roll(1d6)
         result.total
+    }
+
+    // Individual initiative: 1d6 + DEX initiative modifier.
+    // Each combatant rolls separately. Higher is better.
+    mechanic individual_initiative(dex_mod: int = 0) -> int {
+        let result = roll(1d6)
+        result.total + dex_mod
     }
 
     // Reaction roll: 2d6 + CHA modifier, consult outcome table.
