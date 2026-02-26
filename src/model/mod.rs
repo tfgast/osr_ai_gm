@@ -256,39 +256,25 @@ impl Spell {
     }
 }
 
-/// Combat phases per OSE round sequence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CombatPhase {
-    /// Before initiative — declare spells and retreats.
-    Declaration,
-    /// Roll initiative for both sides.
-    Initiative,
-    /// Winning side: morale checks.
-    Morale,
-    /// Winning side: movement.
-    Movement,
-    /// Winning side: missile attacks.
-    Missile,
-    /// Winning side: magic (spells resolve).
-    Magic,
-    /// Winning side: melee attacks.
-    Melee,
-    /// Round complete.
-    EndOfRound,
-}
+/// OSE combat phase sequence. Temporary const array — will become a DSL derive
+/// once list literals land (tdsl-jd5).
+pub const PHASE_SEQUENCE: &[&str] = &[
+    "Declaration",
+    "Initiative",
+    "Morale",
+    "Movement",
+    "Missile",
+    "Magic",
+    "Melee",
+    "EndOfRound",
+];
 
-impl std::fmt::Display for CombatPhase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CombatPhase::Declaration => write!(f, "Declaration"),
-            CombatPhase::Initiative => write!(f, "Initiative"),
-            CombatPhase::Morale => write!(f, "Morale"),
-            CombatPhase::Movement => write!(f, "Movement"),
-            CombatPhase::Missile => write!(f, "Missile"),
-            CombatPhase::Magic => write!(f, "Magic"),
-            CombatPhase::Melee => write!(f, "Melee"),
-            CombatPhase::EndOfRound => write!(f, "End of Round"),
-        }
+/// Display name for a phase ID. Returns the ID itself for most phases,
+/// but formats "EndOfRound" as "End of Round" for human display.
+pub fn phase_display_name(phase: &str) -> &str {
+    match phase {
+        "EndOfRound" => "End of Round",
+        other => other,
     }
 }
 
@@ -313,9 +299,9 @@ pub struct CombatState {
     /// Characters whose spells were disrupted this round.
     #[serde(default)]
     pub disrupted: Vec<String>,
-    /// Current combat phase.
+    /// Current combat phase (string-based phase ID from PHASE_SEQUENCE).
     #[serde(default = "CombatState::default_phase")]
-    pub phase: CombatPhase,
+    pub phase: String,
     /// Whether the first-death morale check has been triggered.
     #[serde(default)]
     pub first_death_checked: bool,
@@ -350,7 +336,7 @@ impl CombatState {
             spell_declarations: Vec::new(),
             pending_spells: Vec::new(),
             disrupted: Vec::new(),
-            phase: CombatPhase::Declaration,
+            phase: PHASE_SEQUENCE[0].to_string(),
             first_death_checked: false,
             half_killed_checked: false,
             initial_monster_count: initial_count,
@@ -366,28 +352,25 @@ impl CombatState {
         self.log.push(LogEntry::new(self.log_seq, message));
     }
 
-    fn default_phase() -> CombatPhase {
-        CombatPhase::Declaration
+    fn default_phase() -> String {
+        PHASE_SEQUENCE[0].to_string()
     }
 
-    /// Advance to the next combat phase.
+    /// Advance to the next combat phase by walking PHASE_SEQUENCE.
     pub fn advance_phase(&mut self) {
-        self.phase = match self.phase {
-            CombatPhase::Declaration => CombatPhase::Initiative,
-            CombatPhase::Initiative => CombatPhase::Morale,
-            CombatPhase::Morale => CombatPhase::Movement,
-            CombatPhase::Movement => CombatPhase::Missile,
-            CombatPhase::Missile => CombatPhase::Magic,
-            CombatPhase::Magic => CombatPhase::Melee,
-            CombatPhase::Melee => CombatPhase::EndOfRound,
-            CombatPhase::EndOfRound => {
+        let idx = PHASE_SEQUENCE.iter().position(|&p| p == self.phase);
+        let next_idx = match idx {
+            Some(i) if i + 1 < PHASE_SEQUENCE.len() => i + 1,
+            _ => {
+                // Wrap: last phase (EndOfRound) → first phase (Declaration).
                 // Clear stale spell state from the completed round so the
                 // next declaration phase starts fresh.
                 self.spell_declarations.clear();
                 self.pending_spells.clear();
-                CombatPhase::Declaration
+                0
             }
         };
+        self.phase = PHASE_SEQUENCE[next_idx].to_string();
     }
 
     pub fn living_monsters(&self) -> Vec<(usize, &Monster)> {

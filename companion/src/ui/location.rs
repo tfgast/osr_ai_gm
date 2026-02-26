@@ -1,4 +1,4 @@
-use osr_ai_gm::model::CombatPhase;
+use osr_ai_gm::model::PHASE_SEQUENCE;
 use osr_ai_gm::persist::GameState;
 use osr_ai_gm::state::dungeon::DoorState;
 use osr_ai_gm::state::game::GameMode;
@@ -159,33 +159,23 @@ fn render_exploration(state: &GameState) -> Vec<Line<'static>> {
 }
 
 /// Short label for each phase used in the progression bar.
-fn phase_short(phase: &CombatPhase) -> &'static str {
+fn phase_short(phase: &str) -> &'static str {
     match phase {
-        CombatPhase::Declaration => "Decl",
-        CombatPhase::Initiative => "Init",
-        CombatPhase::Morale => "Moral",
-        CombatPhase::Movement => "Move",
-        CombatPhase::Missile => "Miss",
-        CombatPhase::Magic => "Magic",
-        CombatPhase::Melee => "Melee",
-        CombatPhase::EndOfRound => "End",
+        "Declaration" => "Decl",
+        "Initiative" => "Init",
+        "Morale" => "Moral",
+        "Movement" => "Move",
+        "Missile" => "Miss",
+        "Magic" => "Magic",
+        "Melee" => "Melee",
+        "EndOfRound" => "End",
+        _ => "???",
     }
 }
 
-const PHASE_ORDER: [CombatPhase; 8] = [
-    CombatPhase::Declaration,
-    CombatPhase::Initiative,
-    CombatPhase::Morale,
-    CombatPhase::Movement,
-    CombatPhase::Missile,
-    CombatPhase::Magic,
-    CombatPhase::Melee,
-    CombatPhase::EndOfRound,
-];
-
-fn render_phase_bar(current: &CombatPhase) -> Line<'static> {
+fn render_phase_bar(current: &str) -> Line<'static> {
     let mut spans: Vec<Span> = Vec::new();
-    for (i, phase) in PHASE_ORDER.iter().enumerate() {
+    for (i, &phase) in PHASE_SEQUENCE.iter().enumerate() {
         if i > 0 {
             spans.push(Span::styled(" › ", Style::default().fg(Color::DarkGray)));
         }

@@ -36,7 +36,7 @@ fn apply_initiative(combat: &mut CombatState, party: i32, monsters: i32) -> (i32
     combat.disrupted.clear();
     combat.monsters_attacked_this_round.clear();
     combat.characters_acted.clear();
-    combat.phase = crate::model::CombatPhase::Morale;
+    combat.phase = "Morale".to_string();
 
     let winner = if party > monsters {
         "Party acts first"

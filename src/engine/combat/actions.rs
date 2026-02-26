@@ -1103,16 +1103,20 @@ pub fn action_end_combat(state: &mut GameState, skip_xp: bool) -> Result<EndComb
 
 pub fn action_next_phase(state: &mut GameState) -> Result<NextPhaseResult, EngineError> {
     let combat = state.combat.as_mut().ok_or_else(no_active_combat)?;
-    let previous = combat.phase;
+    let previous = combat.phase.clone();
     combat.advance_phase();
-    let current = combat.phase;
-    let msg = format!("Phase: {} → {}", previous, current);
+    let current = combat.phase.clone();
+    let msg = format!(
+        "Phase: {} → {}",
+        crate::model::phase_display_name(&previous),
+        crate::model::phase_display_name(&current),
+    );
     combat.log_event(msg.clone());
 
     Ok(NextPhaseResult {
         message: msg,
-        previous_phase: previous.to_string(),
-        current_phase: current.to_string(),
+        previous_phase: previous,
+        current_phase: current,
         round: combat.round,
     })
 }
@@ -1684,7 +1688,7 @@ mod tests {
         // Advance through all phases to reach Declaration for the new round.
         // EndOfRound → Declaration clears spell declarations.
         let combat = state.combat.as_mut().unwrap();
-        while combat.phase != crate::model::CombatPhase::EndOfRound {
+        while combat.phase != "EndOfRound" {
             combat.advance_phase();
         }
         combat.advance_phase(); // EndOfRound → Declaration (clears spell state)

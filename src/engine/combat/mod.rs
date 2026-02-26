@@ -38,16 +38,7 @@ use crate::model::{Character, CombatState};
 /// Format combat status for display.
 pub fn combat_status(combat: &CombatState, party: &[Character]) -> String {
     let mut out = String::new();
-    let phase_name = match combat.phase {
-        crate::model::CombatPhase::Declaration => "Declaration",
-        crate::model::CombatPhase::Initiative => "Initiative",
-        crate::model::CombatPhase::Morale => "Morale",
-        crate::model::CombatPhase::Movement => "Movement",
-        crate::model::CombatPhase::Missile => "Missile",
-        crate::model::CombatPhase::Magic => "Magic",
-        crate::model::CombatPhase::Melee => "Melee",
-        crate::model::CombatPhase::EndOfRound => "End of Round",
-    };
+    let phase_name = crate::model::phase_display_name(&combat.phase);
     out.push_str(&format!(
         "=== Combat — Round {} ({}) ===\n",
         combat.round, phase_name
@@ -661,15 +652,15 @@ mod tests {
 
         // === ROUND 1 ===
         // Declaration phase
-        assert_eq!(combat.phase, crate::model::CombatPhase::Declaration);
+        assert_eq!(combat.phase, "Declaration");
         declare_spell(&mut combat, "Elara", "Sleep");
         combat.advance_phase(); // -> Initiative
 
         // Initiative
-        assert_eq!(combat.phase, crate::model::CombatPhase::Initiative);
+        assert_eq!(combat.phase, "Initiative");
         let (_p, _m) = roll_initiative_with(&mut combat, &mut rng);
         // roll_initiative sets phase to Morale
-        assert_eq!(combat.phase, crate::model::CombatPhase::Morale);
+        assert_eq!(combat.phase, "Morale");
         assert_eq!(combat.round, 1);
 
         // Morale (no deaths yet, skip)
@@ -677,11 +668,11 @@ mod tests {
         combat.advance_phase(); // -> Movement
 
         // Movement
-        assert_eq!(combat.phase, crate::model::CombatPhase::Movement);
+        assert_eq!(combat.phase, "Movement");
         combat.advance_phase(); // -> Missile
 
         // Missile phase — shoot at goblin
-        assert_eq!(combat.phase, crate::model::CombatPhase::Missile);
+        assert_eq!(combat.phase, "Missile");
         let missile_result = character_missile_attack_with(
             &mut combat,
             &fighter,
@@ -695,12 +686,12 @@ mod tests {
         combat.advance_phase(); // -> Magic
 
         // Magic phase — spell resolves (not disrupted)
-        assert_eq!(combat.phase, crate::model::CombatPhase::Magic);
+        assert_eq!(combat.phase, "Magic");
         assert!(!is_disrupted(&combat, "Elara"));
         combat.advance_phase(); // -> Melee
 
         // Melee
-        assert_eq!(combat.phase, crate::model::CombatPhase::Melee);
+        assert_eq!(combat.phase, "Melee");
         // Goblins attack in melee
         for i in 0..3 {
             if combat.monsters[i].is_alive() {
@@ -710,11 +701,11 @@ mod tests {
         combat.advance_phase(); // -> EndOfRound
 
         // End of round
-        assert_eq!(combat.phase, crate::model::CombatPhase::EndOfRound);
+        assert_eq!(combat.phase, "EndOfRound");
         combat.advance_phase(); // -> Declaration (new round)
 
         // === ROUND 2 ===
-        assert_eq!(combat.phase, crate::model::CombatPhase::Declaration);
+        assert_eq!(combat.phase, "Declaration");
         // Initiative
         combat.advance_phase();
         let (_p2, _m2) = roll_initiative_with(&mut combat, &mut rng);
@@ -749,24 +740,24 @@ mod tests {
     #[test]
     fn phase_advancement_full_cycle() {
         let mut combat = CombatState::new(vec![test_goblin()], 10);
-        assert_eq!(combat.phase, crate::model::CombatPhase::Declaration);
+        assert_eq!(combat.phase, "Declaration");
         combat.advance_phase();
-        assert_eq!(combat.phase, crate::model::CombatPhase::Initiative);
+        assert_eq!(combat.phase, "Initiative");
         combat.advance_phase();
-        assert_eq!(combat.phase, crate::model::CombatPhase::Morale);
+        assert_eq!(combat.phase, "Morale");
         combat.advance_phase();
-        assert_eq!(combat.phase, crate::model::CombatPhase::Movement);
+        assert_eq!(combat.phase, "Movement");
         combat.advance_phase();
-        assert_eq!(combat.phase, crate::model::CombatPhase::Missile);
+        assert_eq!(combat.phase, "Missile");
         combat.advance_phase();
-        assert_eq!(combat.phase, crate::model::CombatPhase::Magic);
+        assert_eq!(combat.phase, "Magic");
         combat.advance_phase();
-        assert_eq!(combat.phase, crate::model::CombatPhase::Melee);
+        assert_eq!(combat.phase, "Melee");
         combat.advance_phase();
-        assert_eq!(combat.phase, crate::model::CombatPhase::EndOfRound);
+        assert_eq!(combat.phase, "EndOfRound");
         combat.advance_phase();
         // Wraps back to Declaration
-        assert_eq!(combat.phase, crate::model::CombatPhase::Declaration);
+        assert_eq!(combat.phase, "Declaration");
     }
 
     // --- Morale trigger conditions ---
