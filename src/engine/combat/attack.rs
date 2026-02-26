@@ -42,7 +42,7 @@ fn dsl_attack_roll(thac0: u32, target_ac: i32, modifiers: i32) -> Option<DslAtta
         ],
     ) {
         Ok(Value::EnumVariant { ref variant, .. }) => {
-            let hit = variant.as_str() == "atk_hit";
+            let hit = variant.as_str() == "Hit";
             let roll = handler
                 .rolls
                 .first()

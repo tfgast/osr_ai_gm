@@ -642,27 +642,27 @@ mod dsl_gate {
 
     fn parse_spell_progression(s: &str) -> Option<SpellProgression> {
         match s {
-            "prog_bard" => Some(SpellProgression::Bard),
-            "prog_cleric" => Some(SpellProgression::Cleric),
-            "prog_drow" => Some(SpellProgression::Drow),
-            "prog_druid" => Some(SpellProgression::Druid),
-            "prog_arcane_full" => Some(SpellProgression::ArcaneFullCaster),
-            "prog_half_elf" => Some(SpellProgression::HalfElf),
-            "prog_paladin" => Some(SpellProgression::Paladin),
-            "prog_ranger" => Some(SpellProgression::Ranger),
-            "non_caster" => Some(SpellProgression::NonCaster),
+            "Bard" => Some(SpellProgression::Bard),
+            "Cleric" => Some(SpellProgression::Cleric),
+            "Drow" => Some(SpellProgression::Drow),
+            "Druid" => Some(SpellProgression::Druid),
+            "ArcaneFull" => Some(SpellProgression::ArcaneFullCaster),
+            "HalfElf" => Some(SpellProgression::HalfElf),
+            "Paladin" => Some(SpellProgression::Paladin),
+            "Ranger" => Some(SpellProgression::Ranger),
+            "NonCaster" => Some(SpellProgression::NonCaster),
             _ => None,
         }
     }
 
     fn parse_spell_list(s: &str) -> Option<SpellListType> {
         match s {
-            "no_list" => Some(SpellListType::None),
-            "list_cleric" => Some(SpellListType::Cleric),
-            "list_druid" => Some(SpellListType::Druid),
-            "list_illusionist" => Some(SpellListType::Illusionist),
-            "list_magic_user" => Some(SpellListType::MagicUser),
-            "list_drow_arcane_divine" => Some(SpellListType::DrowArcaneAndDivine),
+            "NoList" => Some(SpellListType::None),
+            "Cleric" => Some(SpellListType::Cleric),
+            "Druid" => Some(SpellListType::Druid),
+            "Illusionist" => Some(SpellListType::Illusionist),
+            "MagicUser" => Some(SpellListType::MagicUser),
+            "DrowArcaneDivine" => Some(SpellListType::DrowArcaneAndDivine),
             _ => None,
         }
     }

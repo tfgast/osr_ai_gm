@@ -195,8 +195,8 @@ mod dsl_gate {
             Value::EnumVariant {
                 variant, fields, ..
             } => match variant.as_str() {
-                "turn_impossible" => Some((false, None, TurnResult::Impossible, 0, false)),
-                "turn_failed" => {
+                "Impossible" => Some((false, None, TurnResult::Impossible, 0, false)),
+                "Failed" => {
                     let roll = fields.get(&Name::from("roll")).and_then(|v| {
                         if let Value::Int(n) = v { Some(*n as i32) } else { None }
                     })?;
@@ -205,7 +205,7 @@ mod dsl_gate {
                     })?;
                     Some((false, Some(roll), TurnResult::Roll(target), 0, false))
                 }
-                "turn_rolled" => {
+                "Rolled" => {
                     let roll = fields.get(&Name::from("roll")).and_then(|v| {
                         if let Value::Int(n) = v { Some(*n as i32) } else { None }
                     })?;
@@ -217,13 +217,13 @@ mod dsl_gate {
                     })?;
                     Some((true, Some(roll), TurnResult::Roll(target), hd, false))
                 }
-                "turn_auto" => {
+                "Auto" => {
                     let hd = fields.get(&Name::from("hd")).and_then(|v| {
                         if let Value::Int(n) = v { Some(*n as u32) } else { None }
                     })?;
                     Some((true, None, TurnResult::Turned, hd, false))
                 }
-                "turn_destroy" => {
+                "Destroy" => {
                     let hd = fields.get(&Name::from("hd")).and_then(|v| {
                         if let Value::Int(n) = v { Some(*n as u32) } else { None }
                     })?;

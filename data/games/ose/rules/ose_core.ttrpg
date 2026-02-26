@@ -5,15 +5,6 @@
 // All other OSE files import from this module.
 //
 // Reference: osr_ai_gm/src/rules/class.rs, model/mod.rs
-//
-// NOTE: The TTRPG DSL registers enum variants in a global namespace,
-// so variant names must be unique across ALL enums in the system.
-// Class variants use PascalCase; classification enums use prefixed
-// snake_case to avoid collisions (save_*, prog_*, list_*).
-//
-// LOCAL OVERRIDE: Extends ClassDef with capability tags
-// (has_thief_skills, can_backstab, can_turn_undead, xp_group, bx_equivalent)
-// per design oag-38ymb Phase 1.
 // ============================================================
 
 system "OSE" {
@@ -54,22 +45,21 @@ system "OSE" {
     }
 
     // --- Saving throw categories (one per class group, 13 total) ---
-    // Prefixed save_ to avoid collision with Class variants.
 
     enum SaveCategory {
-        save_thief,
-        save_barbarian,
-        save_cleric,
-        save_drow,
-        save_dwarf,
-        save_elf,
-        save_fighter,
-        save_gnome,
-        save_half_elf,
-        save_half_orc,
-        save_magic_user,
-        save_paladin,
-        save_svirfneblin
+        Thief,
+        Barbarian,
+        Cleric,
+        Drow,
+        Dwarf,
+        Elf,
+        Fighter,
+        Gnome,
+        HalfElf,
+        HalfOrc,
+        MagicUser,
+        Paladin,
+        Svirfneblin
     }
 
     // --- Combat aptitude tiers ---
@@ -87,52 +77,49 @@ system "OSE" {
     }
 
     // --- Spell progression categories (9 total) ---
-    // Prefixed prog_ to avoid collision with Class variants.
 
     enum SpellProgression {
-        prog_bard,
-        prog_cleric,
-        prog_drow,
-        prog_druid,
-        prog_arcane_full,
-        prog_half_elf,
-        prog_paladin,
-        prog_ranger,
-        non_caster
+        Bard,
+        Cleric,
+        Drow,
+        Druid,
+        ArcaneFull,
+        HalfElf,
+        Paladin,
+        Ranger,
+        NonCaster
     }
 
     // --- Spell list types ---
-    // Prefixed list_ to avoid collision with Class variants.
 
     enum SpellListType {
-        no_list,
-        list_cleric,
-        list_druid,
-        list_illusionist,
-        list_magic_user,
-        list_drow_arcane_divine
+        NoList,
+        Cleric,
+        Druid,
+        Illusionist,
+        MagicUser,
+        DrowArcaneDivine
     }
 
     // --- XP progression groups ---
     // Multiple classes share the same XP table. This enum identifies
     // each unique progression to avoid duplicating table rows.
     // 13 groups covering all 22 classes.
-    // Moved here from ose_class.ttrpg so ClassDef can reference XpGroup.
 
     enum XpGroup {
-        xp_fighter,
-        xp_thief,
-        xp_cleric,
-        xp_magic_user,
-        xp_dwarf,
-        xp_elf,
-        xp_halfling,
-        xp_half_elf,
-        xp_paladin,
-        xp_ranger,
-        xp_gnome,
-        xp_half_orc,
-        xp_svirfneblin
+        Fighter,
+        Thief,
+        Cleric,
+        MagicUser,
+        Dwarf,
+        Elf,
+        Halfling,
+        HalfElf,
+        Paladin,
+        Ranger,
+        Gnome,
+        HalfOrc,
+        Svirfneblin
     }
 
     // --- Encumbrance levels ---
@@ -171,11 +158,11 @@ system "OSE" {
     // Full result of a turn_undead_attempt mechanic call, combining
     // table lookup, conditional 2d6 success check, and 2d6 HD roll.
     enum TurnAttempt {
-        turn_impossible,
-        turn_failed(roll: int, target: int),           // rolled 2d6, missed target
-        turn_rolled(roll: int, target: int, hd: int),  // rolled 2d6, met target, 2d6 HD affected
-        turn_auto(hd: int),                            // automatic turn, 2d6 HD affected
-        turn_destroy(hd: int)                          // automatic destroy, 2d6 HD affected
+        Impossible,
+        Failed(roll: int, target: int),
+        Rolled(roll: int, target: int, hd: int),
+        Auto(hd: int),
+        Destroy(hd: int)
     }
 
     // --- Saving throw values (five categories: D/W/P/B/S) ---
@@ -189,7 +176,8 @@ system "OSE" {
     }
 
     // --- Static class definition ---
-    // Extended with capability tags per design oag-38ymb Phase 1.
+    // Includes capability tags for registry population:
+    //   has_thief_skills, can_backstab, can_turn_undead, xp_group, bx_equivalent
 
     struct ClassDef {
         class: Class
@@ -216,7 +204,7 @@ system "OSE" {
         name: string
         class: Class
         level: int = 1
-        alignment: Alignment = Neutral
+        alignment: Alignment = Alignment.Neutral
         abilities: map<Ability, int>
         hp: int
         max_hp: int

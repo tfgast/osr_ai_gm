@@ -313,15 +313,15 @@ mod dsl_gate {
     /// Map Rust SpellProgression to DSL enum variant name.
     fn progression_to_dsl(prog: SpellProgression) -> Value {
         let variant = match prog {
-            SpellProgression::NonCaster => "non_caster",
-            SpellProgression::Bard => "prog_bard",
-            SpellProgression::Cleric => "prog_cleric",
-            SpellProgression::Drow => "prog_drow",
-            SpellProgression::Druid => "prog_druid",
-            SpellProgression::ArcaneFullCaster => "prog_arcane_full",
-            SpellProgression::HalfElf => "prog_half_elf",
-            SpellProgression::Paladin => "prog_paladin",
-            SpellProgression::Ranger => "prog_ranger",
+            SpellProgression::NonCaster => "NonCaster",
+            SpellProgression::Bard => "Bard",
+            SpellProgression::Cleric => "Cleric",
+            SpellProgression::Drow => "Drow",
+            SpellProgression::Druid => "Druid",
+            SpellProgression::ArcaneFullCaster => "ArcaneFull",
+            SpellProgression::HalfElf => "HalfElf",
+            SpellProgression::Paladin => "Paladin",
+            SpellProgression::Ranger => "Ranger",
         };
         Value::EnumVariant {
             enum_name: "SpellProgression".into(),

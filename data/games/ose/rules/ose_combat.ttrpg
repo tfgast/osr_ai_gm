@@ -11,16 +11,16 @@ system "OSE Combat" {
 
     // --- Enums ---
 
-    enum AttackOutcome { atk_miss, atk_hit }
+    enum AttackOutcome { Miss, Hit }
 
-    enum MoraleOutcome { morale_hold, morale_fail }
+    enum MoraleOutcome { Hold, Fail }
 
     enum ReactionOutcome {
-        rx_hostile,
-        rx_unfriendly,
-        rx_neutral,
-        rx_indifferent,
-        rx_friendly
+        Hostile,
+        Unfriendly,
+        Neutral,
+        Indifferent,
+        Friendly
     }
 
 
@@ -43,11 +43,11 @@ system "OSE Combat" {
     // Reaction roll outcome table (2d6 + CHA modifier).
     // Applied when encountering wandering monsters or NPCs.
     table reaction_outcome(roll: int) -> ReactionOutcome {
-        2       => rx_hostile,
-        3..=5   => rx_unfriendly,
-        6..=8   => rx_neutral,
-        9..=11  => rx_indifferent,
-        12      => rx_friendly
+        2       => Hostile,
+        3..=5   => Unfriendly,
+        6..=8   => Neutral,
+        9..=11  => Indifferent,
+        12      => Friendly
     }
 
 
@@ -227,10 +227,10 @@ system "OSE Combat" {
         let target = target_number(thac0, target_ac)
         let result = roll(1d20)
         match {
-            result.unmodified == 1  => AttackOutcome.atk_miss,
-            result.unmodified == 20 => AttackOutcome.atk_hit,
-            result.total + attack_mod >= target => AttackOutcome.atk_hit,
-            _ => AttackOutcome.atk_miss
+            result.unmodified == 1  => AttackOutcome.Miss,
+            result.unmodified == 20 => AttackOutcome.Hit,
+            result.total + attack_mod >= target => AttackOutcome.Hit,
+            _ => AttackOutcome.Miss
         }
     }
 
@@ -317,7 +317,7 @@ system "OSE Combat" {
         // Backstab multiplies the raw dice roll before adding the flat modifier.
         // Normal hit uses the standard damage_roll mechanic.
         let damage = match outcome {
-            AttackOutcome.atk_hit => match {
+            AttackOutcome.Hit => match {
                 backstab_mult > 1 => {
                     let raw = roll(dice(damage_dice, damage_sides))
                     let total = raw.total * backstab_mult + damage_mod
@@ -332,7 +332,7 @@ system "OSE Combat" {
         }
 
         AttackResolution {
-            hit: match outcome { AttackOutcome.atk_hit => 1, _ => 0 },
+            hit: match outcome { AttackOutcome.Hit => 1, _ => 0 },
             attack_mod: attack_mod,
             damage: damage
         }
@@ -344,9 +344,9 @@ system "OSE Combat" {
     mechanic morale_check(morale: int) -> MoraleOutcome {
         let result = roll(2d6)
         if result.total > morale {
-            MoraleOutcome.morale_fail
+            MoraleOutcome.Fail
         } else {
-            MoraleOutcome.morale_hold
+            MoraleOutcome.Hold
         }
     }
 
@@ -391,15 +391,11 @@ system "OSE Combat" {
     // Reference: OSE Reference Booklet — Encounters chapter.
 
     // 4-way surprise matrix: which side (if any) was surprised.
-    // sr_none:              neither side surprised
-    // sr_party_surprises:   party surprises monsters (monsters surprised)
-    // sr_monsters_surprise: monsters surprise party  (party surprised)
-    // sr_both:              both sides surprised
     enum SurpriseState {
-        sr_none,
-        sr_party_surprises,
-        sr_monsters_surprise,
-        sr_both
+        NoSurprise,
+        PartySurprises,
+        MonstersSurprise,
+        Both
     }
 
     // Encounter opening result: raw rolls, resolved surprise, and distance.
@@ -474,10 +470,10 @@ system "OSE Combat" {
         let monster_surp  = monster_roll <= 2
         let surprised_flag = if party_surp || monster_surp { 1 } else { 0 }
         let surprise = match {
-            party_surp && monster_surp => SurpriseState.sr_both,
-            party_surp                 => SurpriseState.sr_monsters_surprise,
-            monster_surp               => SurpriseState.sr_party_surprises,
-            _                          => SurpriseState.sr_none
+            party_surp && monster_surp => SurpriseState.Both,
+            party_surp                 => SurpriseState.MonstersSurprise,
+            monster_surp               => SurpriseState.PartySurprises,
+            _                          => SurpriseState.NoSurprise
         }
         let distance = dungeon_encounter_distance(surprised_flag)
         EncounterStart {
@@ -497,10 +493,10 @@ system "OSE Combat" {
         let monster_surp  = monster_roll <= 2
         let surprised_flag = if party_surp || monster_surp { 1 } else { 0 }
         let surprise = match {
-            party_surp && monster_surp => SurpriseState.sr_both,
-            party_surp                 => SurpriseState.sr_monsters_surprise,
-            monster_surp               => SurpriseState.sr_party_surprises,
-            _                          => SurpriseState.sr_none
+            party_surp && monster_surp => SurpriseState.Both,
+            party_surp                 => SurpriseState.MonstersSurprise,
+            monster_surp               => SurpriseState.PartySurprises,
+            _                          => SurpriseState.NoSurprise
         }
         let distance = wilderness_encounter_distance(surprised_flag)
         EncounterStart {

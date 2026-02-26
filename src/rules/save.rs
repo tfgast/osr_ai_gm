@@ -240,19 +240,19 @@ fn dsl_saving_throws(cat: SaveCategory, level: u32) -> Option<SavingThrows> {
 #[cfg(feature = "dsl-backend")]
 fn dsl_variant_name(cat: SaveCategory) -> &'static str {
     match cat {
-        SaveCategory::Thief => "save_thief",
-        SaveCategory::Barbarian => "save_barbarian",
-        SaveCategory::Cleric => "save_cleric",
-        SaveCategory::Drow => "save_drow",
-        SaveCategory::Dwarf => "save_dwarf",
-        SaveCategory::Elf => "save_elf",
-        SaveCategory::Fighter => "save_fighter",
-        SaveCategory::Gnome => "save_gnome",
-        SaveCategory::HalfElf => "save_half_elf",
-        SaveCategory::HalfOrc => "save_half_orc",
-        SaveCategory::MagicUser => "save_magic_user",
-        SaveCategory::Paladin => "save_paladin",
-        SaveCategory::Svirfneblin => "save_svirfneblin",
+        SaveCategory::Thief => "Thief",
+        SaveCategory::Barbarian => "Barbarian",
+        SaveCategory::Cleric => "Cleric",
+        SaveCategory::Drow => "Drow",
+        SaveCategory::Dwarf => "Dwarf",
+        SaveCategory::Elf => "Elf",
+        SaveCategory::Fighter => "Fighter",
+        SaveCategory::Gnome => "Gnome",
+        SaveCategory::HalfElf => "HalfElf",
+        SaveCategory::HalfOrc => "HalfOrc",
+        SaveCategory::MagicUser => "MagicUser",
+        SaveCategory::Paladin => "Paladin",
+        SaveCategory::Svirfneblin => "Svirfneblin",
     }
 }
 

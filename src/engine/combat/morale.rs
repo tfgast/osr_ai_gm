@@ -115,7 +115,7 @@ fn check_morale_dsl(morale_score: u32) -> Option<MoraleResult> {
         .ok()?;
 
     let passed = match &result {
-        Value::EnumVariant { variant, .. } => variant.as_str() == "morale_hold",
+        Value::EnumVariant { variant, .. } => variant.as_str() == "Hold",
         _ => return None,
     };
 
