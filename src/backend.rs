@@ -20,6 +20,7 @@ pub enum MechanicGroup {
     Chargen,
     Encounter,
     Exploration,
+    Wilderness,
 }
 
 impl MechanicGroup {
@@ -38,6 +39,7 @@ impl MechanicGroup {
             MechanicGroup::Chargen => "CHARGEN",
             MechanicGroup::Encounter => "ENCOUNTER",
             MechanicGroup::Exploration => "EXPLORATION",
+            MechanicGroup::Wilderness => "WILDERNESS",
         }
     }
 }
@@ -56,6 +58,7 @@ pub struct BackendConfig {
     pub chargen: Backend,
     pub encounter: Backend,
     pub exploration: Backend,
+    pub wilderness: Backend,
 }
 
 impl BackendConfig {
@@ -75,6 +78,7 @@ impl BackendConfig {
             chargen: parse_backend_env("OSR_BACKEND_CHARGEN").or(global).unwrap_or(Backend::Dsl),
             encounter: parse_backend_env("OSR_BACKEND_ENCOUNTER").or(global).unwrap_or(Backend::Dsl),
             exploration: parse_backend_env("OSR_BACKEND_EXPLORATION").or(global).unwrap_or(Backend::Dsl),
+            wilderness: parse_backend_env("OSR_BACKEND_WILDERNESS").or(global).unwrap_or(Backend::Dsl),
         }
     }
 
@@ -92,6 +96,7 @@ impl BackendConfig {
             MechanicGroup::Chargen => self.chargen,
             MechanicGroup::Encounter => self.encounter,
             MechanicGroup::Exploration => self.exploration,
+            MechanicGroup::Wilderness => self.wilderness,
         }
     }
 }
@@ -390,6 +395,7 @@ mod tests {
         assert_eq!(config.chargen, Backend::Dsl);
         assert_eq!(config.encounter, Backend::Dsl);
         assert_eq!(config.exploration, Backend::Dsl);
+        assert_eq!(config.wilderness, Backend::Dsl);
     }
 
     #[test]
@@ -414,11 +420,13 @@ mod tests {
             chargen: Backend::Dsl,
             encounter: Backend::Native,
             exploration: Backend::Native,
+            wilderness: Backend::Dsl,
         };
         assert_eq!(config.get(MechanicGroup::Combat), Backend::Dsl);
         assert_eq!(config.get(MechanicGroup::Morale), Backend::Native);
         assert_eq!(config.get(MechanicGroup::Saves), Backend::Dsl);
         assert_eq!(config.get(MechanicGroup::Xp), Backend::Native);
         assert_eq!(config.get(MechanicGroup::Chargen), Backend::Dsl);
+        assert_eq!(config.get(MechanicGroup::Wilderness), Backend::Dsl);
     }
 }

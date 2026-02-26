@@ -23,6 +23,7 @@ files = [
     "ose_spells.ttrpg",
     "ose_time_economy.ttrpg",
     "ose_exploration.ttrpg",
+    "ose_wilderness.ttrpg",
 ]
 
 [data]
@@ -50,6 +51,7 @@ supported = [
     "chargen",
     "encounter",
     "exploration",
+    "wilderness",
 ]
 
 [features]
