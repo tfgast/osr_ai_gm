@@ -5292,3 +5292,65 @@ fn modifier_formatting_in_party_query() {
     assert_eq!(mods[0]["stat"], "AC");
     assert_eq!(mods[0]["value"], -2);
 }
+
+// ===========================================================================
+// SpellInfo
+// ===========================================================================
+
+#[test]
+fn spell_info_happy_path() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("si1", GMCommand::SpellInfo {
+        name: "Fire Ball".to_string(),
+    }), &mut state);
+    assert_response_format(&resp, "si1");
+    assert!(resp.success);
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["name"], "Fire Ball");
+    assert_eq!(data["list"], "Magic-User");
+    assert_eq!(data["level"], 3);
+    assert!(data["duration"].as_str().is_some());
+    assert!(data["save_type"].as_str().is_some());
+    assert!(data["damage_dice"].as_str().is_some());
+}
+
+#[test]
+fn spell_info_not_found() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("si2", GMCommand::SpellInfo {
+        name: "Nonexistent Spell".to_string(),
+    }), &mut state);
+    assert!(!resp.success);
+    assert!(resp.error.unwrap().contains("not found"));
+}
+
+#[test]
+fn spell_info_no_damage_spell() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("si3", GMCommand::SpellInfo {
+        name: "Charm Person".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["name"], "Charm Person");
+    assert_eq!(data["level"], 1);
+    // Damage dice should be empty for non-damage spells
+    let dice = data["damage_dice"].as_str().unwrap();
+    assert!(dice.is_empty(), "Charm Person should have no damage dice");
+}
+
+#[test]
+fn spell_info_healing_spell() {
+    let mut state = GameState::new();
+    let resp = handle_request(&req("si4", GMCommand::SpellInfo {
+        name: "Cure Light Wounds".to_string(),
+    }), &mut state);
+    assert!(resp.success);
+
+    let data = resp.data.unwrap();
+    assert_eq!(data["name"], "Cure Light Wounds");
+    assert_eq!(data["list"], "Cleric");
+    assert_eq!(data["level"], 1);
+}

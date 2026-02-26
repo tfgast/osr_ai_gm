@@ -19,6 +19,7 @@ files = [
     "ose_saves.ttrpg",
     "ose_thief.ttrpg",
     "ose_chargen.ttrpg",
+    "ose_spells.ttrpg",
 ]
 
 [data]

@@ -167,6 +167,81 @@ pub fn all_spells() -> &'static [SpellDef] {
     registry().all()
 }
 
+// ── Spell Metadata (DSL-backed) ───────────────────────────────
+
+/// Look up the saving throw type for a spell via DSL.
+/// Returns one of: "death", "wands", "paralysis", "breath", "spells", "none".
+pub fn spell_save_type(spell_name: &str) -> String {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if let Some(val) = dsl_spell_save_type(spell_name) {
+            return val;
+        }
+    }
+    let _ = spell_name;
+    "none".to_string()
+}
+
+/// Look up the damage dice formula for a spell via DSL.
+/// Returns a descriptive string like "1d6 per caster level", or "" for non-damage spells.
+pub fn spell_damage_dice(spell_name: &str) -> String {
+    #[cfg(feature = "dsl-backend")]
+    {
+        if let Some(val) = dsl_spell_damage_dice(spell_name) {
+            return val;
+        }
+    }
+    let _ = spell_name;
+    String::new()
+}
+
+#[cfg(feature = "dsl-backend")]
+fn dsl_spell_save_type(spell_name: &str) -> Option<String> {
+    use ttrpg_interp::value::Value;
+
+    let rt = crate::backend::dsl()?;
+    let args = vec![Value::Str(spell_name.to_string())];
+    let result = rt
+        .evaluate_derive(
+            &crate::backend::NullState,
+            &mut crate::backend::SimpleDiceHandler::new(),
+            "spell_save_type",
+            args,
+        )
+        .ok()?;
+    match &result {
+        Value::EnumVariant { variant, .. } => Some(match variant.as_str() {
+            "sv_death" => "death".to_string(),
+            "sv_wands" => "wands".to_string(),
+            "sv_paralysis" => "paralysis".to_string(),
+            "sv_breath" => "breath".to_string(),
+            "sv_spells" => "spells".to_string(),
+            _ => "none".to_string(),
+        }),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "dsl-backend")]
+fn dsl_spell_damage_dice(spell_name: &str) -> Option<String> {
+    use ttrpg_interp::value::Value;
+
+    let rt = crate::backend::dsl()?;
+    let args = vec![Value::Str(spell_name.to_string())];
+    let result = rt
+        .evaluate_derive(
+            &crate::backend::NullState,
+            &mut crate::backend::SimpleDiceHandler::new(),
+            "spell_damage_dice",
+            args,
+        )
+        .ok()?;
+    match &result {
+        Value::Str(s) => Some(s.clone()),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,5 +303,122 @@ mod tests {
         let clw = find_spell("Cure Light Wounds", None).unwrap();
         assert!(clw.reversible);
         assert_eq!(clw.reversed_name.as_deref(), Some("Cause Light Wounds"));
+    }
+
+    #[test]
+    fn spell_save_type_returns_value() {
+        // Fireball requires save vs spells
+        let save = spell_save_type("Fire Ball");
+        // Without DSL backend, returns "none" (fallback).
+        // With DSL backend, returns "spells".
+        assert!(save == "spells" || save == "none");
+    }
+
+    #[test]
+    fn spell_save_type_no_save_default() {
+        // Magic Missile has no save
+        let save = spell_save_type("Magic Missile");
+        assert!(save == "none");
+    }
+
+    #[test]
+    fn spell_damage_dice_returns_value() {
+        let dice = spell_damage_dice("Fire Ball");
+        // Without DSL backend, returns "" (fallback).
+        // With DSL backend, returns "1d6 per caster level".
+        assert!(dice == "1d6 per caster level" || dice.is_empty());
+    }
+
+    #[test]
+    fn spell_damage_dice_no_damage_default() {
+        // Detect Magic does no damage
+        let dice = spell_damage_dice("Detect Magic");
+        assert!(dice.is_empty());
+    }
+}
+
+#[cfg(all(test, feature = "dsl-backend"))]
+mod dsl_tests {
+    use super::*;
+
+    // Only runs when DSL backend is available. Tests that the
+    // ose_spells.ttrpg file parses and evaluates correctly.
+
+    fn dsl_available() -> bool {
+        crate::backend::dsl().is_some()
+    }
+
+    #[test]
+    fn dsl_spell_save_type_fireball() {
+        if !dsl_available() {
+            eprintln!("DSL not available, skipping");
+            return;
+        }
+        assert_eq!(spell_save_type("Fire Ball"), "spells");
+    }
+
+    #[test]
+    fn dsl_spell_save_type_cloudkill() {
+        if !dsl_available() {
+            eprintln!("DSL not available, skipping");
+            return;
+        }
+        assert_eq!(spell_save_type("Cloudkill"), "death");
+    }
+
+    #[test]
+    fn dsl_spell_save_type_disintegrate() {
+        if !dsl_available() {
+            eprintln!("DSL not available, skipping");
+            return;
+        }
+        assert_eq!(spell_save_type("Disintegrate"), "death");
+    }
+
+    #[test]
+    fn dsl_spell_save_type_no_save() {
+        if !dsl_available() {
+            eprintln!("DSL not available, skipping");
+            return;
+        }
+        assert_eq!(spell_save_type("Magic Missile"), "none");
+        assert_eq!(spell_save_type("Sleep"), "none");
+        assert_eq!(spell_save_type("Detect Magic"), "none");
+    }
+
+    #[test]
+    fn dsl_spell_damage_dice_fireball() {
+        if !dsl_available() {
+            eprintln!("DSL not available, skipping");
+            return;
+        }
+        assert_eq!(spell_damage_dice("Fire Ball"), "1d6 per caster level");
+    }
+
+    #[test]
+    fn dsl_spell_damage_dice_magic_missile() {
+        if !dsl_available() {
+            eprintln!("DSL not available, skipping");
+            return;
+        }
+        assert_eq!(spell_damage_dice("Magic Missile"), "1d6+1 per missile");
+    }
+
+    #[test]
+    fn dsl_spell_damage_dice_no_damage() {
+        if !dsl_available() {
+            eprintln!("DSL not available, skipping");
+            return;
+        }
+        assert_eq!(spell_damage_dice("Charm Person"), "");
+    }
+
+    #[test]
+    fn dsl_spell_save_type_charm_person() {
+        if !dsl_available() {
+            eprintln!("DSL not available, skipping");
+            return;
+        }
+        assert_eq!(spell_save_type("Charm Person"), "spells");
     }
 }

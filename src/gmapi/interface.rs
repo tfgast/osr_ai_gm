@@ -113,6 +113,7 @@ pub fn handle_request(req: &GMRequest, state: &mut GameState) -> GMResponse {
             combat_handlers::spawn_npc_party(id, state, party_type, *distance)
         }
         GMCommand::LookupSpell { name, list } => query_handlers::lookup_spell(id, state, name, list),
+        GMCommand::SpellInfo { name } => query_handlers::spell_info(id, state, name),
         GMCommand::HireRetainer { employer, retainer_name, retainer_class, retainer_level } => {
             hire_retainer(id, state, employer, retainer_name, *retainer_class, *retainer_level)
         }

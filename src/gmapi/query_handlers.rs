@@ -4,6 +4,7 @@ use crate::persist::GameState;
 use crate::rules::alignment::Alignment;
 use crate::rules::class::Class;
 use crate::rules::encumbrance;
+use crate::rules::spell_data;
 use crate::state::effect::ActiveEffect;
 use super::ok_with_typed_data;
 use serde::Serialize;
@@ -490,4 +491,51 @@ pub(super) fn lookup_spell(id: &str, state: &GameState, name: &str, list_name: &
         Ok(result) => ok_with_typed_data(id, state, result.api_message(), result.api_payload()),
         Err(e) => GMResponse::err(id, e.to_string(), state.mode),
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SpellInfoPayload {
+    pub name: String,
+    pub list: String,
+    pub level: u32,
+    pub duration: String,
+    pub save_type: String,
+    pub damage_dice: String,
+}
+
+pub(super) fn spell_info(id: &str, state: &GameState, name: &str) -> GMResponse {
+    let spell = match spell_data::find_spell(name, None) {
+        Some(s) => s,
+        None => {
+            return GMResponse::err(
+                id,
+                format!("spell not found: '{}'.", name),
+                state.mode,
+            )
+        }
+    };
+
+    let save_type = spell_data::spell_save_type(&spell.name);
+    let damage_dice = spell_data::spell_damage_dice(&spell.name);
+
+    let msg = format!(
+        "{} ({}L{}) — save: {}, damage: {}, duration: {}",
+        spell.name,
+        spell.list.name(),
+        spell.level,
+        save_type,
+        if damage_dice.is_empty() { "none" } else { &damage_dice },
+        spell.duration,
+    );
+
+    let payload = SpellInfoPayload {
+        name: spell.name.clone(),
+        list: spell.list.name().to_string(),
+        level: spell.level,
+        duration: spell.duration.clone(),
+        save_type,
+        damage_dice,
+    };
+
+    ok_with_typed_data(id, state, msg, payload)
 }

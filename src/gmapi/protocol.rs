@@ -279,6 +279,10 @@ pub enum GMCommand {
         #[serde(default)]
         list: String,
     },
+    /// Look up spell mechanical metadata (save type, damage dice, duration).
+    SpellInfo {
+        name: String,
+    },
     /// Hire a retainer.
     HireRetainer {
         employer: String,
