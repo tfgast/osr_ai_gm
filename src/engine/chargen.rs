@@ -195,13 +195,47 @@ pub fn thac0(aptitude: CombatAptitude, level: u32) -> u32 {
 
 /// Create a complete level-1 character.
 /// Abilities should already have racial modifiers applied.
+///
+/// Uses DSL-gated paths for all rule lookups (class_def, saving_throws,
+/// thac0) and dice rolls (roll_hp, roll_gold). This is the production
+/// entry point — see `create_character_with` for a deterministic test variant.
 pub fn create_character(
     name: &str,
     class: Class,
     abilities: [i32; 6],
     alignment: Alignment,
 ) -> Character {
-    create_character_with(name, class, abilities, alignment, &mut rand::thread_rng())
+    let def = class_def(class);
+
+    let con_mod = ability::con_hp_mod(abilities[class::CON]);
+    let hp = roll_hp(def.hit_die, con_mod);
+    let gold = roll_gold(def.starting_gold);
+
+    let dex_mod = ability::dex_ac_mod(abilities[class::DEX]);
+    let ac = equipment::calculate_ac(9, false, dex_mod);
+
+    let saves = save::saving_throws(def.save_category, 1);
+    let thac0_val = thac0(def.combat_aptitude, 1);
+
+    Character {
+        name: name.to_string(),
+        class,
+        level: 1,
+        abilities: AbilityScores::from_array(&abilities),
+        hp,
+        max_hp: hp,
+        ac,
+        xp: 0,
+        inventory: Vec::new(),
+        spells: Vec::new(),
+        alignment,
+        gold_gp: gold,
+        saving_throws: Some(saves),
+        thac0: thac0_val,
+        movement_rate: BASE_MOVEMENT,
+        spell_slots_used: [0; 6],
+        effects: Vec::new(),
+    }
 }
 
 /// Create a complete level-1 character with a specific RNG (for testing).
