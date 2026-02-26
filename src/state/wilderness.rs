@@ -5,6 +5,16 @@ use std::collections::HashSet;
 
 use crate::log_entry::LogEntry;
 
+#[cfg(feature = "dsl-backend")]
+use crate::backend::{is_dsl, MechanicGroup};
+
+/// Returns true when the Wilderness mechanic group is using the DSL backend.
+#[cfg(feature = "dsl-backend")]
+#[inline]
+fn use_dsl() -> bool {
+    is_dsl(MechanicGroup::Wilderness)
+}
+
 /// Terrain types for wilderness hexes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum Terrain {
@@ -83,7 +93,16 @@ impl Terrain {
     /// Movement cost multiplier (fraction of daily movement used per hex).
     /// Base movement: 1 hex per day at movement rate 120'.
     /// Returns (numerator, denominator) for the cost fraction.
+    ///
+    /// When `dsl-backend` is enabled and `OSR_BACKEND_WILDERNESS=dsl`, delegates
+    /// to the `terrain_move_cost_num` / `terrain_move_cost_den` DSL tables.
     pub fn movement_cost(self) -> (u32, u32) {
+        #[cfg(feature = "dsl-backend")]
+        if use_dsl() {
+            if let Some(v) = dsl_gate::dsl_movement_cost(self) {
+                return v;
+            }
+        }
         match self {
             Terrain::Clear | Terrain::City => (1, 1),
             Terrain::Barren | Terrain::Hills => (3, 2),    // 1.5x cost
@@ -96,7 +115,16 @@ impl Terrain {
     }
 
     /// Chance of getting lost (X-in-6). 0 means never lost.
+    ///
+    /// When `dsl-backend` is enabled and `OSR_BACKEND_WILDERNESS=dsl`, delegates
+    /// to the `terrain_lost_chance` DSL table.
     pub fn lost_chance(self) -> u32 {
+        #[cfg(feature = "dsl-backend")]
+        if use_dsl() {
+            if let Some(v) = dsl_gate::dsl_lost_chance(self) {
+                return v;
+            }
+        }
         match self {
             Terrain::Clear | Terrain::City | Terrain::Barren
             | Terrain::Hills | Terrain::Mountains => 1,
@@ -106,18 +134,155 @@ impl Terrain {
     }
 
     /// Whether foraging is possible in this terrain.
+    ///
+    /// When `dsl-backend` is enabled and `OSR_BACKEND_WILDERNESS=dsl`, delegates
+    /// to the `terrain_can_forage` DSL derive.
     pub fn can_forage(self) -> bool {
+        #[cfg(feature = "dsl-backend")]
+        if use_dsl() {
+            if let Some(v) = dsl_gate::dsl_can_forage(self) {
+                return v;
+            }
+        }
         !matches!(self, Terrain::Ocean | Terrain::City | Terrain::Barren)
     }
 
     /// Chance of successful foraging (X-in-6).
+    ///
+    /// When `dsl-backend` is enabled and `OSR_BACKEND_WILDERNESS=dsl`, delegates
+    /// to the `terrain_forage_chance` DSL table.
     pub fn forage_chance(self) -> u32 {
+        #[cfg(feature = "dsl-backend")]
+        if use_dsl() {
+            if let Some(v) = dsl_gate::dsl_forage_chance(self) {
+                return v;
+            }
+        }
         match self {
             Terrain::Forest | Terrain::Jungle | Terrain::River => 2,
             Terrain::Clear | Terrain::Hills => 1,
             Terrain::Swamp => 1,
             Terrain::Desert | Terrain::Mountains => 1,
             _ => 0,
+        }
+    }
+}
+
+// ── DSL gate helpers ──────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_gate {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::value::Value;
+
+    use crate::backend::{self, NullState};
+    use crate::bridge::handler::BridgeHandler;
+
+    use super::Terrain;
+
+    /// Convert a Rust `Terrain` to a DSL `WildernessTerrainKind` enum value.
+    fn terrain_to_value(terrain: Terrain) -> Value {
+        let variant = match terrain {
+            Terrain::Clear     => "wt_clear",
+            Terrain::Forest    => "wt_forest",
+            Terrain::Hills     => "wt_hills",
+            Terrain::Mountains => "wt_mountains",
+            Terrain::Desert    => "wt_desert",
+            Terrain::Swamp     => "wt_swamp",
+            Terrain::Jungle    => "wt_jungle",
+            Terrain::Ocean     => "wt_ocean",
+            Terrain::River     => "wt_river",
+            Terrain::Barren    => "wt_barren",
+            Terrain::City      => "wt_city",
+        };
+        Value::EnumVariant {
+            enum_name: "WildernessTerrainKind".into(),
+            variant: Name::from(variant),
+            fields: BTreeMap::new(),
+        }
+    }
+
+    /// Call `terrain_lost_chance` DSL table.
+    pub fn dsl_lost_chance(terrain: Terrain) -> Option<u32> {
+        let rt = backend::dsl()?;
+        let mut handler = BridgeHandler::new();
+        let result = rt
+            .evaluate_derive(
+                &NullState,
+                &mut handler,
+                "terrain_lost_chance",
+                vec![terrain_to_value(terrain)],
+            )
+            .ok()?;
+        match result {
+            Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
+    }
+
+    /// Call `terrain_forage_chance` DSL table.
+    pub fn dsl_forage_chance(terrain: Terrain) -> Option<u32> {
+        let rt = backend::dsl()?;
+        let mut handler = BridgeHandler::new();
+        let result = rt
+            .evaluate_derive(
+                &NullState,
+                &mut handler,
+                "terrain_forage_chance",
+                vec![terrain_to_value(terrain)],
+            )
+            .ok()?;
+        match result {
+            Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
+    }
+
+    /// Call `terrain_can_forage` DSL derive.
+    pub fn dsl_can_forage(terrain: Terrain) -> Option<bool> {
+        let rt = backend::dsl()?;
+        let mut handler = BridgeHandler::new();
+        let result = rt
+            .evaluate_derive(
+                &NullState,
+                &mut handler,
+                "terrain_can_forage",
+                vec![terrain_to_value(terrain)],
+            )
+            .ok()?;
+        match result {
+            Value::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Call `terrain_move_cost_num` and `terrain_move_cost_den` DSL tables.
+    /// Returns (numerator, denominator) for the movement cost fraction.
+    pub fn dsl_movement_cost(terrain: Terrain) -> Option<(u32, u32)> {
+        let rt = backend::dsl()?;
+        let mut handler = BridgeHandler::new();
+        let v = terrain_to_value(terrain);
+        let num = rt
+            .evaluate_derive(
+                &NullState,
+                &mut handler,
+                "terrain_move_cost_num",
+                vec![v.clone()],
+            )
+            .ok()?;
+        let den = rt
+            .evaluate_derive(
+                &NullState,
+                &mut handler,
+                "terrain_move_cost_den",
+                vec![v],
+            )
+            .ok()?;
+        match (num, den) {
+            (Value::Int(n), Value::Int(d)) => Some((n as u32, d as u32)),
+            _ => None,
         }
     }
 }
@@ -383,5 +548,123 @@ mod tests {
         let s = ws.status();
         assert!(s.contains("Clear"));
         assert!(s.contains("(0, 0)"));
+    }
+}
+
+// ── DSL parity tests ────────────────────────────────────────────
+
+#[cfg(all(test, feature = "dsl-backend"))]
+mod dsl_tests {
+    use super::*;
+
+    const ALL_TERRAINS: &[Terrain] = &[
+        Terrain::Clear,
+        Terrain::Forest,
+        Terrain::Hills,
+        Terrain::Mountains,
+        Terrain::Desert,
+        Terrain::Swamp,
+        Terrain::Jungle,
+        Terrain::Ocean,
+        Terrain::River,
+        Terrain::Barren,
+        Terrain::City,
+    ];
+
+    /// Verify DSL terrain_lost_chance matches native for every terrain.
+    #[test]
+    fn dsl_lost_chance_matches_native() {
+        for &terrain in ALL_TERRAINS {
+            let dsl_val = dsl_gate::dsl_lost_chance(terrain)
+                .unwrap_or_else(|| panic!("DSL terrain_lost_chance({:?}) failed", terrain));
+            assert_eq!(
+                dsl_val,
+                lost_chance_native(terrain),
+                "terrain_lost_chance mismatch for {:?}",
+                terrain,
+            );
+        }
+    }
+
+    /// Verify DSL terrain_forage_chance matches native for every terrain.
+    #[test]
+    fn dsl_forage_chance_matches_native() {
+        for &terrain in ALL_TERRAINS {
+            let dsl_val = dsl_gate::dsl_forage_chance(terrain)
+                .unwrap_or_else(|| panic!("DSL terrain_forage_chance({:?}) failed", terrain));
+            assert_eq!(
+                dsl_val,
+                forage_chance_native(terrain),
+                "terrain_forage_chance mismatch for {:?}",
+                terrain,
+            );
+        }
+    }
+
+    /// Verify DSL terrain_can_forage matches native for every terrain.
+    #[test]
+    fn dsl_can_forage_matches_native() {
+        for &terrain in ALL_TERRAINS {
+            let dsl_val = dsl_gate::dsl_can_forage(terrain)
+                .unwrap_or_else(|| panic!("DSL terrain_can_forage({:?}) failed", terrain));
+            assert_eq!(
+                dsl_val,
+                can_forage_native(terrain),
+                "terrain_can_forage mismatch for {:?}",
+                terrain,
+            );
+        }
+    }
+
+    /// Verify DSL terrain_move_cost_num/den matches native for every terrain.
+    #[test]
+    fn dsl_movement_cost_matches_native() {
+        for &terrain in ALL_TERRAINS {
+            let dsl_val = dsl_gate::dsl_movement_cost(terrain)
+                .unwrap_or_else(|| panic!("DSL movement_cost({:?}) failed", terrain));
+            assert_eq!(
+                dsl_val,
+                movement_cost_native(terrain),
+                "movement_cost mismatch for {:?}",
+                terrain,
+            );
+        }
+    }
+
+    // ── Native-only copies for parity comparison ──────────────
+
+    fn lost_chance_native(terrain: Terrain) -> u32 {
+        match terrain {
+            Terrain::Clear | Terrain::City | Terrain::Barren
+            | Terrain::Hills | Terrain::Mountains => 1,
+            Terrain::Forest | Terrain::River | Terrain::Desert
+            | Terrain::Ocean | Terrain::Swamp | Terrain::Jungle => 2,
+        }
+    }
+
+    fn forage_chance_native(terrain: Terrain) -> u32 {
+        match terrain {
+            Terrain::Forest | Terrain::Jungle | Terrain::River => 2,
+            Terrain::Clear | Terrain::Hills => 1,
+            Terrain::Swamp => 1,
+            Terrain::Desert | Terrain::Mountains => 1,
+            _ => 0,
+        }
+    }
+
+    fn can_forage_native(terrain: Terrain) -> bool {
+        !matches!(terrain, Terrain::Ocean | Terrain::City | Terrain::Barren)
+    }
+
+    fn movement_cost_native(terrain: Terrain) -> (u32, u32) {
+        match terrain {
+            Terrain::Clear | Terrain::City => (1, 1),
+            Terrain::Barren | Terrain::Hills => (3, 2),
+            Terrain::Forest | Terrain::River => (3, 2),
+            Terrain::Desert | Terrain::Jungle => (2, 1),
+            Terrain::Mountains => (3, 1),
+            Terrain::Swamp => (2, 1),
+            Terrain::Ocean => (1, 1),
+        }
     }
 }
