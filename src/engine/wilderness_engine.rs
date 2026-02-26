@@ -114,10 +114,11 @@ pub fn travel_day_with<R: Rng>(
         result.msg(msg.clone());
     }
 
-    // Check for getting lost
+    // Check for getting lost.
+    // DSL gate: terrain_lost_check rolls 1d6 and returns true if the party gets lost.
+    let (got_lost, lost_roll) = lost_check(rng, terrain);
     let lost_chance = terrain.lost_chance();
-    let lost_roll: u32 = rng.gen_range(1..=6);
-    if lost_roll <= lost_chance {
+    if got_lost {
         wilderness.lost = true;
         result.lost = true;
         result.msg(format!(
@@ -185,8 +186,8 @@ pub fn travel_day_with<R: Rng>(
     };
     let periods = ["Morning", "Afternoon", "Night"];
     for period in &periods {
-        let encounter_roll: u32 = rng.gen_range(1..=6);
-        if encounter_roll <= encounter_chance {
+        // DSL gate: terrain_encounter_check rolls 1d6 and returns true if encounter occurs.
+        if encounter_check(rng, current_terrain, encounter_chance) {
             let table_roll: u32 = rng.gen_range(1..=20);
             if let Some(entry) = encounter::wilderness_encounter_simple(current_terrain, table_roll) {
                 result.msg(format!(
@@ -319,11 +320,12 @@ pub fn forage_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState, party:
         };
     }
 
-    // Forage first (food found can offset starvation)
+    // Forage first (food found can offset starvation).
+    // DSL gate: terrain_forage_check rolls 1d6 and returns true if foraging succeeds.
     let chance = terrain.forage_chance();
-    let roll: u32 = rng.gen_range(1..=6);
+    let (forage_success, roll) = forage_check(rng, terrain);
 
-    let (quantity, success, forage_msg) = if roll <= chance {
+    let (quantity, success, forage_msg) = if forage_success {
         let quantity: u32 = rng.gen_range(1..=6);
         party.rations += quantity;
         let msg = format!(
@@ -453,15 +455,16 @@ pub fn orient_with<R: Rng>(rng: &mut R, wilderness: &mut WildernessState, party:
     // Success chance: 6 minus terrain's lost_chance gives X-in-6.
     // Clear/City/Hills/Mountains have 1-in-6 lost chance -> 5-in-6 orient success
     // Forest/Swamp/Jungle/etc have 2-in-6 lost chance -> 4-in-6 orient success
+    // DSL gate: terrain_orient_check rolls 1d6 and returns true if orientation succeeds.
     let orient_chance = 6 - terrain.lost_chance();
-    let roll: u32 = rng.gen_range(1..=6);
+    let (orient_success, roll) = orient_check(rng, terrain);
 
     // Consume daily rations + handle starvation
     let overhead = apply_daily_overhead(rng, party);
 
     wilderness.travel_day += 1;
 
-    if roll <= orient_chance {
+    if orient_success {
         wilderness.lost = false;
         wilderness.log(format!(
             "Day {}: Oriented successfully in {} terrain.",
@@ -532,6 +535,137 @@ pub fn wilderness_status(wilderness: &WildernessState, party: &Party, movement_r
 /// Per OSE: -1 per day without food, capped at -4.
 pub fn starvation_penalty(days_without_food: u32) -> i32 {
     -(days_without_food.min(4) as i32)
+}
+
+// ── DSL-first dice check helpers ─────────────────────────────
+//
+// Each function attempts the DSL mechanic first (if the dsl-backend feature
+// is enabled and the Wilderness group is configured for DSL), then falls back
+// to the native dice roll.  The pattern matches turn_undead.rs and
+// encounter_engine.rs.
+
+/// Roll a lost check (1d6 vs terrain lost chance).
+/// Returns (got_lost, d6_roll).
+fn lost_check<R: Rng>(rng: &mut R, terrain: Terrain) -> (bool, u32) {
+    #[cfg(feature = "dsl-backend")]
+    if let Some(result) = dsl_gate::dsl_lost_check(terrain) {
+        return result;
+    }
+    let roll: u32 = rng.gen_range(1..=6);
+    (roll <= terrain.lost_chance(), roll)
+}
+
+/// Roll an encounter check (1d6 vs terrain encounter chance).
+/// Returns true if an encounter occurs.
+/// `native_chance` is the caller's precomputed native fallback value.
+#[cfg_attr(not(feature = "dsl-backend"), allow(unused_variables))]
+fn encounter_check<R: Rng>(rng: &mut R, terrain: Terrain, native_chance: u32) -> bool {
+    #[cfg(feature = "dsl-backend")]
+    if let Some((b, _)) = dsl_gate::dsl_encounter_check(terrain) {
+        return b;
+    }
+    rng.gen_range(1u32..=6) <= native_chance
+}
+
+/// Roll a forage check (1d6 vs terrain forage chance).
+/// Returns (success, d6_roll).
+fn forage_check<R: Rng>(rng: &mut R, terrain: Terrain) -> (bool, u32) {
+    #[cfg(feature = "dsl-backend")]
+    if let Some(result) = dsl_gate::dsl_forage_check(terrain) {
+        return result;
+    }
+    let roll: u32 = rng.gen_range(1..=6);
+    (roll <= terrain.forage_chance(), roll)
+}
+
+/// Roll an orient check (1d6 vs 6 − terrain_lost_chance).
+/// Returns (success, d6_roll).
+fn orient_check<R: Rng>(rng: &mut R, terrain: Terrain) -> (bool, u32) {
+    #[cfg(feature = "dsl-backend")]
+    if let Some(result) = dsl_gate::dsl_orient_check(terrain) {
+        return result;
+    }
+    let orient_chance = 6 - terrain.lost_chance();
+    let roll: u32 = rng.gen_range(1..=6);
+    (roll <= orient_chance, roll)
+}
+
+// ── DSL gate helpers ─────────────────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_gate {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::value::Value;
+
+    use crate::backend::{self, MechanicGroup};
+    use crate::state::wilderness::Terrain;
+
+    /// Convert a Rust `Terrain` to a DSL `WildernessTerrainKind` enum value.
+    fn terrain_to_value(terrain: Terrain) -> Value {
+        let variant = match terrain {
+            Terrain::Clear     => "wt_clear",
+            Terrain::Forest    => "wt_forest",
+            Terrain::Hills     => "wt_hills",
+            Terrain::Mountains => "wt_mountains",
+            Terrain::Desert    => "wt_desert",
+            Terrain::Swamp     => "wt_swamp",
+            Terrain::Jungle    => "wt_jungle",
+            Terrain::Ocean     => "wt_ocean",
+            Terrain::River     => "wt_river",
+            Terrain::Barren    => "wt_barren",
+            Terrain::City      => "wt_city",
+        };
+        Value::EnumVariant {
+            enum_name: "WildernessTerrainKind".into(),
+            variant: Name::from(variant),
+            fields: BTreeMap::new(),
+        }
+    }
+
+    /// Evaluate a terrain mechanic that takes `WildernessTerrainKind` and returns `bool`.
+    /// Returns `(result, d6_roll)` on success, or `None` if DSL is unavailable.
+    /// The d6 roll is extracted from the dice handler so callers can include it in messages.
+    fn call_bool_mechanic(mechanic: &str, terrain: Terrain) -> Option<(bool, u32)> {
+        if !backend::is_dsl(MechanicGroup::Wilderness) {
+            return None;
+        }
+        let runtime = backend::dsl()?;
+        let mut handler = backend::SimpleDiceHandler::new();
+        match runtime.evaluate_mechanic(
+            &backend::NullState,
+            &mut handler,
+            mechanic,
+            vec![terrain_to_value(terrain)],
+        ) {
+            Ok(Value::Bool(b)) => {
+                let roll = handler.rolls.first().map(|r| r.total as u32).unwrap_or(0);
+                Some((b, roll))
+            }
+            _ => None,
+        }
+    }
+
+    /// Evaluate `terrain_lost_check` → `(got_lost, d6_roll)`.
+    pub fn dsl_lost_check(terrain: Terrain) -> Option<(bool, u32)> {
+        call_bool_mechanic("terrain_lost_check", terrain)
+    }
+
+    /// Evaluate `terrain_encounter_check` → `(encounter_occurred, d6_roll)`.
+    pub fn dsl_encounter_check(terrain: Terrain) -> Option<(bool, u32)> {
+        call_bool_mechanic("terrain_encounter_check", terrain)
+    }
+
+    /// Evaluate `terrain_forage_check` → `(success, d6_roll)`.
+    pub fn dsl_forage_check(terrain: Terrain) -> Option<(bool, u32)> {
+        call_bool_mechanic("terrain_forage_check", terrain)
+    }
+
+    /// Evaluate `terrain_orient_check` → `(success, d6_roll)`.
+    pub fn dsl_orient_check(terrain: Terrain) -> Option<(bool, u32)> {
+        call_bool_mechanic("terrain_orient_check", terrain)
+    }
 }
 
 #[cfg(test)]
