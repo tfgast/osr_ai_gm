@@ -372,11 +372,10 @@ mod tests {
     use crate::registry::{character_ref, monster_ref};
     use osr_ai_gm::model::AbilityScores;
     use osr_ai_gm::rules::attack::HitDice;
-    use osr_ai_gm::rules::class::Class;
     use osr_ai_gm::rules::save::SavingThrows;
 
     fn test_character() -> Character {
-        let mut c = Character::new("Grond", Class::Fighter);
+        let mut c = Character::new("Grond", "Fighter");
         c.level = 3;
         c.hp = 18;
         c.max_hp = 24;
@@ -595,7 +594,7 @@ mod tests {
         let cases = [(1, 19u32), (3, 19), (4, 17), (7, 14)];
 
         for (level, expected_thac0) in cases {
-            let mut c = Character::new("TestFighter", Class::Fighter);
+            let mut c = Character::new("TestFighter", "Fighter");
             c.level = level;
             c.thac0 = expected_thac0;
             let state = BridgeState::new(vec![c], Vec::new(), Vec::new(), 0, 1);
@@ -616,7 +615,7 @@ mod tests {
         // B/X Fighter saving throws (OSE):
         // Level 1-3: D:12 W:13 P:14 B:15 S:16
         let st = SavingThrows::new(12, 13, 14, 15, 16);
-        let mut c = Character::new("TestFighter", Class::Fighter);
+        let mut c = Character::new("TestFighter", "Fighter");
         c.level = 1;
         c.saving_throws = Some(st);
 

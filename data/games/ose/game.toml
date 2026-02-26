@@ -21,6 +21,7 @@ files = [
     "ose_chargen.ttrpg",
     "ose_equipment.ttrpg",
     "ose_spells.ttrpg",
+    "ose_time_economy.ttrpg",
 ]
 
 [data]
