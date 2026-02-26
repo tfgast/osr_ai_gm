@@ -11,11 +11,111 @@ use crate::rules::class::{self, Class, CombatAptitude, class_def};
 use crate::rules::save;
 use crate::rules::equipment;
 
+// ── DSL evaluation helpers (gated) ─────────────────────────────
+
+#[cfg(feature = "dsl-backend")]
+mod dsl_eval {
+    use std::collections::BTreeMap;
+
+    use ttrpg_ast::Name;
+    use ttrpg_interp::value::Value;
+
+    use crate::backend::{NullState, SimpleDiceHandler};
+    use crate::rules::class::CombatAptitude;
+
+    /// Roll a single ability score via DSL mechanic (3d6).
+    pub(super) fn roll_ability() -> Option<i32> {
+        let runtime = crate::backend::dsl()?;
+        let mut handler = SimpleDiceHandler::new();
+        let result = runtime
+            .evaluate_mechanic(&NullState, &mut handler, "roll_ability", vec![])
+            .ok()?;
+        match result {
+            Value::Int(v) => Some(v as i32),
+            _ => None,
+        }
+    }
+
+    /// Roll starting HP via DSL mechanic.
+    pub(super) fn roll_starting_hp(hit_die: u32, con_mod: i32) -> Option<i32> {
+        let runtime = crate::backend::dsl()?;
+        let mut handler = SimpleDiceHandler::new();
+        let result = runtime
+            .evaluate_mechanic(
+                &NullState,
+                &mut handler,
+                "roll_starting_hp",
+                vec![Value::Int(hit_die as i64), Value::Int(con_mod as i64)],
+            )
+            .ok()?;
+        match result {
+            Value::Int(v) => Some(v as i32),
+            _ => None,
+        }
+    }
+
+    /// Look up THAC0 via DSL derive (wraps character_thac0 table).
+    pub(super) fn character_thac0(aptitude: CombatAptitude, level: u32) -> Option<u32> {
+        let runtime = crate::backend::dsl()?;
+        let mut handler = SimpleDiceHandler::new();
+
+        let aptitude_str = match aptitude {
+            CombatAptitude::Martial => "martial",
+            CombatAptitude::SemiMartial => "semi_martial",
+            CombatAptitude::NonMartial => "non_martial",
+        };
+        let aptitude_val = Value::EnumVariant {
+            enum_name: "CombatAptitude".into(),
+            variant: Name::from(aptitude_str),
+            fields: BTreeMap::new(),
+        };
+
+        let result = runtime
+            .evaluate_derive(
+                &NullState,
+                &mut handler,
+                "get_character_thac0",
+                vec![aptitude_val, Value::Int(level as i64)],
+            )
+            .ok()?;
+        match result {
+            Value::Int(v) => Some(v as u32),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(feature = "dsl-backend")]
+use crate::backend::{is_dsl, MechanicGroup};
+
+/// Returns true when the Chargen mechanic group is using the DSL backend.
+#[cfg(feature = "dsl-backend")]
+#[inline]
+fn use_dsl() -> bool {
+    is_dsl(MechanicGroup::Chargen)
+}
+
 /// Base movement rate (unencumbered).
 pub const BASE_MOVEMENT: u32 = 120;
 
 /// Roll 3d6 in order for six abilities: STR, INT, WIS, DEX, CON, CHA.
 pub fn roll_abilities() -> [i32; 6] {
+    #[cfg(feature = "dsl-backend")]
+    if use_dsl() {
+        let mut abilities = [0i32; 6];
+        let mut all_ok = true;
+        for slot in &mut abilities {
+            if let Some(v) = dsl_eval::roll_ability() {
+                *slot = v;
+            } else {
+                all_ok = false;
+                break;
+            }
+        }
+        if all_ok {
+            return abilities;
+        }
+    }
     roll_abilities_with(&mut rand::thread_rng())
 }
 
@@ -30,6 +130,12 @@ pub fn roll_abilities_with<R: Rng>(rng: &mut R) -> [i32; 6] {
 
 /// Roll HP for level 1: 1d(hit_die) + CON modifier, minimum 1.
 pub fn roll_hp(hit_die: u32, con_mod: i32) -> i32 {
+    #[cfg(feature = "dsl-backend")]
+    if use_dsl() {
+        if let Some(v) = dsl_eval::roll_starting_hp(hit_die, con_mod) {
+            return v;
+        }
+    }
     roll_hp_with(hit_die, con_mod, &mut rand::thread_rng())
 }
 
@@ -59,6 +165,12 @@ pub fn roll_gold_with<R: Rng>(notation: &str, rng: &mut R) -> u32 {
 /// THAC0 by combat aptitude and level.
 /// Per OSE attack matrix tables.
 pub fn thac0(aptitude: CombatAptitude, level: u32) -> u32 {
+    #[cfg(feature = "dsl-backend")]
+    if use_dsl() {
+        if let Some(v) = dsl_eval::character_thac0(aptitude, level) {
+            return v;
+        }
+    }
     match aptitude {
         CombatAptitude::Martial => match level {
             1..=3 => 19,

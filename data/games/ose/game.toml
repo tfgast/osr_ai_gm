@@ -18,6 +18,7 @@ files = [
     "ose_magic.ttrpg",
     "ose_saves.ttrpg",
     "ose_thief.ttrpg",
+    "ose_chargen.ttrpg",
 ]
 
 [data]
@@ -42,6 +43,7 @@ supported = [
     "xp",
     "spell",
     "class",
+    "chargen",
 ]
 
 [features]

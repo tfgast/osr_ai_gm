@@ -17,6 +17,7 @@ pub enum MechanicGroup {
     Xp,
     Spell,
     Class,
+    Chargen,
 }
 
 impl MechanicGroup {
@@ -31,6 +32,7 @@ impl MechanicGroup {
             MechanicGroup::Xp => "XP",
             MechanicGroup::Spell => "SPELL",
             MechanicGroup::Class => "CLASS",
+            MechanicGroup::Chargen => "CHARGEN",
         }
     }
 }
@@ -46,6 +48,7 @@ pub struct BackendConfig {
     pub xp: Backend,
     pub spell: Backend,
     pub class: Backend,
+    pub chargen: Backend,
 }
 
 impl BackendConfig {
@@ -62,6 +65,7 @@ impl BackendConfig {
             xp: parse_backend_env("OSR_BACKEND_XP").or(global).unwrap_or(Backend::Dsl),
             spell: parse_backend_env("OSR_BACKEND_SPELL").or(global).unwrap_or(Backend::Dsl),
             class: parse_backend_env("OSR_BACKEND_CLASS").or(global).unwrap_or(Backend::Dsl),
+            chargen: parse_backend_env("OSR_BACKEND_CHARGEN").or(global).unwrap_or(Backend::Dsl),
         }
     }
 
@@ -76,6 +80,7 @@ impl BackendConfig {
             MechanicGroup::Xp => self.xp,
             MechanicGroup::Spell => self.spell,
             MechanicGroup::Class => self.class,
+            MechanicGroup::Chargen => self.chargen,
         }
     }
 }
@@ -357,6 +362,7 @@ mod tests {
         assert_eq!(config.xp, Backend::Dsl);
         assert_eq!(config.spell, Backend::Dsl);
         assert_eq!(config.class, Backend::Dsl);
+        assert_eq!(config.chargen, Backend::Dsl);
     }
 
     #[test]
@@ -378,10 +384,12 @@ mod tests {
             xp: Backend::Native,
             spell: Backend::Native,
             class: Backend::Native,
+            chargen: Backend::Dsl,
         };
         assert_eq!(config.get(MechanicGroup::Combat), Backend::Dsl);
         assert_eq!(config.get(MechanicGroup::Morale), Backend::Native);
         assert_eq!(config.get(MechanicGroup::Saves), Backend::Dsl);
         assert_eq!(config.get(MechanicGroup::Xp), Backend::Native);
+        assert_eq!(config.get(MechanicGroup::Chargen), Backend::Dsl);
     }
 }
