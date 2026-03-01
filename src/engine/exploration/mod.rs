@@ -860,7 +860,11 @@ mod dsl_gate {
                 &mut handler,
                 "skip_exploration_phase",
                 vec![
-                    Value::Str(phase.to_string()),
+                    Value::EnumVariant {
+                        enum_name: Name::from("ExplorationPhase"),
+                        variant: Name::from(phase),
+                        fields: BTreeMap::new(),
+                    },
                     Value::Bool(has_light),
                     Value::Bool(needs_rest),
                 ],

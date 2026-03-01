@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use ttrpg_ast::Name;
 use ttrpg_interp::effect::FieldPathSegment;
-use ttrpg_interp::state::{ActiveCondition, EntityRef, StateProvider, WritableState};
+use ttrpg_interp::state::{ActiveCondition, EntityRef, InvocationId, StateProvider, WritableState};
 use ttrpg_interp::value::Value;
 
 use osr_ai_gm::log_entry::LogEntry;
@@ -79,6 +79,7 @@ impl StateProvider for BridgeState {
                 bearer: *entity,
                 gained_at: e.id as u64,
                 duration: ttrpg_interp::value::duration_variant("permanent"),
+                invocation: None,
             })
             .collect();
         Some(conditions)
@@ -125,6 +126,16 @@ impl StateProvider for BridgeState {
         } else {
             None
         }
+    }
+
+    fn all_entities(&self) -> Vec<EntityRef> {
+        let mut refs: Vec<EntityRef> = (0..self.characters.len())
+            .map(|i| crate::registry::character_ref(i))
+            .collect();
+        refs.extend(
+            (0..self.monsters.len()).map(|i| crate::registry::monster_ref(i)),
+        );
+        refs
     }
 }
 
@@ -186,12 +197,29 @@ impl WritableState for BridgeState {
         }
     }
 
+    fn remove_condition_by_id(&mut self, entity: &EntityRef, id: u64) {
+        let id = id as u32;
+        if is_character(entity) {
+            if let Some(c) = self.characters.get_mut(character_index(entity)) {
+                c.effects.retain(|e| e.id != id);
+            }
+        } else if is_monster(entity) {
+            if let Some(m) = self.monsters.get_mut(monster_index(entity)) {
+                m.effects.retain(|e| e.id != id);
+            }
+        }
+    }
+
     fn write_turn_field(&mut self, _entity: &EntityRef, _field: &str, _value: Value) {
         // B/X has no action economy turn budget
     }
 
     fn remove_field(&mut self, _entity: &EntityRef, _field: &str) {
         // Grant/revoke groups not used in this bridge
+    }
+
+    fn remove_conditions_by_invocation(&mut self, _invocation: InvocationId) {
+        // Invocation tracking not used in this bridge yet
     }
 }
 

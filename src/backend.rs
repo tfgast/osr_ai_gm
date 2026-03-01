@@ -247,7 +247,7 @@ mod dsl_runtime {
                     let content = std::fs::read_to_string(&path)
                         .map_err(|e| format!("Failed to read '{}': {}", path.display(), e))?;
                     sources.push(content);
-                } else if let Some(content) = ttrpg_ose_data::get_rule(filename) {
+                } else if let Some(content) = ttrpg_ose_data::read_file(filename) {
                     sources.push(content.to_string());
                 } else {
                     return Err(format!(

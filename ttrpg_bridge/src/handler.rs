@@ -29,9 +29,17 @@ impl EffectHandler for BridgeHandler {
         match effect {
             Effect::RollDice { expr } => {
                 let result = roll_interp_dice(&expr);
+                let dice_str: Vec<String> = expr
+                    .groups
+                    .iter()
+                    .map(|g| format!("{}d{}", g.count, g.sides))
+                    .collect();
                 self.effect_log.push(format!(
-                    "Rolled {}d{}+{} = {} (dice: {:?})",
-                    expr.count, expr.sides, expr.modifier, result.total, result.dice
+                    "Rolled {}+{} = {} (dice: {:?})",
+                    dice_str.join("+"),
+                    expr.modifier,
+                    result.total,
+                    result.dice
                 ));
                 Response::Rolled(result)
             }
@@ -90,7 +98,9 @@ impl EffectHandler for BridgeHandler {
                 Response::Acknowledged
             }
 
-            Effect::ActionCompleted { ref name, actor } => {
+            Effect::ActionCompleted {
+                ref name, actor, ..
+            } => {
                 self.effect_log
                     .push(format!("Action '{}' completed by {:?}", name, actor));
                 Response::Acknowledged
@@ -128,6 +138,7 @@ impl EffectHandler for BridgeHandler {
             Effect::MutateTurnField { .. }
             | Effect::GrantGroup { .. }
             | Effect::RevokeGroup { .. }
+            | Effect::RevokeInvocation { .. }
             | Effect::ModifyApplied { .. } => Response::Acknowledged,
         }
     }
@@ -142,12 +153,7 @@ mod tests {
     fn handle_roll_dice() {
         let mut handler = BridgeHandler::new();
         let effect = Effect::RollDice {
-            expr: DiceExpr {
-                count: 1,
-                sides: 20,
-                filter: None,
-                modifier: 5,
-            },
+            expr: DiceExpr::single(1, 20, None, 5),
         };
 
         let response = handler.handle(effect);
@@ -165,7 +171,7 @@ mod tests {
 
     #[test]
     fn handle_action_lifecycle() {
-        use ttrpg_interp::effect::ActionKind;
+        use ttrpg_interp::effect::{ActionKind, ActionOutcome};
         use ttrpg_interp::state::EntityRef;
 
         let mut handler = BridgeHandler::new();
@@ -179,6 +185,8 @@ mod tests {
         handler.handle(Effect::ActionCompleted {
             name: "Attack".into(),
             actor: EntityRef(0),
+            outcome: ActionOutcome::Succeeded,
+            invocation: None,
         });
 
         assert_eq!(handler.effect_log.len(), 2);
