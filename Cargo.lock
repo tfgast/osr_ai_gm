@@ -1179,10 +1179,10 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
- "ttrpg-ose-data",
  "ttrpg_ast",
  "ttrpg_checker",
  "ttrpg_interp",
+ "ttrpg_ose_data",
  "ttrpg_parser",
 ]
 
@@ -1956,11 +1956,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ttrpg-ose-data"
-version = "0.1.0"
-source = "git+https://github.com/tfgast/ttrpg-ose-data.git?branch=main#88f4f078522067063445086067393990f2dea7db"
-
-[[package]]
 name = "ttrpg_ast"
 version = "0.1.0"
 source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#05f15a34137e1b115ea4c19007c9ac76f5277576"
@@ -1999,6 +1994,11 @@ source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#05f15a34137e1b
 dependencies = [
  "ttrpg_ast",
 ]
+
+[[package]]
+name = "ttrpg_ose_data"
+version = "0.1.0"
+source = "git+https://github.com/tfgast/ttrpg_dsl.git?branch=main#05f15a34137e1b115ea4c19007c9ac76f5277576"
 
 [[package]]
 name = "ttrpg_parser"
